@@ -27,6 +27,13 @@ class WeightedMesh : public Mesh {
 
     // Prints the mesh to std::out for debugging purposes.
     void printAll();
+
+    // TODO(alex): Indexing functions should probably be part of the Grid interface.
+    // Get the x index of the closest point (rounded down) for a given mz.
+    std::optional<unsigned int> xIndex(double mz);
+
+    // Get the y index of the closest point (rounded down) for a given rt.
+    std::optional<unsigned int> yIndex(double rt);
 };
 
 #endif /* TAPP_GRID_WEIGHTEDMESH_HPP */

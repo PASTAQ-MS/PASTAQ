@@ -64,3 +64,33 @@ void WeightedMesh::printAll() {
     }
     std::cout << std::endl;
 }
+
+std::optional<unsigned int> WeightedMesh::xIndex(double mz) {
+    // In order to be consistent, the maximum value is mz + deltaMz. This
+    // ensures all intervals contain the same number of points.
+    double deltaMz = (mBounds.maxMz - mBounds.minMz) / mDimensions.n;
+    if (mz < mBounds.minMz || mz > mBounds.maxMz + deltaMz) {
+        return std::nullopt;
+    }
+    double d = mz - mBounds.minMz;
+    auto i = static_cast<unsigned int>(d / deltaMz);
+    if (i > mDimensions.n) {
+        return std::nullopt;
+    }
+    return i;
+}
+
+std::optional<unsigned int> WeightedMesh::yIndex(double rt) {
+    // In order to be consistent, the maximum value is rt + deltaRt. This
+    // ensures all intervals contain the same number of points.
+    double deltaRt = (mBounds.maxRt - mBounds.minRt) / mDimensions.m;
+    if (rt < mBounds.minRt || rt > mBounds.maxRt + deltaRt) {
+        return std::nullopt;
+    }
+    double d = rt - mBounds.minRt;
+    auto j = static_cast<unsigned int>(d / deltaRt);
+    if (j > mDimensions.m) {
+        return std::nullopt;
+    }
+    return j;
+}
