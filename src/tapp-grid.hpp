@@ -30,7 +30,8 @@ class Interface {
     // Get the value stored at the given position.
     virtual std::optional<double> at(unsigned int i, unsigned int j) = 0;
 
-    // Set the value at the given position.
+    // Set the value at the given position. Returns the success or failure of
+    // the operation.
     virtual bool set(unsigned int i, unsigned int j, double value) = 0;
 
     // Get the real world mass/charge stored in the given index.
