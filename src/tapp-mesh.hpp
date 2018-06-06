@@ -8,7 +8,7 @@
 // This class represents regular mesh, mapped at discrete intervals for both mz
 // and rt.
 class Mesh : public Grid::Interface {
-   private:
+   protected:
     std::vector<double> mData;
     Grid::Dimensions mDimensions;
     Grid::Bounds mBounds;

@@ -31,7 +31,6 @@ std::optional<double> Mesh::rt(unsigned int j) {
     return mBounds.minRt + deltaRt * j;
 }
 
-// FIXME: Does this return a copy or a reference?
 Grid::Dimensions Mesh::dim() { return mDimensions; }
 
 Grid::Bounds Mesh::bounds() { return mBounds; }
