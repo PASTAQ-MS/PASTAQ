@@ -6,6 +6,20 @@ WeightedMesh::WeightedMesh(Grid::Dimensions dimensions, Grid::Bounds bounds)
       mWeights(dimensions.n * dimensions.m),
       mCounts(dimensions.n * dimensions.m) {}
 
+std::optional<double> WeightedMesh::weightAt(unsigned int i, unsigned int j) {
+    if (mData.size() == 0 || i > mDimensions.n - 1 || j > mDimensions.m - 1) {
+        return std::nullopt;
+    }
+    return mWeights[i + j * mDimensions.m];
+}
+
+std::optional<double> WeightedMesh::countsAt(unsigned int i, unsigned int j) {
+    if (mData.size() == 0 || i > mDimensions.n - 1 || j > mDimensions.m - 1) {
+        return std::nullopt;
+    }
+    return mCounts[i + j * mDimensions.m];
+}
+
 bool WeightedMesh::set(unsigned int i, unsigned int j, double value,
                        double weight) {
     if (mData.size() == 0 || i > mDimensions.n - 1 || j > mDimensions.m - 1) {
