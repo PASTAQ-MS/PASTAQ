@@ -24,3 +24,28 @@ TEST_CASE("Bounds check on Mesh when using Mesh::at") {
         CHECK(mesh.at(4, 3) == std::nullopt);
     };
 }
+
+TEST_CASE("Real world dimensions fetching via Mesh::mz and Mesh::rt") {
+    SUBCASE("An empty mesh should always return std::nullopt") {
+        auto mesh = Mesh();
+        CHECK(mesh.mz(0) == std::nullopt);
+        CHECK(mesh.mz(1) == std::nullopt);
+        CHECK(mesh.mz(2) == std::nullopt);
+        CHECK(mesh.rt(0) == std::nullopt);
+        CHECK(mesh.rt(1) == std::nullopt);
+        CHECK(mesh.rt(2) == std::nullopt);
+    };
+    SUBCASE("Proper interpolation if inside bounds or std::nullopt") {
+        auto mesh = Mesh({4, 4}, {0.0, 75.0, 200.0, 800.0});
+        CHECK(mesh.mz(0) == 200.0);
+        CHECK(mesh.mz(1) == 400.0);
+        CHECK(mesh.mz(2) == 600.0);
+        CHECK(mesh.mz(3) == 800.0);
+        CHECK(mesh.mz(4) == std::nullopt);
+        CHECK(mesh.rt(0) == 0.0);
+        CHECK(mesh.rt(1) == 25.0);
+        CHECK(mesh.rt(2) == 50.0);
+        CHECK(mesh.rt(3) == 75.0);
+        CHECK(mesh.rt(4) == std::nullopt);
+    };
+}

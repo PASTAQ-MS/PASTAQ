@@ -13,13 +13,25 @@ std::optional<double> Mesh::at(unsigned int i, unsigned int j) {
 }
 
 std::optional<double> Mesh::mz(unsigned int i) {
-    return static_cast<double>(i);
+    if (mData.size() == 0 || i > mDimensions.n - 1) {
+        return std::nullopt;
+    }
+
+    auto deltaMz =
+        (mBounds.maxMz - mBounds.minMz) / static_cast<double>(mDimensions.n - 1);
+    return mBounds.minMz + deltaMz * i;
 }
 
 std::optional<double> Mesh::rt(unsigned int j) {
-    return static_cast<double>(j);
+    if (mData.size() == 0 || j > mDimensions.m - 1) {
+        return std::nullopt;
+    }
+    auto deltaRt =
+        (mBounds.maxRt - mBounds.minRt) / static_cast<double>(mDimensions.m - 1);
+    return mBounds.minRt + deltaRt * j;
 }
 
+// FIXME: Does this return a copy or a reference?
 Grid::Dimensions Mesh::dim() { return mDimensions; }
 
 Grid::Bounds Mesh::bounds() { return mBounds; }
