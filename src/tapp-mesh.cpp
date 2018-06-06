@@ -12,6 +12,14 @@ std::optional<double> Mesh::at(unsigned int i, unsigned int j) {
     return mData[i + j * mDimensions.m];
 }
 
+bool Mesh::set(unsigned int i, unsigned int j, double value) {
+    if (mData.size() == 0 || i > mDimensions.n - 1 || j > mDimensions.m - 1) {
+        return false;
+    }
+    mData[i + j * mDimensions.m] = value;
+    return true;
+}
+
 std::optional<double> Mesh::mz(unsigned int i) {
     if (mData.size() == 0 || i > mDimensions.n - 1) {
         return std::nullopt;

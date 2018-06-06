@@ -25,6 +25,18 @@ TEST_CASE("Bounds check on Mesh when using Mesh::at") {
     };
 }
 
+TEST_CASE("Setting values at given indices should work properly") {
+    auto mesh = Mesh({2, 2}, {0.0, 75.0, 200.0, 800.0});
+    mesh.set(0,0,10.0);
+    CHECK(mesh.at(0,0) == 10.0);
+    mesh.set(1,1,1.0);
+    CHECK(mesh.at(1,1) == 1.0);
+    mesh.set(1,1,2.0);
+    CHECK(mesh.at(1,1) == 2.0);
+    mesh.set(0,1,20.0);
+    CHECK(mesh.at(0,1) == 20.0);
+}
+
 TEST_CASE("Real world dimensions fetching via Mesh::mz and Mesh::rt") {
     SUBCASE("An empty mesh should always return std::nullopt") {
         auto mesh = Mesh();

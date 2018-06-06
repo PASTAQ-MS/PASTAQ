@@ -27,10 +27,11 @@ struct Bounds {
 
 class Interface {
    public:
-    // Fetch the data stored at the given indices.
-    // TODO: Make this a [][] overloaded operator, along with a way of storing
-    // the data on them.
+    // Get the value stored at the given position.
     virtual std::optional<double> at(unsigned int i, unsigned int j) = 0;
+
+    // Set the value at the given position.
+    virtual bool set(unsigned int i, unsigned int j, double value) = 0;
 
     // Get the real world mass/charge stored in the given index.
     virtual std::optional<double> mz(unsigned int i) = 0;

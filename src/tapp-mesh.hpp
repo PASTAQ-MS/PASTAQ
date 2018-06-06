@@ -18,6 +18,7 @@ class Mesh : public Grid::Interface {
 
     // Implementation methods for Grid::Interface.
     std::optional<double> at(unsigned int i, unsigned int j);
+    bool set(unsigned int i, unsigned int j, double value);
     std::optional<double> mz(unsigned int i);
     std::optional<double> rt(unsigned int j);
     Grid::Dimensions dim();
