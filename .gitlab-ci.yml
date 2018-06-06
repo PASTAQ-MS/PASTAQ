@@ -1,10 +1,11 @@
 image: ubuntu:latest
 
 variables:
-  DOCKER_DRIVER: btrfs
+    DOCKER_DRIVER: btrfs
 
 stages:
     - build
+    - test
 
 before_script:
     # Configure gitlab runner credentials.
@@ -14,25 +15,20 @@ before_script:
     # Transform local submodules into relative paths.
     - sed -i "s/http:\\/\\/129.125.166.241\\//..\\/..\\//g" .gitmodules
     - sed -i "s/git@129.125.166.241:/..\\/..\\//g" .gitmodules
-    # Prepare apt-get cache.
-    - export APT_CACHE_DIR=`pwd`/.apt-cache && mkdir -pv $APT_CACHE_DIR
     # Install required packages.
     - apt-get update
-    - apt-get -y -o dir::cache::archives="$APT_CACHE_DIR" install
+    - apt-get -y install
         cmake ninja-build build-essential git mingw-w64 binutils-mingw-w64
     # Initialize submodules.
     - git submodule sync
     - git submodule update --init
 
-cache:
-    key: "$CI_PROJECT_PATH_SLUG $CI_COMMIT_SHA apt-cache"
-    paths:
-        - .apt-cache/
-
 build:linux:
     stage: build
     script:
         # Perform build.
+        - echo $CI_PROJECT_PATH_SLUG
+        - echo $CI_COMMIT_SHA
         - cd build
         - cmake .. -G Ninja
         - ninja
@@ -40,10 +36,6 @@ build:linux:
         key: "$CI_PROJECT_PATH_SLUG $CI_COMMIT_SHA linux"
         paths:
             - build/
-    cache:
-        key: "$CI_PROJECT_PATH_SLUG $CI_COMMIT_SHA apt-cache"
-        paths:
-            - .apt-cache/
 
 build:windows:
     stage: build
@@ -60,22 +52,15 @@ build:windows:
         key: "$CI_PROJECT_PATH_SLUG $CI_COMMIT_SHA windows"
         paths:
             - build/
-    cache:
-        key: "$CI_PROJECT_PATH_SLUG $CI_COMMIT_SHA apt-cache"
-        paths:
-            - .apt-cache/
 
-test:
+test:linux:
     stage: test
     script:
+        - echo $CI_PROJECT_PATH_SLUG
+        - echo $CI_COMMIT_SHA
         - cd build
-        - ls
         - ninja test
     cache:
         key: "$CI_PROJECT_PATH_SLUG $CI_COMMIT_SHA linux"
         paths:
             - build/
-    cache:
-        key: "$CI_PROJECT_PATH_SLUG $CI_COMMIT_SHA apt-cache"
-        paths:
-            - .apt-cache/
