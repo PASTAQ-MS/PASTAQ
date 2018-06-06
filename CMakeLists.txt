@@ -16,10 +16,10 @@ if (MSVC)
 endif()
 
 # Include library target.
-add_library(tapp-grid
+add_library(tapp-mesh
     "${CMAKE_CURRENT_SOURCE_DIR}/src/tapp-mesh.cpp"
     )
-target_include_directories(tapp-grid PUBLIC src)
+target_include_directories(tapp-mesh PUBLIC src)
 
 # Include tests if testing library is present.
 unset(DOCTEST_LIBRARY_PATH CACHE)

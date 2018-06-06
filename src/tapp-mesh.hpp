@@ -1,8 +1,12 @@
 #ifndef TAPP_GRID_MESH_HPP
 #define TAPP_GRID_MESH_HPP
 
+#include <vector>
+
 #include "tapp-grid.hpp"
 
+// This class represents regular mesh, mapped at discrete intervals for both mz
+// and rt.
 class Mesh : public Grid::Interface {
    private:
     std::vector<double> mData;
@@ -10,13 +14,12 @@ class Mesh : public Grid::Interface {
     Grid::Bounds mBounds;
 
    public:
-    Mesh();
-    ~Mesh();
+    Mesh(Grid::Dimensions dimensions = {}, Grid::Bounds bounds = {});
 
     // Implementation methods for Grid::Interface.
-    std::optional<double> at(int i, int j);
-    std::optional<double> mz(int i);
-    std::optional<double> rt(int j);
+    std::optional<double> at(unsigned int i, unsigned int j);
+    std::optional<double> mz(unsigned int i);
+    std::optional<double> rt(unsigned int j);
     Grid::Dimensions dim();
     Grid::Bounds bounds();
 };
