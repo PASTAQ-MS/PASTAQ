@@ -34,6 +34,10 @@ class WeightedMesh : public Mesh {
 
     // Get the y index of the closest point (rounded down) for a given rt.
     std::optional<unsigned int> yIndex(double rt);
+
+    // Perform gaussian splatting of the given point into the mesh, returns the
+    // success or failure of the operation.
+    bool splash(double mz, double rt, double value);
 };
 
 #endif /* TAPP_GRID_WEIGHTEDMESH_HPP */

@@ -9,7 +9,7 @@ std::optional<double> Mesh::at(unsigned int i, unsigned int j) {
     if (mData.size() == 0 || i > mDimensions.n - 1 || j > mDimensions.m - 1) {
         return std::nullopt;
     }
-    return mData[i + j * mDimensions.m];
+    return mData[i + j * mDimensions.n];
 }
 
 bool Mesh::set(unsigned int i, unsigned int j, double value) {

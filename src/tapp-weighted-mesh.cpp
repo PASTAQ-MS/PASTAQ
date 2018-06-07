@@ -1,6 +1,8 @@
+#include <cmath>
+#include <iostream>
+
 #include "tapp-weighted-mesh.hpp"
 
-#include <iostream>
 WeightedMesh::WeightedMesh(Grid::Dimensions dimensions, Grid::Bounds bounds)
     : Mesh(dimensions, bounds),
       mWeights(dimensions.n * dimensions.m),
@@ -97,3 +99,53 @@ std::optional<unsigned int> WeightedMesh::yIndex(double rt) {
     return j;
 }
 
+bool WeightedMesh::splash(double mzValue, double rtValue, double value) {
+    // TODO: For now let's hardcode the magnitude of the splatting, will
+    // parametrize later.
+    double sigmaRt = 5.0;
+    double sigmaMz = 100.0;
+
+    // Get the gaussian square dimensions.
+    double minRt = rtValue - 2 * sigmaRt;
+    double maxRt = rtValue + 2 * sigmaRt;
+    double minMz = mzValue - 2 * sigmaMz;
+    double maxMz = mzValue + 2 * sigmaMz;
+
+    // Even if the point lays outside the current grid, we still want to account
+    // for it's contribution to the points in the frontier. However if the
+    // minimum value in the splatting lays outside the grid, it will not have
+    // any effect.
+    auto iMin = xIndex(minMz);
+    auto jMin = yIndex(minRt);
+    if (iMin == std::nullopt && jMin == std::nullopt) {
+        return false;
+    }
+
+    auto iMax = xIndex(maxMz) ? xIndex(maxMz) : mDimensions.n - 1;
+    auto jMax = yIndex(maxRt) ? yIndex(maxRt) : mDimensions.m - 1;
+
+    double x0 = mzValue;
+    double y0 = rtValue;
+    for (unsigned int j = jMin.value(); j <= jMax.value(); ++j) {
+        for (unsigned int i = iMin.value(); i <= iMax.value(); ++i) {
+            // No need to do boundary check, since we are sure we are inside the
+            // grid.
+            double x = mz(i).value();
+            double y = rt(j).value();
+
+            // Calculate the gaussian weight for this point.
+            double a = (x - x0) / sigmaMz;
+            double b = (y - y0) / sigmaRt;
+            a *= a;
+            b *= b;
+            double weight = std::exp(-0.5 * (a + b));
+
+            set(i, j, value * weight, weight);
+            // TODO(alex): In this case the gaussian kernel is a square, se
+            // could filter it to be a circle in exchange of extra computations.
+            std::cout << "(" << i << "," << j << "," << weight << ")\t";
+        }
+        std::cout << std::endl;
+    }
+    return true;
+}
