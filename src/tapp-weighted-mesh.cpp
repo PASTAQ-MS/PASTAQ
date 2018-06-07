@@ -86,12 +86,8 @@ std::optional<unsigned int> WeightedMesh::yIndex(double rt) {
     return j;
 }
 
-bool WeightedMesh::splash(double mzValue, double rtValue, double value) {
-    // TODO: For now let's hardcode the magnitude of the splatting, will
-    // parametrize later.
-    double sigmaRt = 5.0;
-    double sigmaMz = 100.0;
-
+bool WeightedMesh::splash(double mzValue, double rtValue, double value,
+                          double sigmaMz, double sigmaRt) {
     // Get the gaussian square dimensions.
     double minRt = rtValue - 2 * sigmaRt;
     double maxRt = rtValue + 2 * sigmaRt;
