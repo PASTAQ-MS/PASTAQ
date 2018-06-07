@@ -22,25 +22,12 @@ std::optional<double> WeightedMesh::countsAt(unsigned int i, unsigned int j) {
     return mCounts[i + j * mDimensions.m];
 }
 
-bool WeightedMesh::set(unsigned int i, unsigned int j, double value,
-                       double weight) {
-    if (mData.size() == 0 || i > mDimensions.n - 1 || j > mDimensions.m - 1) {
-        return false;
-    }
-    mData[i + j * mDimensions.n] += value * weight;
-    mWeights[i + j * mDimensions.n] += weight;
-    ++mCounts[i + j * mDimensions.n];
-    return true;
-}
-
 void WeightedMesh::printAll() {
     std::cout << "DATA:" << std::endl;
     for (unsigned int j = 0; j < mDimensions.m; ++j) {
         for (unsigned int i = 0; i < mDimensions.n; ++i) {
-            auto e = at(i, j);
-            if (e) {
-                std::cout << e.value() << "\t";
-            }
+            auto e = mData[i + j * mDimensions.n];
+            std::cout << e << "\t";
         }
         std::cout << std::endl;
     }
@@ -138,14 +125,16 @@ bool WeightedMesh::splash(double mzValue, double rtValue, double value) {
             double b = (y - y0) / sigmaRt;
             a *= a;
             b *= b;
-            double weight = std::exp(-0.5 * (a + b));
 
-            set(i, j, value * weight, weight);
+            double weight = std::exp(-0.5 * (a + b));
             // TODO(alex): In this case the gaussian kernel is a square, se
             // could filter it to be a circle in exchange of extra computations.
-            std::cout << "(" << i << "," << j << "," << weight << ")\t";
+
+            // Set the value, weight and counts.
+            mData[i + j * mDimensions.n] += value * weight;
+            mWeights[i + j * mDimensions.n] += weight;
+            ++mCounts[i + j * mDimensions.n];
         }
-        std::cout << std::endl;
     }
     return true;
 }
