@@ -26,7 +26,7 @@ TEST_CASE("X/Y indexing") {
     //           20 | (0,2) (1,2) (2,2) (3,2) (4,2) (5,2)
     //           30 | (0,3) (1,3) (2,3) (3,3) (4,3) (5,3)
     //           40 | (0,4) (1,4) (2,4) (3,4) (4,4) (5,4)
-    auto mesh = WeightedMesh({5, 4}, {0.0, 40.0, 0.0, 500.0});
+    auto mesh = WeightedMesh({6, 5}, {0.0, 40.0, 0.0, 500.0});
     CHECK(mesh.xIndex(0.0) == 0);
     CHECK(mesh.xIndex(10.0) == 0);
     CHECK(mesh.xIndex(40.0) == 0);
