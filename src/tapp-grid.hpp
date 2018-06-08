@@ -16,13 +16,13 @@ struct Dimensions {
 // Represent the real world bounds for this grid. Note that the bounds are
 // included, that is the minimum represent the first point in the grid for that
 // dimension and the maximum the last.
-//   rtRange <- [minRt, maxRt]
-//   mzRange <- [minMz, maxMz]
+//   rt_range <- [min_rt, max_rt]
+//   mz_range <- [min_mz, max_mz]
 struct Bounds {
-    double minRt;
-    double maxRt;
-    double minMz;
-    double maxMz;
+    double min_rt;
+    double max_rt;
+    double min_mz;
+    double max_mz;
 };
 
 class Interface {

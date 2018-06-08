@@ -1,44 +1,46 @@
 #include "tapp-mesh.hpp"
 
 Mesh::Mesh(Grid::Dimensions dimensions, Grid::Bounds bounds)
-    : mData(dimensions.n * dimensions.m),
-      mDimensions(dimensions),
-      mBounds(bounds) {}
+    : m_data(dimensions.n * dimensions.m),
+      m_dimensions(dimensions),
+      m_bounds(bounds) {}
 
 std::optional<double> Mesh::at(unsigned int i, unsigned int j) {
-    if (mData.size() == 0 || i > mDimensions.n - 1 || j > mDimensions.m - 1) {
+    if (m_data.size() == 0 || i > m_dimensions.n - 1 ||
+        j > m_dimensions.m - 1) {
         return std::nullopt;
     }
-    return mData[i + j * mDimensions.n];
+    return m_data[i + j * m_dimensions.n];
 }
 
 bool Mesh::set(unsigned int i, unsigned int j, double value) {
-    if (mData.size() == 0 || i > mDimensions.n - 1 || j > mDimensions.m - 1) {
+    if (m_data.size() == 0 || i > m_dimensions.n - 1 ||
+        j > m_dimensions.m - 1) {
         return false;
     }
-    mData[i + j * mDimensions.n] = value;
+    m_data[i + j * m_dimensions.n] = value;
     return true;
 }
 
 std::optional<double> Mesh::mz(unsigned int i) {
-    if (mData.size() == 0 || i > mDimensions.n - 1) {
+    if (m_data.size() == 0 || i > m_dimensions.n - 1) {
         return std::nullopt;
     }
 
-    auto deltaMz = (mBounds.maxMz - mBounds.minMz) /
-                   static_cast<double>(mDimensions.n - 1);
-    return mBounds.minMz + deltaMz * i;
+    auto delta_mz = (m_bounds.max_mz - m_bounds.min_mz) /
+                    static_cast<double>(m_dimensions.n - 1);
+    return m_bounds.min_mz + delta_mz * i;
 }
 
 std::optional<double> Mesh::rt(unsigned int j) {
-    if (mData.size() == 0 || j > mDimensions.m - 1) {
+    if (m_data.size() == 0 || j > m_dimensions.m - 1) {
         return std::nullopt;
     }
-    auto deltaRt = (mBounds.maxRt - mBounds.minRt) /
-                   static_cast<double>(mDimensions.m - 1);
-    return mBounds.minRt + deltaRt * j;
+    auto delta_rt = (m_bounds.max_rt - m_bounds.min_rt) /
+                    static_cast<double>(m_dimensions.m - 1);
+    return m_bounds.min_rt + delta_rt * j;
 }
 
-Grid::Dimensions Mesh::dim() { return mDimensions; }
+Grid::Dimensions Mesh::dim() { return m_dimensions; }
 
-Grid::Bounds Mesh::bounds() { return mBounds; }
+Grid::Bounds Mesh::bounds() { return m_bounds; }

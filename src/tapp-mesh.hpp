@@ -9,9 +9,9 @@
 // and rt.
 class Mesh : public Grid::Interface {
    protected:
-    std::vector<double> mData;
-    Grid::Dimensions mDimensions;
-    Grid::Bounds mBounds;
+    std::vector<double> m_data;
+    Grid::Dimensions m_dimensions;
+    Grid::Bounds m_bounds;
 
    public:
     Mesh(Grid::Dimensions dimensions = {}, Grid::Bounds bounds = {});
