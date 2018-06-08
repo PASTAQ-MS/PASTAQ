@@ -88,7 +88,8 @@ std::optional<unsigned int> WeightedMesh::yIndex(double rt) {
 
 bool WeightedMesh::splash(double mzValue, double rtValue, double value,
                           double sigmaMz, double sigmaRt) {
-    // Get the gaussian square dimensions.
+    // Get the gaussian square dimensions. Note that we are using a square kernel
+    // approximation for simplicity and computational efficiency.
     double minRt = rtValue - 2 * sigmaRt;
     double maxRt = rtValue + 2 * sigmaRt;
     double minMz = mzValue - 2 * sigmaMz;
@@ -121,10 +122,7 @@ bool WeightedMesh::splash(double mzValue, double rtValue, double value,
             double b = (y - y0) / sigmaRt;
             a *= a;
             b *= b;
-
             double weight = std::exp(-0.5 * (a + b));
-            // TODO(alex): In this case the gaussian kernel is a square, se
-            // could filter it to be a circle in exchange of extra computations.
 
             // Set the value, weight and counts.
             mData[i + j * mDimensions.n] += value * weight;
