@@ -47,6 +47,7 @@ class Interface {
     // Return the bounds of the grid.
     virtual Bounds bounds() = 0;
 };
+
 }  // namespace Grid
 
 #endif /* TAPP_GRID_GRID_HPP */
