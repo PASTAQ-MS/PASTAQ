@@ -68,23 +68,22 @@ bool WeightedMesh::splash(double mz, double rt, double value, double sigma_rt) {
     double min_mz = mz - 2 * sigma_mz;
     double max_mz = mz + 2 * sigma_mz;
 
-    // Even if the point lays outside the current grid, we still want to account
-    // for it's contribution to the points in the frontier. However if the
-    // minimum value in the splatting lays outside the grid, it will not have
-    // any effect.
-    auto i_min = x_index(min_mz);
-    auto j_min = y_index(min_rt);
-    if (i_min == std::nullopt && j_min == std::nullopt) {
+    if ((max_rt < m_bounds.min_rt) || (max_mz < m_bounds.min_mz) ||
+        (min_rt > m_bounds.max_rt) || (min_mz > m_bounds.max_mz)) {
         return false;
     }
 
-    auto i_max = x_index(max_mz) ? x_index(max_mz) : m_dimensions.n - 1;
-    auto j_max = y_index(max_rt) ? y_index(max_rt) : m_dimensions.m - 1;
+    // Even if the point lays outside the current grid, we still want to account
+    // for it's contribution to the points in the frontier.
+    auto i_min = x_index(min_mz) ? x_index(min_mz).value() : 0;
+    auto j_min = y_index(min_rt) ? y_index(min_rt).value() : 0;
+    auto i_max = x_index(max_mz) ? x_index(max_mz).value() : m_dimensions.n - 1;
+    auto j_max = y_index(max_rt) ? y_index(max_rt).value() : m_dimensions.m - 1;
 
     double x0 = mz;
     double y0 = rt;
-    for (unsigned int j = j_min.value(); j <= j_max.value(); ++j) {
-        for (unsigned int i = i_min.value(); i <= i_max.value(); ++i) {
+    for (unsigned int j = j_min; j <= j_max; ++j) {
+        for (unsigned int i = i_min; i <= i_max; ++i) {
             // No need to do boundary check, since we are sure we are inside the
             // grid.
             double x = mz_at(i).value();
