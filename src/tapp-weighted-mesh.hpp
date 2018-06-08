@@ -14,7 +14,9 @@ class WeightedMesh : public Mesh {
     std::vector<unsigned int> m_counts;
 
    public:
-    WeightedMesh(Grid::Dimensions dimensions = {}, Grid::Bounds bounds = {});
+    WeightedMesh(Grid::Dimensions dimensions = {}, Grid::Bounds bounds = {},
+                 Instrument::Config instrument_config = {Instrument::QUAD, 200,
+                                                         0.001});
 
     // Getter methods for m_weights and m_counts.
     std::optional<double> weight_at(unsigned int i, unsigned int j);
@@ -25,8 +27,7 @@ class WeightedMesh : public Mesh {
 
     // Perform gaussian splatting of the given point into the mesh, returns the
     // success or failure of the operation.
-    bool splash(double mz, double rt, double value, double sigma_mz,
-                double sigma_rt);
+    bool splash(double mz, double rt, double value, double sigma_rt);
 };
 
 #endif /* TAPP_GRID_WEIGHTEDMESH_HPP */

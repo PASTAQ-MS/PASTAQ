@@ -3,8 +3,9 @@
 
 #include "tapp-weighted-mesh.hpp"
 
-WeightedMesh::WeightedMesh(Grid::Dimensions dimensions, Grid::Bounds bounds)
-    : Mesh(dimensions, bounds),
+WeightedMesh::WeightedMesh(Grid::Dimensions dimensions, Grid::Bounds bounds,
+                           Instrument::Config instrument_config)
+    : Mesh(dimensions, bounds, instrument_config),
       m_weights(dimensions.n * dimensions.m),
       m_counts(dimensions.n * dimensions.m) {}
 
@@ -54,8 +55,12 @@ void WeightedMesh::print_all() {
     std::cout << std::endl;
 }
 
-bool WeightedMesh::splash(double mz, double rt, double value, double sigma_mz,
-                          double sigma_rt) {
+bool WeightedMesh::splash(double mz, double rt, double value, double sigma_rt) {
+    // For some instruments the peaks get wider in proportion to the adquired
+    // mass. In order to maintain the same number of sampling points we will
+    // scale the sigm_mz accordingly.
+    double sigma_mz = sigma_at_mz(mz);
+
     // Get the gaussian square dimensions. Note that we are using a square
     // kernel approximation for simplicity and computational efficiency.
     double min_rt = rt - 2 * sigma_rt;

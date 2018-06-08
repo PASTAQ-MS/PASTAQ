@@ -47,9 +47,11 @@ TEST_CASE("Gaussian splatting") {
     // For testing purposes we will set the bounds to [-3 * sigma, +3 * sigma]
     // on both dimensions, even if there is no such thing as negative retention
     // time or mass.
-    auto mesh = WeightedMesh({7, 7}, {-3.0 * sigma_rt, 3.0 * sigma_rt,
-                                      -3.0 * sigma_mz, 3.0 * sigma_mz});
-    mesh.splash(0.0, 0.0, 10, sigma_mz, sigma_rt);
+    auto mesh = WeightedMesh(
+        {7, 7},
+        {-3.0 * sigma_rt, 3.0 * sigma_rt, -3.0 * sigma_mz, 3.0 * sigma_mz},
+        {Instrument::QUAD, 1, sigma_mz});
+    mesh.splash(0.0, 0.0, 10, sigma_rt);
     CHECK(mesh.value_at(3, 3) == 10);
     CHECK(mesh.weight_at(3, 3) == 1);
     CHECK(std::to_string(mesh.weight_at(2, 3).value()) == "0.606531");
