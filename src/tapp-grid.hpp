@@ -28,17 +28,23 @@ struct Bounds {
 class Interface {
    public:
     // Get the value stored at the given position.
-    virtual std::optional<double> at(unsigned int i, unsigned int j) = 0;
+    virtual std::optional<double> value_at(unsigned int i, unsigned int j) = 0;
 
     // Set the value at the given position. Returns the success or failure of
     // the operation.
-    virtual bool set(unsigned int i, unsigned int j, double value) = 0;
+    virtual bool set_value(unsigned int i, unsigned int j, double value) = 0;
 
     // Get the real world mass/charge stored in the given index.
-    virtual std::optional<double> mz(unsigned int i) = 0;
+    virtual std::optional<double> mz_at(unsigned int i) = 0;
 
     // Get the real world retention time stored in the given index.
-    virtual std::optional<double> rt(unsigned int j) = 0;
+    virtual std::optional<double> rt_at(unsigned int j) = 0;
+
+    // Get the x index of the closest point (rounded down) for a given mz.
+    virtual std::optional<unsigned int> x_index(double mz) = 0;
+
+    // Get the y index of the closest point (rounded down) for a given rt.
+    virtual std::optional<unsigned int> y_index(double rt) = 0;
 
     // Return the dimensions of the Grid in index coordinates:
     //   i <- [0,N], j <- [0,M]

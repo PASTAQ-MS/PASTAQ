@@ -50,7 +50,7 @@ TEST_CASE("Gaussian splatting") {
     auto mesh = WeightedMesh({7, 7}, {-3.0 * sigma_rt, 3.0 * sigma_rt,
                                       -3.0 * sigma_mz, 3.0 * sigma_mz});
     mesh.splash(0.0, 0.0, 10, sigma_mz, sigma_rt);
-    CHECK(mesh.at(3, 3) == 10);
+    CHECK(mesh.value_at(3, 3) == 10);
     CHECK(mesh.weight_at(3, 3) == 1);
     CHECK(std::to_string(mesh.weight_at(2, 3).value()) == "0.606531");
     CHECK(std::to_string(mesh.weight_at(3, 2).value()) == "0.606531");
@@ -60,12 +60,12 @@ TEST_CASE("Gaussian splatting") {
     CHECK(std::to_string(mesh.weight_at(3, 1).value()) == "0.135335");
     CHECK(std::to_string(mesh.weight_at(3, 5).value()) == "0.135335");
     CHECK(std::to_string(mesh.weight_at(5, 3).value()) == "0.135335");
-    CHECK(std::to_string(mesh.at(2, 3).value()) == "6.065307");
-    CHECK(std::to_string(mesh.at(3, 2).value()) == "6.065307");
-    CHECK(std::to_string(mesh.at(3, 4).value()) == "6.065307");
-    CHECK(std::to_string(mesh.at(4, 3).value()) == "6.065307");
-    CHECK(std::to_string(mesh.at(1, 3).value()) == "1.353353");
-    CHECK(std::to_string(mesh.at(3, 1).value()) == "1.353353");
-    CHECK(std::to_string(mesh.at(3, 5).value()) == "1.353353");
-    CHECK(std::to_string(mesh.at(5, 3).value()) == "1.353353");
+    CHECK(std::to_string(mesh.value_at(2, 3).value()) == "6.065307");
+    CHECK(std::to_string(mesh.value_at(3, 2).value()) == "6.065307");
+    CHECK(std::to_string(mesh.value_at(3, 4).value()) == "6.065307");
+    CHECK(std::to_string(mesh.value_at(4, 3).value()) == "6.065307");
+    CHECK(std::to_string(mesh.value_at(1, 3).value()) == "1.353353");
+    CHECK(std::to_string(mesh.value_at(3, 1).value()) == "1.353353");
+    CHECK(std::to_string(mesh.value_at(3, 5).value()) == "1.353353");
+    CHECK(std::to_string(mesh.value_at(5, 3).value()) == "1.353353");
 }

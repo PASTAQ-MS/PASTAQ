@@ -17,12 +17,14 @@ class Mesh : public Grid::Interface {
     Mesh(Grid::Dimensions dimensions = {}, Grid::Bounds bounds = {});
 
     // Implementation methods for Grid::Interface.
-    std::optional<double> at(unsigned int i, unsigned int j);
-    bool set(unsigned int i, unsigned int j, double value);
-    std::optional<double> mz(unsigned int i);
-    std::optional<double> rt(unsigned int j);
-    Grid::Dimensions dim();
-    Grid::Bounds bounds();
+    std::optional<double> value_at(unsigned int i, unsigned int j) override;
+    bool set_value(unsigned int i, unsigned int j, double value) override;
+    std::optional<double> mz_at(unsigned int i) override;
+    std::optional<double> rt_at(unsigned int j) override;
+    std::optional<unsigned int> x_index(double mz) override;
+    std::optional<unsigned int> y_index(double rt) override;
+    Grid::Dimensions dim() override;
+    Grid::Bounds bounds() override;
 };
 
 #endif /* TAPP_GRID_MESH_HPP */

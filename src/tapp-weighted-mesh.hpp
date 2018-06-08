@@ -23,14 +23,6 @@ class WeightedMesh : public Mesh {
     // Prints the mesh to std::out for debugging purposes.
     void print_all();
 
-    // TODO(alex): Indexing functions should probably be part of the Grid
-    // interface. Get the x index of the closest point (rounded down) for a
-    // given mz.
-    std::optional<unsigned int> x_index(double mz);
-
-    // Get the y index of the closest point (rounded down) for a given rt.
-    std::optional<unsigned int> y_index(double rt);
-
     // Perform gaussian splatting of the given point into the mesh, returns the
     // success or failure of the operation.
     bool splash(double mz, double rt, double value, double sigma_mz,
