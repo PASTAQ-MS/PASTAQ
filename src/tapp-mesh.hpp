@@ -5,16 +5,6 @@
 
 #include "tapp-grid.hpp"
 
-namespace Instrument {
-enum Type { QUAD, TOF, FTICR, ORBITRAP };
-
-struct Config {
-    Type type;
-    double mz_at_sigma;
-    double sigma;
-};
-}  // namespace Instrument
-
 // This class represents regular mesh, mapped at discrete intervals for both mz
 // and rt.
 class Mesh : public Grid::Interface {

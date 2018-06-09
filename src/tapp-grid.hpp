@@ -58,6 +58,20 @@ class Interface {
     virtual Bounds bounds() = 0;
 };
 
+// Perform gaussian splatting of the given point into the grid, returns the
+// success or failure of the operation.
+bool splash(Grid::Interface &grid, double mz, double rt, double value,
+            double sigma_rt);
+
 }  // namespace Grid
+namespace Instrument {
+enum Type { QUAD, TOF, FTICR, ORBITRAP };
+
+struct Config {
+    Type type;
+    double mz_at_sigma;
+    double sigma;
+};
+}  // namespace Instrument
 
 #endif /* TAPP_GRID_GRID_HPP */
