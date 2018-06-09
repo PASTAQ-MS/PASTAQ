@@ -28,10 +28,6 @@ class Mesh : public Grid::Interface {
     Mesh(Grid::Dimensions dimensions = {}, Grid::Bounds bounds = {},
          Instrument::Config instrument_config = {Instrument::QUAD, 200, 0.001});
 
-    // Scale the sigma for a given mass based on the configuration of the
-    // instrument that generated the data.
-    double sigma_at_mz(double mz);
-
     // Implementation methods for Grid::Interface.
     std::optional<double> value_at(unsigned int i, unsigned int j) override;
     bool set_value(unsigned int i, unsigned int j, double value) override;
@@ -39,6 +35,7 @@ class Mesh : public Grid::Interface {
     std::optional<double> rt_at(unsigned int j) override;
     std::optional<unsigned int> x_index(double mz) override;
     std::optional<unsigned int> y_index(double rt) override;
+    double sigma_at_mz(double mz) override;
     Grid::Dimensions dim() override;
     Grid::Bounds bounds() override;
 };

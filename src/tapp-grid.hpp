@@ -46,6 +46,10 @@ class Interface {
     // Get the y index of the closest point (rounded down) for a given rt.
     virtual std::optional<unsigned int> y_index(double rt) = 0;
 
+    // Scale the sigma for a given mass based on the configuration of the
+    // instrument that generated the data.
+    virtual double sigma_at_mz(double mz) = 0;
+
     // Return the dimensions of the Grid in index coordinates:
     //   i <- [0,N], j <- [0,M]
     virtual Dimensions dim() = 0;
