@@ -31,6 +31,11 @@ struct Bounds {
     double max_mz;
 };
 
+// The parameters necessary to perform gaussian smoothing. Note that since the
+// number of sampling points is dependent on the sigma at a particular mz, we
+// need to pass this data in aggregate. The number of sampling points for the
+// retention time should be more consistent across the run, so there is no need
+// to correct for it.
 struct SmoothingParams {
     double mz;
     double sigma_mz;
