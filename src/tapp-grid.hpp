@@ -3,6 +3,12 @@
 
 #include <optional>
 
+namespace Instrument {
+
+enum Type { QUAD, TOF, FTICR, ORBITRAP };
+
+}  // namespace Instrument
+
 namespace Grid {
 
 // Represent the grid dimensions in index coordinates:
@@ -23,6 +29,12 @@ struct Bounds {
     double max_rt;
     double min_mz;
     double max_mz;
+};
+
+struct SmoothingParams {
+    double mz;
+    double sigma_mz;
+    double sigma_rt;
 };
 
 class Interface {
@@ -46,9 +58,13 @@ class Interface {
     // Get the y index of the closest point (rounded down) for a given rt.
     virtual std::optional<unsigned int> y_index(double rt) = 0;
 
-    // Scale the sigma for a given mass based on the configuration of the
-    // instrument that generated the data.
-    virtual double sigma_at_mz(double mz) = 0;
+    // Get the sigma_mz used for smoothing. In order to maintain the same number
+    // of sampling points for smoothing across all the mz range of the
+    // instrument, we need to scale the sigma accordingly.
+    virtual double sigma_mz(double mz) = 0;
+
+    // Get the sigma_rt used for smoothing.
+    virtual double sigma_rt() = 0;
 
     // Return the dimensions of the Grid in index coordinates:
     //   i <- [0,N], j <- [0,M]
@@ -60,18 +76,8 @@ class Interface {
 
 // Perform gaussian splatting of the given point into the grid, returns the
 // success or failure of the operation.
-bool splash(Grid::Interface &grid, double mz, double rt, double value,
-            double sigma_rt);
+bool splat(Grid::Interface &grid, double mz, double rt, double value);
 
 }  // namespace Grid
-namespace Instrument {
-enum Type { QUAD, TOF, FTICR, ORBITRAP };
-
-struct Config {
-    Type type;
-    double mz_at_sigma;
-    double sigma;
-};
-}  // namespace Instrument
 
 #endif /* TAPP_GRID_GRID_HPP */

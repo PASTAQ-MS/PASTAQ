@@ -7,16 +7,21 @@
 
 // This class represents regular mesh, mapped at discrete intervals for both mz
 // and rt.
+// TODO(alex): Rename as RegularMesh
 class Mesh : public Grid::Interface {
    protected:
     std::vector<double> m_data;
+
+    // Required parameters.
     Grid::Dimensions m_dimensions;
     Grid::Bounds m_bounds;
-    Instrument::Config m_instrument_config;
+    Instrument::Type m_instrument_type;
+    Grid::SmoothingParams m_smoothing_params;
 
    public:
-    Mesh(Grid::Dimensions dimensions = {}, Grid::Bounds bounds = {},
-         Instrument::Config instrument_config = {Instrument::QUAD, 200, 0.001});
+    Mesh(Grid::Dimensions dimensions, Grid::Bounds bounds,
+         Instrument::Type instrument_type,
+         Grid::SmoothingParams smoothing_params);
 
     // Implementation methods for Grid::Interface.
     std::optional<double> value_at(unsigned int i, unsigned int j) override;
@@ -25,7 +30,8 @@ class Mesh : public Grid::Interface {
     std::optional<double> rt_at(unsigned int j) override;
     std::optional<unsigned int> x_index(double mz) override;
     std::optional<unsigned int> y_index(double rt) override;
-    double sigma_at_mz(double mz) override;
+    double sigma_mz(double mz) override;
+    double sigma_rt() override;
     Grid::Dimensions dim() override;
     Grid::Bounds bounds() override;
 };

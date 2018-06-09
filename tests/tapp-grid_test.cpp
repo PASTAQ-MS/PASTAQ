@@ -16,8 +16,8 @@ TEST_CASE("Gaussian splatting") {
         auto mesh = Mesh(
             {7, 7},
             {-3.0 * sigma_rt, 3.0 * sigma_rt, -3.0 * sigma_mz, 3.0 * sigma_mz},
-            {Instrument::QUAD, 1, sigma_mz});
-        Grid::splash(mesh, 0.0, 0.0, 1, sigma_rt);
+            Instrument::QUAD, {1.0, sigma_mz, 1.0});
+        Grid::splat(mesh, 0.0, 0.0, 1);
         std::vector<std::string> expected_weights = {
             "0.000000", "0.000000", "0.000000", "0.000000",
             "0.000000", "0.000000", "0.000000",  // Row 0
@@ -47,22 +47,22 @@ TEST_CASE("Gaussian splatting") {
         auto mesh = Mesh(
             {7, 7},
             {-3.0 * sigma_rt, 3.0 * sigma_rt, -3.0 * sigma_mz, 3.0 * sigma_mz},
-            {Instrument::QUAD, 1, sigma_mz});
-        CHECK_FALSE(Grid::splash(mesh, -20.0, -20.0, 1, sigma_rt));
-        CHECK_FALSE(Grid::splash(mesh, 20.0, 20.0, 1, sigma_rt));
-        CHECK_FALSE(Grid::splash(mesh, -20.0, 20.0, 1, sigma_rt));
-        CHECK_FALSE(Grid::splash(mesh, 20.0, +20.0, 1, sigma_rt));
+            Instrument::QUAD, {1.0, sigma_mz, 1.0});
+        CHECK_FALSE(Grid::splat(mesh, -20.0, -20.0, 1));
+        CHECK_FALSE(Grid::splat(mesh, 20.0, 20.0, 1));
+        CHECK_FALSE(Grid::splat(mesh, -20.0, 20.0, 1));
+        CHECK_FALSE(Grid::splat(mesh, 20.0, +20.0, 1));
     }
 
     SUBCASE("Splat outside but range falls inside") {
         auto mesh = Mesh(
             {7, 7},
             {-3.0 * sigma_rt, 3.0 * sigma_rt, -3.0 * sigma_mz, 3.0 * sigma_mz},
-            {Instrument::QUAD, 1, sigma_mz});
-        CHECK(Grid::splash(mesh, -5.0, 0.0, 1, sigma_rt));
-        CHECK(Grid::splash(mesh, 5.0, 0.0, 1, sigma_rt));
-        CHECK(Grid::splash(mesh, 0.0, -5.0, 1, sigma_rt));
-        CHECK(Grid::splash(mesh, 0.0, 5.0, 1, sigma_rt));
+            Instrument::QUAD, {1.0, sigma_mz, 1.0});
+        CHECK(Grid::splat(mesh, -5.0, 0.0, 1));
+        CHECK(Grid::splat(mesh, 5.0, 0.0, 1));
+        CHECK(Grid::splat(mesh, 0.0, -5.0, 1));
+        CHECK(Grid::splat(mesh, 0.0, 5.0, 1));
         std::vector<std::string> expected_weights = {
             "0.000000", "0.018316", "0.082085", "0.135335",
             "0.082085", "0.018316", "0.000000",  // Row 0

@@ -2,12 +2,15 @@
 
 #include "tapp-mesh.hpp"
 
+// TODO(alex): Handle case where bounds/dimensions are not correct.
 Mesh::Mesh(Grid::Dimensions dimensions, Grid::Bounds bounds,
-           Instrument::Config instrument_config)
+           Instrument::Type instrument_type,
+           Grid::SmoothingParams smoothing_params)
     : m_data(dimensions.n * dimensions.m),
       m_dimensions(dimensions),
       m_bounds(bounds),
-      m_instrument_config(instrument_config) {}
+      m_instrument_type(instrument_type),
+      m_smoothing_params(smoothing_params) {}
 
 std::optional<double> Mesh::value_at(unsigned int i, unsigned int j) {
     if (m_data.empty() || i > m_dimensions.n - 1 || j > m_dimensions.m - 1) {
@@ -75,29 +78,30 @@ std::optional<unsigned int> Mesh::y_index(double rt) {
     return j;
 }
 
-double Mesh::sigma_at_mz(double mz) {
+double Mesh::sigma_mz(double mz) {
     double sigma_mz = 0.0;
-    switch (m_instrument_config.type) {
+    switch (m_instrument_type) {
         case Instrument::ORBITRAP: {
-            sigma_mz = m_instrument_config.sigma *
-                       std::pow(mz / m_instrument_config.mz_at_sigma, 1.5);
+            sigma_mz = m_smoothing_params.sigma_mz *
+                       std::pow(mz / m_smoothing_params.mz, 1.5);
         } break;
         case Instrument::FTICR: {
-            sigma_mz = m_instrument_config.sigma *
-                       std::pow(mz / m_instrument_config.mz_at_sigma, 2);
+            sigma_mz = m_smoothing_params.sigma_mz *
+                       std::pow(mz / m_smoothing_params.mz, 2);
         } break;
         case Instrument::TOF: {
-            sigma_mz = m_instrument_config.sigma * mz /
-                       m_instrument_config.mz_at_sigma;
+            sigma_mz = m_smoothing_params.sigma_mz * mz / m_smoothing_params.mz;
         } break;
         case Instrument::QUAD: {
             // QUAD/IONTRAP instruments maintain the same resolution across all
             // mass range.
-            sigma_mz = m_instrument_config.sigma;
+            sigma_mz = m_smoothing_params.sigma_mz;
         } break;
     }
     return sigma_mz;
 }
+
+double Mesh::sigma_rt() { return m_smoothing_params.sigma_rt; }
 
 Grid::Dimensions Mesh::dim() { return m_dimensions; }
 

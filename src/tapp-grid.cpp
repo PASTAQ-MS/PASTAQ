@@ -2,12 +2,12 @@
 
 #include "tapp-grid.hpp"
 
-bool Grid::splash(Grid::Interface &grid, double mz, double rt, double value,
-                  double sigma_rt) {
+bool Grid::splat(Grid::Interface &grid, double mz, double rt, double value) {
     // For some instruments the peaks get wider in proportion to the adquired
     // mass. In order to maintain the same number of sampling points we will
     // scale the sigm_mz accordingly.
-    double sigma_mz = grid.sigma_at_mz(mz);
+    double sigma_mz = grid.sigma_mz(mz);
+    double sigma_rt = grid.sigma_rt();
 
     // Get the gaussian square dimensions. Note that we are using a square
     // kernel approximation for simplicity and computational efficiency.

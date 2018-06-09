@@ -5,7 +5,8 @@
 
 TEST_CASE("Bounds check on Mesh when using Mesh::at") {
     SUBCASE("An empty mesh should always return std::nullopt") {
-        auto mesh = Mesh();
+        auto mesh = Mesh({0, 0}, {0.0, 60.0, 80.5, 1000.0}, Instrument::QUAD,
+                         {200, 0.01, 1.0});
         CHECK(mesh.value_at(0, 0) == std::nullopt);
         CHECK(mesh.value_at(0, 1) == std::nullopt);
         CHECK(mesh.value_at(1, 0) == std::nullopt);
@@ -13,7 +14,8 @@ TEST_CASE("Bounds check on Mesh when using Mesh::at") {
     };
     SUBCASE(
         "An mesh should return it's value if inside bounds or std::nullopt") {
-        auto mesh = Mesh({4, 4}, {0.0, 60.0, 80.5, 1000.0});
+        auto mesh = Mesh({4, 4}, {0.0, 60.0, 80.5, 1000.0}, Instrument::QUAD,
+                         {200, 0.01, 1.0});
         CHECK(mesh.value_at(0, 0) == 0.0);
         CHECK(mesh.value_at(0, 0) == 0.0);
         CHECK(mesh.value_at(0, 1) == 0.0);
@@ -26,7 +28,8 @@ TEST_CASE("Bounds check on Mesh when using Mesh::at") {
 }
 
 TEST_CASE("Setting values at given indices should work properly") {
-    auto mesh = Mesh({2, 2}, {0.0, 75.0, 200.0, 800.0});
+    auto mesh = Mesh({2, 2}, {0.0, 75.0, 200.0, 800.0}, Instrument::QUAD,
+                     {200, 0.01, 1.0});
     mesh.set_value(0, 0, 10.0);
     CHECK(mesh.value_at(0, 0) == 10.0);
     mesh.set_value(1, 1, 1.0);
@@ -39,7 +42,8 @@ TEST_CASE("Setting values at given indices should work properly") {
 
 TEST_CASE("Real world dimensions fetching via Mesh::mz and Mesh::rt") {
     SUBCASE("An empty mesh should always return std::nullopt") {
-        auto mesh = Mesh();
+        auto mesh = Mesh({0, 0}, {0.0, 75.0, 200.0, 800.0}, Instrument::QUAD,
+                         {200, 0.01, 1.0});
         CHECK(mesh.mz_at(0) == std::nullopt);
         CHECK(mesh.mz_at(1) == std::nullopt);
         CHECK(mesh.mz_at(2) == std::nullopt);
@@ -48,7 +52,8 @@ TEST_CASE("Real world dimensions fetching via Mesh::mz and Mesh::rt") {
         CHECK(mesh.rt_at(2) == std::nullopt);
     };
     SUBCASE("Proper interpolation if inside bounds or std::nullopt") {
-        auto mesh = Mesh({4, 4}, {0.0, 75.0, 200.0, 800.0});
+        auto mesh = Mesh({4, 4}, {0.0, 75.0, 200.0, 800.0}, Instrument::QUAD,
+                         {200, 0.01, 1.0});
         CHECK(mesh.mz_at(0) == 200.0);
         CHECK(mesh.mz_at(1) == 400.0);
         CHECK(mesh.mz_at(2) == 600.0);
@@ -64,7 +69,8 @@ TEST_CASE("Real world dimensions fetching via Mesh::mz and Mesh::rt") {
 
 TEST_CASE("Getters for mDimensions and mBounds") {
     SUBCASE("With an empty mesh") {
-        auto mesh = Mesh();
+        auto mesh = Mesh({0, 0}, {0.0, 0.0, 0.0, 0.0}, Instrument::QUAD,
+                         {200, 0.01, 1.0});
         auto dimensions = mesh.dim();
         auto bounds = mesh.bounds();
         CHECK(dimensions.n == 0);
@@ -75,7 +81,8 @@ TEST_CASE("Getters for mDimensions and mBounds") {
         CHECK(bounds.max_mz == 0.0);
     };
     SUBCASE("With a non empty mesh") {
-        auto mesh = Mesh({4, 10}, {0.0, 75.0, 200.0, 800.0});
+        auto mesh = Mesh({4, 10}, {0.0, 75.0, 200.0, 800.0}, Instrument::QUAD,
+                         {200, 0.01, 1.0});
         auto dimensions = mesh.dim();
         auto bounds = mesh.bounds();
         CHECK(dimensions.n == 4);
