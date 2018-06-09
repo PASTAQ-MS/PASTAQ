@@ -3,7 +3,7 @@
 #include "tapp-mesh.hpp"
 
 // TODO(alex): Handle case where bounds/dimensions are not correct.
-Mesh::Mesh(Grid::Dimensions dimensions, Grid::Bounds bounds,
+RegularMesh::RegularMesh(Grid::Dimensions dimensions, Grid::Bounds bounds,
            Instrument::Type instrument_type,
            Grid::SmoothingParams smoothing_params)
     : m_data(dimensions.n * dimensions.m),
@@ -12,14 +12,14 @@ Mesh::Mesh(Grid::Dimensions dimensions, Grid::Bounds bounds,
       m_instrument_type(instrument_type),
       m_smoothing_params(smoothing_params) {}
 
-std::optional<double> Mesh::value_at(unsigned int i, unsigned int j) {
+std::optional<double> RegularMesh::value_at(unsigned int i, unsigned int j) {
     if (m_data.empty() || i > m_dimensions.n - 1 || j > m_dimensions.m - 1) {
         return std::nullopt;
     }
     return m_data[i + j * m_dimensions.n];
 }
 
-bool Mesh::set_value(unsigned int i, unsigned int j, double value) {
+bool RegularMesh::set_value(unsigned int i, unsigned int j, double value) {
     if (m_data.empty() || i > m_dimensions.n - 1 || j > m_dimensions.m - 1) {
         return false;
     }
@@ -27,7 +27,7 @@ bool Mesh::set_value(unsigned int i, unsigned int j, double value) {
     return true;
 }
 
-std::optional<double> Mesh::mz_at(unsigned int i) {
+std::optional<double> RegularMesh::mz_at(unsigned int i) {
     if (m_data.empty() || i > m_dimensions.n - 1) {
         return std::nullopt;
     }
@@ -37,7 +37,7 @@ std::optional<double> Mesh::mz_at(unsigned int i) {
     return m_bounds.min_mz + delta_mz * i;
 }
 
-std::optional<double> Mesh::rt_at(unsigned int j) {
+std::optional<double> RegularMesh::rt_at(unsigned int j) {
     if (m_data.empty() || j > m_dimensions.m - 1) {
         return std::nullopt;
     }
@@ -46,7 +46,7 @@ std::optional<double> Mesh::rt_at(unsigned int j) {
     return m_bounds.min_rt + delta_rt * j;
 }
 
-std::optional<unsigned int> Mesh::x_index(double mz) {
+std::optional<unsigned int> RegularMesh::x_index(double mz) {
     // In order to be consistent, the maximum value is mz + delta_mz. This
     // ensures all intervals contain the same number of points.
     double delta_mz = (m_bounds.max_mz - m_bounds.min_mz) /
@@ -62,7 +62,7 @@ std::optional<unsigned int> Mesh::x_index(double mz) {
     return i;
 }
 
-std::optional<unsigned int> Mesh::y_index(double rt) {
+std::optional<unsigned int> RegularMesh::y_index(double rt) {
     // In order to be consistent, the maximum value is rt + delta_rt. This
     // ensures all intervals contain the same number of points.
     double delta_rt = (m_bounds.max_rt - m_bounds.min_rt) /
@@ -78,7 +78,7 @@ std::optional<unsigned int> Mesh::y_index(double rt) {
     return j;
 }
 
-double Mesh::sigma_mz(double mz) {
+double RegularMesh::sigma_mz(double mz) {
     double sigma_mz = 0.0;
     switch (m_instrument_type) {
         case Instrument::ORBITRAP: {
@@ -101,8 +101,8 @@ double Mesh::sigma_mz(double mz) {
     return sigma_mz;
 }
 
-double Mesh::sigma_rt() { return m_smoothing_params.sigma_rt; }
+double RegularMesh::sigma_rt() { return m_smoothing_params.sigma_rt; }
 
-Grid::Dimensions Mesh::dim() { return m_dimensions; }
+Grid::Dimensions RegularMesh::dim() { return m_dimensions; }
 
-Grid::Bounds Mesh::bounds() { return m_bounds; }
+Grid::Bounds RegularMesh::bounds() { return m_bounds; }

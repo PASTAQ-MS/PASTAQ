@@ -13,7 +13,7 @@ TEST_CASE("Gaussian splatting") {
     double sigma_rt = 1.0;
 
     SUBCASE("Splat on the cencer of the mesh") {
-        auto mesh = Mesh(
+        auto mesh = RegularMesh(
             {7, 7},
             {-3.0 * sigma_rt, 3.0 * sigma_rt, -3.0 * sigma_mz, 3.0 * sigma_mz},
             Instrument::QUAD, {1.0, sigma_mz, 1.0});
@@ -44,7 +44,7 @@ TEST_CASE("Gaussian splatting") {
 
     // Point is totally outside the grid.
     SUBCASE("Splatting outside the grid fails") {
-        auto mesh = Mesh(
+        auto mesh = RegularMesh(
             {7, 7},
             {-3.0 * sigma_rt, 3.0 * sigma_rt, -3.0 * sigma_mz, 3.0 * sigma_mz},
             Instrument::QUAD, {1.0, sigma_mz, 1.0});
@@ -55,7 +55,7 @@ TEST_CASE("Gaussian splatting") {
     }
 
     SUBCASE("Splat outside but range falls inside") {
-        auto mesh = Mesh(
+        auto mesh = RegularMesh(
             {7, 7},
             {-3.0 * sigma_rt, 3.0 * sigma_rt, -3.0 * sigma_mz, 3.0 * sigma_mz},
             Instrument::QUAD, {1.0, sigma_mz, 1.0});

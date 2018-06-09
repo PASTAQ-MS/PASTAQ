@@ -7,8 +7,7 @@
 
 // This class represents regular mesh, mapped at discrete intervals for both mz
 // and rt.
-// TODO(alex): Rename as RegularMesh
-class Mesh : public Grid::Interface {
+class RegularMesh : public Grid::Interface {
    protected:
     std::vector<double> m_data;
 
@@ -19,7 +18,7 @@ class Mesh : public Grid::Interface {
     Grid::SmoothingParams m_smoothing_params;
 
    public:
-    Mesh(Grid::Dimensions dimensions, Grid::Bounds bounds,
+    RegularMesh(Grid::Dimensions dimensions, Grid::Bounds bounds,
          Instrument::Type instrument_type,
          Grid::SmoothingParams smoothing_params);
 
