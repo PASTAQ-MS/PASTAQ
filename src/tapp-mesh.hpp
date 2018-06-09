@@ -19,8 +19,20 @@ class RegularMesh : public Grid::Interface {
 
    public:
     RegularMesh(Grid::Dimensions dimensions, Grid::Bounds bounds,
-         Instrument::Type instrument_type,
-         Grid::SmoothingParams smoothing_params);
+                Instrument::Type instrument_type,
+                Grid::SmoothingParams smoothing_params);
+
+    // Load the data from a istream.
+    // TODO(alex): It would be a good idea to put all the parameters directly as
+    // binary data instead of reading from two different files, .mesh and .dat.
+    // The header on the .dat file will contain all the relevant parameters
+    // necessary to interpret the data.
+    bool load_dat(std::istream &stream, Grid::Dimensions dimensions,
+                  Grid::Bounds bounds, Instrument::Type instrument_type,
+                  Grid::SmoothingParams smoothing_params);
+
+    // Writes the current data to the stream.
+    bool write_dat(std::ostream &stream);
 
     // Implementation methods for Grid::Interface.
     std::optional<double> value_at(unsigned int i, unsigned int j) override;

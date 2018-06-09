@@ -1,11 +1,13 @@
 #include <cmath>
+#include <iostream>
+#include <iterator>
 
 #include "tapp-mesh.hpp"
 
 // TODO(alex): Handle case where bounds/dimensions are not correct.
 RegularMesh::RegularMesh(Grid::Dimensions dimensions, Grid::Bounds bounds,
-           Instrument::Type instrument_type,
-           Grid::SmoothingParams smoothing_params)
+                         Instrument::Type instrument_type,
+                         Grid::SmoothingParams smoothing_params)
     : m_data(dimensions.n * dimensions.m),
       m_dimensions(dimensions),
       m_bounds(bounds),
@@ -106,3 +108,31 @@ double RegularMesh::sigma_rt() { return m_smoothing_params.sigma_rt; }
 Grid::Dimensions RegularMesh::dim() { return m_dimensions; }
 
 Grid::Bounds RegularMesh::bounds() { return m_bounds; }
+
+bool RegularMesh::load_dat(std::istream &stream, Grid::Dimensions dimensions,
+                           Grid::Bounds bounds,
+                           Instrument::Type instrument_type,
+                           Grid::SmoothingParams smoothing_params) {
+    if (stream.good()) {
+        // Reading all data from the stream into m_data.
+        // FIXME(alex): This can fail if we ran out of memory. Should we try co
+        // catch the error here?
+        std::istream_iterator<double> start(stream);
+        std::istream_iterator<double> end;
+        m_data = std::vector<double>(start, end);
+        m_dimensions = dimensions;
+        m_bounds = bounds;
+        m_instrument_type = instrument_type;
+        m_smoothing_params = smoothing_params;
+        return true;
+    }
+    return false;
+}
+
+bool RegularMesh::write_dat(std::ostream &stream) {
+    if (stream.good()) {
+        stream.write((char *)&m_data[0], sizeof(double) * m_data.size());
+        return stream.good();
+    }
+    return false;
+}
