@@ -122,7 +122,8 @@ bool RegularMesh::load_dat(std::istream &stream, Grid::Dimensions dimensions,
         m_bounds = bounds;
         m_instrument_type = instrument_type;
         m_smoothing_params = smoothing_params;
-        if (stream.read((char *)&m_data[0], m_data.size() * sizeof(double))) {
+        if (stream.read(reinterpret_cast<char *>(&m_data[0]),
+                        m_data.size() * sizeof(double))) {
             return true;
         }
     }
@@ -131,7 +132,8 @@ bool RegularMesh::load_dat(std::istream &stream, Grid::Dimensions dimensions,
 
 bool RegularMesh::write_dat(std::ostream &stream) {
     if (stream.good()) {
-        stream.write((char *)&m_data[0], sizeof(double) * m_data.size());
+        stream.write(reinterpret_cast<char *>(&m_data[0]),
+                     sizeof(double) * m_data.size());
         return stream.good();
     }
     return false;

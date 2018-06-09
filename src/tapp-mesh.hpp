@@ -27,6 +27,7 @@ class RegularMesh : public Grid::Interface {
     // binary data instead of reading from two different files, .mesh and .dat.
     // The header on the .dat file will contain all the relevant parameters
     // necessary to interpret the data.
+    //     see: https://stackoverflow.com/questions/416436/what-to-put-in-a-binary-data-files-header
     bool load_dat(std::istream &stream, Grid::Dimensions dimensions,
                   Grid::Bounds bounds, Instrument::Type instrument_type,
                   Grid::SmoothingParams smoothing_params);

@@ -105,8 +105,9 @@ TEST_CASE("Getters for mDimensions and mBounds") {
 // an error when using the stream.
 struct VectorStream : std::streambuf {
     VectorStream(std::vector<double> &data) {
-        auto begin = (char *)&data[0];
-        auto end = (char *)&data[0] + sizeof(double) * data.size();
+        auto begin = reinterpret_cast<char *>(&data[0]);
+        auto end =
+            reinterpret_cast<char *>(&data[0]) + sizeof(double) * data.size();
         setg(begin, begin, end);
         setp(begin, end);
     }
