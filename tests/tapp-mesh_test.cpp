@@ -108,15 +108,17 @@ TEST_CASE("Loading data from the dat file") {
     auto mesh = RegularMesh({4, 10}, {0.0, 75.0, 200.0, 800.0},
                             Instrument::QUAD, {200, 0.01, 1.0});
     mesh.set_value(0, 0, 10.0);
-    mesh.set_value(1, 1, 1.0);
     mesh.set_value(1, 1, 2.0);
     mesh.set_value(0, 1, 20.0);
     std::ofstream fileout("foo.dat", std::ios::out | std::ios::binary);
     CHECK(mesh.write_dat(fileout));
-    // fileout << 1.0;
+    fileout.close();
 
-    // std::istringstream stream;
-    // std::iostream *sbuff;
-    // std::copy(data.begin(), data.end(), std::istream_iterator<double>(sbuff)
-    // );
+    mesh = RegularMesh({}, {}, Instrument::QUAD, {});
+    std::ifstream filein("foo.dat", std::ios::in | std::ios::binary);
+    CHECK(mesh.load_dat(filein, {4, 10}, {0.0, 75.0, 200.0, 800.0},
+                        Instrument::QUAD, {200, 0.01, 1.0}));
+    CHECK(mesh.value_at(0, 0) == 10.0);
+    CHECK(mesh.value_at(1, 1) == 2.0);
+    CHECK(mesh.value_at(0, 1) == 20.0);
 }

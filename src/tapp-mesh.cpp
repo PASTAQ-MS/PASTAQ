@@ -117,14 +117,14 @@ bool RegularMesh::load_dat(std::istream &stream, Grid::Dimensions dimensions,
         // Reading all data from the stream into m_data.
         // FIXME(alex): This can fail if we ran out of memory. Should we try co
         // catch the error here?
-        std::istream_iterator<double> start(stream);
-        std::istream_iterator<double> end;
-        m_data = std::vector<double>(start, end);
+        m_data.resize(dimensions.n * dimensions.m);
         m_dimensions = dimensions;
         m_bounds = bounds;
         m_instrument_type = instrument_type;
         m_smoothing_params = smoothing_params;
-        return true;
+        if (stream.read((char *)&m_data[0], m_data.size() * sizeof(double))) {
+            return true;
+        }
     }
     return false;
 }
