@@ -99,14 +99,16 @@ TEST_CASE("Getters for mDimensions and mBounds") {
     };
 }
 
-// Helper class to use a vector to mock istreams/ostreams
+// Helper class to use a vector to mock istreams/ostreams. Note that the
+// lifetime of the VectorStream class is not tied to the object we have mapped.
+// If the vector get's deallocated or it's dimensions change, it will result in
+// an error when using the stream.
 struct VectorStream : std::streambuf {
-    std::vector<double> m_data;
-    VectorStream(std::vector<double> data) {
-        m_data = data;
-        auto begin = (char*)&m_data[0];
-        auto end = (char*)&m_data[0] + sizeof(double) * m_data.size();
+    VectorStream(std::vector<double> &data) {
+        auto begin = (char *)&data[0];
+        auto end = (char *)&data[0] + sizeof(double) * data.size();
         setg(begin, begin, end);
+        setp(begin, end);
     }
 };
 
@@ -134,11 +136,11 @@ TEST_CASE("Loading/Saving data from the dat file") {
         }
     }
 
-    auto data = std::vector<double>{
-        1.0, 2.0, 3.0, 4.0, 5.0,  // Row 1
-        6.0, 7.0, 8.0, 9.0, 0.0,  // Row 2
-    };
     SUBCASE("Load from stream") {
+        auto data = std::vector<double>{
+            1.0, 2.0, 3.0, 4.0, 5.0,  // Row 1
+            6.0, 7.0, 8.0, 9.0, 0.0,  // Row 2
+        };
         auto mesh = RegularMesh({}, {}, Instrument::QUAD, {});
         Grid::Dimensions dimensions = {5, 2};
         Grid::Bounds bounds = {0.0, 75.0, 200.0, 800.0};
@@ -154,6 +156,15 @@ TEST_CASE("Loading/Saving data from the dat file") {
         for (unsigned int j = 0; j < 2; j++) {
             for (unsigned int i = 0; i < 5; ++i) {
                 CHECK(data[i + 5 * j] == mesh.value_at(i, j).value());
+            }
+        }
+        std::vector<double> output_data(data.size());
+        VectorStream output_vector_stream(output_data);
+        std::iostream output_stream(&output_vector_stream);
+        CHECK(mesh.write_dat(output_stream));
+        for (unsigned int j = 0; j < 2; j++) {
+            for (unsigned int i = 0; i < 5; ++i) {
+                CHECK(output_data[i + 5 * j] == mesh.value_at(i, j).value());
             }
         }
     }
