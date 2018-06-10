@@ -117,4 +117,58 @@ TEST_CASE("MockStream") {
         stream.write((char*)&x, sizeof(double));
         CHECK_FALSE(stream.good());
     }
+
+    SUBCASE("Data read/write methods <int>(RO)") {
+        auto data_source = std::vector<int>{
+            1, 2, 3, 4, 5,  // Row 1
+            6, 7, 8, 9, 1,  // Row 2
+        };
+        std::vector<int> data_destination(data_source.size());
+        MockStream<int> stream(data_destination);
+        // Reading the data element by element as well as writing on the
+        // destination array. The two pointers for read/write work
+        // independently.
+        int ret = -1;
+        for (const auto& e : data_source) {
+            stream.write((char*)&e, sizeof(int));
+            stream.read((char*)&ret, sizeof(int));
+            CHECK(ret == e);
+            CHECK(stream.good());
+        }
+        for (int i = 0; i < data_source.size(); ++i) {
+            CHECK(data_source[i] == data_destination[i]);
+        }
+        // Attempting to write past the number of elements contained results in
+        // stream failure.
+        int x = 41;
+        stream.write((char*)&x, sizeof(int));
+        CHECK_FALSE(stream.good());
+    }
+
+    SUBCASE("Data read/write methods <double>(RO)") {
+        auto data_source = std::vector<double>{
+            1, 2, 3, 4, 5,  // Row 1
+            6, 7, 8, 9, 1,  // Row 2
+        };
+        std::vector<double> data_destination(data_source.size());
+        MockStream<double> stream(data_destination);
+        // Reading the data element by element as well as writing on the
+        // destination array. The two pointers for read/write work
+        // independently.
+        double ret = -1;
+        for (const auto& e : data_source) {
+            stream.write((char*)&e, sizeof(double));
+            stream.read((char*)&ret, sizeof(double));
+            CHECK(ret == e);
+            CHECK(stream.good());
+        }
+        for (int i = 0; i < data_source.size(); ++i) {
+            CHECK(data_source[i] == data_destination[i]);
+        }
+        // Attempting to write past the number of elements contained results in
+        // stream failure.
+        double x = 41;
+        stream.write((char*)&x, sizeof(double));
+        CHECK_FALSE(stream.good());
+    }
 }
