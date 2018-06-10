@@ -39,7 +39,7 @@ std::optional<Grid::Parameters> DatFile::load_parameters(std::istream &stream) {
     if (stream.good()) {
         std::cout << "GOOD STREAM" << std::endl;
         std::cout << stream.tellg() << std::endl;
-        stream.seekg(0, stream.beg);
+        stream.seekg(0, std::ios::beg);
         std::cout << stream.tellg() << std::endl;
         // auto stream_beg = stream.tellg();
 

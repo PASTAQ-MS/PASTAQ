@@ -15,8 +15,8 @@ namespace Grid {
 //   (n == number of columns == Number of points in mz)
 //   (m == number of rows == Number of points in rt)
 struct Dimensions {
-    uint32_t n;
-    uint32_t m;
+    unsigned int n;
+    unsigned int m;
 };
 
 // Represent the real world bounds for this grid. Note that the bounds are
@@ -52,23 +52,23 @@ struct Parameters {
 class Interface {
    public:
     // Get the value stored at the given position.
-    virtual std::optional<double> value_at(uint32_t i, uint32_t j) = 0;
+    virtual std::optional<double> value_at(unsigned int i, unsigned int j) = 0;
 
     // Set the value at the given position. Returns the success or failure of
     // the operation.
-    virtual bool set_value(uint32_t i, uint32_t j, double value) = 0;
+    virtual bool set_value(unsigned int i, unsigned int j, double value) = 0;
 
     // Get the real world mass/charge stored in the given index.
-    virtual std::optional<double> mz_at(uint32_t i) = 0;
+    virtual std::optional<double> mz_at(unsigned int i) = 0;
 
     // Get the real world retention time stored in the given index.
-    virtual std::optional<double> rt_at(uint32_t j) = 0;
+    virtual std::optional<double> rt_at(unsigned int j) = 0;
 
     // Get the x index of the closest point (rounded down) for a given mz.
-    virtual std::optional<uint32_t> x_index(double mz) = 0;
+    virtual std::optional<unsigned int> x_index(double mz) = 0;
 
     // Get the y index of the closest point (rounded down) for a given rt.
-    virtual std::optional<uint32_t> y_index(double rt) = 0;
+    virtual std::optional<unsigned int> y_index(double rt) = 0;
 
     // Get the sigma_mz used for smoothing. In order to maintain the same number
     // of sampling points for smoothing across all the mz range of the
