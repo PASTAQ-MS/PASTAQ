@@ -34,8 +34,8 @@ struct FileFooter {
     char footer_length;
 };
 
-std::optional<Grid::Parameters> DatFile::load_parameters(std::istream &stream) {
-    Grid::Parameters parameters = {};
+bool DatFile::load_parameters(std::istream &stream,
+                              Grid::Parameters *parameters) {
     if (stream.good()) {
         std::cout << "GOOD STREAM" << std::endl;
         std::cout << stream.tellg() << std::endl;
@@ -59,6 +59,17 @@ std::optional<Grid::Parameters> DatFile::load_parameters(std::istream &stream) {
         return parameters;
     }
     return std::nullopt;
+}
+
+bool DatFile::write_parameters(std::ostream &stream,
+                               Grid::Parameters &parameters) {
+    auto footer_size = static_cast<char>(sizeof(Grid::Parameters) +
+                                         sizeof(DatFile::Parameters));
+    DatFile::Parameters file_parameters = {1, footer_size};
+    stream.write(reinterpret_cast<char *>(&parameters), sizeof(parameters));
+    stream.write(reinterpret_cast<char *>(&file_parameters),
+                 sizeof(file_parameters));
+    return stream.good();
 }
 
 bool DatFile::load_uint32(std::istream &stream, uint32_t *i) {

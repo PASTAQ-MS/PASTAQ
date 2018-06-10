@@ -12,13 +12,23 @@
 // big endian we will swap the bytes around.
 namespace DatFile {
 
+// This structure will be saved after the parameters as a way to extract and
+// interpret the footer data with the grid parameters. For now, saving the
+// spec_version in case we need to do revisions to the format in the future.
+struct Parameters {
+    char spec_version;
+    char footer_length;
+};
+
 // Load an entire file from the binary stream into the destination vector and
 // the parameters structure.
 bool load(std::istream &stream, std::vector<double> &destination,
           Grid::Parameters &parameters);
 
-// Load the parameters from the footer of the binary straem.
-std::optional<Grid::Parameters> load_parameters(std::istream &stream);
+// Load the parameters from the footer of the binary stream.
+bool DatFile::load_parameters(std::istream &stream,
+                              Grid::Parameters *parameters);
+bool write_parameters(std::ostream &stream, Grid::Parameters &parameters);
 
 // Write the entire source vector and parameters struct into the destination
 // binary stream.

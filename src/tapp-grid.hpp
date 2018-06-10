@@ -5,11 +5,18 @@
 
 namespace Instrument {
 
-enum Type { QUAD, TOF, FTICR, ORBITRAP };
+enum Type : char { QUAD, TOF, FTICR, ORBITRAP };
 
 }  // namespace Instrument
 
 namespace Grid {
+
+// Flags
+enum Flags : char {
+    WARPED_MESH = 0b00000001,
+    PRECISION_64 = 0b00000010,
+    OTHER_FLAG = 0b00000100,
+};
 
 // Represent the grid dimensions in index coordinates:
 //   (n == number of columns == Number of points in mz)
@@ -47,6 +54,8 @@ struct Parameters {
     Dimensions dimensions;
     Bounds bounds;
     SmoothingParams smoothing_params;
+    Instrument::Type instrument_type;
+    Flags flags;
 };
 
 class Interface {

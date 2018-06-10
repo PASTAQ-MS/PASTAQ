@@ -35,3 +35,12 @@ TEST_CASE("Writing functions to stream") {
         }
     }
 }
+
+TEST_CASE("Writing parameters to the stream") {
+    std::vector<char> data(255);
+    MockStream<char> stream(data);
+    Grid::Parameters parameters = {
+        {1, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD};
+    CHECK(DatFile::write_parameters(stream, parameters));
+    //CHECK(0 == 1);
+}
