@@ -32,4 +32,8 @@ bool write(std::ostream &stream, const std::vector<double> &source,
 // const std::vector<double> &source,
 // const Grid::Parameters &parameters);
 
+// Read/Write an unsigned integer from/to the stream.
+bool load_uint32(std::istream &stream, uint32_t *i);
+bool save_uint32(std::ostream &stream, uint32_t i);
+
 }  // namespace DatFile

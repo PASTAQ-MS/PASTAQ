@@ -40,7 +40,7 @@ if (DOCTEST_LIBRARY_PATH)
         tests/main.cpp
         tests/tapp-mesh_test.cpp
         tests/tapp-grid_test.cpp
-        #tests/tapp-datfile_test.cpp
+        tests/tapp-datfile_test.cpp
         )
     add_test(NAME tapp-mesh_test COMMAND tapp-mesh_test)
     target_link_libraries(tapp-mesh_test doctest tapp-mesh)

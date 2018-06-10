@@ -34,8 +34,8 @@ TEST_CASE("Gaussian splatting") {
             "0.000000", "0.000000", "0.000000", "0.000000",
             "0.000000", "0.000000", "0.000000",  // Row 6
         };
-        for (unsigned int j = 0; j < 7; j++) {
-            for (unsigned int i = 0; i < 7; ++i) {
+        for (size_t j = 0; j < 7; j++) {
+            for (size_t i = 0; i < 7; ++i) {
                 CHECK(expected_weights[i + 7 * j] ==
                       std::to_string(mesh.value_at(i, j).value()));
             }
@@ -79,8 +79,8 @@ TEST_CASE("Gaussian splatting") {
             "0.000000", "0.018316", "0.082085", "0.135335",
             "0.082085", "0.018316", "0.000000",  // Row 6
         };
-        for (unsigned int j = 0; j < 7; j++) {
-            for (unsigned int i = 0; i < 7; ++i) {
+        for (size_t j = 0; j < 7; j++) {
+            for (size_t i = 0; i < 7; ++i) {
                 CHECK(expected_weights[i + 7 * j] ==
                       std::to_string(mesh.value_at(i, j).value()));
             }
