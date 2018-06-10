@@ -55,7 +55,7 @@ struct Parameters {
     Bounds bounds;
     SmoothingParams smoothing_params;
     Instrument::Type instrument_type;
-    Flags flags;
+    char flags = 0x00;
 };
 
 class Interface {

@@ -37,10 +37,23 @@ TEST_CASE("Writing functions to stream") {
 }
 
 TEST_CASE("Writing parameters to the stream") {
-    std::vector<char> data(255);
+    std::vector<char> data(sizeof(Grid::Parameters) +
+                           sizeof(DatFile::Parameters));
     MockStream<char> stream(data);
-    Grid::Parameters parameters = {
-        {1, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD};
-    CHECK(DatFile::write_parameters(stream, parameters));
-    //CHECK(0 == 1);
+    Grid::Parameters source_parameters = {
+        {6, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD};
+    CHECK(DatFile::write_parameters(stream, source_parameters));
+    Grid::Parameters dest_parameters = {};
+    CHECK(DatFile::load_parameters(stream, &dest_parameters));
+    CHECK(dest_parameters.bounds.min_rt == source_parameters.bounds.min_rt);
+    CHECK(dest_parameters.bounds.max_rt == source_parameters.bounds.max_rt);
+    CHECK(dest_parameters.bounds.min_mz == source_parameters.bounds.min_mz);
+    CHECK(dest_parameters.bounds.max_mz == source_parameters.bounds.max_mz);
+    CHECK(dest_parameters.dimensions.n == source_parameters.dimensions.n);
+    CHECK(dest_parameters.dimensions.m == source_parameters.dimensions.m);
+    CHECK(dest_parameters.smoothing_params.mz == source_parameters.smoothing_params.mz);
+    CHECK(dest_parameters.smoothing_params.sigma_mz == source_parameters.smoothing_params.sigma_mz);
+    CHECK(dest_parameters.smoothing_params.sigma_rt == source_parameters.smoothing_params.sigma_rt);
+    CHECK(dest_parameters.instrument_type == source_parameters.instrument_type);
+    CHECK(dest_parameters.flags == source_parameters.flags);
 }

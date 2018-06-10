@@ -20,8 +20,9 @@ struct MockStream : public std::iostream {
             setg(begin, begin, end);
             setp(begin, end);
         }
-        pos_type pubseekoff(off_type off, std::ios_base::seekdir dir,
-                            std::ios_base::openmode which = std::ios_base::in) {
+        pos_type seekoff(
+            off_type off, std::ios_base::seekdir dir,
+            std::ios_base::openmode which = std::ios_base::in) override {
             switch (dir) {
                 case std::ios::beg: {
                     setg(eback(), eback() + off, egptr());

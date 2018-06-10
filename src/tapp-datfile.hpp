@@ -26,8 +26,7 @@ bool load(std::istream &stream, std::vector<double> &destination,
           Grid::Parameters &parameters);
 
 // Load the parameters from the footer of the binary stream.
-bool DatFile::load_parameters(std::istream &stream,
-                              Grid::Parameters *parameters);
+bool load_parameters(std::istream &stream, Grid::Parameters *parameters);
 bool write_parameters(std::ostream &stream, Grid::Parameters &parameters);
 
 // Write the entire source vector and parameters struct into the destination
