@@ -61,17 +61,22 @@ std::optional<Grid::Parameters> DatFile::load_parameters(std::istream &stream) {
     return std::nullopt;
 }
 
-bool DatFile::save_uint32(std::ostream &stream, uint32_t i) {
-    char buffer[4] = {};
-    buffer[3] = (i >> 24) & 0xFF;
-    buffer[2] = (i >> 16) & 0xFF;
-    buffer[1] = (i >> 8) & 0xFF;
-    buffer[0] = i & 0xFF;
-    stream.write(reinterpret_cast<char *>(&buffer), 4 * sizeof(char));
+bool DatFile::load_uint32(std::istream &stream, uint32_t *i) {
+    stream.read(reinterpret_cast<char *>(i), 4 * sizeof(char));
     return stream.good();
 }
 
-bool DatFile::load_uint32(std::istream &stream, uint32_t *i) {
-    stream.read(reinterpret_cast<char *>(i), 4 * sizeof(char));
+bool DatFile::save_uint32(std::ostream &stream, uint32_t i) {
+    stream.write(reinterpret_cast<char *>(&i), 4 * sizeof(char));
+    return stream.good();
+}
+
+bool DatFile::load_double(std::istream &stream, double *d) {
+    stream.read(reinterpret_cast<char *>(d), sizeof(double));
+    return stream.good();
+}
+
+bool DatFile::save_double(std::ostream &stream, double d) {
+    stream.write(reinterpret_cast<char *>(&d), sizeof(double));
     return stream.good();
 }

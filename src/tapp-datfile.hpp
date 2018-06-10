@@ -36,4 +36,8 @@ bool write(std::ostream &stream, const std::vector<double> &source,
 bool load_uint32(std::istream &stream, uint32_t *i);
 bool save_uint32(std::ostream &stream, uint32_t i);
 
+// Read/Write a double floating point value from/to the stream.
+bool load_double(std::istream &stream, double *d);
+bool save_double(std::ostream &stream, double d);
+
 }  // namespace DatFile
