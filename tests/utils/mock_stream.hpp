@@ -10,12 +10,13 @@
 // If the vector get's deallocated or it's dimensions change, it will result in
 // an error when using the stream. This is not a robust class and should be used
 // with caution.
+template <class T>
 struct MockStream : public std::iostream {
     struct VectorStream : public std::streambuf {
-        VectorStream(std::vector<char> &data) {
+        VectorStream(std::vector<T> &data) {
             auto begin = reinterpret_cast<char *>(&data[0]);
             auto end =
-                reinterpret_cast<char *>(&data[0]) + sizeof(char) * data.size();
+                reinterpret_cast<char *>(&data[0]) + sizeof(T) * data.size();
             setg(begin, begin, end);
             setp(begin, end);
         }
@@ -31,11 +32,14 @@ struct MockStream : public std::iostream {
                 case std::ios::end: {
                     setg(eback(), egptr() + off, egptr());
                 } break;
+                default: {
+                    // ...
+                } break;
             }
             return gptr() - eback();
         }
     } m_vs;
-    MockStream(std::vector<char> &data) : m_vs(data), std::iostream(&m_vs) {}
+    MockStream(std::vector<T> &data) : m_vs(data), std::iostream(&m_vs) {}
     pos_type seekg(off_type off, std::ios_base::seekdir dir,
                    std::ios_base::openmode which = std::ios_base::in) {
         if (!good()) {

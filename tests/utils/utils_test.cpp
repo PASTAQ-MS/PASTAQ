@@ -4,12 +4,12 @@
 #include "mock_stream.hpp"
 
 TEST_CASE("MockStream") {
-    SUBCASE("Data access methods (RO)") {
+    SUBCASE("Data access methods <char>(RO)") {
         auto data = std::vector<char>{
             1, 2, 3, 4, 5,  // Row 1
             6, 7, 8, 9, 1,  // Row 2
         };
-        MockStream stream(data);
+        MockStream<char> stream(data);
         CHECK(stream.peek() == 1);
         CHECK(stream.good());
         CHECK(stream.tellg() == 0);
@@ -37,5 +37,44 @@ TEST_CASE("MockStream") {
         CHECK(stream.peek() == 1);
         CHECK(stream.good());
         CHECK(stream.tellg() == 9);
+    }
+
+    SUBCASE("Data access methods <int>(RO)") {
+        auto data = std::vector<int>{
+            1, 2, 3, 4, 5,  // Row 1
+            6, 7, 8, 9, 1,  // Row 2
+        };
+        MockStream<int> stream(data);
+        // Reading the data element by element.
+        int ret = -1;
+        for (const auto& e : data) {
+            stream.read((char*)&ret, sizeof(int));
+            CHECK(ret == e);
+            CHECK(stream.good());
+            std::cout << stream.eof() << std::endl;
+        }
+        // Attempting to read past the number of elements contained results in
+        // stream failure.
+        stream.read((char*)&ret, sizeof(int));
+        CHECK_FALSE(stream.good());
+    }
+
+    SUBCASE("Data access methods <double>(RO)") {
+        auto data = std::vector<double>{
+            1, 2, 3, 4, 5,  // Row 1
+            6, 7, 8, 9, 1,  // Row 2
+        };
+        MockStream<double> stream(data);
+        double ret = -1;
+        for (const auto& e : data) {
+            stream.read((char*)&ret, sizeof(double));
+            CHECK(ret == e);
+            CHECK(stream.good());
+            std::cout << stream.eof() << std::endl;
+        }
+        // Attempting to read past the number of elements contained results in
+        // stream failure.
+        stream.read((char*)&ret, sizeof(double));
+        CHECK_FALSE(stream.good());
     }
 }
