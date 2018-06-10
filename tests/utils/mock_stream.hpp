@@ -1,5 +1,5 @@
-#ifndef TESTUTILS_UTILS_HPP
-#define TESTUTILS_UTILS_HPP
+#ifndef TESTUTILS_MOCKSTREAM_HPP
+#define TESTUTILS_MOCKSTREAM_HPP
 
 #include <iostream>
 #include <streambuf>
@@ -55,4 +55,4 @@ struct MockStream : public std::iostream {
     }
 };
 
-#endif /* TESTUTILS_UTILS_HPP */
+#endif /* TESTUTILS_MOCKSTREAM_HPP */
