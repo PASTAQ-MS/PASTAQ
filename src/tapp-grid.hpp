@@ -42,6 +42,13 @@ struct SmoothingParams {
     double sigma_rt;
 };
 
+// This groups all parameters that can be used for operating with Grid objects.
+struct Parameters {
+    Dimensions dimensions;
+    Bounds bounds;
+    SmoothingParams smoothing_params;
+};
+
 class Interface {
    public:
     // Get the value stored at the given position.
