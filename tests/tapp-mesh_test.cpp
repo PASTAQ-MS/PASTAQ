@@ -154,8 +154,8 @@ TEST_CASE("Loading/Saving data from the dat file") {
         CHECK(mesh.bounds().max_mz == bounds.max_mz);
         CHECK(mesh.bounds().min_rt == bounds.min_rt);
         CHECK(mesh.bounds().max_rt == bounds.max_rt);
-        for (unsigned int j = 0; j < 2; j++) {
-            for (unsigned int i = 0; i < 5; ++i) {
+        for (size_t j = 0; j < 2; j++) {
+            for (size_t i = 0; i < 5; ++i) {
                 CHECK(data[i + 5 * j] == mesh.value_at(i, j).value());
             }
         }
@@ -163,8 +163,8 @@ TEST_CASE("Loading/Saving data from the dat file") {
         VectorStream output_vector_stream(output_data);
         std::iostream output_stream(&output_vector_stream);
         CHECK(mesh.write_dat(output_stream));
-        for (unsigned int j = 0; j < 2; j++) {
-            for (unsigned int i = 0; i < 5; ++i) {
+        for (size_t j = 0; j < 2; j++) {
+            for (size_t i = 0; i < 5; ++i) {
                 CHECK(output_data[i + 5 * j] == mesh.value_at(i, j).value());
             }
         }

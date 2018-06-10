@@ -32,8 +32,8 @@ bool Grid::splat(Grid::Interface &grid, double mz, double rt, double value) {
 
     double x0 = mz;
     double y0 = rt;
-    for (unsigned int j = j_min; j <= j_max; ++j) {
-        for (unsigned int i = i_min; i <= i_max; ++i) {
+    for (size_t j = j_min; j <= j_max; ++j) {
+        for (size_t i = i_min; i <= i_max; ++i) {
             // No need to do boundary check, since we are sure we are inside the
             // grid.
             double x = grid.mz_at(i).value();

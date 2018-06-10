@@ -1,5 +1,4 @@
 #include "tapp-datfile.hpp"
-#include <cstdint>
 #include <iostream>
 #include <string>
 
@@ -42,20 +41,20 @@ std::optional<Grid::Parameters> DatFile::load_parameters(std::istream &stream) {
         std::cout << stream.tellg() << std::endl;
         stream.seekg(0, stream.beg);
         std::cout << stream.tellg() << std::endl;
-        //auto stream_beg = stream.tellg();
+        // auto stream_beg = stream.tellg();
 
         // Get to the end of the file to read the file footer.
-        //stream.seekg(0, stream.end);
+        // stream.seekg(0, stream.end);
         // Read the length of the footer.
         char footer_length = 0;
-        std::cout << "GOOD STREAM? "  << stream.good() << std::endl;
-        std::cout << "BEFORE: "  << int(footer_length) << std::endl;
+        std::cout << "GOOD STREAM? " << stream.good() << std::endl;
+        std::cout << "BEFORE: " << int(footer_length) << std::endl;
         footer_length = stream.peek();
-        //stream.read(&footer_length, 1);
-        std::cout << "AFTER: "  << int(footer_length) << std::endl;
-        std::cout << "GOOD STREAM? "  << stream.good() << std::endl;
+        // stream.read(&footer_length, 1);
+        std::cout << "AFTER: " << int(footer_length) << std::endl;
+        std::cout << "GOOD STREAM? " << stream.good() << std::endl;
         std::cout << stream.tellg() << std::endl;
-        //stream.seekg(0, stream.beg);
+        // stream.seekg(0, stream.beg);
         std::cout << stream.tellg() << std::endl;
         return parameters;
     }

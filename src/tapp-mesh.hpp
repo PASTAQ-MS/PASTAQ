@@ -27,7 +27,8 @@ class RegularMesh : public Grid::Interface {
     // binary data instead of reading from two different files, .mesh and .dat.
     // The header on the .dat file will contain all the relevant parameters
     // necessary to interpret the data.
-    //     see: https://stackoverflow.com/questions/416436/what-to-put-in-a-binary-data-files-header
+    //     see:
+    //     https://stackoverflow.com/questions/416436/what-to-put-in-a-binary-data-files-header
     bool load_dat(std::istream &stream, Grid::Dimensions dimensions,
                   Grid::Bounds bounds, Instrument::Type instrument_type,
                   Grid::SmoothingParams smoothing_params);
@@ -36,12 +37,12 @@ class RegularMesh : public Grid::Interface {
     bool write_dat(std::ostream &stream);
 
     // Implementation methods for Grid::Interface.
-    std::optional<double> value_at(unsigned int i, unsigned int j) override;
-    bool set_value(unsigned int i, unsigned int j, double value) override;
-    std::optional<double> mz_at(unsigned int i) override;
-    std::optional<double> rt_at(unsigned int j) override;
-    std::optional<unsigned int> x_index(double mz) override;
-    std::optional<unsigned int> y_index(double rt) override;
+    std::optional<double> value_at(uint32_t i, uint32_t j) override;
+    bool set_value(uint32_t i, uint32_t j, double value) override;
+    std::optional<double> mz_at(uint32_t i) override;
+    std::optional<double> rt_at(uint32_t j) override;
+    std::optional<uint32_t> x_index(double mz) override;
+    std::optional<uint32_t> y_index(double rt) override;
     double sigma_mz(double mz) override;
     double sigma_rt() override;
     Grid::Dimensions dim() override;
