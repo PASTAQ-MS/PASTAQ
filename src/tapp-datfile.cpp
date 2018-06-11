@@ -1,8 +1,8 @@
-#include "tapp-datfile.hpp"
 #include <iostream>
 #include <string>
 
-// TODO: Should we have a function to verify if the parameters are correct?
+#include "tapp-datfile.hpp"
+
 bool Grid::File::load(std::istream &stream, std::vector<double> *destination,
                       Grid::Parameters *parameters) {
     if (Grid::File::load_parameters(stream, parameters)) {

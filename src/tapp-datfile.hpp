@@ -3,16 +3,13 @@
 
 #include "tapp-grid.hpp"
 
-// TODO: This binary file will contain the data at the beginning followed by
+// This binary file contains the data at the beginning followed by
 // a header with the parameters that we need to interpret the data properly.
-// Hopefully doing it this way will make it so it is compatible with the
-// existing solutions.
-// TODO: This reader/writer module should deal properly with endianness. We will
-// save the data as little-endian and if we encounter an architecture that is
-// big endian we will swap the bytes around.
+// The data is stored in little endian format and using 64 bits of precision for
+// double floating points values.
 namespace Grid::File {
 
-// This structure will be saved after the parameters as a way to extract and
+// This structure is saved after the parameters as a way to extract and
 // interpret the footer data with the grid parameters. For now, saving the
 // spec_version in case we need to do revisions to the format in the future.
 struct Parameters {
