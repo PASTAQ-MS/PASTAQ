@@ -5,7 +5,7 @@
 #include "xml_reader.hpp"
 
 // Read the next mz1 scan from the stream.
-std::vector<XmlReader::Scan> XmlReader::read_next_scan(
+std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
     std::istream& stream, Grid::Parameters& parameters) {
     std::vector<XmlReader::Scan> scans;
     while (stream.good()) {
@@ -14,20 +14,49 @@ std::vector<XmlReader::Scan> XmlReader::read_next_scan(
             continue;
         }
         if (tag.value().name == "scan" && !tag.value().closed) {
-            std::cout << "SCAN FOUND:" << std::endl;
-            for (const auto& e : tag.value().attributes) {
-                std::cout << e.first << " = " << e.second << std::endl;
+            auto attributes = tag.value().attributes;
+            // We are only interested on ms1 scans for now.
+            if (attributes["msLevel"] != "1") {
+                continue;
             }
-            
+            // Extract the peak count.
+            if (attributes.find("peaksCount") == attributes.end()) {
+                return std::nullopt;
+            }
+            int peaks_count = std::stoi(attributes["peaksCount"]);
+
+            // Extract the retention time.
+            if (attributes.find("retentionTime") == attributes.end()) {
+                return std::nullopt;
+            }
+            std::regex rt_regex("PT([[:digit:]]+.?[[:digit:]]+)S");
+            std::smatch matches;
+            if (!std::regex_search(attributes["retentionTime"], matches,
+                                  rt_regex) || matches.size() != 2) {
+                // Handle error retentionTime does not match regex for numeric
+                // extraction.
+                return std::nullopt;
+            }
+            double retention_time = std::stod(matches[1]);
+
+            // Check if we are on the desired region as defined by Grid::Bounds.
+            if (retention_time < parameters.bounds.min_rt) {
+                continue;
+            }
+            // Assuming linearity of the retention time on the mzXML file. We stop
+            // searching for the scan, since we are out of bounds.
+            if (retention_time > parameters.bounds.max_rt) {
+                return std::nullopt;
+            }
         }
     }
-    return scans;
+    return std::nullopt;
 }
 
 // TODO: Should fix the parser to accept spaces in quoted strings.
-// TODO: This is a very naive way of performing the tag parsing, going through it
-// character by character. We should evaluate the performance and see if it is
-// worth to make it faster by buffering.
+// TODO: This is a very naive way of performing the tag parsing, going through
+// it character by character. We should evaluate the performance and see if it
+// is worth to make it faster by buffering.
 std::optional<XmlReader::Tag> XmlReader::read_tag(std::istream& stream) {
     bool is_closed = false;
     bool reading_content = false;

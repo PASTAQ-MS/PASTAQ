@@ -17,8 +17,8 @@ struct Scan {
     double value;
 };
 
-std::vector<Scan>
-read_next_scan(std::istream& stream, Grid::Parameters& parameters);
+std::optional<std::vector<Scan>> read_next_scan(std::istream& stream,
+                                                Grid::Parameters& parameters);
 std::optional<Tag> read_tag(std::istream& stream);
 
 }  // namespace XmlReader

@@ -44,41 +44,7 @@
     //}
 //}
 
-//static const char* mz_xml_data = R"mz_xml(
-    //<?xml version="1.0" encoding="ISO-8859-1"?>
-    //<mzXML xmlns="http://sashimi.sourceforge.net/schema_revision/mzXML_3.2"
-        //xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        //xsi:schemaLocation="http://sashimi.sourceforge.net/schema_revision/mzXML_3.2 http://sashimi.sourceforge.net/schema_revision/mzXML_3.2/mzXML_idx_3.2.xsd">
-    //<msRun scanCount="41479" startTime="PT0.105449S" endTime="PT7499.98S">
-        //<parentFile fileName="file:///M:\MSData\MYakovleva/150210_11_01.raw"
-                    //fileType="RAWData"
-                    //fileSha1="567ff0b2bb506ddff54f7a862e441ec06f7ce6ec"/>
-        //<msInstrument msInstrumentID="1">
-        //<msManufacturer category="msManufacturer" value="Thermo Scientific"/>
-        //<msModel category="msModel" value="Q Exactive"/>
-        //<msIonisation category="msIonisation" value="nanoelectrospray"/>
-        //<msMassAnalyzer category="msMassAnalyzer" value="quadrupole"/>
-        //<msDetector category="msDetector" value="inductive detector"/>
-        //<software type="acquisition" name="Xcalibur" version="2.3-176401/2.3.0.1765"/>
-        //</msInstrument>
-        //<dataProcessing>
-        //<software type="conversion" name="ProteoWizard software" version="3.0.5533"/>
-        //<processingOperation name="Conversion to mzML"/>
-        //</dataProcessing>
-        //<scan num="1"
-            //scanType="Full"
-            //centroided="0"
-            //msLevel="1"
-            //peaksCount="203"
-            //polarity="+"
-            //retentionTime="PT0.105449S"
-            //lowMz="346.523396127795"
-            //highMz="1818.208877852599"
-            //basePeakMz="1570.170703"
-            //basePeakIntensity="5349.8892"
-            //totIonCurrent="66361.031000000003">
-    //)mz_xml";
-static const char* mz_xml_data = R"mz_xml(
+const char* mz_xml_data = R"mz_xml(
     <?xml version="1.0" encoding="ISO-8859-1"?>
     <mzXML xmlns="http://sashimi.sourceforge.net/schema_revision/mzXML_3.2"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -120,7 +86,7 @@ static const char* mz_xml_data = R"mz_xml(
         <scan num="2"
             scanType="Full"
             centroided="0"
-            msLevel="1"
+            msLevel="2"
             peaksCount="11149"
             polarity="+"
             retentionTime="PT0.564456S"
