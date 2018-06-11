@@ -119,7 +119,8 @@ TEST_CASE("Loading/Saving data from the dat file") {
             // Save mesh to a dat file.
             auto mesh = RegularMesh({4, 10}, {0.0, 75.0, 200.0, 800.0},
                                     Instrument::QUAD, {200, 0.01, 1.0});
-            std::ofstream fileout("foo.dat", std::ios::out | std::ios::binary);
+            std::ofstream fileout("test_dat_file.dat",
+                                  std::ios::out | std::ios::binary);
             mesh.set_value(0, 0, 10.0);
             mesh.set_value(1, 1, 2.0);
             mesh.set_value(0, 1, 20.0);
@@ -127,7 +128,8 @@ TEST_CASE("Loading/Saving data from the dat file") {
         }
         {
             // Reload the previously saved mesh.
-            std::ifstream filein("foo.dat", std::ios::in | std::ios::binary);
+            std::ifstream filein("test_dat_file.dat",
+                                 std::ios::in | std::ios::binary);
             auto mesh = RegularMesh({}, {}, Instrument::QUAD, {});
             CHECK(mesh.load_dat(filein, {4, 10}, {0.0, 75.0, 200.0, 800.0},
                                 Instrument::QUAD, {200, 0.01, 1.0}));
