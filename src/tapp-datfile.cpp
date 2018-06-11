@@ -35,8 +35,8 @@ bool DatFile::load_parameters(std::istream &stream,
     stream.seekg(-1, std::ios::end);
     stream.seekg(-1 * stream.peek(), std::ios::end);
     // Read the parameters into the Grid::Parameters object. Note that we are
-    // not making use of the DatFile::Parameters.spec_version yet, we always
-    // read the data in the same way for now.
+    // not making use of the DatFile::Parameters.spec_version yet, for now we
+    // always read the data in the same way.
     stream.read(reinterpret_cast<char *>(parameters), sizeof(Grid::Parameters));
     return stream.good();
 }

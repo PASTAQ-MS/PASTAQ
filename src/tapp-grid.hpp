@@ -58,6 +58,9 @@ struct Parameters {
     char flags = 0x00;
 };
 
+// TODO: Instead of having to implement this for every particular function, we
+// could make it so that these functions are dependant only on the given
+// Grid::Parameters.
 class Interface {
    public:
     // Get the value stored at the given position.
