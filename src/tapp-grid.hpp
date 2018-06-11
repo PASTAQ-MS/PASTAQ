@@ -2,6 +2,7 @@
 #define TAPP_GRID_GRID_HPP
 
 #include <optional>
+#include <vector>
 
 namespace Instrument {
 
@@ -100,7 +101,20 @@ class Interface {
 
 // Perform gaussian splatting of the given point into the grid, returns the
 // success or failure of the operation.
-bool splat(Grid::Interface &grid, double mz, double rt, double value);
+bool splat(double mz, double rt, double value, Grid::Parameters& parameters,
+           std::vector<double>& data);
+
+std::optional<double> value_at(unsigned int i, unsigned int j,
+                               Parameters& parameters,
+                               std::vector<double> data);
+bool set_value(unsigned int i, unsigned int j, double value,
+               Parameters& parameters, std::vector<double>& data);
+std::optional<double> mz_at(unsigned int i, Parameters& parameters);
+std::optional<double> rt_at(unsigned int j, Parameters& parameters);
+std::optional<unsigned int> x_index(double mz, Parameters& parameters);
+std::optional<unsigned int> y_index(double rt, Parameters& parameters);
+double sigma_mz(double mz, Parameters& parameters);
+double sigma_rt(Parameters& parameters);
 
 }  // namespace Grid
 

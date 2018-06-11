@@ -3,7 +3,6 @@
 
 #include "doctest.h"
 #include "tapp-grid.hpp"
-#include "tapp-mesh.hpp"
 
 TEST_CASE("Gaussian splatting") {
     // For testing purposes we will set the bounds to [-3 * sigma, +3 * sigma]
@@ -13,11 +12,14 @@ TEST_CASE("Gaussian splatting") {
     double sigma_rt = 1.0;
 
     SUBCASE("Splat on the cencer of the mesh") {
-        auto mesh = RegularMesh(
+        Grid::Parameters parameters = {
             {7, 7},
             {-3.0 * sigma_rt, 3.0 * sigma_rt, -3.0 * sigma_mz, 3.0 * sigma_mz},
-            Instrument::QUAD, {1.0, sigma_mz, 1.0});
-        Grid::splat(mesh, 0.0, 0.0, 1);
+            {1.0, sigma_mz, 1.0},
+            Instrument::QUAD};
+        std::vector<double> data(parameters.dimensions.n *
+                                 parameters.dimensions.m);
+        Grid::splat(0.0, 0.0, 1, parameters, data);
         std::vector<std::string> expected_weights = {
             "0.000000", "0.000000", "0.000000", "0.000000",
             "0.000000", "0.000000", "0.000000",  // Row 0
@@ -37,32 +39,38 @@ TEST_CASE("Gaussian splatting") {
         for (size_t j = 0; j < 7; j++) {
             for (size_t i = 0; i < 7; ++i) {
                 CHECK(expected_weights[i + 7 * j] ==
-                      std::to_string(mesh.value_at(i, j).value()));
+                      std::to_string(
+                          Grid::value_at(i, j, parameters, data).value()));
             }
         }
     }
 
-    // Point is totally outside the grid.
     SUBCASE("Splatting outside the grid fails") {
-        auto mesh = RegularMesh(
+        Grid::Parameters parameters = {
             {7, 7},
             {-3.0 * sigma_rt, 3.0 * sigma_rt, -3.0 * sigma_mz, 3.0 * sigma_mz},
-            Instrument::QUAD, {1.0, sigma_mz, 1.0});
-        CHECK_FALSE(Grid::splat(mesh, -20.0, -20.0, 1));
-        CHECK_FALSE(Grid::splat(mesh, 20.0, 20.0, 1));
-        CHECK_FALSE(Grid::splat(mesh, -20.0, 20.0, 1));
-        CHECK_FALSE(Grid::splat(mesh, 20.0, +20.0, 1));
+            {1.0, sigma_mz, 1.0},
+            Instrument::QUAD};
+        std::vector<double> data(parameters.dimensions.n *
+                                 parameters.dimensions.m);
+        CHECK_FALSE(Grid::splat(-20.0, -20.0, 1, parameters, data));
+        CHECK_FALSE(Grid::splat(20.0, 20.0, 1, parameters, data));
+        CHECK_FALSE(Grid::splat(-20.0, 20.0, 1, parameters, data));
+        CHECK_FALSE(Grid::splat(20.0, +20.0, 1, parameters, data));
     }
 
     SUBCASE("Splat outside but range falls inside") {
-        auto mesh = RegularMesh(
+        Grid::Parameters parameters = {
             {7, 7},
             {-3.0 * sigma_rt, 3.0 * sigma_rt, -3.0 * sigma_mz, 3.0 * sigma_mz},
-            Instrument::QUAD, {1.0, sigma_mz, 1.0});
-        CHECK(Grid::splat(mesh, -5.0, 0.0, 1));
-        CHECK(Grid::splat(mesh, 5.0, 0.0, 1));
-        CHECK(Grid::splat(mesh, 0.0, -5.0, 1));
-        CHECK(Grid::splat(mesh, 0.0, 5.0, 1));
+            {1.0, sigma_mz, 1.0},
+            Instrument::QUAD};
+        std::vector<double> data(parameters.dimensions.n *
+                                 parameters.dimensions.m);
+        CHECK(Grid::splat(-5.0, 0.0, 1, parameters, data));
+        CHECK(Grid::splat(5.0, 0.0, 1, parameters, data));
+        CHECK(Grid::splat(0.0, -5.0, 1, parameters, data));
+        CHECK(Grid::splat(0.0, 5.0, 1, parameters, data));
         std::vector<std::string> expected_weights = {
             "0.000000", "0.018316", "0.082085", "0.135335",
             "0.082085", "0.018316", "0.000000",  // Row 0
@@ -82,7 +90,8 @@ TEST_CASE("Gaussian splatting") {
         for (size_t j = 0; j < 7; j++) {
             for (size_t i = 0; i < 7; ++i) {
                 CHECK(expected_weights[i + 7 * j] ==
-                      std::to_string(mesh.value_at(i, j).value()));
+                      std::to_string(
+                          Grid::value_at(i, j, parameters, data).value()));
             }
         }
     }
