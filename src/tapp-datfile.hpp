@@ -10,7 +10,7 @@
 // TODO: This reader/writer module should deal properly with endianness. We will
 // save the data as little-endian and if we encounter an architecture that is
 // big endian we will swap the bytes around.
-namespace DatFile {
+namespace Grid::File {
 
 // This structure will be saved after the parameters as a way to extract and
 // interpret the footer data with the grid parameters. For now, saving the
@@ -49,4 +49,4 @@ bool save_uint32(std::ostream &stream, uint32_t i);
 bool load_double(std::istream &stream, double *d);
 bool save_double(std::ostream &stream, double d);
 
-}  // namespace DatFile
+}  // namespace Grid::File
