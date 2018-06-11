@@ -19,6 +19,7 @@ endif()
 add_library(grid
     "${CMAKE_CURRENT_SOURCE_DIR}/src/grid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/grid_file.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/xml_reader.cpp"
     )
 target_include_directories(grid PUBLIC src)
 
@@ -39,6 +40,7 @@ if (DOCTEST_LIBRARY_PATH)
         tests/main.cpp
         tests/grid_test.cpp
         tests/grid_file_test.cpp
+        tests/xml_reader_test.cpp
         )
     add_test(NAME grid_test COMMAND grid_test)
     target_link_libraries(grid_test doctest grid)

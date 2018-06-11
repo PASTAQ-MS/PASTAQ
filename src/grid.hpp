@@ -57,6 +57,7 @@ struct Parameters {
 
 // Perform gaussian splatting of the given point into the grid, returns the
 // success or failure of the operation.
+// TODO: Sould we pass the point as a struct {mz, rt, value}?
 bool splat(double mz, double rt, double value, Grid::Parameters& parameters,
            std::vector<double>& data);
 
