@@ -3,7 +3,7 @@
 #include <streambuf>
 
 #include "doctest.h"
-#include "tapp-datfile.hpp"
+#include "grid_file.hpp"
 #include "utils/mock_stream.hpp"
 
 TEST_CASE("Writing functions to stream") {

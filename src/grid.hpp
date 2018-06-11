@@ -1,5 +1,5 @@
-#ifndef TAPP_GRID_GRID_HPP
-#define TAPP_GRID_GRID_HPP
+#ifndef GRID_GRID_HPP
+#define GRID_GRID_HPP
 
 #include <optional>
 #include <vector>
@@ -93,4 +93,4 @@ double sigma_rt(Parameters& parameters);
 
 }  // namespace Grid
 
-#endif /* TAPP_GRID_GRID_HPP */
+#endif /* GRID_GRID_HPP */

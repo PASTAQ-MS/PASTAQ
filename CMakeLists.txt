@@ -1,4 +1,4 @@
-project(tapp-grid)
+project(grid)
 
 cmake_minimum_required(VERSION 3.1)
 
@@ -16,11 +16,11 @@ if (MSVC)
 endif()
 
 # Include library target.
-add_library(tapp-grid
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/tapp-grid.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/tapp-datfile.cpp"
+add_library(grid
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid_file.cpp"
     )
-target_include_directories(tapp-grid PUBLIC src)
+target_include_directories(grid PUBLIC src)
 
 # Include tests if testing library is present.
 unset(DOCTEST_LIBRARY_PATH CACHE)
@@ -35,13 +35,13 @@ if (DOCTEST_LIBRARY_PATH)
     target_include_directories(doctest INTERFACE ext/doctest/doctest)
     enable_testing()
     add_executable(
-        tapp-grid_test
+        grid_test
         tests/main.cpp
-        tests/tapp-grid_test.cpp
-        tests/tapp-datfile_test.cpp
+        tests/grid_test.cpp
+        tests/grid_file_test.cpp
         )
-    add_test(NAME tapp-grid_test COMMAND tapp-grid_test)
-    target_link_libraries(tapp-grid_test doctest tapp-grid)
+    add_test(NAME grid_test COMMAND grid_test)
+    target_link_libraries(grid_test doctest grid)
 
     add_executable(
         test-utils_test

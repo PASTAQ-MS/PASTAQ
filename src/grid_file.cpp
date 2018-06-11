@@ -1,7 +1,7 @@
 #include <iostream>
 #include <string>
 
-#include "tapp-datfile.hpp"
+#include "grid_file.hpp"
 
 bool Grid::File::load(std::istream &stream, std::vector<double> *destination,
                       Grid::Parameters *parameters) {

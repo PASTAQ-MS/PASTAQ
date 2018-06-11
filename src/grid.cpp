@@ -1,6 +1,6 @@
 #include <cmath>
 
-#include "tapp-grid.hpp"
+#include "grid.hpp"
 
 bool Grid::splat(double mz, double rt, double value,
                  Grid::Parameters& parameters, std::vector<double>& data) {

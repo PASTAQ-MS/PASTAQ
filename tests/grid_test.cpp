@@ -2,7 +2,7 @@
 #include <vector>
 
 #include "doctest.h"
-#include "tapp-grid.hpp"
+#include "grid.hpp"
 
 TEST_CASE("Gaussian splatting") {
     // For testing purposes we will set the bounds to [-3 * sigma, +3 * sigma]

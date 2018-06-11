@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
 
-#include "tapp-grid.hpp"
+#include "grid.hpp"
 
 // This binary file contains the data at the beginning followed by
 // a header with the parameters that we need to interpret the data properly.
