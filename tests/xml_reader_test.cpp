@@ -107,6 +107,6 @@ TEST_CASE("Reading scans") {
     auto stream = std::stringstream(mz_xml_data);
     Grid::Parameters parameters = {
         {4, 4}, {0.0, 75.0, 200.0, 800.0}, {200, 0.01, 1.0}, Instrument::QUAD};
-    XmlReader::read_next_scan(stream, parameters);
-    CHECK(1 == 0);
+    CHECK(XmlReader::read_next_scan(stream, parameters));
+    //CHECK(1 == 0);
 }

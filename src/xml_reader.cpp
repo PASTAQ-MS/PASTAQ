@@ -7,7 +7,6 @@
 // Read the next mz1 scan from the stream.
 std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
     std::istream& stream, Grid::Parameters& parameters) {
-    std::vector<XmlReader::Scan> scans;
     while (stream.good()) {
         auto tag = XmlReader::read_tag(stream);
         if (!tag) {
@@ -32,7 +31,8 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
             std::regex rt_regex("PT([[:digit:]]+.?[[:digit:]]+)S");
             std::smatch matches;
             if (!std::regex_search(attributes["retentionTime"], matches,
-                                  rt_regex) || matches.size() != 2) {
+                                   rt_regex) ||
+                matches.size() != 2) {
                 // Handle error retentionTime does not match regex for numeric
                 // extraction.
                 return std::nullopt;
@@ -43,11 +43,35 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
             if (retention_time < parameters.bounds.min_rt) {
                 continue;
             }
-            // Assuming linearity of the retention time on the mzXML file. We stop
-            // searching for the scan, since we are out of bounds.
+            // Assuming linearity of the retention time on the mzXML file. We
+            // stop searching for the scan, since we are out of bounds.
             if (retention_time > parameters.bounds.max_rt) {
                 return std::nullopt;
             }
+
+            // Fetch the peaks tag.
+            auto peaks_tag = XmlReader::read_tag(stream);
+            while (peaks_tag) {
+                if (peaks_tag.value().name == "scan" &&
+                    peaks_tag.value().closed) {
+                    return std::nullopt;
+                }
+                if (peaks_tag.value().name == "peaks") {
+                    break;
+                }
+                peaks_tag = XmlReader::read_tag(stream);
+            }
+
+            // TODO: Extract the precision from the peaks tag.
+            // TODO: Extract the byteOrder from the peaks tag.
+            // TODO: Extract the contentType from the peaks tag and exit if it
+            // is not `m/z-int`.
+            // TODO: Extract the peaks from the data, performing the Base64
+            // decoding in the process.
+            // TODO: We don't need to extract the peaks when we are not inside the
+            // mz bounds.
+            std::vector<XmlReader::Scan> scans;
+            return scans;
         }
     }
     return std::nullopt;
