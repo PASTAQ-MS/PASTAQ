@@ -22,8 +22,8 @@ struct Parameters {
 
 // Load an entire file from the binary stream into the destination vector and
 // the parameters structure.
-bool load(std::istream &stream, std::vector<double> &destination,
-          Grid::Parameters &parameters);
+bool load(std::istream &stream, std::vector<double> *destination,
+          Grid::Parameters *parameters);
 
 // Load the parameters from the footer of the binary stream.
 bool load_parameters(std::istream &stream, Grid::Parameters *parameters);
@@ -31,8 +31,8 @@ bool write_parameters(std::ostream &stream, Grid::Parameters &parameters);
 
 // Write the entire source vector and parameters struct into the destination
 // binary stream.
-bool write(std::ostream &stream, const std::vector<double> &source,
-           const Grid::Parameters &parameters);
+bool write(std::ostream &stream, std::vector<double> &source,
+           Grid::Parameters &parameters);
 
 // TODO(alex): Allow for reading or loading specific ranges.
 // bool load_range(std::istream &stream, const Grid::Bounds &bounds,

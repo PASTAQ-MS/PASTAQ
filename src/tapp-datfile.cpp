@@ -2,31 +2,25 @@
 #include <iostream>
 #include <string>
 
-bool DatFile::load(std::istream &stream, std::vector<double> &destination,
-                   Grid::Parameters &parameters) {
-    if (stream.good()) {
-        // Reading all data from the stream into m_data.
-        // m_data.resize(dimensions.n * dimensions.m);
-        // m_dimensions = dimensions;
-        // m_bounds = bounds;
-        // m_instrument_type = instrument_type;
-        // m_smoothing_params = smoothing_params;
-        // if (stream.read(reinterpret_cast<char *>(&m_data[0]),
-        // m_data.size() * sizeof(double))) {
-        // return true;
-        //}
+// TODO: Should we have a function to verify if the parameters are correct?
+bool DatFile::load(std::istream &stream, std::vector<double> *destination,
+                   Grid::Parameters *parameters) {
+    if (DatFile::load_parameters(stream, parameters)) {
+        auto n_points = parameters->dimensions.n * parameters->dimensions.m;
+        destination->resize(n_points);
+        stream.seekg(0, std::ios::beg);
+        stream.read(reinterpret_cast<char *>(&(*destination)[0]),
+                    sizeof(double) * n_points);
     }
-    return false;
+    return stream.good();
 }
 
-bool DatFile::write(std::ostream &stream, const std::vector<double> &source,
-                    const Grid::Parameters &parameters) {
-    // if (stream.good()) {
-    // stream.write(reinterpret_cast<char *>(&source[0]),
-    // sizeof(double) * m_data.size());
-    // return stream.good();
-    //}
-    return false;
+bool DatFile::write(std::ostream &stream, std::vector<double> &source,
+                    Grid::Parameters &parameters) {
+    stream.write(reinterpret_cast<char *>(&source[0]),
+                 sizeof(double) * source.size());
+    DatFile::write_parameters(stream, parameters);
+    return stream.good();
 }
 
 bool DatFile::load_parameters(std::istream &stream,
