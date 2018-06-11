@@ -13,11 +13,7 @@ enum Type : char { QUAD, TOF, FTICR, ORBITRAP };
 namespace Grid {
 
 // Flags
-enum Flags : char {
-    WARPED_MESH = 0b00000001,
-    PRECISION_64 = 0b00000010,
-    OTHER_FLAG = 0b00000100,
-};
+enum Flags : char { WARPED_MESH = 0b00000001 };
 
 // Represent the grid dimensions in index coordinates:
 //   (n == number of columns == Number of points in mz)
@@ -59,61 +55,40 @@ struct Parameters {
     char flags = 0x00;
 };
 
-// TODO: Instead of having to implement this for every particular function, we
-// could make it so that these functions are dependant only on the given
-// Grid::Parameters.
-class Interface {
-   public:
-    // Get the value stored at the given position.
-    virtual std::optional<double> value_at(unsigned int i, unsigned int j) = 0;
-
-    // Set the value at the given position. Returns the success or failure of
-    // the operation.
-    virtual bool set_value(unsigned int i, unsigned int j, double value) = 0;
-
-    // Get the real world mass/charge stored in the given index.
-    virtual std::optional<double> mz_at(unsigned int i) = 0;
-
-    // Get the real world retention time stored in the given index.
-    virtual std::optional<double> rt_at(unsigned int j) = 0;
-
-    // Get the x index of the closest point (rounded down) for a given mz.
-    virtual std::optional<unsigned int> x_index(double mz) = 0;
-
-    // Get the y index of the closest point (rounded down) for a given rt.
-    virtual std::optional<unsigned int> y_index(double rt) = 0;
-
-    // Get the sigma_mz used for smoothing. In order to maintain the same number
-    // of sampling points for smoothing across all the mz range of the
-    // instrument, we need to scale the sigma accordingly.
-    virtual double sigma_mz(double mz) = 0;
-
-    // Get the sigma_rt used for smoothing.
-    virtual double sigma_rt() = 0;
-
-    // Return the dimensions of the Grid in index coordinates:
-    //   i <- [0,N], j <- [0,M]
-    virtual Dimensions dim() = 0;
-
-    // Return the bounds of the grid.
-    virtual Bounds bounds() = 0;
-};
-
 // Perform gaussian splatting of the given point into the grid, returns the
 // success or failure of the operation.
 bool splat(double mz, double rt, double value, Grid::Parameters& parameters,
            std::vector<double>& data);
 
+// Get the value stored at the given position of the given data vector.
 std::optional<double> value_at(unsigned int i, unsigned int j,
                                Parameters& parameters,
-                               std::vector<double> data);
+                               std::vector<double>& data);
+
+// Set the value at the given position for the given data vector. Returns the
+// success or failure of the operation.
 bool set_value(unsigned int i, unsigned int j, double value,
                Parameters& parameters, std::vector<double>& data);
+
+// Get the real world mass/charge stored in the given index for the given
+// parameters.
 std::optional<double> mz_at(unsigned int i, Parameters& parameters);
+
+// Get the real world retention time stored in the given index.
 std::optional<double> rt_at(unsigned int j, Parameters& parameters);
+
+// Get the x index of the closest point (rounded down) for a given mz.
 std::optional<unsigned int> x_index(double mz, Parameters& parameters);
+
+// Get the y index of the closest point (rounded down) for a given rt.
 std::optional<unsigned int> y_index(double rt, Parameters& parameters);
+
+// Get the sigma_mz used for smoothing. In order to maintain the same number
+// of sampling points for smoothing across all the mz range of the
+// instrument, we need to scale the sigma accordingly.
 double sigma_mz(double mz, Parameters& parameters);
+
+// Get the sigma_rt used for smoothing.
 double sigma_rt(Parameters& parameters);
 
 }  // namespace Grid

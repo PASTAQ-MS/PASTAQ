@@ -64,7 +64,7 @@ bool Grid::splat(double mz, double rt, double value,
 
 std::optional<double> Grid::value_at(unsigned int i, unsigned int j,
                                      Grid::Parameters& parameters,
-                                     std::vector<double> data) {
+                                     std::vector<double> &data) {
     if (data.empty() || i > parameters.dimensions.n - 1 ||
         j > parameters.dimensions.m - 1) {
         return std::nullopt;

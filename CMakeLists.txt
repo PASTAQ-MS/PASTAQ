@@ -16,12 +16,11 @@ if (MSVC)
 endif()
 
 # Include library target.
-add_library(tapp-mesh
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/tapp-mesh.cpp"
+add_library(tapp-grid
     "${CMAKE_CURRENT_SOURCE_DIR}/src/tapp-grid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/tapp-datfile.cpp"
     )
-target_include_directories(tapp-mesh PUBLIC src)
+target_include_directories(tapp-grid PUBLIC src)
 
 # Include tests if testing library is present.
 unset(DOCTEST_LIBRARY_PATH CACHE)
@@ -36,14 +35,13 @@ if (DOCTEST_LIBRARY_PATH)
     target_include_directories(doctest INTERFACE ext/doctest/doctest)
     enable_testing()
     add_executable(
-        tapp-mesh_test
+        tapp-grid_test
         tests/main.cpp
-        tests/tapp-mesh_test.cpp
         tests/tapp-grid_test.cpp
         tests/tapp-datfile_test.cpp
         )
-    add_test(NAME tapp-mesh_test COMMAND tapp-mesh_test)
-    target_link_libraries(tapp-mesh_test doctest tapp-mesh)
+    add_test(NAME tapp-grid_test COMMAND tapp-grid_test)
+    target_link_libraries(tapp-grid_test doctest tapp-grid)
 
     add_executable(
         test-utils_test

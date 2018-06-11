@@ -96,3 +96,34 @@ TEST_CASE("Gaussian splatting") {
         }
     }
 }
+
+TEST_CASE("Test the fetching of real world parameters from index") {
+    SUBCASE("An empty mesh should always return std::nullopt") {
+        Grid::Parameters parameters = {{0, 0},
+                                       {0.0, 75.0, 200.0, 800.0},
+                                       {200, 0.01, 1.0},
+                                       Instrument::QUAD};
+        CHECK(Grid::mz_at(0, parameters) == std::nullopt);
+        CHECK(Grid::mz_at(1, parameters) == std::nullopt);
+        CHECK(Grid::mz_at(2, parameters) == std::nullopt);
+        CHECK(Grid::rt_at(0, parameters) == std::nullopt);
+        CHECK(Grid::rt_at(1, parameters) == std::nullopt);
+        CHECK(Grid::rt_at(2, parameters) == std::nullopt);
+    };
+    SUBCASE("Proper interpolation if inside bounds or std::nullopt") {
+        Grid::Parameters parameters = {{4, 4},
+                                       {0.0, 75.0, 200.0, 800.0},
+                                       {200, 0.01, 1.0},
+                                       Instrument::QUAD};
+        CHECK(Grid::mz_at(0, parameters) == 200.0);
+        CHECK(Grid::mz_at(1, parameters) == 400.0);
+        CHECK(Grid::mz_at(2, parameters) == 600.0);
+        CHECK(Grid::mz_at(3, parameters) == 800.0);
+        CHECK(Grid::mz_at(4, parameters) == std::nullopt);
+        CHECK(Grid::rt_at(0, parameters) == 0.0);
+        CHECK(Grid::rt_at(1, parameters) == 25.0);
+        CHECK(Grid::rt_at(2, parameters) == 50.0);
+        CHECK(Grid::rt_at(3, parameters) == 75.0);
+        CHECK(Grid::rt_at(4, parameters) == std::nullopt);
+    };
+}
