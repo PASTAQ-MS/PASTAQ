@@ -116,9 +116,9 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
                 Base64::get_float_float(ptr, bit, mz, intensity, precision,
                                         little_endian);
                 // We don't need to extract the peaks when we are not inside
-                // the mz bounds.
+                // the mz bounds or contain no value.
                 if (mz < parameters.bounds.min_mz ||
-                    mz > parameters.bounds.max_mz) {
+                    mz > parameters.bounds.max_mz || intensity == 0) {
                     continue;
                 }
 
