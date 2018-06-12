@@ -1,3 +1,6 @@
+#ifndef GRID_XMLREADER_HPP
+#define GRID_XMLREADER_HPP
+
 #include <map>
 #include <optional>
 
@@ -46,7 +49,7 @@ const unsigned char translation_table[256] = {
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     64, 64, 64, 64, 64, 64, 64, 64, 64};
 
-inline static uint32_t get32(char *&p, int &bit, int littleendian) {
+inline static uint32_t get32(char *&p, int &bit, int little_endian) {
     // bit is either 0, 2, 4
     // indicates how many bits should be discarded
     unsigned int b;
@@ -80,11 +83,11 @@ inline static uint32_t get32(char *&p, int &bit, int littleendian) {
             bit = 0;
             break;
     }
-    //Swap::MakeInt32(b, littleendian);
+    // Swap::MakeInt32(b, little_endian);
     return b;
 }
 
-inline static uint64_t get64(char *&p, int &bit, int littleendian) {
+inline static uint64_t get64(char *&p, int &bit, int little_endian) {
     // bit is either 0, 2, 4
     // indicates how many bits should be discarded
     uint64_t b;
@@ -151,28 +154,23 @@ inline static uint64_t get64(char *&p, int &bit, int littleendian) {
     }
     b = (uint64_t)b1 << 32;
     b |= b2;
-    //Swap::MakeInt64(b, littleendian);
+    // Swap::MakeInt64(b, little_endian);
     return b;
 }
 
-inline static void get_float_float(char *&p, int &bit, double &f, double &i,
-                                   int precision, int littleendian) {
+// TODO: Can we make it so that we don't have to pass the 'bit' variable around?
+inline static std::optional<double> get_double(char *&p, int &bit, int precision,
+                                 int little_endian) {
     if (precision == 32) {
-        uint32_t b;
-        b = get32(p, bit, littleendian);
-        f = *(float *)&b;
-        b = get32(p, bit, littleendian);
-        i = *(float *)&b;
+        uint32_t b = get32(p, bit, little_endian);
+        return *(float *)&b;
     } else if (precision == 64) {
-        uint64_t b;
-        b = get64(p, bit, littleendian);
-        f = *(double *)&b;
-        b = get64(p, bit, littleendian);
-        i = *(double *)&b;
-    } else {
-        std::cout << "Not handled precision!";
-        exit(2);
+        uint64_t b = get64(p, bit, little_endian);
+        return *(double *)&b;
     }
+    return std::nullopt;
 }
 
 }  // namespace Base64
+
+#endif /* GRID_XMLREADER_HPP */

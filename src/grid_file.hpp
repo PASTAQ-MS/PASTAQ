@@ -1,3 +1,6 @@
+#ifndef GRID_GRIDFILE_HPP
+#define GRID_GRIDFILE_HPP
+
 #include <iostream>
 #include <vector>
 
@@ -47,3 +50,5 @@ bool load_double(std::istream &stream, double *d);
 bool save_double(std::ostream &stream, double d);
 
 }  // namespace Grid::File
+
+#endif /* GRID_GRIDFILE_HPP */

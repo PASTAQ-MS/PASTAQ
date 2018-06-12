@@ -111,14 +111,18 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
             char* ptr = &data.value()[0];
             for (size_t i = 0; i < peaks_count; ++i) {
                 // FIXME(alex): Ugh.
-                double mz = 0;
-                double intensity = 0;
-                Base64::get_float_float(ptr, bit, mz, intensity, precision,
-                                        little_endian);
+                auto mz =
+                    Base64::get_double(ptr, bit, precision, little_endian);
+                auto intensity =
+                    Base64::get_double(ptr, bit, precision, little_endian);
+                if (!mz || !intensity) {
+                    return std::nullopt;
+                }
                 // We don't need to extract the peaks when we are not inside
                 // the mz bounds or contain no value.
-                if (mz < parameters.bounds.min_mz ||
-                    mz > parameters.bounds.max_mz || intensity == 0) {
+                if (mz.value() < parameters.bounds.min_mz ||
+                    mz.value() > parameters.bounds.max_mz ||
+                    intensity.value() == 0) {
                     continue;
                 }
 
@@ -126,7 +130,8 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
                 // prealocate but we don't know at this point how many peaks
                 // from peak_count are inside our bounds. Would it be better to
                 // preallocate and then trim zeroed values?
-                scans.push_back({mz, retention_time, intensity});
+                scans.push_back(
+                    {mz.value(), retention_time, intensity.value()});
             }
 
             return scans;
