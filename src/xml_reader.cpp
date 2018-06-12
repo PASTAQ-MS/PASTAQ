@@ -13,28 +13,27 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
             continue;
         }
         if (tag.value().name == "scan" && !tag.value().closed) {
-            auto attributes = tag.value().attributes;
+            auto scan_attributes = tag.value().attributes;
             // We are only interested on ms1 scans for now.
-            if (attributes["msLevel"] != "1") {
+            if (scan_attributes["msLevel"] != "1") {
                 continue;
             }
             // Extract the peak count.
-            if (attributes.find("peaksCount") == attributes.end()) {
+            if (scan_attributes.find("peaksCount") == scan_attributes.end()) {
                 return std::nullopt;
             }
-            int peaks_count = std::stoi(attributes["peaksCount"]);
+            int peaks_count = std::stoi(scan_attributes["peaksCount"]);
 
             // Extract the retention time.
-            if (attributes.find("retentionTime") == attributes.end()) {
+            if (scan_attributes.find("retentionTime") ==
+                scan_attributes.end()) {
                 return std::nullopt;
             }
             std::regex rt_regex("PT([[:digit:]]+.?[[:digit:]]+)S");
             std::smatch matches;
-            if (!std::regex_search(attributes["retentionTime"], matches,
+            if (!std::regex_search(scan_attributes["retentionTime"], matches,
                                    rt_regex) ||
                 matches.size() != 2) {
-                // Handle error retentionTime does not match regex for numeric
-                // extraction.
                 return std::nullopt;
             }
             double retention_time = std::stod(matches[1]);
@@ -50,26 +49,60 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
             }
 
             // Fetch the peaks tag.
-            auto peaks_tag = XmlReader::read_tag(stream);
-            while (peaks_tag) {
-                if (peaks_tag.value().name == "scan" &&
-                    peaks_tag.value().closed) {
+            tag = XmlReader::read_tag(stream);
+            while (tag) {
+                if (tag.value().name == "scan" && tag.value().closed) {
                     return std::nullopt;
                 }
-                if (peaks_tag.value().name == "peaks") {
+                if (tag.value().name == "peaks") {
                     break;
                 }
-                peaks_tag = XmlReader::read_tag(stream);
+                tag = XmlReader::read_tag(stream);
+            }
+            auto peak_attributes = tag.value().attributes;
+
+            // Extract the precision from the peaks tag.
+            if (peak_attributes.find("precision") == peak_attributes.end()) {
+                return std::nullopt;
+            }
+            int precision = std::stoi(peak_attributes["precision"]);
+
+            // Extract the byteOrder from the peaks tag. This determines the
+            // endianness in which the data was stored. `network` ==
+            // `big_endian`.
+            if (peak_attributes.find("byteOrder") == peak_attributes.end()) {
+                return std::nullopt;
+            }
+            auto byte_order = peak_attributes["byteOrder"];
+            auto little_endian = (byte_order == "network") ? false : true;
+            std::cout << little_endian << std::endl;
+
+            // Extract the contentType/pairOrder from the peaks tag and exit if
+            // it is not `m/z-int`. In older versions of ProteoWizard, the
+            // conversion was not validated and the tag was incorrect. Here we
+            // are supporting both versions for compatibility but we are not
+            // trying to be exhaustive.
+            auto content_type_found =
+                peak_attributes.find("contentType") != peak_attributes.end();
+            auto pair_order_found =
+                peak_attributes.find("pairOrder") != peak_attributes.end();
+            if (!content_type_found && !pair_order_found) {
+                return std::nullopt;
+            }
+            std::string pair_order;
+            if (content_type_found) {
+                pair_order = peak_attributes["contentType"];
+            } else {
+                pair_order = peak_attributes["pairOrder"];
             }
 
-            // TODO: Extract the precision from the peaks tag.
-            // TODO: Extract the byteOrder from the peaks tag.
-            // TODO: Extract the contentType from the peaks tag and exit if it
-            // is not `m/z-int`.
             // TODO: Extract the peaks from the data, performing the Base64
             // decoding in the process.
-            // TODO: We don't need to extract the peaks when we are not inside the
-            // mz bounds.
+            // TODO: We don't need to extract the peaks when we are not inside
+            // the mz bounds.
+ 
+            std::cout << "OKI" << std::endl;
+            return std::nullopt;
             std::vector<XmlReader::Scan> scans;
             return scans;
         }
