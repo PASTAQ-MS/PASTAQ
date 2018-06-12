@@ -7,40 +7,42 @@
 #include "xml_reader.hpp"
 
 TEST_CASE("Reading a well formed tag") {
-    std::vector<std::string> table = {
-        "<testTag attr1=\"one\" attr2=\"2.0001\">DATA</testTag>",
-        // TODO: The specification mandates that there should not be space in
-        // between the `<` and the tag name. These should be invalid.
-        "<    testTag attr1=\"one\" attr2=\"2.0001\">DATA</testTag>",
-        "<    testTag attr1=\"one\" attr2=\"2.0001\"   >DATA</testTag>",
-        "<    testTag\n attr1=\"one\"\n attr2=\"2.0001\"\n   >DATA</testTag>",
-        "<    testTag\t attr1=\"one\"\n attr2=\"2.0001\"\n   >DATA</testTag>",
-    };
-    for (auto& test : table) {
-        auto stream = std::stringstream(test);
-        auto parsed_tag = XmlReader::read_tag(stream);
-        CHECK(parsed_tag != std::nullopt);
-        if (parsed_tag) {
-            CHECK(parsed_tag->name == "testTag");
-            CHECK(parsed_tag->attributes["attr1"] == "one");
-            CHECK(parsed_tag->attributes["attr2"] == "2.0001");
+    SUBCASE("No spaces on the attributes") {
+        std::vector<std::string> table = {
+            "<testTag attr1=\"one\" attr2=\"2.0001\">DATA</testTag>",
+            "<testTag attr1=\"one\"   attr2=\"2.0001\">DATA</testTag>",
+            "<testTag attr1=\"one\"\tattr2=\"2.0001\">DATA</testTag>",
+            "<testTag attr1=\"one\" attr2=\"2.0001\"   >DATA</testTag>",
+            "<testTag\n attr1=\"one\"\n attr2=\"2.0001\"\n>DATA</testTag>",
+            "<testTag\t attr1=\"one\"\n attr2=\"2.0001\"\n>DATA</testTag>",
+        };
+        for (auto& test : table) {
+            auto stream = std::stringstream(test);
+            auto parsed_tag = XmlReader::read_tag(stream);
+            CHECK(parsed_tag != std::nullopt);
+            if (parsed_tag) {
+                CHECK(parsed_tag->name == "testTag");
+                CHECK(parsed_tag->attributes["attr1"] == "one");
+                CHECK(parsed_tag->attributes["attr2"] == "2.0001");
+            }
         }
     }
-}
-
-TEST_CASE("Reading a malformed tag") {
-    std::vector<std::string> table = {
-        "<testTag =\"one\" attr2=\"2.0001\">DATA</testTag>",
-        "<testTag \"one\" attr2=\"2.0001\">DATA</testTag>",
-        "<testTag attr1=one attr2=\"2.0001\">DATA</testTag>",
-        "<testTag attr1=\"one\" attr2=2.0001>DATA</testTag>",
-        "<testTag attr2>DATA</testTag>",
-        "<testTag attr1=\"one\" attr2=\"2.0001\"",
-    };
-    for (auto& test : table) {
-        auto stream = std::stringstream(test);
-        auto parsed_tag = XmlReader::read_tag(stream);
-        CHECK(parsed_tag == std::nullopt);
+    SUBCASE("With spaces on the attributes") {
+        std::vector<std::string> table = {
+            "<testTag attr1=\"one two\" attr2=\"2.0001\">DATA</testTag>",
+            "<testTag attr1=\"one two\" attr2=\"  2.0001\">DATA</testTag>",
+            "<testTag attr1=\"one two\" attr2=\"2.0001\">DATA</testTag>",
+            "<testTag attr1=\"one two\" attr2=\"2.0001  \">DATA</testTag>",
+        };
+        for (auto& test : table) {
+            auto stream = std::stringstream(test);
+            auto parsed_tag = XmlReader::read_tag(stream);
+            CHECK(parsed_tag != std::nullopt);
+            if (parsed_tag) {
+                CHECK(parsed_tag->name == "testTag");
+                CHECK(parsed_tag->attributes["attr1"] == "one two");
+            }
+        }
     }
 }
 

@@ -160,10 +160,6 @@ std::optional<std::string> XmlReader::read_data(std::istream& stream) {
     return data;
 }
 
-// TODO: Should fix the parser to accept spaces in quoted strings.
-// TODO: This is a very naive way of performing the tag parsing, going through
-// it character by character. We should evaluate the performance and see if it
-// is worth to make it faster by buffering.
 std::optional<XmlReader::Tag> XmlReader::read_tag(std::istream& stream) {
     bool is_closed = false;
     bool reading_content = false;
@@ -177,6 +173,8 @@ std::optional<XmlReader::Tag> XmlReader::read_tag(std::istream& stream) {
             if (stream.peek() == '/') {
                 tag->closed = true;
                 stream.get();
+            } else if (stream.peek() == ' ') {
+                return std::nullopt;
             }
             reading_content = true;
         } else if (c == '>') {
@@ -193,32 +191,19 @@ std::optional<XmlReader::Tag> XmlReader::read_tag(std::istream& stream) {
 
     // Tokenize tag contents.
     std::stringstream ss(buffer);
-    std::string item;
-    std::vector<std::string> tokens;
-    while (ss >> item) {
-        tokens.push_back(item);
-    };
+    ss >> tag->name;
 
-    // Fill tag fieds.
-    for (int i = 0; i < tokens.size(); ++i) {
-        auto token = tokens[i];
-        if (i == 0) {
-            tag->name = token;
-        } else {
-            // Parse each attribute on the hash map.
-            std::regex attribute_regex("(\\S+)=\"(\\S+)\"");
-            std::smatch matches;
-            if (std::regex_search(token, matches, attribute_regex)) {
-                // Malformed attributes, expected `name=value`
-                if (matches.size() != 3 || matches[1] == "" ||
-                    matches[2] == "") {
-                    return std::nullopt;
-                }
-                tag->attributes[matches[1]] = matches[2];
-            } else {
-                return std::nullopt;
-            }
+    // Find all attributes of this tag and store them on the attribute map.
+    std::regex attribute_regex("(\\S+)=\"([^\"]+)\"");
+    for (std::sregex_iterator i = std::sregex_iterator(
+             buffer.begin(), buffer.end(), attribute_regex);
+         i != std::sregex_iterator(); ++i) {
+        std::smatch matches = *i;
+        // Malformed attributes, expected `name=value`
+        if (matches.size() != 3 || matches[1] == "" || matches[2] == "") {
+            return std::nullopt;
         }
+        tag->attributes[matches[1]] = matches[2];
     }
     return tag;
 };
