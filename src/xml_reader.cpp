@@ -75,7 +75,6 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
             }
             auto byte_order = peak_attributes["byteOrder"];
             auto little_endian = (byte_order == "network") ? false : true;
-            std::cout << little_endian << std::endl;
 
             // Extract the contentType/pairOrder from the peaks tag and exit if
             // it is not `m/z-int`. In older versions of ProteoWizard, the
@@ -96,16 +95,34 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
                 pair_order = peak_attributes["pairOrder"];
             }
 
-            // TODO: Extract the peaks from the data, performing the Base64
-            // decoding in the process.
+            // Extract the peaks from the data.
             auto data = XmlReader::read_data(stream);
-            // TODO: We don't need to extract the peaks when we are not inside
-            // the mz bounds.
+            if (!data) {
+                return std::nullopt;
+            }
 
-            std::cout << peaks_count << std::endl;
-            std::cout << "OKI" << std::endl;
-            return std::nullopt;
+            // Decode the peaks from the base 64 string.
             std::vector<XmlReader::Scan> scans;
+            int bit = 0;
+            char *ptr = &data.value()[0];
+            for (size_t i = 0; i < peaks_count; ++i) {
+                // FIXME(alex): Ugh.
+                double mz = 0;
+                double intensity = 0;
+                Base64::get_float_float(ptr, bit, mz, intensity, precision, little_endian);
+                // We don't need to extract the peaks when we are not inside
+                // the mz bounds.
+                if (mz < parameters.bounds.min_mz  || mz > parameters.bounds.max_mz) {
+                    continue;
+                }
+
+                // NOTE(alex): Not the most efficient way. It would be better to prealocate
+                // but we don't know at this point how many peaks from peak_count
+                // are inside our bounds. Would it be better to preallocate and
+                // then trim zeroed values?
+                scans.push_back({mz, retention_time, intensity});
+            }
+
             return scans;
         }
     }
@@ -115,7 +132,7 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
 std::optional<std::string> XmlReader::read_data(std::istream& stream) {
     std::string data;
     std::getline(stream, data, '<');
-    if (data.size() == 0) {
+    if (data.size() == 0 || !stream.good()) {
         return std::nullopt;
     }
     
