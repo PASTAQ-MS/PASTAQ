@@ -29,6 +29,10 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
                 scan_attributes.end()) {
                 return std::nullopt;
             }
+            // TODO(alex): The time is in xs:duration units. Here we are only
+            // accounting for the data as stored in seconds. It would be better
+            // to fully account for this. See:
+            //    https://www.ibm.com/support/knowledgecenter/en/ssw_ibm_i_72/rzasp/rzasp_xsduration.htm
             std::regex rt_regex("PT([[:digit:]]+.?[[:digit:]]+)S");
             std::smatch matches;
             if (!std::regex_search(scan_attributes["retentionTime"], matches,
@@ -104,22 +108,24 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
             // Decode the peaks from the base 64 string.
             std::vector<XmlReader::Scan> scans;
             int bit = 0;
-            char *ptr = &data.value()[0];
+            char* ptr = &data.value()[0];
             for (size_t i = 0; i < peaks_count; ++i) {
                 // FIXME(alex): Ugh.
                 double mz = 0;
                 double intensity = 0;
-                Base64::get_float_float(ptr, bit, mz, intensity, precision, little_endian);
+                Base64::get_float_float(ptr, bit, mz, intensity, precision,
+                                        little_endian);
                 // We don't need to extract the peaks when we are not inside
                 // the mz bounds.
-                if (mz < parameters.bounds.min_mz  || mz > parameters.bounds.max_mz) {
+                if (mz < parameters.bounds.min_mz ||
+                    mz > parameters.bounds.max_mz) {
                     continue;
                 }
 
-                // NOTE(alex): Not the most efficient way. It would be better to prealocate
-                // but we don't know at this point how many peaks from peak_count
-                // are inside our bounds. Would it be better to preallocate and
-                // then trim zeroed values?
+                // NOTE(alex): Not the most efficient way. It would be better to
+                // prealocate but we don't know at this point how many peaks
+                // from peak_count are inside our bounds. Would it be better to
+                // preallocate and then trim zeroed values?
                 scans.push_back({mz, retention_time, intensity});
             }
 
@@ -135,7 +141,7 @@ std::optional<std::string> XmlReader::read_data(std::istream& stream) {
     if (data.size() == 0 || !stream.good()) {
         return std::nullopt;
     }
-    
+
     // Trim potential whitespace at the beginning of the data string.
     for (size_t i = 0; i < data.size(); ++i) {
         if (!std::isspace(data[i])) {
