@@ -98,9 +98,11 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
 
             // TODO: Extract the peaks from the data, performing the Base64
             // decoding in the process.
+            auto data = XmlReader::read_data(stream);
             // TODO: We don't need to extract the peaks when we are not inside
             // the mz bounds.
- 
+
+            std::cout << peaks_count << std::endl;
             std::cout << "OKI" << std::endl;
             return std::nullopt;
             std::vector<XmlReader::Scan> scans;
@@ -108,6 +110,26 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
         }
     }
     return std::nullopt;
+}
+
+std::optional<std::string> XmlReader::read_data(std::istream& stream) {
+    std::string data;
+    std::getline(stream, data, '<');
+    if (data.size() == 0) {
+        return std::nullopt;
+    }
+    
+    // Trim potential whitespace at the beginning of the data string.
+    for (size_t i = 0; i < data.size(); ++i) {
+        if (!std::isspace(data[i])) {
+            if (i != 0) {
+                data = data.substr(i);
+            }
+            break;
+        }
+    }
+
+    return data;
 }
 
 // TODO: Should fix the parser to accept spaces in quoted strings.
