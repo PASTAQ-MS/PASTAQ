@@ -240,9 +240,9 @@ int main(int argc, char* argv[]) {
     }
     if (instrument == "orbitrap") {
         parameters.instrument_type = Instrument::Type::ORBITRAP;
-    } else if (instrument == "quad") {
+    } else if (instrument == "quad" || instrument == "iontrap") {
         parameters.instrument_type = Instrument::Type::QUAD;
-    } else if (instrument == "tof") {
+    } else if (instrument == "tof" || instrument == "qtof") {
         parameters.instrument_type = Instrument::Type::TOF;
     } else if (instrument == "fticr") {
         parameters.instrument_type = Instrument::Type::FTICR;
