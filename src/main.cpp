@@ -42,7 +42,7 @@ bool is_unsigned_int(std::string& s) {
     std::regex double_regex("^([[:digit:]]+)$");
     return std::regex_search(s, double_regex);
 }
-bool is_double(std::string& s) {
+bool is_number(std::string& s) {
     std::regex double_regex("^([[:digit:]]+\\.?[[:digit:]]+)$");
     return std::regex_search(s, double_regex);
 }
@@ -166,28 +166,28 @@ int main(int argc, char* argv[]) {
     auto max_rt = options["-max_rt"];
     auto min_mz = options["-min_mz"];
     auto max_mz = options["-max_mz"];
-    if (!is_double(min_rt)) {
+    if (!is_number(min_rt)) {
         std::cout << "error: "
                   << "min_rt"
                   << " has to be a number" << std::endl;
         print_usage();
         return -1;
     }
-    if (!is_double(max_rt)) {
+    if (!is_number(max_rt)) {
         std::cout << "error: "
                   << "max_rt"
                   << " has to be a number" << std::endl;
         print_usage();
         return -1;
     }
-    if (!is_double(min_mz)) {
+    if (!is_number(min_mz)) {
         std::cout << "error: "
                   << "min_mz"
                   << " has to be a number" << std::endl;
         print_usage();
         return -1;
     }
-    if (!is_double(max_mz)) {
+    if (!is_number(max_mz)) {
         std::cout << "error: "
                   << "max_mz"
                   << " has to be a number" << std::endl;
@@ -211,21 +211,21 @@ int main(int argc, char* argv[]) {
     auto smooth_mz = options["-smooth_mz"];
     auto sigma_mz = options["-sigma_mz"];
     auto sigma_rt = options["-sigma_rt"];
-    if (!is_double(smooth_mz)) {
+    if (!is_number(smooth_mz)) {
         std::cout << "error: "
                   << "smooth_mz"
                   << " has to be a number" << std::endl;
         print_usage();
         return -1;
     }
-    if (!is_double(sigma_mz)) {
+    if (!is_number(sigma_mz)) {
         std::cout << "error: "
                   << "sigma_mz"
                   << " has to be a number" << std::endl;
         print_usage();
         return -1;
     }
-    if (!is_double(sigma_rt)) {
+    if (!is_number(sigma_rt)) {
         std::cout << "error: "
                   << "sigma_rt"
                   << " has to be a number" << std::endl;
