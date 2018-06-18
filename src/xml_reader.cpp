@@ -78,7 +78,7 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
                 return std::nullopt;
             }
             auto byte_order = peak_attributes["byteOrder"];
-            auto little_endian = (byte_order == "network") ? false : true;
+            auto little_endian = byte_order != "network";
 
             // Extract the contentType/pairOrder from the peaks tag and exit if
             // it is not `m/z-int`. In older versions of ProteoWizard, the
@@ -143,7 +143,7 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
 std::optional<std::string> XmlReader::read_data(std::istream& stream) {
     std::string data;
     std::getline(stream, data, '<');
-    if (data.size() == 0 || !stream.good()) {
+    if (data.empty() || !stream.good()) {
         return std::nullopt;
     }
 

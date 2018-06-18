@@ -14,36 +14,6 @@ void print_usage() {
     std::cout << "USAGE: grid [-help] [options] <files>" << std::endl;
 }
 
-// Flag format is map where the key is the flag name and contains a tuple with
-// the description and if it takes extra parameters or not: <description,
-// takes_parameters>
-const std::map<std::string, std::pair<std::string, bool>> accepted_flags = {
-    // Dimensions.
-    {"-num_mz", {"The number of sampling points for the grid on mz", true}},
-    {"-num_rt", {"The number of sampling points for the grid on rt", true}},
-    {"-delta_mz",
-     {"The interval between sampling points for the grid on mz", true}},
-    {"-delta_rt",
-     {"The interval between sampling points for the grid on mz", true}},
-    // Bounds.
-    {"-min_rt", {"The minimum rt value", true}},
-    {"-max_rt", {"The maximum rt value", true}},
-    {"-min_mz", {"The minimum mz value", true}},
-    {"-max_mz", {"The maximum mz value", true}},
-    // SmoothingParams.
-    {"-smooth_mz", {"The mass at which the smoothing sigma is given", true}},
-    {"-sigma_mz", {"The smoothing sigma in the mz direction", true}},
-    {"-sigma_rt", {"The smoothing sigma in the rt direction", true}},
-    // Instrument::Type.
-    {"-instrument", {"The instrument in which the data was extracted", true}},
-    // Flags.
-    {"-warped", {"Specify if the output grid will be warped", false}},
-    // Command parameters.
-    {"-out_dir", {"The output directory", true}},
-    {"-help", {"Display available options", false}},
-    {"-config", {"Specify the configuration file", true}},
-};
-
 // Helper functions to check if the given string contains a number.
 bool is_unsigned_int(std::string& s) {
     std::regex double_regex("^([[:digit:]]+)$");
@@ -56,12 +26,12 @@ bool is_number(std::string& s) {
 
 // Helper function to trim the whitespace surrounding a string.
 void trim_space(std::string& s) {
-    auto not_space = [](char ch) { return !std::isspace(ch); };
+    auto not_space = [](int ch) { return !std::isspace(ch); };
     s.erase(s.begin(), std::find_if(s.begin(), s.end(), not_space));
     s.erase(std::find_if(s.rbegin(), s.rend(), not_space).base(), s.end());
 }
 
-bool parse_hdr(std::filesystem::path path, options_map& options) {
+bool parse_hdr(const std::filesystem::path& path, options_map& options) {
     std::ifstream stream(path);
     std::string parameter;
     const std::string delimiter = "<==>";
@@ -125,6 +95,38 @@ bool parse_hdr(std::filesystem::path path, options_map& options) {
 }
 
 int main(int argc, char* argv[]) {
+    // Flag format is map where the key is the flag name and contains a tuple
+    // with the description and if it takes extra parameters or not:
+    // <description, takes_parameters>
+    const std::map<std::string, std::pair<std::string, bool>> accepted_flags = {
+        // Dimensions.
+        {"-num_mz", {"The number of sampling points for the grid on mz", true}},
+        {"-num_rt", {"The number of sampling points for the grid on rt", true}},
+        {"-delta_mz",
+         {"The interval between sampling points for the grid on mz", true}},
+        {"-delta_rt",
+         {"The interval between sampling points for the grid on mz", true}},
+        // Bounds.
+        {"-min_rt", {"The minimum rt value", true}},
+        {"-max_rt", {"The maximum rt value", true}},
+        {"-min_mz", {"The minimum mz value", true}},
+        {"-max_mz", {"The maximum mz value", true}},
+        // SmoothingParams.
+        {"-smooth_mz",
+         {"The mass at which the smoothing sigma is given", true}},
+        {"-sigma_mz", {"The smoothing sigma in the mz direction", true}},
+        {"-sigma_rt", {"The smoothing sigma in the rt direction", true}},
+        // Instrument::Type.
+        {"-instrument",
+         {"The instrument in which the data was extracted", true}},
+        // Flags.
+        {"-warped", {"Specify if the output grid will be warped", false}},
+        // Command parameters.
+        {"-out_dir", {"The output directory", true}},
+        {"-help", {"Display available options", false}},
+        {"-config", {"Specify the configuration file", true}},
+    };
+
     if (argc == 1) {
         print_usage();
         return -1;
@@ -133,7 +135,7 @@ int main(int argc, char* argv[]) {
     // Parse arguments and extract options and file names.
     options_map options;
     std::vector<std::string> files;
-    for (int i = 1; i < argc; ++i) {
+    for (size_t i = 1; i < argc; ++i) {
         auto arg = argv[i];
         if (arg[0] == '-') {
             if (accepted_flags.find(arg) == accepted_flags.end()) {
@@ -156,7 +158,7 @@ int main(int argc, char* argv[]) {
                 options[arg] = "";
             }
         } else {
-            files.push_back(arg);
+            files.emplace_back(arg);
         }
     }
 
@@ -182,7 +184,7 @@ int main(int argc, char* argv[]) {
             } else {
                 std::cout << "      ";
             }
-            for (int i = 0; i < (padding - e.first.size()) + 4; ++i) {
+            for (size_t i = 0; i < (padding - e.first.size()) + 4; ++i) {
                 std::cout << " ";
             }
             std::cout << e.second.first << std::endl;
@@ -190,7 +192,7 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if (files.size() == 0) {
+    if (files.empty()) {
         std::cout << "No input files specified." << std::endl;
         print_usage();
         return -1;
@@ -374,8 +376,8 @@ int main(int argc, char* argv[]) {
     }
     auto instrument = options["-instrument"];
     // Transform instrument to lowercase to prevent typos.
-    for (int i = 0; i < instrument.size(); ++i) {
-        instrument[i] = std::tolower(instrument[i]);
+    for (auto& ch : instrument) {
+        ch = std::tolower(ch);
     }
     if (instrument == "orbitrap") {
         parameters.instrument_type = Instrument::Type::ORBITRAP;
@@ -419,8 +421,8 @@ int main(int argc, char* argv[]) {
         // Check if the file has the appropriate format.
         std::string extension = file.extension();
         std::string lowercase_extension = extension;
-        for (int i = 0; i < lowercase_extension.size(); ++i) {
-            lowercase_extension[i] = std::tolower(lowercase_extension[i]);
+        for (auto& ch : lowercase_extension) {
+            ch = std::tolower(ch);
         }
         if (lowercase_extension == ".mzxml") {
             // TODO(alex): do work here...

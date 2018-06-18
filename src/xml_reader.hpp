@@ -49,7 +49,7 @@ const unsigned char translation_table[256] = {
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     64, 64, 64, 64, 64, 64, 64, 64, 64};
 
-inline static uint32_t get32(char *&p, int &bit, int little_endian) {
+inline static uint32_t get32(char *&p, int &bit, bool little_endian) {
     // bit is either 0, 2, 4
     // indicates how many bits should be discarded
     unsigned int b;
@@ -87,7 +87,7 @@ inline static uint32_t get32(char *&p, int &bit, int little_endian) {
     return b;
 }
 
-inline static uint64_t get64(char *&p, int &bit, int little_endian) {
+inline static uint64_t get64(char *&p, int &bit, bool little_endian) {
     // bit is either 0, 2, 4
     // indicates how many bits should be discarded
     uint64_t b;
@@ -160,7 +160,7 @@ inline static uint64_t get64(char *&p, int &bit, int little_endian) {
 
 // TODO: Can we make it so that we don't have to pass the 'bit' variable around?
 inline static std::optional<double> get_double(char *&p, int &bit, int precision,
-                                 int little_endian) {
+                                 bool little_endian) {
     if (precision == 32) {
         uint32_t b = get32(p, bit, little_endian);
         return *(float *)&b;
