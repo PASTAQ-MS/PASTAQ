@@ -50,6 +50,7 @@ build:windows:
             -DBUILD_SHARED_LIBS=OFF
             -DCMAKE_SYSTEM_NAME=Windows
         - ninja
+    allow_failure: true
     cache:
         key: "$CI_PROJECT_PATH_SLUG $CI_COMMIT_SHA windows"
         paths:
