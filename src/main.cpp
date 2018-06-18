@@ -2,6 +2,8 @@
 #include <map>
 #include <vector>
 
+#include "grid.hpp"
+
 void print_usage() {
     std::cout << "USAGE: grid [-help] [-option x] <files>" << std::endl;
 }
@@ -31,6 +33,10 @@ const std::map<std::string, std::pair<std::string, bool>> accepted_flags = {
     {"-help", {"Display available options", false}},
     {"-config", {"Specify the configuration file", true}},
 };
+
+bool is_unsigned_integer(std::string& s) { return true; }
+bool is_integer(std::string& s) { return true; }
+bool is_double(std::string& s) { return true; }
 
 int main(int argc, char* argv[]) {
     if (argc == 1) {
@@ -68,7 +74,6 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Print help.
     if (options.find("-help") != options.end()) {
         print_usage();
         // Find maximum option length to adjust text padding.
@@ -108,6 +113,148 @@ int main(int argc, char* argv[]) {
     // TODO(alex): If config file is provided, read it and parse it. The
     // parameters specified as command line arguments will override the config
     // file.
+
+    // Parse the options to build the Grid::Parameters struct.
+    Grid::Parameters parameters;
+    // Get the dimensions.
+    // TODO: Accept also -delta_mz/-delta_rt instead of -num_mz/-num_rt
+    if ((options.find("-num_mz") == options.end()) ||
+        (options.find("-num_rt") == options.end())) {
+        std::cout << "Grid dimensions (num_mz, num_rt) not specified"
+                  << std::endl;
+        return -1;
+    }
+    auto num_mz = options["-num_mz"];
+    auto num_rt = options["-num_rt"];
+    if (!is_unsigned_integer(num_mz)) {
+        std::cout << "error: "
+                  << "num_mz"
+                  << " has to be a positive integer" << std::endl;
+        print_usage();
+        return -1;
+    }
+    if (!is_unsigned_integer(num_rt)) {
+        std::cout << "error: "
+                  << "num_rt"
+                  << " has to be a positive integer" << std::endl;
+        print_usage();
+        return -1;
+    }
+    parameters.dimensions.n = std::stoi(num_mz);
+    parameters.dimensions.m = std::stoi(num_rt);
+
+    // Get the bounds.
+    if ((options.find("-min_rt") == options.end()) ||
+        (options.find("-max_rt") == options.end()) ||
+        (options.find("-min_mz") == options.end()) ||
+        (options.find("-max_mz") == options.end())) {
+        std::cout
+            << "Grid bounds (min_rt, max_rt, min_mz, max_mz) not specified"
+            << std::endl;
+        return -1;
+    }
+    auto min_rt = options["-min_rt"];
+    auto max_rt = options["-max_rt"];
+    auto min_mz = options["-min_mz"];
+    auto max_mz = options["-max_mz"];
+    if (!is_double(min_rt)) {
+        std::cout << "error: "
+                  << "min_rt"
+                  << " has to be a number" << std::endl;
+        print_usage();
+        return -1;
+    }
+    if (!is_double(max_rt)) {
+        std::cout << "error: "
+                  << "max_rt"
+                  << " has to be a number" << std::endl;
+        print_usage();
+        return -1;
+    }
+    if (!is_double(min_mz)) {
+        std::cout << "error: "
+                  << "min_mz"
+                  << " has to be a number" << std::endl;
+        print_usage();
+        return -1;
+    }
+    if (!is_double(max_mz)) {
+        std::cout << "error: "
+                  << "max_mz"
+                  << " has to be a number" << std::endl;
+        print_usage();
+        return -1;
+    }
+    parameters.bounds.min_rt = std::stod(min_rt);
+    parameters.bounds.max_rt = std::stod(max_rt);
+    parameters.bounds.min_mz = std::stod(min_mz);
+    parameters.bounds.max_mz = std::stod(max_mz);
+
+    // Get the smoothing parameters.
+    if ((options.find("-smooth_mz") == options.end()) ||
+        (options.find("-sigma_mz") == options.end()) ||
+        (options.find("-sigma_rt") == options.end())) {
+        std::cout << "Smoothing parameters (smooth_mz, sigma_mz, sigma_rt) not "
+                     "specified"
+                  << std::endl;
+        return -1;
+    }
+    auto smooth_mz = options["-smooth_mz"];
+    auto sigma_mz = options["-sigma_mz"];
+    auto sigma_rt = options["-sigma_rt"];
+    if (!is_double(smooth_mz)) {
+        std::cout << "error: "
+                  << "smooth_mz"
+                  << " has to be a number" << std::endl;
+        print_usage();
+        return -1;
+    }
+    if (!is_double(sigma_mz)) {
+        std::cout << "error: "
+                  << "sigma_mz"
+                  << " has to be a number" << std::endl;
+        print_usage();
+        return -1;
+    }
+    if (!is_double(sigma_rt)) {
+        std::cout << "error: "
+                  << "sigma_rt"
+                  << " has to be a number" << std::endl;
+        print_usage();
+        return -1;
+    }
+    parameters.smoothing_params.mz = std::stod(smooth_mz);
+    parameters.smoothing_params.sigma_mz = std::stod(sigma_mz);
+    parameters.smoothing_params.sigma_rt = std::stod(min_mz);
+
+    // Get the instrument type.
+    if (options.find("-instrument") == options.end()) {
+        std::cout << "Instrument type (instrument) not specified" << std::endl;
+        print_usage();
+        return -1;
+    }
+    auto instrument = options["-instrument"];
+    // Transform instrument to lowercase to prevent typos.
+    for (int i = 0; i < instrument.size(); ++i) {
+        instrument[i] = std::tolower(instrument[i]);
+    }
+    if (instrument == "orbitrap") {
+        parameters.instrument_type = Instrument::Type::ORBITRAP;
+    } else if (instrument == "quad") {
+        parameters.instrument_type = Instrument::Type::QUAD;
+    } else if (instrument == "tof") {
+        parameters.instrument_type = Instrument::Type::TOF;
+    } else if (instrument == "fticr") {
+        parameters.instrument_type = Instrument::Type::FTICR;
+    } else {
+        std::cout << "Unknown instrument type: " << instrument << std::endl;
+        return -1;
+    }
+
+    // Set up the flags.
+    if (options.find("-warped") != options.end()) {
+        parameters.flags |= Grid::Flags::WARPED_MESH;
+    }
 
     std::cout << "PRINTING ARGUMENTS:" << std::endl;
     for (const auto& e : options) {
