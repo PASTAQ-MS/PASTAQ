@@ -7,6 +7,9 @@
 
 #include "grid.hpp"
 
+// Type aliases.
+using options_map = std::map<std::string, std::string>;
+
 void print_usage() {
     std::cout << "USAGE: grid [-help] [options] <files>" << std::endl;
 }
@@ -47,6 +50,76 @@ bool is_number(std::string& s) {
     return std::regex_search(s, double_regex);
 }
 
+// Helper function to trim the whitespace surrounding a string.
+void trim_space(std::string& s) {
+    auto not_space = [](char ch) { return !std::isspace(ch); };
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), not_space));
+    s.erase(std::find_if(s.rbegin(), s.rend(), not_space).base(), s.end());
+}
+
+bool parse_hdr(std::filesystem::path path, options_map& options) {
+    std::ifstream stream(path);
+    std::string parameter;
+    const std::string delimiter = "<==>";
+    while (stream.good()) {
+        std::getline(stream, parameter);
+        auto pos = parameter.find(delimiter);
+        auto name = parameter.substr(0, pos);
+        parameter.erase(0, pos + delimiter.size());
+        trim_space(parameter);
+
+        // Bounds.
+        if (name == "ConversionStartMass") {
+            if (options.find("-min_mz") == options.end()) {
+                options["-min_mz"] = parameter;
+            }
+        } else if (name == "ConversionEndMass") {
+            if (options.find("-max_mz") == options.end()) {
+                options["-max_mz"] = parameter;
+            }
+        } else if (name == "ConversionStartTime") {
+            if (options.find("-min_rt") == options.end()) {
+                options["-min_rt"] = parameter;
+            }
+        } else if (name == "ConversionEndTime") {
+            if (options.find("-max_rt") == options.end()) {
+                options["-max_rt"] = parameter;
+            }
+        } else if (name == "ConversionMassAtSigma") {
+            if (options.find("-smooth_mz") == options.end()) {
+                options["-smooth_mz"] = parameter;
+            }
+        } else if (name == "ConversionSigmaMass") {
+            if (options.find("-sigma_mz") == options.end()) {
+                options["-sigma_mz"] = parameter;
+            }
+        } else if (name == "ConversionSigmaTime") {
+            if (options.find("-sigma_rt") == options.end()) {
+                options["-sigma_rt"] = parameter;
+            }
+        } else if (name == "ConversionMeanDeltaMass") {
+            if (options.find("-delta_mz") == options.end()) {
+                options["-delta_mz"] = parameter;
+            }
+        } else if (name == "ConversionMeanDeltaTime") {
+            if (options.find("-delta_rt") == options.end()) {
+                options["-delta_rt"] = parameter;
+            }
+        } else if (name == "ConversionMassSpecType") {
+            if (options.find("-instrument") == options.end()) {
+                options["-instrument"] = parameter;
+            }
+        } else if (name == "ConversionWarpedMesh") {
+            if (options.find("-warped") == options.end()) {
+                options["-warped"] = parameter;
+            }
+        } else {
+            // ignoring unknown parameters...
+        }
+    }
+    return false;
+}
+
 int main(int argc, char* argv[]) {
     if (argc == 1) {
         print_usage();
@@ -54,7 +127,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Parse arguments and extract options and file names.
-    std::map<std::string, std::string> options;
+    options_map options;
     std::vector<std::string> files;
     for (int i = 1; i < argc; ++i) {
         auto arg = argv[i];
@@ -119,9 +192,30 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    // TODO(alex): If config file is provided, read it and parse it. The
-    // parameters specified as command line arguments will override the config
-    // file.
+    // If config file is provided, read it and parse it. The parameters
+    // specified as command line arguments will override the config file.
+    if (options.find("-config") != options.end()) {
+        std::filesystem::path config_path = options["-config"];
+        if (!std::filesystem::exists(config_path)) {
+            std::cout << "error: couldn't find config file " << config_path
+                      << std::endl;
+            print_usage();
+            return -1;
+        }
+
+        // TODO(alex): accept both json and hdr for now.
+        auto extension = config_path.extension();
+        if (extension == ".json") {
+            // TODO(alex): parse .json file...
+        } else if (extension == ".hdr") {
+            parse_hdr(config_path, options);
+        } else {
+            std::cout << "error: invalid format for config file " << config_path
+                      << std::endl;
+            print_usage();
+            return -1;
+        }
+    }
 
     // Parse the options to build the Grid::Parameters struct.
     Grid::Parameters parameters;
@@ -277,34 +371,26 @@ int main(int argc, char* argv[]) {
     }
 
     // Execute the program here.
-    for (const auto& file : files) {
+    for (const auto& file_name : files) {
+        std::filesystem::path file = file_name;
         // Check if the files exist.
         if (!std::filesystem::exists(file)) {
-            std::cout << "error: couldn't find file \"" << file << "\""
-                      << std::endl;
+            std::cout << "error: couldn't find file " << file << std::endl;
             print_usage();
             return -1;
         }
 
         // Check if the file has the appropriate format.
-        auto idx = file.rfind('.');
-        if (idx != std::string::npos) {
-            std::string extension = file.substr(idx + 1);
-            std::string lowercase_extension = extension;
-            for (int i = 0; i < lowercase_extension.size(); ++i) {
-                lowercase_extension[i] = std::tolower(lowercase_extension[i]);
-            }
-            if (lowercase_extension == "mzxml") {
-                // TODO(alex): do work here...
-            } else {
-                std::cout << "error: unknown file format for file \"" << file
-                          << "\"" << std::endl;
-                print_usage();
-                return -1;
-            }
+        std::string extension = file.extension();
+        std::string lowercase_extension = extension;
+        for (int i = 0; i < lowercase_extension.size(); ++i) {
+            lowercase_extension[i] = std::tolower(lowercase_extension[i]);
+        }
+        if (lowercase_extension == ".mzxml") {
+            // TODO(alex): do work here...
         } else {
-            std::cout << "error: unknown file format for file \"" << file
-                      << "\"" << std::endl;
+            std::cout << "error: unknown file format for file " << file
+                      << std::endl;
             print_usage();
             return -1;
         }
