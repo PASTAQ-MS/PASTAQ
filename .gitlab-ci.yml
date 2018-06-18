@@ -19,6 +19,8 @@ before_script:
     - apt-get update
     - apt-get -y install
         cmake ninja-build build-essential git mingw-w64 binutils-mingw-w64 gcc-8
+    - ls /usr/bin 
+    - ls /bin 
     # Initialize submodules.
     - git submodule sync
     - git submodule update --init
@@ -30,7 +32,7 @@ build:linux:
         - echo $CI_PROJECT_PATH_SLUG
         - echo $CI_COMMIT_SHA
         - cd build
-        - CXX=gcc++-8 cmake ..
+        - CXX=/usr/bin/gcc++-8 cmake ..
             -G Ninja
         - ninja
     cache:
