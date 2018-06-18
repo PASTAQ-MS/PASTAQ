@@ -16,12 +16,17 @@ if (MSVC)
 endif()
 
 # Include library target.
-add_library(grid
+add_library(gridlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/grid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/grid_file.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/xml_reader.cpp"
     )
-target_include_directories(grid PUBLIC src)
+target_include_directories(gridlib PUBLIC src)
+
+# Include executable target.
+add_executable(grid
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
+    )
 
 # Include tests if testing library is present.
 unset(DOCTEST_LIBRARY_PATH CACHE)
@@ -43,7 +48,7 @@ if (DOCTEST_LIBRARY_PATH)
         tests/xml_reader_test.cpp
         )
     add_test(NAME grid_test COMMAND grid_test)
-    target_link_libraries(grid_test doctest grid)
+    target_link_libraries(grid_test doctest gridlib)
 
     add_executable(
         test-utils_test
