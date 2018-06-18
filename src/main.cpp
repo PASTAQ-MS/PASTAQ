@@ -1,32 +1,35 @@
 #include <iostream>
 #include <map>
+#include <vector>
 
 void print_usage() {
-    std::cout << "usage: grid [options] <files>" << std::endl;
+    std::cout << "USAGE: grid [-help] [-option x] <files>" << std::endl;
 }
 
-// TODO: pair<string, string>:  <Flag name, description>. OR:
-//  std::tuple<string, string, bool> <Flag name, description, takes_parameters>
+// Flag format is map where the key is the flag name and contains a tuple with
+// the description and if it takes extra parameters or not: <description,
+// takes_parameters>
 const std::map<std::string, std::pair<std::string, bool>> accepted_flags = {
     // Dimensions.
-    {"--num_mz", {"*description--", true}},
-    {"--num_rt", {"*description--", true}},
+    {"-num_mz", {"The number of sampling points for the grid on mz", true}},
+    {"-num_rt", {"The number of sampling points for the grid on rt", true}},
     // Bounds.
-    {"--min_rt", {"*description--", true}},
-    {"--max_rt", {"*description--", true}},
-    {"--min_mz", {"*description--", true}},
-    {"--max_mz", {"*description--", true}},
+    {"-min_rt", {"The minimum rt value", true}},
+    {"-max_rt", {"The maximum rt value", true}},
+    {"-min_mz", {"The minimum mz value", true}},
+    {"-max_mz", {"The maximum mz value", true}},
     // SmoothingParams.
-    {"--smooth_mz", {"*description--", true}},
-    {"--sigma_mz", {"*description--", true}},
-    {"--sigma_rt", {"*description--", true}},
+    {"-smooth_mz", {"The mass at which the smoothing sigma is given", true}},
+    {"-sigma_mz", {"The smoothing sigma in the mz direction", true}},
+    {"-sigma_rt", {"The smoothing sigma in the rt direction", true}},
     // Instrument::Type.
-    {"--instrument", {"*description--", true}},
+    {"-instrument", {"The instrument in which the data was extracted", true}},
     // Flags.
-    {"--warped", {"*description--", false}},
+    {"-warped", {"Specify if the output grid will be warped", false}},
     // Command parameters.
-    {"--out_dir", {"*description--", true}},
-    {"--help", {"*description--", false}},
+    {"-out_dir", {"The output directory", true}},
+    {"-help", {"Display available options", false}},
+    {"-config", {"Specify the configuration file", true}},
 };
 
 int main(int argc, char* argv[]) {
@@ -35,38 +38,88 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    // TODO: Fill argument map.
-    // std::vector<std::string> unknown_flags = {};
+    // Parse arguments and extract options and file names.
+    std::map<std::string, std::string> options;
+    std::vector<std::string> files;
     for (int i = 1; i < argc; ++i) {
         auto arg = argv[i];
-        if (accepted_flags.find(arg) == accepted_flags.end()) {
-            std::cout << "unknown option: " << arg << std::endl;
-            print_usage();
-            return -1;
-        }
-        auto flag = accepted_flags.at(arg);
-        std::string option_arg = "";
-        // If the flag takes arguments make sure it's available and fetch it.
-        if (flag.second) {
-            if (i + 1 >= argc) {
-                std::cout << "no parameters specified for " << arg << std::endl;
+        if (arg[0] == '-') {
+            if (accepted_flags.find(arg) == accepted_flags.end()) {
+                std::cout << "unknown option: " << arg << std::endl;
                 print_usage();
                 return -1;
             }
-            ++i;
-            option_arg = argv[i];
-            std::cout << arg << " " << option_arg << std::endl;
+
+            auto flag = accepted_flags.at(arg);
+            if (flag.second) {
+                if (i + 1 >= argc || argv[i + 1][0] == '-') {
+                    std::cout << "no parameters specified for " << arg
+                              << std::endl;
+                    print_usage();
+                    return -1;
+                }
+                ++i;
+                options[arg] = argv[i];
+            } else {
+                options[arg] = "";
+            }
+        } else {
+            files.push_back(arg);
         }
     }
 
-    // TODO: Check for unknown file format.
-    // TODO: Check for no files specified.
-    // std::cout << "ARGC: " << argc << std::endl;
-    // std::cout << "ARGV:" << std::endl;
-    // for (int i = 0; i < argc; ++i) {
-    // auto arg = argv[i];
-    // std::cout << arg << std::endl;
-    //}
-    // print_usage();
+    // Print help.
+    if (options.find("-help") != options.end()) {
+        print_usage();
+        // Find maximum option length to adjust text padding.
+        auto padding = 0;
+        for (const auto& e : accepted_flags) {
+            if (e.first.size() > padding) {
+                padding = e.first.size();
+            }
+        }
+
+        // Print options with a 4 space padding between flag name and
+        // description.
+        std::cout << "OPTIONS:" << std::endl;
+        for (const auto& e : accepted_flags) {
+            std::cout << e.first;
+            // If the option requires an argument we have to specify it,
+            // otherwise we add padding.
+            if (e.second.second) {
+                std::cout << " <arg>";
+            } else {
+                std::cout << "      ";
+            }
+            for (int i = 0; i < (padding - e.first.size()) + 4; ++i) {
+                std::cout << " ";
+            }
+            std::cout << e.second.first << std::endl;
+        }
+        return 0;
+    }
+
+    if (files.size() == 0) {
+        std::cout << "No input files specified." << std::endl;
+        print_usage();
+        return -1;
+    }
+
+    // TODO(alex): If config file is provided, read it and parse it. The
+    // parameters specified as command line arguments will override the config
+    // file.
+
+    std::cout << "PRINTING ARGUMENTS:" << std::endl;
+    for (const auto& e : options) {
+        std::cout << e.first << " " << e.second << std::endl;
+    }
+    std::cout << "PRINTING FILES:" << std::endl;
+    for (const auto& e : files) {
+        std::cout << e << std::endl;
+    }
+
+    // TODO(alex): Check for unknown file format.
+    // TODO(alex): Check for no files specified.
+    // TODO(alex): check for file not found.
     return 0;
 }
