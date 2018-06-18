@@ -1,3 +1,5 @@
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <vector>
@@ -34,8 +36,8 @@ const std::map<std::string, std::pair<std::string, bool>> accepted_flags = {
     {"-config", {"Specify the configuration file", true}},
 };
 
+// TODO(alex): implement these
 bool is_unsigned_integer(std::string& s) { return true; }
-bool is_integer(std::string& s) { return true; }
 bool is_double(std::string& s) { return true; }
 
 int main(int argc, char* argv[]) {
@@ -256,17 +258,50 @@ int main(int argc, char* argv[]) {
         parameters.flags |= Grid::Flags::WARPED_MESH;
     }
 
-    std::cout << "PRINTING ARGUMENTS:" << std::endl;
-    for (const auto& e : options) {
-        std::cout << e.first << " " << e.second << std::endl;
+    // Set up the output directory and check if it exists.
+    if (options.find("-out_dir") == options.end()) {
+        options["-out_dir"] = ".";
     }
-    std::cout << "PRINTING FILES:" << std::endl;
-    for (const auto& e : files) {
-        std::cout << e << std::endl;
+    if (!std::filesystem::exists(options["-out_dir"])) {
+        std::cout << "error: couldn't find output directory \""
+                  << options["-out_dir"] << "\"" << std::endl;
+        print_usage();
+        return -1;
     }
 
-    // TODO(alex): Check for unknown file format.
-    // TODO(alex): Check for no files specified.
-    // TODO(alex): check for file not found.
+    // Execute the program here.
+    for (const auto& file : files) {
+        // Check if the files exist.
+        if (!std::filesystem::exists(file)) {
+            std::cout << "error: couldn't find file \"" << file << "\""
+                      << std::endl;
+            print_usage();
+            return -1;
+        }
+
+        // Check if the file has the appropriate format.
+        auto idx = file.rfind('.');
+        if (idx != std::string::npos) {
+            std::string extension = file.substr(idx + 1);
+            std::string lowercase_extension = extension;
+            for (int i = 0; i < lowercase_extension.size(); ++i) {
+                lowercase_extension[i] = std::tolower(lowercase_extension[i]);
+            }
+            if (lowercase_extension == "mzxml") {
+                // TODO(alex): do work here...
+            } else {
+                std::cout << "error: unknown file format for file \"" << file
+                          << "\"" << std::endl;
+                print_usage();
+                return -1;
+            }
+        } else {
+            std::cout << "error: unknown file format for file \"" << file
+                      << "\"" << std::endl;
+            print_usage();
+            return -1;
+        }
+    }
+
     return 0;
 }
