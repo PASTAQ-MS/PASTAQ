@@ -2,12 +2,13 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <regex>
 #include <vector>
 
 #include "grid.hpp"
 
 void print_usage() {
-    std::cout << "USAGE: grid [-help] [-option x] <files>" << std::endl;
+    std::cout << "USAGE: grid [-help] [options] <files>" << std::endl;
 }
 
 // Flag format is map where the key is the flag name and contains a tuple with
@@ -36,9 +37,15 @@ const std::map<std::string, std::pair<std::string, bool>> accepted_flags = {
     {"-config", {"Specify the configuration file", true}},
 };
 
-// TODO(alex): implement these
-bool is_unsigned_integer(std::string& s) { return true; }
-bool is_double(std::string& s) { return true; }
+// Helper functions to check if the given string contains a number.
+bool is_unsigned_int(std::string& s) {
+    std::regex double_regex("^([[:digit:]]+)$");
+    return std::regex_search(s, double_regex);
+}
+bool is_double(std::string& s) {
+    std::regex double_regex("^([[:digit:]]+\\.?[[:digit:]]+)$");
+    return std::regex_search(s, double_regex);
+}
 
 int main(int argc, char* argv[]) {
     if (argc == 1) {
@@ -119,7 +126,7 @@ int main(int argc, char* argv[]) {
     // Parse the options to build the Grid::Parameters struct.
     Grid::Parameters parameters;
     // Get the dimensions.
-    // TODO: Accept also -delta_mz/-delta_rt instead of -num_mz/-num_rt
+    // TODO(alex): Accept also -delta_mz/-delta_rt instead of -num_mz/-num_rt
     if ((options.find("-num_mz") == options.end()) ||
         (options.find("-num_rt") == options.end())) {
         std::cout << "Grid dimensions (num_mz, num_rt) not specified"
@@ -128,14 +135,14 @@ int main(int argc, char* argv[]) {
     }
     auto num_mz = options["-num_mz"];
     auto num_rt = options["-num_rt"];
-    if (!is_unsigned_integer(num_mz)) {
+    if (!is_unsigned_int(num_mz)) {
         std::cout << "error: "
                   << "num_mz"
                   << " has to be a positive integer" << std::endl;
         print_usage();
         return -1;
     }
-    if (!is_unsigned_integer(num_rt)) {
+    if (!is_unsigned_int(num_rt)) {
         std::cout << "error: "
                   << "num_rt"
                   << " has to be a positive integer" << std::endl;
