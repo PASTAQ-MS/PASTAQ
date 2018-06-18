@@ -18,7 +18,9 @@ before_script:
     # Install required packages.
     - apt-get update
     - apt-get -y install
-        cmake ninja-build build-essential git mingw-w64 binutils-mingw-w64
+        cmake ninja-build build-essential git mingw-w64 binutils-mingw-w64 gcc-8
+    - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 700 --slave /usr/bin/g++ g++ /usr/bin/g++-7
+    - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8
     # Initialize submodules.
     - git submodule sync
     - git submodule update --init
