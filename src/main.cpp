@@ -21,8 +21,10 @@ const std::map<std::string, std::pair<std::string, bool>> accepted_flags = {
     // Dimensions.
     {"-num_mz", {"The number of sampling points for the grid on mz", true}},
     {"-num_rt", {"The number of sampling points for the grid on rt", true}},
-    {"-delta_mz", {"The interval between sampling points for the grid on mz", true}},
-    {"-delta_rt", {"The interval between sampling points for the grid on mz", true}},
+    {"-delta_mz",
+     {"The interval between sampling points for the grid on mz", true}},
+    {"-delta_rt",
+     {"The interval between sampling points for the grid on mz", true}},
     // Bounds.
     {"-min_rt", {"The minimum rt value", true}},
     {"-max_rt", {"The maximum rt value", true}},
@@ -362,7 +364,7 @@ int main(int argc, char* argv[]) {
     }
     parameters.smoothing_params.mz = std::stod(smooth_mz);
     parameters.smoothing_params.sigma_mz = std::stod(sigma_mz);
-    parameters.smoothing_params.sigma_rt = std::stod(min_mz);
+    parameters.smoothing_params.sigma_rt = std::stod(sigma_rt);
 
     // Get the instrument type.
     if (options.find("-instrument") == options.end()) {
