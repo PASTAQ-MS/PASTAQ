@@ -460,10 +460,7 @@ int main(int argc, char* argv[]) {
             ch = std::tolower(ch);
         }
         if (lowercase_extension == ".mzxml") {
-            // TODO(alex): do work here...
             print_parameters_summary(parameters);
-            // Perform analysis.
-            // -----------------
 
             // Instantiate memory.
             std::vector<double> data(parameters.dimensions.n *
@@ -475,6 +472,7 @@ int main(int argc, char* argv[]) {
                 std::cout << "error: could not open file " << file << std::endl;
                 return -1;
             }
+
             // TODO(alex): Don't hardcode the name of the file!
             auto datfile_name = "/data/ftp_data/comparing_grids/example_grid.dat";
             std::ofstream datfile;
@@ -498,6 +496,7 @@ int main(int argc, char* argv[]) {
                 }
                 scans = XmlReader::read_next_scan(stream, parameters);
             } while (scans != std::nullopt);
+
             std::cout << "Saving into dat file..." << std::endl;
             Grid::File::write(datfile, data, parameters);
         } else {
