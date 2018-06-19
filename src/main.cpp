@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "grid.hpp"
+#include "grid_file.hpp"
+#include "xml_reader.hpp"
 
 // Type aliases.
 using options_map = std::map<std::string, std::string>;
@@ -20,7 +22,7 @@ bool is_unsigned_int(std::string& s) {
     return std::regex_search(s, double_regex);
 }
 bool is_number(std::string& s) {
-    std::regex double_regex("^([[:digit:]]+\\.?[[:digit:]]+)$");
+    std::regex double_regex("^([[:digit:]]+[\\.]?[[:digit:]]*)$");
     return std::regex_search(s, double_regex);
 }
 
@@ -83,7 +85,7 @@ bool parse_hdr(const std::filesystem::path& path, options_map& options) {
             if (options.find("-instrument") == options.end()) {
                 options["-instrument"] = parameter;
             }
-        } else if (name == "ConversionWarpedMesh") {
+        } else if (name == "ConversionWarpedMesh" && parameter == "1") {
             if (options.find("-warped") == options.end()) {
                 options["-warped"] = parameter;
             }
@@ -92,6 +94,39 @@ bool parse_hdr(const std::filesystem::path& path, options_map& options) {
         }
     }
     return false;
+}
+
+void print_parameters_summary(const Grid::Parameters& parameters) {
+    std::cout << "The following parameters were set:" << std::endl;
+    // Dimensions.
+    std::cout << "DIMENSIONS:" << std::endl;
+    std::cout << "num_mz:" << parameters.dimensions.n << std::endl;
+    std::cout << "num_rt:" << parameters.dimensions.m << std::endl;
+    // Bounds.
+    std::cout << "BOUNDS:" << std::endl;
+    std::cout << "min_rt:" << parameters.bounds.min_rt << std::endl;
+    std::cout << "max_rt:" << parameters.bounds.max_rt << std::endl;
+    std::cout << "min_mz:" << parameters.bounds.min_mz << std::endl;
+    std::cout << "max_mz:" << parameters.bounds.max_mz << std::endl;
+    // SmoothingParams.
+    std::cout << "SMOOTHING PARAMETERS:" << std::endl;
+    std::cout << "mz:" << parameters.smoothing_params.mz << std::endl;
+    std::cout << "sigma_mz:" << parameters.smoothing_params.sigma_mz
+              << std::endl;
+    std::cout << "sigma_rt:" << parameters.smoothing_params.sigma_rt
+              << std::endl;
+    // Instrument type.
+    std::cout << "INSTRUMENT TYPE:" << std::endl;
+    std::cout << parameters.instrument_type << std::endl;
+
+    // Flags.
+    std::cout << "FLAGS:" << std::endl;
+    std::cout << "Warped: " << bool(parameters.flags & Grid::Flags::WARPED_MESH)
+              << std::endl;
+
+    // Memory usage.
+    double x = parameters.dimensions.n * parameters.dimensions.m * 8;
+    std::cout << "APPROXIMATE MEMORY USAGE (BYTES):" << x << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -426,6 +461,45 @@ int main(int argc, char* argv[]) {
         }
         if (lowercase_extension == ".mzxml") {
             // TODO(alex): do work here...
+            print_parameters_summary(parameters);
+            // Perform analysis.
+            // -----------------
+
+            // Instantiate memory.
+            std::vector<double> data(parameters.dimensions.n *
+                                     parameters.dimensions.m);
+            // Open files.
+            std::ifstream stream;
+            stream.open(file);
+            if (!stream) {
+                std::cout << "error: could not open file " << file << std::endl;
+                return -1;
+            }
+            // TODO(alex): Don't hardcode the name of the file!
+            auto datfile_name = "/data/ftp_data/comparing_grids/example_grid.dat";
+            std::ofstream datfile;
+            datfile.open(datfile_name, std::ios::out | std::ios::binary);
+            if (!datfile) {
+                std::cout << "error: could not open file " << datfile_name
+                          << std::endl;
+                return -1;
+            }
+
+            std::cout << "Parsing file..." << std::endl;
+            auto scans = XmlReader::read_next_scan(stream, parameters);
+            if (scans == std::nullopt) {
+                std::cout << "error: no scans found on file " << file
+                          << " for the given parameters" << std::endl;
+                return -1;
+            }
+            do {
+                for (const auto& scan : scans.value()) {
+                    Grid::splat(scan.mz, scan.rt, scan.value, parameters, data);
+                }
+                scans = XmlReader::read_next_scan(stream, parameters);
+            } while (scans != std::nullopt);
+            std::cout << "Saving into dat file..." << std::endl;
+            Grid::File::write(datfile, data, parameters);
         } else {
             std::cout << "error: unknown file format for file " << file
                       << std::endl;
