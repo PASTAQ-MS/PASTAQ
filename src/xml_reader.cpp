@@ -195,15 +195,14 @@ std::optional<XmlReader::Tag> XmlReader::read_tag(std::istream& stream) {
 
     // Find all attributes of this tag and store them on the attribute map.
     std::regex attribute_regex("(\\S+)=\"([^\"]+)\"");
-    for (std::sregex_iterator i = std::sregex_iterator(
-             buffer.begin(), buffer.end(), attribute_regex);
-         i != std::sregex_iterator(); ++i) {
-        std::smatch matches = *i;
-        // Malformed attributes, expected `name=value`
+    std::smatch matches;
+    while (std::regex_search(buffer, matches, attribute_regex)) {
         if (matches.size() != 3 || matches[1] == "" || matches[2] == "") {
             return std::nullopt;
         }
         tag->attributes[matches[1]] = matches[2];
+        buffer = matches.suffix().str();
     }
+
     return tag;
 };
