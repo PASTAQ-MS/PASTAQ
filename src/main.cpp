@@ -465,7 +465,7 @@ int main(int argc, char* argv[]) {
             // Instantiate memory.
             std::vector<double> data(parameters.dimensions.n *
                                      parameters.dimensions.m);
-            // Open files.
+            // Open input file.
             std::ifstream stream;
             stream.open(file);
             if (!stream) {
@@ -473,13 +473,14 @@ int main(int argc, char* argv[]) {
                 return -1;
             }
 
-            // TODO(alex): Don't hardcode the name of the file!
-            auto datfile_name = "/data/ftp_data/comparing_grids/example_grid.dat";
+            // Prepare the name of the output file.
+            auto datfile_name =
+                options["-out_dir"] / file.filename().replace_extension(".dat");
             std::ofstream datfile;
             datfile.open(datfile_name, std::ios::out | std::ios::binary);
             if (!datfile) {
                 std::cout << "error: could not open file " << datfile_name
-                          << std::endl;
+                          << " for writing" << std::endl;
                 return -1;
             }
 
