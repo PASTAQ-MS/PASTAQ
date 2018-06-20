@@ -26,18 +26,18 @@ bool Grid::splat(double mz, double rt, double value,
 
     // Even if the point lays outside the current grid, we still want to account
     // for it's contribution to the points in the frontier.
-    auto i_min = Grid::x_index(min_mz, parameters)
-                     ? Grid::x_index(min_mz, parameters).value()
-                     : 0;
-    auto j_min = Grid::y_index(min_rt, parameters)
-                     ? Grid::y_index(min_rt, parameters).value()
-                     : 0;
-    auto i_max = Grid::x_index(max_mz, parameters)
-                     ? Grid::x_index(max_mz, parameters).value()
-                     : parameters.dimensions.n - 1;
-    auto j_max = Grid::y_index(max_rt, parameters)
-                     ? Grid::y_index(max_rt, parameters).value()
-                     : parameters.dimensions.m - 1;
+    auto i_min = min_mz < parameters.bounds.min_mz
+                     ? 0
+                     : Grid::x_index(min_mz, parameters);
+    auto j_min = min_rt < parameters.bounds.min_rt
+                     ? 0
+                     : Grid::y_index(min_rt, parameters);
+    auto i_max = max_mz > parameters.bounds.max_mz
+                     ? parameters.dimensions.n - 1
+                     : Grid::x_index(max_mz, parameters);
+    auto j_max = max_rt > parameters.bounds.max_rt
+                     ? parameters.dimensions.m - 1
+                     : Grid::y_index(max_rt, parameters);
 
     double x0 = mz;
     double y0 = rt;
@@ -141,26 +141,14 @@ std::optional<double> Grid::rt_at(unsigned int j,
 }
 
 // TODO(alex): add unit tests for warped grid
-std::optional<unsigned int> Grid::x_index(double mz,
-                                          Grid::Parameters& parameters) {
+unsigned int Grid::x_index(double mz, Grid::Parameters& parameters) {
     // Regular grid.
     if (!(parameters.flags & Grid::Flags::WARPED_MESH)) {
         // In order to be consistent, the maximum value is mz + delta_mz. This
         // ensures all intervals contain the same number of points.
-        double delta_mz =
-            (parameters.bounds.max_mz - parameters.bounds.min_mz) /
-            static_cast<double>(parameters.dimensions.n - 1);
-        if (mz < parameters.bounds.min_mz ||
-            mz > parameters.bounds.max_mz + delta_mz) {
-            return std::nullopt;
-        }
         double d = mz - parameters.bounds.min_mz;
-        auto i = static_cast<unsigned int>(d / delta_mz);
-        if (i > parameters.dimensions.n - 1) {
-            return std::nullopt;
-        }
-
-        return i;
+        return static_cast<unsigned int>(d /
+                                         parameters.smoothing_params.sigma_mz);
     }
 
     // Warped grid.
@@ -170,11 +158,7 @@ std::optional<unsigned int> Grid::x_index(double mz,
                        parameters.smoothing_params.sigma_mz;
             double b = 1 / std::sqrt(parameters.bounds.min_mz);
             double c = std::sqrt(1 / mz);
-            auto i = static_cast<unsigned int>(a * (b - c));
-            if (i > parameters.dimensions.n - 1) {
-                return std::nullopt;
-            }
-            return i;
+            return static_cast<unsigned int>(a * (b - c));
         } break;
         case Instrument::FTICR: {
             double a = 1 - parameters.bounds.min_mz / mz;
@@ -182,57 +166,29 @@ std::optional<unsigned int> Grid::x_index(double mz,
                 parameters.smoothing_params.mz * parameters.smoothing_params.mz;
             double c =
                 parameters.smoothing_params.sigma_mz * parameters.bounds.min_mz;
-            auto i = static_cast<unsigned int>(a * b / c);
-            if (i > parameters.dimensions.n - 1) {
-                return std::nullopt;
-            }
-            return i;
+            return static_cast<unsigned int>(a * b / c);
         } break;
         case Instrument::TOF: {
-            auto i = static_cast<unsigned int>(
+            return static_cast<unsigned int>(
                 parameters.smoothing_params.mz /
                 parameters.smoothing_params.sigma_mz *
                 std::log(mz / parameters.bounds.min_mz));
-            if (i > parameters.dimensions.n - 1) {
-                return std::nullopt;
-            }
-            return i;
         } break;
         case Instrument::QUAD: {
             // Same as the regular grid.
-            double delta_mz =
-                (parameters.bounds.max_mz - parameters.bounds.min_mz) /
-                static_cast<double>(parameters.dimensions.n - 1);
-            if (mz < parameters.bounds.min_mz ||
-                mz > parameters.bounds.max_mz + delta_mz) {
-                return std::nullopt;
-            }
             double d = mz - parameters.bounds.min_mz;
-            auto i = static_cast<unsigned int>(d / delta_mz);
-            if (i > parameters.dimensions.n - 1) {
-                return std::nullopt;
-            }
+            return static_cast<unsigned int>(
+                d / parameters.smoothing_params.sigma_mz);
         } break;
     }
-    return std::nullopt;
+    return 0;
 }
 
-std::optional<unsigned int> Grid::y_index(double rt,
-                                          Grid::Parameters& parameters) {
+unsigned int Grid::y_index(double rt, Grid::Parameters& parameters) {
     // In order to be consistent, the maximum value is rt + delta_rt. This
     // ensures all intervals contain the same number of points.
-    double delta_rt = (parameters.bounds.max_rt - parameters.bounds.min_rt) /
-                      static_cast<double>(parameters.dimensions.m - 1);
-    if (rt < parameters.bounds.min_rt ||
-        rt > parameters.bounds.max_rt + delta_rt) {
-        return std::nullopt;
-    }
     double d = rt - parameters.bounds.min_rt;
-    auto j = static_cast<unsigned int>(d / delta_rt);
-    if (j > parameters.dimensions.m - 1) {
-        return std::nullopt;
-    }
-    return j;
+    return static_cast<unsigned int>(d / parameters.smoothing_params.sigma_rt);
 }
 
 double Grid::sigma_mz(double mz, Grid::Parameters& parameters) {

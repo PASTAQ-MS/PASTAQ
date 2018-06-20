@@ -78,11 +78,13 @@ std::optional<double> mz_at(unsigned int i, Parameters& parameters);
 // Get the real world retention time stored in the given index.
 std::optional<double> rt_at(unsigned int j, Parameters& parameters);
 
-// Get the x index of the closest point (rounded down) for a given mz.
-std::optional<unsigned int> x_index(double mz, Parameters& parameters);
+// Get the x index of the closest point (rounded down) for a given mz. It
+// doesn't perform any boundary checks.
+unsigned int x_index(double mz, Parameters& parameters);
 
-// Get the y index of the closest point (rounded down) for a given rt.
-std::optional<unsigned int> y_index(double rt, Parameters& parameters);
+// Get the y index of the closest point (rounded down) for a given rt. It
+// doesn't perform any boundary checks.
+unsigned int y_index(double rt, Parameters& parameters);
 
 // Get the sigma_mz used for smoothing. In order to maintain the same number
 // of sampling points for smoothing across all the mz range of the
