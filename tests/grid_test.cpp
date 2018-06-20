@@ -13,10 +13,11 @@ TEST_CASE("Gaussian splatting") {
 
     SUBCASE("Splat on the cencer of the mesh") {
         Grid::Parameters parameters = {
-            {7, 7},
+            {},
             {-3.0 * sigma_rt, 3.0 * sigma_rt, -3.0 * sigma_mz, 3.0 * sigma_mz},
             {1.0, sigma_mz, 1.0},
             Instrument::QUAD};
+        CHECK(calculate_dimensions(parameters));
         std::vector<double> data(parameters.dimensions.n *
                                  parameters.dimensions.m);
         Grid::splat(0.0, 0.0, 1, parameters, data);

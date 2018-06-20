@@ -218,3 +218,15 @@ double Grid::sigma_mz(double mz, Grid::Parameters& parameters) {
 double Grid::sigma_rt(Grid::Parameters& parameters) {
     return parameters.smoothing_params.sigma_rt;
 }
+
+bool Grid::calculate_dimensions(Grid::Parameters& parameters) {
+    if ((parameters.bounds.min_mz >= parameters.bounds.max_mz) ||
+        (parameters.bounds.min_rt >= parameters.bounds.max_rt)) {
+        return false;
+    }
+
+    auto n = Grid::x_index(parameters.bounds.max_mz, parameters);
+    auto m = Grid::y_index(parameters.bounds.max_rt, parameters);
+    parameters.dimensions = Grid::Dimensions{n + 1, m + 1};
+    return true;
+}

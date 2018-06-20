@@ -94,6 +94,11 @@ double sigma_mz(double mz, Parameters& parameters);
 // Get the sigma_rt used for smoothing.
 double sigma_rt(Parameters& parameters);
 
+// Set up the Grid::Dimensions inside the given Grid::Parameters. The dimensions
+// of the grid depend on it being a warped mesh or not, the bounds, the sampling
+// delta (As defined on the smoothing parameters) and the instrument.
+bool calculate_dimensions(Grid::Parameters& parameters);
+
 }  // namespace Grid
 
 #endif /* GRID_GRID_HPP */
