@@ -445,16 +445,16 @@ int main(int argc, char* argv[]) {
 
     // Execute the program here.
     for (const auto& file_name : files) {
-        std::filesystem::path file = file_name;
+        std::filesystem::path input_file = file_name;
         // Check if the files exist.
-        if (!std::filesystem::exists(file)) {
-            std::cout << "error: couldn't find file " << file << std::endl;
+        if (!std::filesystem::exists(input_file)) {
+            std::cout << "error: couldn't find file " << input_file << std::endl;
             print_usage();
             return -1;
         }
 
         // Check if the file has the appropriate format.
-        std::string extension = file.extension();
+        std::string extension = input_file.extension();
         std::string lowercase_extension = extension;
         for (auto& ch : lowercase_extension) {
             ch = std::tolower(ch);
@@ -467,15 +467,16 @@ int main(int argc, char* argv[]) {
                                      parameters.dimensions.m);
             // Open input file.
             std::ifstream stream;
-            stream.open(file);
+            stream.open(input_file);
             if (!stream) {
-                std::cout << "error: could not open file " << file << std::endl;
+                std::cout << "error: could not open input file " << input_file
+                          << std::endl;
                 return -1;
             }
 
             // Prepare the name of the output file.
-            auto datfile_name =
-                options["-out_dir"] / file.filename().replace_extension(".dat");
+            auto datfile_name = options["-out_dir"] /
+                                input_file.filename().replace_extension(".dat");
             std::ofstream datfile;
             datfile.open(datfile_name, std::ios::out | std::ios::binary);
             if (!datfile) {
@@ -487,7 +488,7 @@ int main(int argc, char* argv[]) {
             std::cout << "Parsing file..." << std::endl;
             auto scans = XmlReader::read_next_scan(stream, parameters);
             if (scans == std::nullopt) {
-                std::cout << "error: no scans found on file " << file
+                std::cout << "error: no scans found on file " << input_file
                           << " for the given parameters" << std::endl;
                 return -1;
             }
@@ -501,7 +502,7 @@ int main(int argc, char* argv[]) {
             std::cout << "Saving into dat file..." << std::endl;
             Grid::File::write(datfile, data, parameters);
         } else {
-            std::cout << "error: unknown file format for file " << file
+            std::cout << "error: unknown file format for file " << input_file
                       << std::endl;
             print_usage();
             return -1;
