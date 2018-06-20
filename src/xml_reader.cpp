@@ -6,7 +6,7 @@
 
 // Read the next mz1 scan from the stream.
 std::optional<std::vector<Grid::Peak>> XmlReader::read_next_scan(
-    std::istream& stream, Grid::Parameters& parameters) {
+    std::istream& stream, const Grid::Parameters& parameters) {
     while (stream.good()) {
         auto tag = XmlReader::read_tag(stream);
         if (!tag) {

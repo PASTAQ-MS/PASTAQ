@@ -15,9 +15,9 @@ bool Grid::File::load(std::istream &stream, std::vector<double> *destination,
     return stream.good();
 }
 
-bool Grid::File::write(std::ostream &stream, std::vector<double> &source,
-                       Grid::Parameters &parameters) {
-    stream.write(reinterpret_cast<char *>(&source[0]),
+bool Grid::File::write(std::ostream &stream, const std::vector<double> &source,
+                       const Grid::Parameters &parameters) {
+    stream.write(reinterpret_cast<const char *>(&source[0]),
                  sizeof(double) * source.size());
     Grid::File::write_parameters(stream, parameters);
     return stream.good();
@@ -36,12 +36,12 @@ bool Grid::File::load_parameters(std::istream &stream,
 }
 
 bool Grid::File::write_parameters(std::ostream &stream,
-                                  Grid::Parameters &parameters) {
+                                  const Grid::Parameters &parameters) {
     auto footer_size = static_cast<char>(sizeof(Grid::Parameters) +
                                          sizeof(Grid::File::Parameters));
     Grid::File::Parameters file_parameters = {1, footer_size};
-    stream.write(reinterpret_cast<char *>(&parameters), sizeof(parameters));
-    stream.write(reinterpret_cast<char *>(&file_parameters),
+    stream.write(reinterpret_cast<const char *>(&parameters), sizeof(parameters));
+    stream.write(reinterpret_cast<const char *>(&file_parameters),
                  sizeof(file_parameters));
     return stream.good();
 }

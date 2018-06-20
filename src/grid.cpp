@@ -2,7 +2,7 @@
 
 #include "grid.hpp"
 
-bool Grid::splat(const Grid::Peak& peak, Grid::Parameters& parameters,
+bool Grid::splat(const Grid::Peak& peak, const Grid::Parameters& parameters,
                  std::vector<double>& data) {
     // For some instruments the peaks get wider in proportion to the adquired
     // mass. In order to maintain the same number of sampling points we will
@@ -61,8 +61,8 @@ bool Grid::splat(const Grid::Peak& peak, Grid::Parameters& parameters,
 }
 
 std::optional<double> Grid::value_at(unsigned int i, unsigned int j,
-                                     Grid::Parameters& parameters,
-                                     std::vector<double>& data) {
+                                     const Grid::Parameters& parameters,
+                                     const std::vector<double>& data) {
     if (data.empty() || i > parameters.dimensions.n - 1 ||
         j > parameters.dimensions.m - 1) {
         return std::nullopt;
@@ -71,7 +71,8 @@ std::optional<double> Grid::value_at(unsigned int i, unsigned int j,
 }
 
 bool Grid::set_value(unsigned int i, unsigned int j, double value,
-                     Grid::Parameters& parameters, std::vector<double>& data) {
+                     const Grid::Parameters& parameters,
+                     std::vector<double>& data) {
     if (data.empty() || i > parameters.dimensions.n - 1 ||
         j > parameters.dimensions.m - 1) {
         return false;
@@ -82,7 +83,7 @@ bool Grid::set_value(unsigned int i, unsigned int j, double value,
 
 // TODO(alex): add unit tests for warped grid
 std::optional<double> Grid::mz_at(unsigned int i,
-                                  Grid::Parameters& parameters) {
+                                  const Grid::Parameters& parameters) {
     if (parameters.dimensions.n * parameters.dimensions.m == 0 ||
         i > parameters.dimensions.n - 1) {
         return std::nullopt;
@@ -128,7 +129,7 @@ std::optional<double> Grid::mz_at(unsigned int i,
 }
 
 std::optional<double> Grid::rt_at(unsigned int j,
-                                  Grid::Parameters& parameters) {
+                                  const Grid::Parameters& parameters) {
     if (parameters.dimensions.n * parameters.dimensions.m == 0 ||
         j > parameters.dimensions.m - 1) {
         return std::nullopt;
@@ -139,7 +140,7 @@ std::optional<double> Grid::rt_at(unsigned int j,
 }
 
 // TODO(alex): add unit tests for warped grid
-unsigned int Grid::x_index(double mz, Grid::Parameters& parameters) {
+unsigned int Grid::x_index(double mz, const Grid::Parameters& parameters) {
     // Regular grid.
     if (!(parameters.flags & Grid::Flags::WARPED_MESH)) {
         // In order to be consistent, the maximum value is mz + delta_mz. This
@@ -182,14 +183,14 @@ unsigned int Grid::x_index(double mz, Grid::Parameters& parameters) {
     return 0;
 }
 
-unsigned int Grid::y_index(double rt, Grid::Parameters& parameters) {
+unsigned int Grid::y_index(double rt, const Grid::Parameters& parameters) {
     // In order to be consistent, the maximum value is rt + delta_rt. This
     // ensures all intervals contain the same number of points.
     double d = rt - parameters.bounds.min_rt;
     return static_cast<unsigned int>(d / parameters.smoothing_params.sigma_rt);
 }
 
-double Grid::sigma_mz(double mz, Grid::Parameters& parameters) {
+double Grid::sigma_mz(double mz, const Grid::Parameters& parameters) {
     double sigma_mz = 0.0;
     switch (parameters.instrument_type) {
         case Instrument::ORBITRAP: {
@@ -213,7 +214,7 @@ double Grid::sigma_mz(double mz, Grid::Parameters& parameters) {
     return sigma_mz;
 }
 
-double Grid::sigma_rt(Grid::Parameters& parameters) {
+double Grid::sigma_rt(const Grid::Parameters& parameters) {
     return parameters.smoothing_params.sigma_rt;
 }
 
