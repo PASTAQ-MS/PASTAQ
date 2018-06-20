@@ -82,6 +82,7 @@ bool Grid::set_value(unsigned int i, unsigned int j, double value,
     return true;
 }
 
+// TODO(alex): add unit tests for warped grid
 std::optional<double> Grid::mz_at(unsigned int i,
                                   Grid::Parameters& parameters) {
     if (parameters.dimensions.n * parameters.dimensions.m == 0 ||
@@ -89,9 +90,43 @@ std::optional<double> Grid::mz_at(unsigned int i,
         return std::nullopt;
     }
 
-    auto delta_mz = (parameters.bounds.max_mz - parameters.bounds.min_mz) /
-                    static_cast<double>(parameters.dimensions.n - 1);
-    return parameters.bounds.min_mz + delta_mz * i;
+    // Regular grid.
+    if (!(parameters.flags & Grid::Flags::WARPED_MESH)) {
+        auto delta_mz = (parameters.bounds.max_mz - parameters.bounds.min_mz) /
+                        static_cast<double>(parameters.dimensions.n - 1);
+        return parameters.bounds.min_mz + delta_mz * i;
+    }
+
+    // Warped grid.
+    switch (parameters.instrument_type) {
+        case Instrument::ORBITRAP: {
+            double a = 1 / std::sqrt(parameters.bounds.min_mz);
+            double b = parameters.smoothing_params.sigma_mz /
+                       std::pow(parameters.smoothing_params.mz, 1.5) * i;
+            double c = (a - b);
+            return 1 / (c * c);
+        } break;
+        case Instrument::FTICR: {
+            double a =
+                parameters.smoothing_params.sigma_mz * parameters.bounds.min_mz;
+            double b =
+                parameters.smoothing_params.mz * parameters.smoothing_params.mz;
+            return parameters.bounds.min_mz / (1 - (a / b) * i);
+        } break;
+        case Instrument::TOF: {
+            return parameters.bounds.min_mz *
+                   std::exp(parameters.smoothing_params.sigma_mz /
+                            parameters.smoothing_params.mz * i);
+        } break;
+        case Instrument::QUAD: {
+            // Same as regular grid.
+            auto delta_mz =
+                (parameters.bounds.max_mz - parameters.bounds.min_mz) /
+                static_cast<double>(parameters.dimensions.n - 1);
+            return parameters.bounds.min_mz + delta_mz * i;
+        } break;
+    }
+    return std::nullopt;
 }
 
 std::optional<double> Grid::rt_at(unsigned int j,
@@ -105,22 +140,81 @@ std::optional<double> Grid::rt_at(unsigned int j,
     return parameters.bounds.min_rt + delta_rt * j;
 }
 
+// TODO(alex): add unit tests for warped grid
 std::optional<unsigned int> Grid::x_index(double mz,
                                           Grid::Parameters& parameters) {
-    // In order to be consistent, the maximum value is mz + delta_mz. This
-    // ensures all intervals contain the same number of points.
-    double delta_mz = (parameters.bounds.max_mz - parameters.bounds.min_mz) /
-                      static_cast<double>(parameters.dimensions.n - 1);
-    if (mz < parameters.bounds.min_mz ||
-        mz > parameters.bounds.max_mz + delta_mz) {
-        return std::nullopt;
+    // Regular grid.
+    if (!(parameters.flags & Grid::Flags::WARPED_MESH)) {
+        // In order to be consistent, the maximum value is mz + delta_mz. This
+        // ensures all intervals contain the same number of points.
+        double delta_mz =
+            (parameters.bounds.max_mz - parameters.bounds.min_mz) /
+            static_cast<double>(parameters.dimensions.n - 1);
+        if (mz < parameters.bounds.min_mz ||
+            mz > parameters.bounds.max_mz + delta_mz) {
+            return std::nullopt;
+        }
+        double d = mz - parameters.bounds.min_mz;
+        auto i = static_cast<unsigned int>(d / delta_mz);
+        if (i > parameters.dimensions.n - 1) {
+            return std::nullopt;
+        }
+
+        return i;
     }
-    double d = mz - parameters.bounds.min_mz;
-    auto i = static_cast<unsigned int>(d / delta_mz);
-    if (i > parameters.dimensions.n - 1) {
-        return std::nullopt;
+
+    // Warped grid.
+    switch (parameters.instrument_type) {
+        case Instrument::ORBITRAP: {
+            double a = std::pow(parameters.smoothing_params.mz, 1.5) /
+                       parameters.smoothing_params.sigma_mz;
+            double b = 1 / std::sqrt(parameters.bounds.min_mz);
+            double c = std::sqrt(1 / mz);
+            auto i = static_cast<unsigned int>(a * (b - c));
+            if (i > parameters.dimensions.n - 1) {
+                return std::nullopt;
+            }
+            return i;
+        } break;
+        case Instrument::FTICR: {
+            double a = 1 - parameters.bounds.min_mz / mz;
+            double b =
+                parameters.smoothing_params.mz * parameters.smoothing_params.mz;
+            double c =
+                parameters.smoothing_params.sigma_mz * parameters.bounds.min_mz;
+            auto i = static_cast<unsigned int>(a * b / c);
+            if (i > parameters.dimensions.n - 1) {
+                return std::nullopt;
+            }
+            return i;
+        } break;
+        case Instrument::TOF: {
+            auto i = static_cast<unsigned int>(
+                parameters.smoothing_params.mz /
+                parameters.smoothing_params.sigma_mz *
+                std::log(mz / parameters.bounds.min_mz));
+            if (i > parameters.dimensions.n - 1) {
+                return std::nullopt;
+            }
+            return i;
+        } break;
+        case Instrument::QUAD: {
+            // Same as the regular grid.
+            double delta_mz =
+                (parameters.bounds.max_mz - parameters.bounds.min_mz) /
+                static_cast<double>(parameters.dimensions.n - 1);
+            if (mz < parameters.bounds.min_mz ||
+                mz > parameters.bounds.max_mz + delta_mz) {
+                return std::nullopt;
+            }
+            double d = mz - parameters.bounds.min_mz;
+            auto i = static_cast<unsigned int>(d / delta_mz);
+            if (i > parameters.dimensions.n - 1) {
+                return std::nullopt;
+            }
+        } break;
     }
-    return i;
+    return std::nullopt;
 }
 
 std::optional<unsigned int> Grid::y_index(double rt,
