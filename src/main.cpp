@@ -308,64 +308,6 @@ int main(int argc, char* argv[]) {
     parameters.bounds.min_mz = std::stod(min_mz);
     parameters.bounds.max_mz = std::stod(max_mz);
 
-    // Get the dimensions. The number of sampling points in either direction can
-    // be set manually specifying -num_mz and -num_rt or indirectly using
-    // -delta_mz and -delta_rt. The former will take priority over the later.
-    if ((options.find("-delta_mz") != options.end()) &&
-        (options.find("-num_mz") == options.end())) {
-        auto delta_mz = options["-delta_mz"];
-        if (!is_number(delta_mz)) {
-            std::cout << "error: "
-                      << "delta_mz"
-                      << " has to be a number" << std::endl;
-            print_usage();
-            return -1;
-        }
-        unsigned int num_mz =
-            (parameters.bounds.max_mz - parameters.bounds.min_mz) /
-            std::stod(delta_mz);
-        options["-num_mz"] = std::to_string(num_mz);
-    }
-    if ((options.find("-delta_rt") != options.end()) &&
-        (options.find("-num_rt") == options.end())) {
-        auto delta_rt = options["-delta_rt"];
-        if (!is_number(delta_rt)) {
-            std::cout << "error: "
-                      << "delta_rt"
-                      << " has to be a number" << std::endl;
-            print_usage();
-            return -1;
-        }
-        unsigned int num_rt =
-            (parameters.bounds.max_rt - parameters.bounds.min_rt) /
-            std::stod(delta_rt);
-        options["-num_rt"] = std::to_string(num_rt);
-    }
-    if ((options.find("-num_mz") == options.end()) ||
-        (options.find("-num_rt") == options.end())) {
-        std::cout << "Grid dimensions (num_mz, num_rt) not specified"
-                  << std::endl;
-        return -1;
-    }
-    auto num_mz = options["-num_mz"];
-    auto num_rt = options["-num_rt"];
-    if (!is_unsigned_int(num_mz)) {
-        std::cout << "error: "
-                  << "num_mz"
-                  << " has to be a positive integer" << std::endl;
-        print_usage();
-        return -1;
-    }
-    if (!is_unsigned_int(num_rt)) {
-        std::cout << "error: "
-                  << "num_rt"
-                  << " has to be a positive integer" << std::endl;
-        print_usage();
-        return -1;
-    }
-    parameters.dimensions.n = std::stoi(num_mz);
-    parameters.dimensions.m = std::stoi(num_rt);
-
     // Get the smoothing parameters.
     if ((options.find("-smooth_mz") == options.end()) ||
         (options.find("-sigma_mz") == options.end()) ||
@@ -427,9 +369,77 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    // Set up the flags.
     if (options.find("-warped") != options.end()) {
+        // Set up the flags.
         parameters.flags |= Grid::Flags::WARPED_MESH;
+
+        // Manually specifying delta/number of sampling points is
+        // not valid when using a warped grid. To calculate the dimensions of
+        // the warped grid we need to use the bounds and the reference sigma_mz
+        // at a given mass for the given instrument.
+        Grid::calculate_dimensions(parameters);
+
+        // When we encounter a warped grid, the rest of dimensions options are
+        // ignored.
+    } else {
+        // Get the dimensions. The number of sampling points in either direction
+        // can be set manually specifying -num_mz and -num_rt or indirectly
+        // using -delta_mz and -delta_rt. The former will take priority over the
+        // later.
+        if ((options.find("-delta_mz") != options.end()) &&
+            (options.find("-num_mz") == options.end())) {
+            auto delta_mz = options["-delta_mz"];
+            if (!is_number(delta_mz)) {
+                std::cout << "error: "
+                          << "delta_mz"
+                          << " has to be a number" << std::endl;
+                print_usage();
+                return -1;
+            }
+            unsigned int num_mz =
+                (parameters.bounds.max_mz - parameters.bounds.min_mz) /
+                std::stod(delta_mz);
+            options["-num_mz"] = std::to_string(num_mz);
+        }
+        if ((options.find("-delta_rt") != options.end()) &&
+            (options.find("-num_rt") == options.end())) {
+            auto delta_rt = options["-delta_rt"];
+            if (!is_number(delta_rt)) {
+                std::cout << "error: "
+                          << "delta_rt"
+                          << " has to be a number" << std::endl;
+                print_usage();
+                return -1;
+            }
+            unsigned int num_rt =
+                (parameters.bounds.max_rt - parameters.bounds.min_rt) /
+                std::stod(delta_rt);
+            options["-num_rt"] = std::to_string(num_rt);
+        }
+        if ((options.find("-num_mz") == options.end()) ||
+            (options.find("-num_rt") == options.end())) {
+            std::cout << "Grid dimensions (num_mz, num_rt) not specified"
+                      << std::endl;
+            return -1;
+        }
+        auto num_mz = options["-num_mz"];
+        auto num_rt = options["-num_rt"];
+        if (!is_unsigned_int(num_mz)) {
+            std::cout << "error: "
+                      << "num_mz"
+                      << " has to be a positive integer" << std::endl;
+            print_usage();
+            return -1;
+        }
+        if (!is_unsigned_int(num_rt)) {
+            std::cout << "error: "
+                      << "num_rt"
+                      << " has to be a positive integer" << std::endl;
+            print_usage();
+            return -1;
+        }
+        parameters.dimensions.n = std::stoi(num_mz);
+        parameters.dimensions.m = std::stoi(num_rt);
     }
 
     // Set up the output directory and check if it exists.
@@ -448,7 +458,8 @@ int main(int argc, char* argv[]) {
         std::filesystem::path input_file = file_name;
         // Check if the files exist.
         if (!std::filesystem::exists(input_file)) {
-            std::cout << "error: couldn't find file " << input_file << std::endl;
+            std::cout << "error: couldn't find file " << input_file
+                      << std::endl;
             print_usage();
             return -1;
         }
