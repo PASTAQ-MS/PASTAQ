@@ -2,20 +2,20 @@
 
 #include "grid.hpp"
 
-bool Grid::splat(double mz, double rt, double value,
-                 Grid::Parameters& parameters, std::vector<double>& data) {
+bool Grid::splat(const Grid::Peak& peak, Grid::Parameters& parameters,
+                 std::vector<double>& data) {
     // For some instruments the peaks get wider in proportion to the adquired
     // mass. In order to maintain the same number of sampling points we will
     // scale the sigm_mz accordingly.
-    double sigma_mz = Grid::sigma_mz(mz, parameters);
+    double sigma_mz = Grid::sigma_mz(peak.mz, parameters);
     double sigma_rt = Grid::sigma_rt(parameters);
 
     // Get the gaussian square dimensions. Note that we are using a square
     // kernel approximation for simplicity and computational efficiency.
-    double min_rt = rt - 2 * sigma_rt;
-    double max_rt = rt + 2 * sigma_rt;
-    double min_mz = mz - 2 * sigma_mz;
-    double max_mz = mz + 2 * sigma_mz;
+    double min_rt = peak.rt - 2 * sigma_rt;
+    double max_rt = peak.rt + 2 * sigma_rt;
+    double min_mz = peak.mz - 2 * sigma_mz;
+    double max_mz = peak.mz + 2 * sigma_mz;
 
     if ((max_rt < parameters.bounds.min_rt) ||
         (max_mz < parameters.bounds.min_mz) ||
@@ -39,8 +39,6 @@ bool Grid::splat(double mz, double rt, double value,
                      ? parameters.dimensions.m - 1
                      : Grid::y_index(max_rt, parameters);
 
-    double x0 = mz;
-    double y0 = rt;
     for (size_t j = j_min; j <= j_max; ++j) {
         for (size_t i = i_min; i <= i_max; ++i) {
             // No need to do boundary check, since we are sure we are inside the
@@ -49,13 +47,13 @@ bool Grid::splat(double mz, double rt, double value,
             double y = Grid::rt_at(j, parameters).value();
 
             // Calculate the gaussian weight for this point.
-            double a = (x - x0) / sigma_mz;
-            double b = (y - y0) / sigma_rt;
+            double a = (x - peak.mz) / sigma_mz;
+            double b = (y - peak.rt) / sigma_rt;
             double weight = std::exp(-0.5 * (a * a + b * b));
 
             // Set the value, weight and counts.
             auto old_value = Grid::value_at(i, j, parameters, data);
-            Grid::set_value(i, j, old_value.value() + value * weight,
+            Grid::set_value(i, j, old_value.value() + peak.value * weight,
                             parameters, data);
         }
     }

@@ -497,18 +497,18 @@ int main(int argc, char* argv[]) {
             }
 
             std::cout << "Parsing file..." << std::endl;
-            auto scans = XmlReader::read_next_scan(stream, parameters);
-            if (scans == std::nullopt) {
-                std::cout << "error: no scans found on file " << input_file
+            auto peaks = XmlReader::read_next_scan(stream, parameters);
+            if (peaks == std::nullopt) {
+                std::cout << "error: no peaks found on file " << input_file
                           << " for the given parameters" << std::endl;
                 return -1;
             }
             do {
-                for (const auto& scan : scans.value()) {
-                    Grid::splat(scan.mz, scan.rt, scan.value, parameters, data);
+                for (const auto& peak : peaks.value()) {
+                    Grid::splat(peak, parameters, data);
                 }
-                scans = XmlReader::read_next_scan(stream, parameters);
-            } while (scans != std::nullopt);
+                peaks = XmlReader::read_next_scan(stream, parameters);
+            } while (peaks != std::nullopt);
 
             std::cout << "Saving into dat file..." << std::endl;
             Grid::File::write(datfile, data, parameters);

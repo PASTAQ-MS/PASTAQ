@@ -15,14 +15,8 @@ struct Tag {
     bool closed;
 };
 
-struct Scan {
-    double mz;
-    double rt;
-    double value;
-};
-
-std::optional<std::vector<Scan>> read_next_scan(std::istream &stream,
-                                                Grid::Parameters &parameters);
+std::optional<std::vector<Grid::Peak>> read_next_scan(
+    std::istream &stream, Grid::Parameters &parameters);
 std::optional<Tag> read_tag(std::istream &stream);
 
 // Read data until the next tag is found and trim whitespace at the beginning in
@@ -159,8 +153,9 @@ inline static uint64_t get64(char *&p, int &bit, bool little_endian) {
 }
 
 // TODO: Can we make it so that we don't have to pass the 'bit' variable around?
-inline static std::optional<double> get_double(char *&p, int &bit, int precision,
-                                 bool little_endian) {
+inline static std::optional<double> get_double(char *&p, int &bit,
+                                               int precision,
+                                               bool little_endian) {
     if (precision == 32) {
         uint32_t b = get32(p, bit, little_endian);
         return *(float *)&b;

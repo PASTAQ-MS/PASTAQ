@@ -5,7 +5,7 @@
 #include "xml_reader.hpp"
 
 // Read the next mz1 scan from the stream.
-std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
+std::optional<std::vector<Grid::Peak>> XmlReader::read_next_scan(
     std::istream& stream, Grid::Parameters& parameters) {
     while (stream.good()) {
         auto tag = XmlReader::read_tag(stream);
@@ -106,7 +106,7 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
             }
 
             // Decode the peaks from the base 64 string.
-            std::vector<XmlReader::Scan> scans;
+            std::vector<Grid::Peak> peaks;
             int bit = 0;
             char* ptr = &data.value()[0];
             for (size_t i = 0; i < peaks_count; ++i) {
@@ -126,15 +126,15 @@ std::optional<std::vector<XmlReader::Scan>> XmlReader::read_next_scan(
                     continue;
                 }
 
-                // NOTE(alex): Not the most efficient way. It would be better to
+                // TODO(alex): Not the most efficient way. It would be better to
                 // prealocate but we don't know at this point how many peaks
                 // from peak_count are inside our bounds. Would it be better to
                 // preallocate and then trim zeroed values?
-                scans.push_back(
+                peaks.push_back(
                     {mz.value(), retention_time, intensity.value()});
             }
 
-            return scans;
+            return peaks;
         }
     }
     return std::nullopt;

@@ -20,7 +20,7 @@ TEST_CASE("Gaussian splatting") {
         CHECK(calculate_dimensions(parameters));
         std::vector<double> data(parameters.dimensions.n *
                                  parameters.dimensions.m);
-        Grid::splat(0.0, 0.0, 1, parameters, data);
+        Grid::splat({0.0, 0.0, 1}, parameters, data);
         std::vector<std::string> expected_weights = {
             "0.000000", "0.000000", "0.000000", "0.000000",
             "0.000000", "0.000000", "0.000000",  // Row 0
@@ -54,10 +54,10 @@ TEST_CASE("Gaussian splatting") {
             Instrument::QUAD};
         std::vector<double> data(parameters.dimensions.n *
                                  parameters.dimensions.m);
-        CHECK_FALSE(Grid::splat(-20.0, -20.0, 1, parameters, data));
-        CHECK_FALSE(Grid::splat(20.0, 20.0, 1, parameters, data));
-        CHECK_FALSE(Grid::splat(-20.0, 20.0, 1, parameters, data));
-        CHECK_FALSE(Grid::splat(20.0, +20.0, 1, parameters, data));
+        CHECK_FALSE(Grid::splat({-20.0, -20.0, 1}, parameters, data));
+        CHECK_FALSE(Grid::splat({20.0, 20.0, 1}, parameters, data));
+        CHECK_FALSE(Grid::splat({-20.0, 20.0, 1}, parameters, data));
+        CHECK_FALSE(Grid::splat({20.0, +20.0, 1}, parameters, data));
     }
 
     SUBCASE("Splat outside but range falls inside") {
@@ -68,10 +68,10 @@ TEST_CASE("Gaussian splatting") {
             Instrument::QUAD};
         std::vector<double> data(parameters.dimensions.n *
                                  parameters.dimensions.m);
-        CHECK(Grid::splat(-5.0, 0.0, 1, parameters, data));
-        CHECK(Grid::splat(5.0, 0.0, 1, parameters, data));
-        CHECK(Grid::splat(0.0, -5.0, 1, parameters, data));
-        CHECK(Grid::splat(0.0, 5.0, 1, parameters, data));
+        CHECK(Grid::splat({-5.0, 0.0, 1}, parameters, data));
+        CHECK(Grid::splat({5.0, 0.0, 1}, parameters, data));
+        CHECK(Grid::splat({0.0, -5.0, 1}, parameters, data));
+        CHECK(Grid::splat({0.0, 5.0, 1}, parameters, data));
         std::vector<std::string> expected_weights = {
             "0.000000", "0.018316", "0.082085", "0.135335",
             "0.082085", "0.018316", "0.000000",  // Row 0

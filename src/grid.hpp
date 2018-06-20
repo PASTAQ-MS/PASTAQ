@@ -55,10 +55,16 @@ struct Parameters {
     char flags = 0x00;
 };
 
+// A Grid::Peak represents a single measured value at a given mz and rt.
+struct Peak {
+    double mz;
+    double rt;
+    double value;
+};
+
 // Perform gaussian splatting of the given point into the grid, returns the
 // success or failure of the operation.
-// TODO: Sould we pass the point as a struct {mz, rt, value}?
-bool splat(double mz, double rt, double value, Grid::Parameters& parameters,
+bool splat(const Grid::Peak& peak, Grid::Parameters& parameters,
            std::vector<double>& data);
 
 // Get the value stored at the given position of the given data vector.
