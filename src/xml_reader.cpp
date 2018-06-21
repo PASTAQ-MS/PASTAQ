@@ -30,18 +30,27 @@ std::optional<std::vector<Grid::Peak>> XmlReader::read_next_scan(
                 scan_attributes.end()) {
                 return std::nullopt;
             }
-            // TODO(alex): The time is in xs:duration units. Here we are only
-            // accounting for the data as stored in seconds. It would be better
-            // to fully account for this. See:
+
+            // The time is in xs:duration units. Here we are only accounting for
+            // the data as stored in seconds, minutes and hours. It is unlikely
+            // that we are going to need to parse the days, months and years.
+            // For more information about the format see:
             //    https://www.ibm.com/support/knowledgecenter/en/ssw_ibm_i_72/rzasp/rzasp_xsduration.htm
-            std::regex rt_regex("PT([[:digit:]]+.?[[:digit:]]+)S");
+            std::regex rt_regex(
+                R"(P.*T(?:([[:digit:]]+)H)?(?:([[:digit:]]+)M)?(?:([[:digit:]]+\.?[[:digit:]]*)S))");
             std::smatch matches;
             if (!std::regex_search(scan_attributes["retentionTime"], matches,
                                    rt_regex) ||
-                matches.size() != 2) {
+                matches.size() != 4) {
                 return std::nullopt;
             }
-            double retention_time = std::stod(matches[1]);
+            double retention_time = std::stod(matches[3]);
+            if (matches[2] != "") {
+                retention_time += std::stod(matches[2]) * 60;
+            }
+            if (matches[1] != "") {
+                retention_time += std::stod(matches[1]) * 60 * 60;
+            }
 
             // Check if we are on the desired region as defined by Grid::Bounds.
             if (retention_time < parameters.bounds.min_rt) {

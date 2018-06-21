@@ -76,7 +76,7 @@ TEST_CASE("Reading scans") {
                 msLevel="1"
                 peaksCount="203"
                 polarity="+"
-                retentionTime="PT0.105449S"
+                retentionTime="PT0H0M0.105449S"
                 lowMz="346.523396127795"
                 highMz="1818.208877852599"
                 basePeakMz="1570.170703"
