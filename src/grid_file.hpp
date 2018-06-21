@@ -41,16 +41,6 @@ bool write_parameters(std::ostream &stream, const Grid::Parameters &parameters);
 // const std::vector<double> &source,
 // const Grid::Parameters &parameters);
 
-// Read/Write an unsigned integer from/to the stream.
-// TODO(alex): Unused functions...
-bool load_uint32(std::istream &stream, uint32_t *i);
-bool save_uint32(std::ostream &stream, uint32_t i);
-
-// Read/Write a double floating point value from/to the stream.
-// TODO(alex): Unused functions...
-bool load_double(std::istream &stream, double *d);
-bool save_double(std::ostream &stream, double d);
-
 }  // namespace Grid::File
 
 #endif /* GRID_GRIDFILE_HPP */

@@ -45,23 +45,3 @@ bool Grid::File::write_parameters(std::ostream &stream,
                  sizeof(file_parameters));
     return stream.good();
 }
-
-bool Grid::File::load_uint32(std::istream &stream, uint32_t *i) {
-    stream.read(reinterpret_cast<char *>(i), 4 * sizeof(char));
-    return stream.good();
-}
-
-bool Grid::File::save_uint32(std::ostream &stream, uint32_t i) {
-    stream.write(reinterpret_cast<char *>(&i), 4 * sizeof(char));
-    return stream.good();
-}
-
-bool Grid::File::load_double(std::istream &stream, double *d) {
-    stream.read(reinterpret_cast<char *>(d), sizeof(double));
-    return stream.good();
-}
-
-bool Grid::File::save_double(std::ostream &stream, double d) {
-    stream.write(reinterpret_cast<char *>(&d), sizeof(double));
-    return stream.good();
-}
