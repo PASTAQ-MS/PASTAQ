@@ -131,10 +131,9 @@ std::optional<std::vector<Grid::Peak>> XmlReader::read_next_scan(
                     continue;
                 }
 
-                // TODO(alex): Not the most efficient way. It would be better to
-                // prealocate but we don't know at this point how many peaks
-                // from peak_count are inside our bounds. Would it be better to
-                // preallocate and then trim zeroed values?
+                // Not the most efficient way. It would be better to
+                // preallocate but we don't know at this point how many peaks
+                // from peak_count are inside our bounds.
                 peaks.push_back({mz, retention_time, intensity});
             }
 
