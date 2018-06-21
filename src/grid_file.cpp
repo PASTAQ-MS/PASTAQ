@@ -1,4 +1,3 @@
-#include <iostream>
 #include <string>
 
 #include "grid_file.hpp"
@@ -93,6 +92,53 @@ bool Grid::File::load_range(std::istream &stream, const Grid::Bounds &bounds,
         return false;
     }
     return stream.good();
+}
+
+bool Grid::File::write_range(std::ostream &stream, const Grid::Bounds &bounds,
+                             const std::vector<double> &source,
+                             const Grid::Parameters &parameters) {
+    auto i_min = Grid::x_index(bounds.min_mz, parameters);
+    auto i_max = Grid::x_index(bounds.max_mz, parameters);
+    auto j_min = Grid::y_index(bounds.min_rt, parameters);
+    auto j_max = Grid::y_index(bounds.max_rt, parameters);
+
+    // Check that indexes min/max are not swapped.
+    if (i_min > i_max || j_min > j_max) {
+        return false;
+    }
+
+    // Check that indexes are inside the grid.
+    if ((i_min > parameters.dimensions.n - 1) ||
+        (j_min > parameters.dimensions.m - 1)) {
+        return false;
+    }
+
+    // Get the precise bounds for sliced range.
+    Grid::Bounds sliced_bounds = {};
+    sliced_bounds.min_mz = Grid::mz_at(i_min, parameters).value();
+    sliced_bounds.max_mz = Grid::mz_at(i_max, parameters).value();
+    sliced_bounds.min_rt = Grid::rt_at(j_min, parameters).value();
+    sliced_bounds.max_rt = Grid::rt_at(j_max, parameters).value();
+
+    // Get dimensions for sliced range.
+    Grid::Dimensions sliced_dimensions = {};
+    sliced_dimensions.n = (i_max - i_min) + 1;
+    sliced_dimensions.m = (j_max - j_min) + 1;
+
+    // Set up parameters.
+    Grid::Parameters sliced_parameters = {};
+    sliced_parameters.dimensions = sliced_dimensions;
+    sliced_parameters.bounds = sliced_bounds;
+    sliced_parameters.smoothing_params = parameters.smoothing_params;
+    sliced_parameters.flags = parameters.flags;
+    sliced_parameters.instrument_type = parameters.instrument_type;
+
+    for (size_t j = j_min; j <= j_max; ++j) {
+        size_t offset = j * parameters.dimensions.n + i_min;
+        stream.write(reinterpret_cast<const char *>(&source[offset]),
+                     sizeof(double) * sliced_parameters.dimensions.n);
+    }
+    return Grid::File::write_parameters(stream, sliced_parameters);
 }
 
 bool Grid::File::load_parameters(std::istream &stream,

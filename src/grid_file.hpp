@@ -31,21 +31,21 @@ bool write(std::ostream &stream, const std::vector<double> &source,
            const Grid::Parameters &parameters);
 
 // Loads a specific range from the given stream. Both the destination and
-// parameters will be properly modified. Returns the success or failure of the
-// operation.
+// parameters arguments will be properly modified. Returns the success or
+// failure of the operation.
 bool load_range(std::istream &stream, const Grid::Bounds &bounds,
                 std::vector<double> *destination, Grid::Parameters *parameters);
 
-// TODO(alex): Allow for reading or loading specific ranges.
-// bool write_range(std::ostream &stream, const Grid::Bounds &bounds,
-// const std::vector<double> &source,
-// const Grid::Parameters &parameters);
+// Write the specific range and derivated parameters into the file stream.
+// Returns the success or failure of the operation.
+bool write_range(std::ostream &stream, const Grid::Bounds &bounds,
+                 const std::vector<double> &source,
+                 const Grid::Parameters &parameters);
 
 // Load the parameters from the footer of the binary stream. Returns the success
 // or failure of the operation.
 bool load_parameters(std::istream &stream, Grid::Parameters *parameters);
 bool write_parameters(std::ostream &stream, const Grid::Parameters &parameters);
-
 
 }  // namespace Grid::File
 
