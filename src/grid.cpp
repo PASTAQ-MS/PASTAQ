@@ -81,7 +81,6 @@ bool Grid::set_value(unsigned int i, unsigned int j, double value,
     return true;
 }
 
-// TODO(alex): add unit tests for warped grid
 std::optional<double> Grid::mz_at(unsigned int i,
                                   const Grid::Parameters& parameters) {
     if (parameters.dimensions.n * parameters.dimensions.m == 0 ||

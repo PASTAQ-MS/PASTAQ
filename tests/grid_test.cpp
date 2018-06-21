@@ -127,4 +127,59 @@ TEST_CASE("Test the fetching of real world parameters from index") {
         CHECK(Grid::rt_at(3, parameters) == 75.0);
         CHECK(Grid::rt_at(4, parameters) == std::nullopt);
     };
+    SUBCASE("Using a warped grid") {
+        auto round_double = [](double d) {
+            return (long long int)(d * 1000.0) / 1000.0;
+        };
+        SUBCASE("QUAD") {
+            Grid::Parameters parameters = {{4, 4},
+                                           {0.0, 75.0, 200.0, 800.0},
+                                           {200, 1.0, 1.0},
+                                           Instrument::QUAD,
+                                           Grid::Flags::WARPED_MESH};
+            CHECK(Grid::mz_at(0, parameters) == 200.0);
+            CHECK(Grid::mz_at(1, parameters) == 400.0);
+            CHECK(Grid::mz_at(2, parameters) == 600.0);
+            CHECK(Grid::mz_at(3, parameters) == 800.0);
+        }
+        SUBCASE("ORBITRAP") {
+            Grid::Parameters parameters = {{},
+                                           {0.0, 75.0, 200.0, 800.0},
+                                           {200, 1.0, 1.0},
+                                           Instrument::ORBITRAP,
+                                           Grid::Flags::WARPED_MESH};
+            Grid::calculate_dimensions(parameters);
+            CHECK(round_double(Grid::mz_at(0, parameters).value()) == 200.0);
+            CHECK(round_double(Grid::mz_at(1, parameters).value()) == 202.015);
+            CHECK(round_double(Grid::mz_at(2, parameters).value()) == 204.06);
+            CHECK(round_double(Grid::mz_at(3, parameters).value()) == 206.137);
+            CHECK(round_double(Grid::mz_at(100, parameters).value()) == 800.0);
+        }
+        SUBCASE("FTICR") {
+            Grid::Parameters parameters = {{},
+                                           {0.0, 75.0, 200.0, 800.0},
+                                           {200, 1.0, 1.0},
+                                           Instrument::FTICR,
+                                           Grid::Flags::WARPED_MESH};
+            Grid::calculate_dimensions(parameters);
+            CHECK(round_double(Grid::mz_at(0, parameters).value()) == 200.0);
+            CHECK(round_double(Grid::mz_at(1, parameters).value()) == 201.005);
+            CHECK(round_double(Grid::mz_at(2, parameters).value()) == 202.02);
+            CHECK(round_double(Grid::mz_at(3, parameters).value()) == 203.045);
+            CHECK(round_double(Grid::mz_at(100, parameters).value()) == 400);
+            CHECK(round_double(Grid::mz_at(150, parameters).value()) == 800);
+        }
+        SUBCASE("TOF") {
+            Grid::Parameters parameters = {{},
+                                           {0.0, 75.0, 200.0, 800.0},
+                                           {200, 1.0, 1.0},
+                                           Instrument::TOF,
+                                           Grid::Flags::WARPED_MESH};
+            Grid::calculate_dimensions(parameters);
+            CHECK(round_double(Grid::mz_at(0, parameters).value()) == 200.0);
+            CHECK(round_double(Grid::mz_at(1, parameters).value()) == 201.002);
+            CHECK(round_double(Grid::mz_at(2, parameters).value()) == 202.01);
+            CHECK(round_double(Grid::mz_at(3, parameters).value()) == 203.022);
+        }
+    }
 }
