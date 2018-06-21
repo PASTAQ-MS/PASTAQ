@@ -503,14 +503,19 @@ int main(int argc, char* argv[]) {
                           << " for the given parameters" << std::endl;
                 return -1;
             }
+            std::vector<Grid::Peak> all_peaks = {};
             do {
-                for (const auto& peak : peaks.value()) {
-                    Grid::splat(peak, parameters, data);
-                }
+                all_peaks.insert(end(all_peaks), begin(peaks.value()),
+                                 end(peaks.value()));
                 peaks = XmlReader::read_next_scan(stream, parameters);
             } while (peaks != std::nullopt);
 
-            std::cout << "Saving into dat file..." << std::endl;
+            std::cout << "Splatting points into grid..." << std::endl;
+            for (const auto& peak : all_peaks) {
+                Grid::splat(peak, parameters, data);
+            }
+
+            std::cout << "Saving grid into dat file..." << std::endl;
             Grid::File::write(datfile, data, parameters);
         } else {
             std::cout << "error: unknown file format for file " << input_file
