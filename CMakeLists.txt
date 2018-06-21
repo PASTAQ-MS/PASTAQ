@@ -20,6 +20,7 @@ add_library(gridlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/grid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/grid_file.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/xml_reader.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/base64.cpp"
     )
 target_include_directories(gridlib PUBLIC src)
 

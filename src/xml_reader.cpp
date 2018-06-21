@@ -2,11 +2,12 @@
 #include <regex>
 #include <sstream>
 
+#include "base64.hpp"
 #include "xml_reader.hpp"
 
 // Read the next mz1 scan from the stream.
 std::optional<std::vector<Grid::Peak>> XmlReader::read_next_scan(
-    std::istream& stream, const Grid::Parameters& parameters) {
+    std::istream &stream, const Grid::Parameters &parameters) {
     while (stream.good()) {
         auto tag = XmlReader::read_tag(stream);
         if (!tag) {
@@ -107,22 +108,17 @@ std::optional<std::vector<Grid::Peak>> XmlReader::read_next_scan(
 
             // Decode the peaks from the base 64 string.
             std::vector<Grid::Peak> peaks;
-            int bit = 0;
-            char* ptr = &data.value()[0];
+
+            // Initialize Base64 decoder.
+            Base64 decoder(&data.value()[0], precision, little_endian);
             for (size_t i = 0; i < peaks_count; ++i) {
-                // FIXME(alex): Ugh.
-                auto mz =
-                    Base64::get_double(ptr, bit, precision, little_endian);
-                auto intensity =
-                    Base64::get_double(ptr, bit, precision, little_endian);
-                if (!mz || !intensity) {
-                    return std::nullopt;
-                }
+                auto mz = decoder.get_double();
+                auto intensity = decoder.get_double();
+
                 // We don't need to extract the peaks when we are not inside
                 // the mz bounds or contain no value.
-                if (mz.value() < parameters.bounds.min_mz ||
-                    mz.value() > parameters.bounds.max_mz ||
-                    intensity.value() == 0) {
+                if (mz < parameters.bounds.min_mz ||
+                    mz > parameters.bounds.max_mz || intensity == 0) {
                     continue;
                 }
 
@@ -130,8 +126,7 @@ std::optional<std::vector<Grid::Peak>> XmlReader::read_next_scan(
                 // prealocate but we don't know at this point how many peaks
                 // from peak_count are inside our bounds. Would it be better to
                 // preallocate and then trim zeroed values?
-                peaks.push_back(
-                    {mz.value(), retention_time, intensity.value()});
+                peaks.push_back({mz, retention_time, intensity});
             }
 
             return peaks;
@@ -140,7 +135,7 @@ std::optional<std::vector<Grid::Peak>> XmlReader::read_next_scan(
     return std::nullopt;
 }
 
-std::optional<std::string> XmlReader::read_data(std::istream& stream) {
+std::optional<std::string> XmlReader::read_data(std::istream &stream) {
     std::string data;
     std::getline(stream, data, '<');
     if (data.empty() || !stream.good()) {
@@ -160,7 +155,7 @@ std::optional<std::string> XmlReader::read_data(std::istream& stream) {
     return data;
 }
 
-std::optional<XmlReader::Tag> XmlReader::read_tag(std::istream& stream) {
+std::optional<XmlReader::Tag> XmlReader::read_tag(std::istream &stream) {
     bool is_closed = false;
     bool reading_content = false;
     auto tag = std::optional<Tag>(Tag{});
