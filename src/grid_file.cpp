@@ -57,32 +57,34 @@ bool Grid::File::load_range(std::istream &stream, const Grid::Bounds &bounds,
         Grid::Bounds sliced_bounds = {};
         sliced_bounds.min_mz = Grid::mz_at(i_min, file_parameters).value();
         sliced_bounds.max_mz = Grid::mz_at(i_max, file_parameters).value();
-        sliced_bounds.min_rt = Grid::rt_at(i_min, file_parameters).value();
-        sliced_bounds.max_rt = Grid::rt_at(i_max, file_parameters).value();
+        sliced_bounds.min_rt = Grid::rt_at(j_min, file_parameters).value();
+        sliced_bounds.max_rt = Grid::rt_at(j_max, file_parameters).value();
 
         // Get dimensions for sliced range.
         Grid::Dimensions sliced_dimensions = {};
-        sliced_dimensions.n = (i_max - i_min);
-        sliced_dimensions.m = (j_max - j_min);
-        if (sliced_dimensions.n * sliced_dimensions.m == 0) {
-            return false;
-        }
+        sliced_dimensions.n = (i_max - i_min) + 1;
+        sliced_dimensions.m = (j_max - j_min) + 1;
+
+        // Set up parameters.
         parameters->dimensions = sliced_dimensions;
         parameters->bounds = sliced_bounds;
         parameters->smoothing_params = file_parameters.smoothing_params;
         parameters->flags = file_parameters.flags;
         parameters->instrument_type = file_parameters.instrument_type;
 
+        // Allocate memory on destination array.
         auto n_points = parameters->dimensions.n * parameters->dimensions.m;
         destination->resize(n_points);
 
         // Fill the destination with the data from the sliced parameters.
+        size_t read_offset = 0;
         for (size_t j = j_min; j <= j_max; ++j) {
             stream.seekg(
                 (j * file_parameters.dimensions.n + i_min) * sizeof(double),
                 std::ios::beg);
-            stream.read(reinterpret_cast<char *>(&(*destination)[0]),
+            stream.read(reinterpret_cast<char *>(&(*destination)[read_offset]),
                         sizeof(double) * parameters->dimensions.n);
+            read_offset += parameters->dimensions.n;
             if (stream.bad()) {
                 return false;
             }

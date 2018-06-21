@@ -102,6 +102,49 @@ TEST_CASE("Writing data/parameters to the stream") {
         CHECK(dest_parameters.flags == source_parameters.flags);
     }
 
+    SUBCASE("Loading custom range") {
+        std::vector<double> source_data = {
+            1, 2, 3, 4, 5,  // Row 1
+            6, 5, 4, 3, 2,  // Row 2
+        };
+        Grid::Parameters source_parameters = {
+            {5, 2}, {0, 1, 0, 4}, {1, 1, 1}, Instrument::QUAD};
+        std::vector<char> stream_data(sizeof(double) * source_data.size() +
+                                      sizeof(Grid::Parameters) +
+                                      sizeof(Grid::File::Parameters));
+        MockStream<char> stream(stream_data);
+        CHECK(Grid::File::write(stream, source_data, source_parameters));
+        std::vector<double> dest_data = {};
+        Grid::Parameters dest_parameters = {};
+        auto load_range_results = Grid::File::load_range(
+            stream, {0, 1, 1, 3}, &dest_data, &dest_parameters);
+        CHECK(load_range_results);
+        if (load_range_results) {
+            std::vector<double> expected = {
+                2, 3, 4,  // Row 1
+                5, 4, 3,  // Row 2
+            };
+            for (size_t i = 0; i < dest_data.size(); ++i) {
+                CHECK(expected[i] == dest_data[i]);
+            }
+            CHECK(dest_parameters.dimensions.n == 3);
+            CHECK(dest_parameters.dimensions.m == 2);
+            CHECK(dest_parameters.bounds.min_mz == 1);
+            CHECK(dest_parameters.bounds.max_mz == 3);
+            CHECK(dest_parameters.bounds.min_rt == 0);
+            CHECK(dest_parameters.bounds.max_rt == 1);
+            CHECK(dest_parameters.smoothing_params.mz ==
+                  source_parameters.smoothing_params.mz);
+            CHECK(dest_parameters.smoothing_params.sigma_mz ==
+                  source_parameters.smoothing_params.sigma_mz);
+            CHECK(dest_parameters.smoothing_params.sigma_rt ==
+                  source_parameters.smoothing_params.sigma_rt);
+            CHECK(dest_parameters.instrument_type ==
+                  source_parameters.instrument_type);
+            CHECK(dest_parameters.flags == source_parameters.flags);
+        }
+    }
+
     SUBCASE("Testing on file stream") {
         std::vector<double> source_data = {
             1, 2, 3, 4, 5,  // Row 1
