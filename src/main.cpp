@@ -746,10 +746,8 @@ int main(int argc, char* argv[]) {
             }
         } else if (lowercase_extension == ".rawdump") {
             // Prepare the name of the output file.
-            // auto datfile_name = options["-out_dir"] /
-            // input_file.filename().replace_extension(".dat");
-            // TODO(alex): hardcoded datfile_name for debugging purpuses
-            auto datfile_name = "concurrent_datfile.dat";
+            auto datfile_name = options["-out_dir"] /
+                                input_file.filename().replace_extension(".dat");
             std::ofstream datfile_stream;
             datfile_stream.open(datfile_name, std::ios::out | std::ios::binary);
             if (!datfile_stream) {
