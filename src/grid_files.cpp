@@ -2,13 +2,13 @@
 
 #include "grid_files.hpp"
 
-bool Grid::Files::Dat::load(std::istream &stream,
+bool Grid::Files::Dat::read(std::istream &stream,
                             std::vector<double> *destination,
                             Grid::Parameters *parameters) {
     if (destination == nullptr || parameters == nullptr) {
         return false;
     }
-    if (Grid::Files::Dat::load_parameters(stream, parameters)) {
+    if (Grid::Files::Dat::read_parameters(stream, parameters)) {
         auto n_points = parameters->dimensions.n * parameters->dimensions.m;
         destination->resize(n_points);
         stream.seekg(0, std::ios::beg);
@@ -29,7 +29,7 @@ bool Grid::Files::Dat::write(std::ostream &stream,
     return stream.good();
 }
 
-bool Grid::Files::Dat::load_range(std::istream &stream,
+bool Grid::Files::Dat::read_range(std::istream &stream,
                                   const Grid::Bounds &bounds,
                                   std::vector<double> *destination,
                                   Grid::Parameters *parameters) {
@@ -37,7 +37,7 @@ bool Grid::Files::Dat::load_range(std::istream &stream,
         return false;
     }
     Grid::Parameters file_parameters = {};
-    if (Grid::Files::Dat::load_parameters(stream, &file_parameters)) {
+    if (Grid::Files::Dat::read_parameters(stream, &file_parameters)) {
         // Get the indexes for the sliced range.
         auto i_min = Grid::x_index(bounds.min_mz, file_parameters);
         auto i_max = Grid::x_index(bounds.max_mz, file_parameters);
@@ -145,7 +145,7 @@ bool Grid::Files::Dat::write_range(std::ostream &stream,
     return Grid::Files::Dat::write_parameters(stream, sliced_parameters);
 }
 
-bool Grid::Files::Dat::load_parameters(std::istream &stream,
+bool Grid::Files::Dat::read_parameters(std::istream &stream,
                                        Grid::Parameters *parameters) {
     if (parameters == nullptr) {
         return false;
@@ -181,7 +181,7 @@ bool Grid::Files::Rawdump::write(std::ostream &stream,
     return stream.good();
 }
 
-bool Grid::Files::Rawdump::load(std::istream &stream,
+bool Grid::Files::Rawdump::read(std::istream &stream,
                                 std::vector<Grid::Peak> &peaks) {
     uint64_t n_peaks = 0;
     stream.read(reinterpret_cast<char *>(&n_peaks), sizeof(uint64_t));

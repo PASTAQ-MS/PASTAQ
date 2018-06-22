@@ -567,7 +567,7 @@ int main(int argc, char* argv[]) {
 
             // Load the peaks into memory.
             std::vector<Grid::Peak> all_peaks;
-            if (!Grid::Files::Rawdump::load(stream, all_peaks)) {
+            if (!Grid::Files::Rawdump::read(stream, all_peaks)) {
                 std::cout << "error: the raw dump could not be loaded properly"
                           << std::endl;
                 return -1;

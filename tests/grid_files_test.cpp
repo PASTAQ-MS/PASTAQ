@@ -14,7 +14,7 @@ TEST_CASE("Writing parameters to the stream") {
             {6, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD};
         CHECK(Grid::Files::Dat::write_parameters(stream, source_parameters));
         Grid::Parameters dest_parameters = {};
-        CHECK(Grid::Files::Dat::load_parameters(stream, &dest_parameters));
+        CHECK(Grid::Files::Dat::read_parameters(stream, &dest_parameters));
         CHECK(dest_parameters.bounds.min_rt == source_parameters.bounds.min_rt);
         CHECK(dest_parameters.bounds.max_rt == source_parameters.bounds.max_rt);
         CHECK(dest_parameters.bounds.min_mz == source_parameters.bounds.min_mz);
@@ -42,7 +42,7 @@ TEST_CASE("Writing parameters to the stream") {
         std::ifstream filein("test_dat_file.dat",
                              std::ios::out | std::ios::binary);
         Grid::Parameters dest_parameters = {};
-        CHECK(Grid::Files::Dat::load_parameters(filein, &dest_parameters));
+        CHECK(Grid::Files::Dat::read_parameters(filein, &dest_parameters));
         CHECK(dest_parameters.bounds.min_rt == source_parameters.bounds.min_rt);
         CHECK(dest_parameters.bounds.max_rt == source_parameters.bounds.max_rt);
         CHECK(dest_parameters.bounds.min_mz == source_parameters.bounds.min_mz);
@@ -76,7 +76,7 @@ TEST_CASE("Writing data/parameters to the stream") {
         CHECK(Grid::Files::Dat::write(stream, source_data, source_parameters));
         std::vector<double> dest_data = {};
         Grid::Parameters dest_parameters = {};
-        CHECK(Grid::Files::Dat::load(stream, &dest_data, &dest_parameters));
+        CHECK(Grid::Files::Dat::read(stream, &dest_data, &dest_parameters));
 
         // Check that the data is restored succesfully.
         for (int i = 0; i < dest_data.size(); ++i) {
@@ -115,10 +115,10 @@ TEST_CASE("Writing data/parameters to the stream") {
         CHECK(Grid::Files::Dat::write(stream, source_data, source_parameters));
         std::vector<double> dest_data = {};
         Grid::Parameters dest_parameters = {};
-        auto load_range_results = Grid::Files::Dat::load_range(
+        auto read_range_results = Grid::Files::Dat::read_range(
             stream, {0, 1, 1, 3}, &dest_data, &dest_parameters);
-        CHECK(load_range_results);
-        if (load_range_results) {
+        CHECK(read_range_results);
+        if (read_range_results) {
             std::vector<double> expected = {
                 2, 3, 4,  // Row 1
                 5, 4, 3,  // Row 2
@@ -159,10 +159,10 @@ TEST_CASE("Writing data/parameters to the stream") {
                                             source_parameters));
         std::vector<double> dest_data = {};
         Grid::Parameters dest_parameters = {};
-        auto load_results =
-            Grid::Files::Dat::load(stream, &dest_data, &dest_parameters);
-        CHECK(load_results);
-        if (load_results) {
+        auto read_results =
+            Grid::Files::Dat::read(stream, &dest_data, &dest_parameters);
+        CHECK(read_results);
+        if (read_results) {
             std::vector<double> expected = {
                 2, 3, 4,  // Row 1
                 5, 4, 3,  // Row 2
@@ -203,7 +203,7 @@ TEST_CASE("Writing data/parameters to the stream") {
                              std::ios::in | std::ios::binary);
         std::vector<double> dest_data = {};
         Grid::Parameters dest_parameters = {};
-        CHECK(Grid::Files::Dat::load(filein, &dest_data, &dest_parameters));
+        CHECK(Grid::Files::Dat::read(filein, &dest_data, &dest_parameters));
 
         // Check that the data is restored succesfully.
         for (int i = 0; i < dest_data.size(); ++i) {
@@ -242,7 +242,7 @@ TEST_CASE("Writing rawdump to the stream") {
         CHECK(Grid::Files::Rawdump::write(stream, source_data));
         std::vector<Grid::Peak> dest_data = {};
         Grid::Parameters dest_parameters = {};
-        CHECK(Grid::Files::Rawdump::load(stream, dest_data));
+        CHECK(Grid::Files::Rawdump::read(stream, dest_data));
 
         // Check that the data is restored succesfully.
         for (int i = 0; i < dest_data.size(); ++i) {
