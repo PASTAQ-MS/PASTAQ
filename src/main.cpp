@@ -132,7 +132,7 @@ void print_parameters_summary(const Grid::Parameters& parameters) {
 
 // Splits the parameters into n_split sections of the same dimensions.n.
 std::vector<Grid::Parameters> split_parameters(
-    Grid::Parameters& original_params, unsigned int n_splits) {
+    const Grid::Parameters& original_params, unsigned int n_splits) {
     // In order to determine the overlapping of the splits we need to calculate
     // what is the maximum distance that will be used by the kernel smoothing.
     // To avoid aliasing we will overlap at least the maximum kernel width.
@@ -161,8 +161,8 @@ std::vector<Grid::Parameters> split_parameters(
     // How many segments do we have with the given segment_width.
     unsigned int num_segments = original_params.dimensions.m / segment_width;
     if (original_params.dimensions.m % segment_width) {
-        // If we need more segments that the maximum we specify we need to try one
-        // less split and adjust the sizes accordingly.
+        // If we need more segments that the maximum we specify we need to try
+        // one less split and adjust the sizes accordingly.
         if (num_segments + 1 > n_splits) {
             segment_width = original_params.dimensions.m / (n_splits - 1);
             num_segments = original_params.dimensions.m / segment_width;
@@ -252,6 +252,62 @@ std::vector<double> merge_groups(
     return merged;
 }
 
+std::vector<double> run_parallel(unsigned int max_threads,
+                                 const Grid::Parameters& parameters,
+                                 const std::vector<Grid::Peak>& all_peaks) {
+    // Split parameters and peaks into the corresponding  groups.
+    auto all_parameters = split_parameters(parameters, max_threads);
+    auto groups = assign_peaks(all_parameters, all_peaks);
+    std::cout << "Indexes size: " << groups.size() << std::endl;
+    if (groups.size() != all_parameters.size()) {
+        std::cout << "error: could not divide the peaks into " << max_threads
+                  << " groups" << std::endl;
+        std::exit(-1);
+    }
+
+    // Allocate data memory.
+    std::cout << "Allocating memory..." << std::endl;
+    std::vector<std::vector<double>> data_array;
+    for (const auto& parameters : all_parameters) {
+        data_array.emplace_back(std::vector<double>(parameters.dimensions.n *
+                                                    parameters.dimensions.m));
+    }
+
+    // Splatting!
+    std::cout << "Splatting peaks into concurrent groups..." << std::endl;
+    std::vector<std::thread> threads;
+    for (size_t i = 0; i < groups.size(); ++i) {
+        threads.push_back(
+            std::thread([&groups, &all_parameters, &data_array, i]() {
+                // Perform splatting in this group.
+                for (const auto& peak : groups[i]) {
+                    Grid::splat(peak, all_parameters[i], data_array[i]);
+                }
+            }));
+    }
+
+    // Wait for the threads to finish.
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    std::cout << "Merging concurrent groups..." << std::endl;
+    return merge_groups(all_parameters, data_array);
+}
+
+std::vector<double> run_serial(const Grid::Parameters& parameters,
+                               const std::vector<Grid::Peak>& all_peaks) {
+    // Instantiate memory.
+    std::vector<double> data(parameters.dimensions.n * parameters.dimensions.m);
+
+    // Perform grid splatting.
+    std::cout << "Splatting peaks into grid..." << std::endl;
+    for (const auto& peak : all_peaks) {
+        Grid::splat(peak, parameters, data);
+    }
+    return data;
+}
+
 int main(int argc, char* argv[]) {
     // Flag format is map where the key is the flag name and contains a tuple
     // with the description and if it takes extra parameters or not:
@@ -283,7 +339,7 @@ int main(int argc, char* argv[]) {
         {"-out_dir", {"The output directory", true}},
         {"-help", {"Display available options", false}},
         {"-config", {"Specify the configuration file", true}},
-        {"-parallel", {"Enable parallel processing", true}},
+        {"-parallel", {"Enable parallel processing", false}},
         {"-n_threads",
          {"Specify the maximum number of threads that will be used for the "
           "calculations",
@@ -581,6 +637,26 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
+    // Set up maximum concurrency.
+    unsigned int max_threads = std::thread::hardware_concurrency();
+    if (!max_threads) {
+        std::cout << "error: this system does not support parallel processing"
+                  << std::endl;
+        return -1;
+    }
+    if ((options.find("-n_threads") != options.end()) &&
+        (options.find("-parallel") != options.end())) {
+        auto n_threads = options["-n_threads"];
+        if (!is_unsigned_int(n_threads)) {
+            std::cout << "error: "
+                      << "n_threads"
+                      << " has to be a positive integer" << std::endl;
+            print_usage();
+            return -1;
+        }
+        max_threads = std::stoi(n_threads);
+    }
+
     // Execute the program here.
     for (const auto& file_name : files) {
         std::filesystem::path input_file = file_name;
@@ -601,9 +677,6 @@ int main(int argc, char* argv[]) {
         if (lowercase_extension == ".mzxml") {
             print_parameters_summary(parameters);
 
-            // Instantiate memory.
-            std::vector<double> data(parameters.dimensions.n *
-                                     parameters.dimensions.m);
             // Open input file.
             std::ifstream stream;
             stream.open(input_file);
@@ -658,11 +731,13 @@ int main(int argc, char* argv[]) {
                 return -1;
             }
 
-            // Perform grid splatting.
-            std::cout << "Splatting peaks into grid..." << std::endl;
-            for (const auto& peak : all_peaks) {
-                Grid::splat(peak, parameters, data);
+            std::vector<double> data;
+            if (options.find("-parallel") != options.end()) {
+                data = run_parallel(max_threads, parameters, all_peaks);
+            } else {
+                data = run_serial(parameters, all_peaks);
             }
+
             std::cout << "Saving grid into dat file..." << std::endl;
             if (!Grid::Files::Dat::write(datfile_stream, data, parameters)) {
                 std::cout << "error: the grid could not be saved properly"
@@ -692,26 +767,6 @@ int main(int argc, char* argv[]) {
                 return -1;
             }
 
-            // Set up maximum concurrency.
-            unsigned int max_threads = std::thread::hardware_concurrency();
-            if (!max_threads) {
-                std::cout
-                    << "error: this system does not support parallel processing"
-                    << std::endl;
-                return -1;
-            }
-            if (options.find("-n_threads") != options.end()) {
-                auto n_threads = options["-n_threads"];
-                if (!is_unsigned_int(n_threads)) {
-                    std::cout << "error: "
-                              << "n_threads"
-                              << " has to be a positive integer" << std::endl;
-                    print_usage();
-                    return -1;
-                }
-                max_threads = std::stoi(n_threads);
-            }
-
             // Load the peaks into memory.
             std::vector<Grid::Peak> all_peaks;
             if (!Grid::Files::Rawdump::read(stream, all_peaks)) {
@@ -726,44 +781,12 @@ int main(int argc, char* argv[]) {
             }
             std::cout << "Loaded " << all_peaks.size() << " peaks" << std::endl;
 
-            auto all_parameters = split_parameters(parameters, max_threads);
-            auto groups = assign_peaks(all_parameters, all_peaks);
-            std::cout << "Indexes size: " << groups.size() << std::endl;
-            if (groups.size() != all_parameters.size()) {
-                std::cout << "error: could not divide the peaks into 4 groups"
-                          << std::endl;
-                return -1;
+            std::vector<double> data;
+            if (options.find("-parallel") != options.end()) {
+                data = run_parallel(max_threads, parameters, all_peaks);
+            } else {
+                data = run_serial(parameters, all_peaks);
             }
-
-            // Allocate memory.
-            std::cout << "Allocating memory..." << std::endl;
-            std::vector<std::vector<double>> data_array;
-            for (const auto& parameters : all_parameters) {
-                data_array.emplace_back(std::vector<double>(
-                    parameters.dimensions.n * parameters.dimensions.m));
-            }
-
-            // Splatting!
-            std::cout << "Splatting peaks into concurrent groups..."
-                      << std::endl;
-            std::vector<std::thread> threads;
-            for (size_t i = 0; i < groups.size(); ++i) {
-                threads.push_back(
-                    std::thread([&groups, &all_parameters, &data_array, i]() {
-                        // Perform splatting in this group.
-                        for (const auto& peak : groups[i]) {
-                            Grid::splat(peak, all_parameters[i], data_array[i]);
-                        }
-                    }));
-            }
-
-            // Wait for the threads to finish.
-            for (auto& thread : threads) {
-                thread.join();
-            }
-
-            std::cout << "Merging concurrent groups..." << std::endl;
-            auto data = merge_groups(all_parameters, data_array);
 
             std::cout << "Saving grid into dat file..." << std::endl;
             if (!Grid::Files::Dat::write(datfile_stream, data, parameters)) {
