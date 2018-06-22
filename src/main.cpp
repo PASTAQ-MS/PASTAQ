@@ -138,24 +138,45 @@ std::vector<Grid::Parameters> split_parameters(
     // To avoid aliasing we will overlap at least the maximum kernel width.
     //
     // The kernel in rt is always 2 * sigma_rt in both directions.
-    double sigma_rt = Grid::sigma_rt(original_params);
     unsigned int kernel_width = Grid::y_index(
-        original_params.bounds.min_rt + 4 * sigma_rt, original_params);
-    unsigned int n_points_split =
-        original_params.dimensions.m / n_splits + kernel_width;
+        original_params.bounds.min_rt + 4 * Grid::sigma_rt(original_params),
+        original_params);
+
+    // We need to make sure that we have the minimum number of points for the
+    // splits. Since we have an overlap of a single kernel_width, we need to
+    // have at least twice that amount of points in order to support full
+    // overlap in both directions.
+    unsigned int min_segment_width = 2 * kernel_width;
+    unsigned int segment_width = original_params.dimensions.m / n_splits;
+    if (segment_width < min_segment_width) {
+        segment_width = min_segment_width;
+    }
+
+    // If the orginal parameters don't contain the required minimum number of
+    // points for segmentation, we can only use one segment.
+    if ((original_params.dimensions.m - 1) < min_segment_width) {
+        return std::vector<Grid::Parameters>({original_params});
+    }
+
+    // How many segments do we have with the given segment_width.
+    unsigned int num_segments = original_params.dimensions.m / segment_width;
+    if (original_params.dimensions.m % segment_width) {
+        ++num_segments;
+    }
 
     std::vector<Grid::Parameters> all_parameters;
-    for (size_t i = 0; i < n_splits; ++i) {
-        // Calculate the minimum and maximum indexes for this split.
-        int min_i = 0;
-        if (i != 0) {
-            min_i = n_points_split * i - kernel_width * 2;
+    auto min_i = 0;
+    auto max_i = 0;
+    for (size_t i = 0; i < num_segments; ++i) {
+        if (i == 0) {
+            min_i = 0;
+        } else {
+            min_i = segment_width * i - kernel_width;
         }
-        int max_i = n_points_split * (i + 1) - 1;
+        max_i = segment_width * (i + 1) - 1;
         if (max_i > original_params.dimensions.m) {
             max_i = original_params.dimensions.m - 1;
         }
-
         // Prepare the next Grid::Parameters object.
         Grid::Parameters parameters(original_params);
         parameters.bounds.min_rt = Grid::rt_at(min_i, original_params).value();
@@ -178,7 +199,7 @@ std::vector<std::vector<Grid::Peak>> assign_peaks(
         for (size_t i = 0; i < all_parameters.size(); ++i) {
             auto parameters = all_parameters[i];
             double sigma_rt = Grid::sigma_rt(parameters);
-            if (peak.rt + 4 * sigma_rt < parameters.bounds.max_rt) {
+            if (peak.rt + 2 * sigma_rt < parameters.bounds.max_rt) {
                 groups[i].push_back(peak);
                 break;
             }
@@ -673,7 +694,7 @@ int main(int argc, char* argv[]) {
             std::cout << "Loaded " << all_peaks.size() << " peaks" << std::endl;
 
             // TODO(alex): hardcoded value of number of splits
-            int n_splits = 4;
+            int n_splits = 12;
             auto all_parameters = split_parameters(parameters, n_splits);
             auto groups = assign_peaks(all_parameters, all_peaks);
             std::cout << "Indexes size: " << groups.size() << std::endl;
@@ -683,23 +704,24 @@ int main(int argc, char* argv[]) {
                 return -1;
             }
 
+            // Allocate memory.
+            std::cout << "Allocating memory..." << std::endl;
+            std::vector<std::vector<double>> data_array;
+            for (const auto& parameters : all_parameters) {
+                data_array.emplace_back(std::vector<double>(
+                    parameters.dimensions.n * parameters.dimensions.m));
+            }
+
+            // Splatting!
             std::cout << "Splatting peaks into concurrent groups..."
                       << std::endl;
-            std::vector<std::vector<double>> data_array;
             std::vector<std::thread> threads;
             for (size_t i = 0; i < groups.size(); ++i) {
-                // Allocate memory for the data.
-                data_array.emplace_back(
-                    std::vector<double>(all_parameters[i].dimensions.n *
-                                        all_parameters[i].dimensions.m));
-
                 threads.push_back(
                     std::thread([&groups, &all_parameters, &data_array, i]() {
-                        auto peaks = groups[i];
-                        auto parameters = all_parameters[i];
                         // Perform splatting in this group.
-                        for (const auto& peak : peaks) {
-                            Grid::splat(peak, parameters, data_array[i]);
+                        for (const auto& peak : groups[i]) {
+                            Grid::splat(peak, all_parameters[i], data_array[i]);
                         }
                     }));
             }
