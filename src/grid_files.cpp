@@ -171,3 +171,25 @@ bool Grid::Files::Dat::write_parameters(std::ostream &stream,
                  sizeof(file_parameters));
     return stream.good();
 }
+
+bool Grid::Files::Rawdump::write(std::ostream &stream,
+                                 const std::vector<Grid::Peak> &peaks) {
+    uint64_t n_peaks = peaks.size();
+    stream.write(reinterpret_cast<const char *>(&n_peaks), sizeof(uint64_t));
+    stream.write(reinterpret_cast<const char *>(&peaks[0]),
+                 sizeof(Grid::Peak) * n_peaks);
+    return stream.good();
+}
+
+bool Grid::Files::Rawdump::load(std::istream &stream,
+                                std::vector<Grid::Peak> &peaks) {
+    uint64_t n_peaks = 0;
+    stream.read(reinterpret_cast<char *>(&n_peaks), sizeof(uint64_t));
+    if (stream.bad()) {
+        return false;
+    }
+    peaks.resize(n_peaks);
+    stream.read(reinterpret_cast<char *>(&peaks[0]),
+                sizeof(Grid::Peak) * n_peaks);
+    return stream.good();
+}

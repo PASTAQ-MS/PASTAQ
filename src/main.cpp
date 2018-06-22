@@ -129,26 +129,6 @@ void print_parameters_summary(const Grid::Parameters& parameters) {
     std::cout << "APPROXIMATE MEMORY USAGE (BYTES):" << x << std::endl;
 }
 
-bool write_rawdump(std::ostream& stream, std::vector<Grid::Peak>& peaks) {
-    uint64_t n_peaks = peaks.size();
-    stream.write(reinterpret_cast<const char*>(&n_peaks), sizeof(uint64_t));
-    stream.write(reinterpret_cast<const char*>(&peaks[0]),
-                 sizeof(Grid::Peak) * n_peaks);
-    return stream.good();
-}
-
-bool load_rawdump(std::istream& stream, std::vector<Grid::Peak>& peaks) {
-    uint64_t n_peaks = 0;
-    stream.read(reinterpret_cast<char*>(&n_peaks), sizeof(uint64_t));
-    if (stream.bad()) {
-        return false;
-    }
-    peaks.resize(n_peaks);
-    stream.read(reinterpret_cast<char*>(&peaks[0]),
-                sizeof(Grid::Peak) * n_peaks);
-    return stream.good();
-}
-
 int main(int argc, char* argv[]) {
     // Flag format is map where the key is the flag name and contains a tuple
     // with the description and if it takes extra parameters or not:
@@ -544,7 +524,7 @@ int main(int argc, char* argv[]) {
             } while (peaks != std::nullopt);
 
             // TODO(alex): this should be optional.
-            if (!write_rawdump(rawdump_stream, all_peaks)) {
+            if (!Grid::Files::Rawdump::write(rawdump_stream, all_peaks)) {
                 std::cout << "error: the raw dump could not be saved properly"
                           << std::endl;
                 return -1;
@@ -587,7 +567,7 @@ int main(int argc, char* argv[]) {
 
             // Load the peaks into memory.
             std::vector<Grid::Peak> all_peaks;
-            if (!load_rawdump(stream, all_peaks)) {
+            if (!Grid::Files::Rawdump::load(stream, all_peaks)) {
                 std::cout << "error: the raw dump could not be loaded properly"
                           << std::endl;
                 return -1;

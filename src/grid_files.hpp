@@ -1,5 +1,5 @@
-#ifndef GRID_GRIDFILE_HPP
-#define GRID_GRIDFILE_HPP
+#ifndef GRID_GRIDFILES_HPP
+#define GRID_GRIDFILES_HPP
 
 #include <iostream>
 #include <vector>
@@ -47,6 +47,24 @@ bool write_range(std::ostream &stream, const Grid::Bounds &bounds,
 bool load_parameters(std::istream &stream, Grid::Parameters *parameters);
 bool write_parameters(std::ostream &stream, const Grid::Parameters &parameters);
 
-}  // namespace Grid::File
+}  // namespace Grid::Files::Dat
 
-#endif /* GRID_GRIDFILE_HPP */
+// The binary file containing the dump of all the peaks present in the original
+// file. This allows for quickly reading the raw data without the need of
+// parsing or decoding the original file. The values are stored in little endian
+// format using 64 bits of precision for floating point values.
+//
+// The serialization is very simple. The first 8 bytes store a uint64_t with the
+// number of peaks contained in the file, followed by a vector of Grid::Peak
+// objects.
+namespace Grid::Files::Rawdump {
+
+// Write the entire source vector in the given binary stream.
+bool write(std::ostream &stream, const std::vector<Grid::Peak> &peaks);
+
+// Load the entire source vector from the given binary stream.
+bool load(std::istream &stream, std::vector<Grid::Peak> &peaks);
+
+}  // namespace Grid::Files::Rawdump
+
+#endif /* GRID_GRIDFILES_HPP */
