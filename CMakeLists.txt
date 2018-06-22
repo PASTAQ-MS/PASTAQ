@@ -25,10 +25,11 @@ add_library(gridlib
 target_include_directories(gridlib PUBLIC src)
 
 # Include executable target.
+find_package(Threads REQUIRED)
 add_executable(grid
     "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
     )
-target_link_libraries(grid stdc++fs gridlib)
+target_link_libraries(grid stdc++fs gridlib ${CMAKE_THREAD_LIBS_INIT})
 
 # Include tests if testing library is present.
 unset(DOCTEST_LIBRARY_PATH CACHE)

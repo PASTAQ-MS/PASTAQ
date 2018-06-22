@@ -3,6 +3,7 @@
 #include <iostream>
 #include <map>
 #include <regex>
+#include <thread>
 #include <vector>
 
 #include "grid.hpp"
@@ -635,9 +636,6 @@ int main(int argc, char* argv[]) {
                 return -1;
             }
         } else if (lowercase_extension == ".rawdump") {
-            // Instantiate memory.
-            // std::vector<double> data(parameters.dimensions.n *
-            // parameters.dimensions.m);
             // Prepare the name of the output file.
             // auto datfile_name = options["-out_dir"] /
             // input_file.filename().replace_extension(".dat");
@@ -688,18 +686,27 @@ int main(int argc, char* argv[]) {
             std::cout << "Splatting peaks into concurrent groups..."
                       << std::endl;
             std::vector<std::vector<double>> data_array;
+            std::vector<std::thread> threads;
             for (size_t i = 0; i < groups.size(); ++i) {
-                auto peaks = groups[i];
-                auto parameters = all_parameters[i];
-
                 // Allocate memory for the data.
-                data_array.emplace_back(std::vector<double>(
-                    parameters.dimensions.n * parameters.dimensions.m));
+                data_array.emplace_back(
+                    std::vector<double>(all_parameters[i].dimensions.n *
+                                        all_parameters[i].dimensions.m));
 
-                // Perform splatting in this group.
-                for (const auto& peak : peaks) {
-                    Grid::splat(peak, parameters, data_array[i]);
-                }
+                threads.push_back(
+                    std::thread([&groups, &all_parameters, &data_array, i]() {
+                        auto peaks = groups[i];
+                        auto parameters = all_parameters[i];
+                        // Perform splatting in this group.
+                        for (const auto& peak : peaks) {
+                            Grid::splat(peak, parameters, data_array[i]);
+                        }
+                    }));
+            }
+
+            // Wait for the threads to finish.
+            for (auto& thread : threads) {
+                thread.join();
             }
 
             std::cout << "Merging concurrent groups..." << std::endl;
