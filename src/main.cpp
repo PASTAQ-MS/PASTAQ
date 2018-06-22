@@ -129,6 +129,42 @@ void print_parameters_summary(const Grid::Parameters& parameters) {
     std::cout << "APPROXIMATE MEMORY USAGE (BYTES):" << x << std::endl;
 }
 
+// Splits the parameters into n_split sections of the same dimensions.n.
+std::vector<Grid::Parameters> split_parameters(
+    Grid::Parameters& original_params, unsigned int n_splits) {
+    // In order to determine the overlapping of the splits we need to calculate
+    // what is the maximum distance that will be used by the kernel smoothing.
+    // To avoid aliasing we will overlap at least the maximum kernel width.
+    //
+    // The kernel in rt is always 2 * sigma_rt in both directions.
+    double sigma_rt = Grid::sigma_rt(original_params);
+    unsigned int kernel_width = Grid::y_index(
+        original_params.bounds.min_rt + 4 * sigma_rt, original_params);
+    unsigned int n_points_split =
+        original_params.dimensions.m / n_splits + kernel_width;
+
+    std::vector<Grid::Parameters> all_parameters;
+    for (size_t i = 0; i < n_splits; ++i) {
+        // Calculate the minimum and maximum indexes for this split.
+        int min_i = 0;
+        if (i != 0) {
+            min_i = n_points_split * i - kernel_width * 2;
+        }
+        int max_i = n_points_split * (i + 1) - 1;
+        if (max_i > original_params.dimensions.m) {
+            max_i = original_params.dimensions.m - 1;
+        }
+
+        // Prepare the next Grid::Parameters object.
+        Grid::Parameters parameters(original_params);
+        parameters.bounds.min_rt = Grid::rt_at(min_i, original_params).value();
+        parameters.bounds.max_rt = Grid::rt_at(max_i, original_params).value();
+        parameters.dimensions.m = max_i - min_i + 1;
+        all_parameters.emplace_back(parameters);
+    }
+    return all_parameters;
+}
+
 int main(int argc, char* argv[]) {
     // Flag format is map where the key is the flag name and contains a tuple
     // with the description and if it takes extra parameters or not:
@@ -579,17 +615,19 @@ int main(int argc, char* argv[]) {
             }
             std::cout << "Loaded " << all_peaks.size() << " peaks" << std::endl;
 
-            // Perform grid splatting.
-            std::cout << "Splatting peaks into grid..." << std::endl;
-            for (const auto& peak : all_peaks) {
-                Grid::splat(peak, parameters, data);
-            }
-            std::cout << "Saving grid into dat file..." << std::endl;
-            if (!Grid::Files::Dat::write(datfile_stream, data, parameters)) {
-                std::cout << "error: the grid could not be saved properly"
-                          << std::endl;
-                return -1;
-            }
+            split_parameters(parameters, 4);
+
+            //// Perform grid splatting.
+            // std::cout << "Splatting peaks into grid..." << std::endl;
+            // for (const auto& peak : all_peaks) {
+            // Grid::splat(peak, parameters, data);
+            //}
+            // std::cout << "Saving grid into dat file..." << std::endl;
+            // if (!Grid::Files::Dat::write(datfile_stream, data, parameters)) {
+            // std::cout << "error: the grid could not be saved properly"
+            //<< std::endl;
+            // return -1;
+            //}
         } else {
             std::cout << "error: unknown file format for file " << input_file
                       << std::endl;
