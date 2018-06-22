@@ -209,18 +209,58 @@ std::vector<double> merge_groups(
     // TODO(alex): loopsssss
     auto previous_max_rt = parameters_array[0].bounds.max_rt;
     auto beg_next = Grid::y_index(previous_max_rt, parameters_array[1]) + 1;
+
+    std::cout << "beg_next: " << beg_next << std::endl;
+    std::cout << "merged.size(): " << merged.size() << std::endl;
+    std::cout << "merged.size() - beg_next: " << merged.size() - beg_next
+              << std::endl;
+    std::cout << "merged.size() - beg_next * parameters_array[0].dimensions.n: "
+              << merged.size() - beg_next * parameters_array[0].dimensions.n
+              << std::endl;
+    std::cout << "parameters_array[0].dimensions.n * beg_next: "
+              << parameters_array[0].dimensions.n * beg_next << std::endl;
+    // Sum the overlapping sections.
+    {
+        int i = (merged.size() - beg_next * parameters_array[0].dimensions.n);
+        for (size_t j = 0; j < (parameters_array[0].dimensions.n * beg_next);
+             ++j) {
+            merged[i] += data_array[1][j];
+            ++i;
+        }
+    }
+    // Insert the next slice.
     merged.insert(
         end(merged),
         begin(data_array[1]) + beg_next * parameters_array[1].dimensions.n,
         end(data_array[1]));
+
     previous_max_rt = parameters_array[1].bounds.max_rt;
     beg_next = Grid::y_index(previous_max_rt, parameters_array[2]) + 1;
+    // Sum the overlapping sections.
+    {
+        int i = (merged.size() - beg_next * parameters_array[1].dimensions.n);
+        for (size_t j = 0; j < (parameters_array[1].dimensions.n * beg_next);
+             ++j) {
+            merged[i] += data_array[2][j];
+            ++i;
+        }
+    }
     merged.insert(
         end(merged),
         begin(data_array[2]) + beg_next * parameters_array[2].dimensions.n,
         end(data_array[2]));
+
     previous_max_rt = parameters_array[2].bounds.max_rt;
     beg_next = Grid::y_index(previous_max_rt, parameters_array[3]) + 1;
+    // Sum the overlapping sections.
+    {
+        int i = (merged.size() - beg_next * parameters_array[2].dimensions.n);
+        for (size_t j = 0; j < (parameters_array[2].dimensions.n * beg_next);
+             ++j) {
+            merged[i] += data_array[3][j];
+            ++i;
+        }
+    }
     merged.insert(
         end(merged),
         begin(data_array[3]) + beg_next * parameters_array[3].dimensions.n,
@@ -742,11 +782,18 @@ int main(int argc, char* argv[]) {
             // Grid::splat(all_peaks[i], all_parameters[i], indexes[i]);
             //}
 
-            //// Perform grid splatting.
-            // std::cout << "Splatting peaks into grid..." << std::endl;
-            // for (const auto& peak : all_peaks) {
-            // Grid::splat(peak, parameters, data);
+            // TODO(alex): debug, calculating the difference between the serial
+            // grid and the concurrent one.
+            //auto full_data = std::vector<double>(parameters.dimensions.n *
+                                                 //parameters.dimensions.m);
+            //std::cout << "Splatting peaks into grid..." << std::endl;
+            //for (const auto& peak : all_peaks) {
+                //Grid::splat(peak, parameters, full_data);
             //}
+            //for (size_t i = 0; i < data.size(); ++i) {
+                //data[i] = full_data[i] - data[i];
+            //}
+
             std::cout << "Saving grid into dat file..." << std::endl;
             if (!Grid::Files::Dat::write(datfile_stream, data, parameters)) {
                 std::cout << "error: the grid could not be saved properly"
