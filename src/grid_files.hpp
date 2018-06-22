@@ -10,7 +10,7 @@
 // a header with the parameters that we need to interpret the data properly.
 // The data is stored in little endian format and using 64 bits of precision for
 // double floating points values.
-namespace Grid::File {
+namespace Grid::Files::Dat {
 
 // This structure is saved after the parameters as a way to extract and
 // interpret the footer data with the grid parameters. For now, saving the

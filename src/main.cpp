@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "grid.hpp"
-#include "grid_file.hpp"
+#include "grid_files.hpp"
 #include "xml_reader.hpp"
 
 // Type aliases.
@@ -556,7 +556,7 @@ int main(int argc, char* argv[]) {
                 Grid::splat(peak, parameters, data);
             }
             std::cout << "Saving grid into dat file..." << std::endl;
-            if (!Grid::File::write(datfile_stream, data, parameters)) {
+            if (!Grid::Files::Dat::write(datfile_stream, data, parameters)) {
                 std::cout << "error: the grid could not be saved properly"
                           << std::endl;
                 return -1;
@@ -605,7 +605,7 @@ int main(int argc, char* argv[]) {
                 Grid::splat(peak, parameters, data);
             }
             std::cout << "Saving grid into dat file..." << std::endl;
-            if (!Grid::File::write(datfile_stream, data, parameters)) {
+            if (!Grid::Files::Dat::write(datfile_stream, data, parameters)) {
                 std::cout << "error: the grid could not be saved properly"
                           << std::endl;
                 return -1;

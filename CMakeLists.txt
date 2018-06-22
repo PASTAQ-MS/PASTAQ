@@ -18,7 +18,7 @@ endif()
 # Include library target.
 add_library(gridlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/grid.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid_file.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid_files.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/xml_reader.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/base64.cpp"
     )
@@ -46,7 +46,7 @@ if (DOCTEST_LIBRARY_PATH)
         grid_test
         tests/main.cpp
         tests/grid_test.cpp
-        tests/grid_file_test.cpp
+        tests/grid_files_test.cpp
         tests/xml_reader_test.cpp
         )
     add_test(NAME grid_test COMMAND grid_test)

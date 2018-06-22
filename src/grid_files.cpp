@@ -1,13 +1,14 @@
 #include <string>
 
-#include "grid_file.hpp"
+#include "grid_files.hpp"
 
-bool Grid::File::load(std::istream &stream, std::vector<double> *destination,
-                      Grid::Parameters *parameters) {
+bool Grid::Files::Dat::load(std::istream &stream,
+                            std::vector<double> *destination,
+                            Grid::Parameters *parameters) {
     if (destination == nullptr || parameters == nullptr) {
         return false;
     }
-    if (Grid::File::load_parameters(stream, parameters)) {
+    if (Grid::Files::Dat::load_parameters(stream, parameters)) {
         auto n_points = parameters->dimensions.n * parameters->dimensions.m;
         destination->resize(n_points);
         stream.seekg(0, std::ios::beg);
@@ -19,22 +20,24 @@ bool Grid::File::load(std::istream &stream, std::vector<double> *destination,
     return stream.good();
 }
 
-bool Grid::File::write(std::ostream &stream, const std::vector<double> &source,
-                       const Grid::Parameters &parameters) {
+bool Grid::Files::Dat::write(std::ostream &stream,
+                             const std::vector<double> &source,
+                             const Grid::Parameters &parameters) {
     stream.write(reinterpret_cast<const char *>(&source[0]),
                  sizeof(double) * source.size());
-    Grid::File::write_parameters(stream, parameters);
+    Grid::Files::Dat::write_parameters(stream, parameters);
     return stream.good();
 }
 
-bool Grid::File::load_range(std::istream &stream, const Grid::Bounds &bounds,
-                            std::vector<double> *destination,
-                            Grid::Parameters *parameters) {
+bool Grid::Files::Dat::load_range(std::istream &stream,
+                                  const Grid::Bounds &bounds,
+                                  std::vector<double> *destination,
+                                  Grid::Parameters *parameters) {
     if (destination == nullptr || parameters == nullptr) {
         return false;
     }
     Grid::Parameters file_parameters = {};
-    if (Grid::File::load_parameters(stream, &file_parameters)) {
+    if (Grid::Files::Dat::load_parameters(stream, &file_parameters)) {
         // Get the indexes for the sliced range.
         auto i_min = Grid::x_index(bounds.min_mz, file_parameters);
         auto i_max = Grid::x_index(bounds.max_mz, file_parameters);
@@ -94,9 +97,10 @@ bool Grid::File::load_range(std::istream &stream, const Grid::Bounds &bounds,
     return stream.good();
 }
 
-bool Grid::File::write_range(std::ostream &stream, const Grid::Bounds &bounds,
-                             const std::vector<double> &source,
-                             const Grid::Parameters &parameters) {
+bool Grid::Files::Dat::write_range(std::ostream &stream,
+                                   const Grid::Bounds &bounds,
+                                   const std::vector<double> &source,
+                                   const Grid::Parameters &parameters) {
     auto i_min = Grid::x_index(bounds.min_mz, parameters);
     auto i_max = Grid::x_index(bounds.max_mz, parameters);
     auto j_min = Grid::y_index(bounds.min_rt, parameters);
@@ -138,11 +142,11 @@ bool Grid::File::write_range(std::ostream &stream, const Grid::Bounds &bounds,
         stream.write(reinterpret_cast<const char *>(&source[offset]),
                      sizeof(double) * sliced_parameters.dimensions.n);
     }
-    return Grid::File::write_parameters(stream, sliced_parameters);
+    return Grid::Files::Dat::write_parameters(stream, sliced_parameters);
 }
 
-bool Grid::File::load_parameters(std::istream &stream,
-                                 Grid::Parameters *parameters) {
+bool Grid::Files::Dat::load_parameters(std::istream &stream,
+                                       Grid::Parameters *parameters) {
     if (parameters == nullptr) {
         return false;
     }
@@ -150,17 +154,17 @@ bool Grid::File::load_parameters(std::istream &stream,
     stream.seekg(-1, std::ios::end);
     stream.seekg(-1 * stream.peek(), std::ios::end);
     // Read the parameters into the Grid::Parameters object. Note that we are
-    // not making use of the Grid::File::Parameters.spec_version yet, for now we
-    // always read the data in the same way.
+    // not making use of the Grid::Files::Dat::Parameters.spec_version yet, for
+    // now we always read the data in the same way.
     stream.read(reinterpret_cast<char *>(parameters), sizeof(Grid::Parameters));
     return stream.good();
 }
 
-bool Grid::File::write_parameters(std::ostream &stream,
-                                  const Grid::Parameters &parameters) {
+bool Grid::Files::Dat::write_parameters(std::ostream &stream,
+                                        const Grid::Parameters &parameters) {
     auto footer_size = static_cast<char>(sizeof(Grid::Parameters) +
-                                         sizeof(Grid::File::Parameters));
-    Grid::File::Parameters file_parameters = {1, footer_size};
+                                         sizeof(Grid::Files::Dat::Parameters));
+    Grid::Files::Dat::Parameters file_parameters = {1, footer_size};
     stream.write(reinterpret_cast<const char *>(&parameters),
                  sizeof(parameters));
     stream.write(reinterpret_cast<const char *>(&file_parameters),

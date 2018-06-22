@@ -2,19 +2,19 @@
 #include <streambuf>
 
 #include "doctest.h"
-#include "grid_file.hpp"
+#include "grid_files.hpp"
 #include "utils/mock_stream.hpp"
 
 TEST_CASE("Writing parameters to the stream") {
     SUBCASE("Testing on MockStream") {
         std::vector<char> data(sizeof(Grid::Parameters) +
-                               sizeof(Grid::File::Parameters));
+                               sizeof(Grid::Files::Dat::Parameters));
         MockStream<char> stream(data);
         Grid::Parameters source_parameters = {
             {6, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD};
-        CHECK(Grid::File::write_parameters(stream, source_parameters));
+        CHECK(Grid::Files::Dat::write_parameters(stream, source_parameters));
         Grid::Parameters dest_parameters = {};
-        CHECK(Grid::File::load_parameters(stream, &dest_parameters));
+        CHECK(Grid::Files::Dat::load_parameters(stream, &dest_parameters));
         CHECK(dest_parameters.bounds.min_rt == source_parameters.bounds.min_rt);
         CHECK(dest_parameters.bounds.max_rt == source_parameters.bounds.max_rt);
         CHECK(dest_parameters.bounds.min_mz == source_parameters.bounds.min_mz);
@@ -37,12 +37,12 @@ TEST_CASE("Writing parameters to the stream") {
             {6, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD};
         std::ofstream fileout("test_dat_file.dat",
                               std::ios::out | std::ios::binary);
-        CHECK(Grid::File::write_parameters(fileout, source_parameters));
+        CHECK(Grid::Files::Dat::write_parameters(fileout, source_parameters));
         fileout.close();
         std::ifstream filein("test_dat_file.dat",
                              std::ios::out | std::ios::binary);
         Grid::Parameters dest_parameters = {};
-        CHECK(Grid::File::load_parameters(filein, &dest_parameters));
+        CHECK(Grid::Files::Dat::load_parameters(filein, &dest_parameters));
         CHECK(dest_parameters.bounds.min_rt == source_parameters.bounds.min_rt);
         CHECK(dest_parameters.bounds.max_rt == source_parameters.bounds.max_rt);
         CHECK(dest_parameters.bounds.min_mz == source_parameters.bounds.min_mz);
@@ -71,12 +71,12 @@ TEST_CASE("Writing data/parameters to the stream") {
             {5, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD};
         std::vector<char> stream_data(sizeof(double) * source_data.size() +
                                       sizeof(Grid::Parameters) +
-                                      sizeof(Grid::File::Parameters));
+                                      sizeof(Grid::Files::Dat::Parameters));
         MockStream<char> stream(stream_data);
-        CHECK(Grid::File::write(stream, source_data, source_parameters));
+        CHECK(Grid::Files::Dat::write(stream, source_data, source_parameters));
         std::vector<double> dest_data = {};
         Grid::Parameters dest_parameters = {};
-        CHECK(Grid::File::load(stream, &dest_data, &dest_parameters));
+        CHECK(Grid::Files::Dat::load(stream, &dest_data, &dest_parameters));
 
         // Check that the data is restored succesfully.
         for (int i = 0; i < dest_data.size(); ++i) {
@@ -110,12 +110,12 @@ TEST_CASE("Writing data/parameters to the stream") {
             {5, 2}, {0, 1, 0, 4}, {1, 1, 1}, Instrument::QUAD};
         std::vector<char> stream_data(sizeof(double) * source_data.size() +
                                       sizeof(Grid::Parameters) +
-                                      sizeof(Grid::File::Parameters));
+                                      sizeof(Grid::Files::Dat::Parameters));
         MockStream<char> stream(stream_data);
-        CHECK(Grid::File::write(stream, source_data, source_parameters));
+        CHECK(Grid::Files::Dat::write(stream, source_data, source_parameters));
         std::vector<double> dest_data = {};
         Grid::Parameters dest_parameters = {};
-        auto load_range_results = Grid::File::load_range(
+        auto load_range_results = Grid::Files::Dat::load_range(
             stream, {0, 1, 1, 3}, &dest_data, &dest_parameters);
         CHECK(load_range_results);
         if (load_range_results) {
@@ -153,14 +153,14 @@ TEST_CASE("Writing data/parameters to the stream") {
             {5, 2}, {0, 1, 0, 4}, {1, 1, 1}, Instrument::QUAD};
         std::vector<char> stream_data(sizeof(double) * 6 +
                                       sizeof(Grid::Parameters) +
-                                      sizeof(Grid::File::Parameters));
+                                      sizeof(Grid::Files::Dat::Parameters));
         MockStream<char> stream(stream_data);
-        CHECK(Grid::File::write_range(stream, {0, 1, 1, 3}, source_data,
-                                      source_parameters));
+        CHECK(Grid::Files::Dat::write_range(stream, {0, 1, 1, 3}, source_data,
+                                            source_parameters));
         std::vector<double> dest_data = {};
         Grid::Parameters dest_parameters = {};
         auto load_results =
-            Grid::File::load(stream, &dest_data, &dest_parameters);
+            Grid::Files::Dat::load(stream, &dest_data, &dest_parameters);
         CHECK(load_results);
         if (load_results) {
             std::vector<double> expected = {
@@ -197,13 +197,13 @@ TEST_CASE("Writing data/parameters to the stream") {
             {5, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD};
         std::ofstream fileout("test_dat_file_all.dat",
                               std::ios::out | std::ios::binary);
-        CHECK(Grid::File::write(fileout, source_data, source_parameters));
+        CHECK(Grid::Files::Dat::write(fileout, source_data, source_parameters));
         fileout.close();
         std::ifstream filein("test_dat_file_all.dat",
                              std::ios::in | std::ios::binary);
         std::vector<double> dest_data = {};
         Grid::Parameters dest_parameters = {};
-        CHECK(Grid::File::load(filein, &dest_data, &dest_parameters));
+        CHECK(Grid::Files::Dat::load(filein, &dest_data, &dest_parameters));
 
         // Check that the data is restored succesfully.
         for (int i = 0; i < dest_data.size(); ++i) {
