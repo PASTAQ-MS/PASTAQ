@@ -161,8 +161,39 @@ std::vector<Grid::Parameters> split_parameters(
         parameters.bounds.max_rt = Grid::rt_at(max_i, original_params).value();
         parameters.dimensions.m = max_i - min_i + 1;
         all_parameters.emplace_back(parameters);
+
+        // TODO(alex): DEBUG
+        std::cout << "Next split: " << min_i << "--" << max_i << std::endl;
+        std::cout << "parameters.bounds.min_rt: " << parameters.bounds.min_rt
+                  << std::endl;
+        std::cout << "parameters.bounds.max_rt: " << parameters.bounds.max_rt
+                  << std::endl;
+        std::cout << "parameters.dimensions.m: " << parameters.dimensions.m
+                  << std::endl;
     }
     return all_parameters;
+}
+
+std::vector<unsigned int> assign_peaks(
+    const std::vector<Grid::Parameters>& all_parameters,
+    const std::vector<Grid::Peak>& peaks) {
+    std::vector<unsigned int> indexes;
+    for (const auto& peak : peaks) {
+        for (size_t i = 0; i < all_parameters.size(); ++i) {
+            auto parameters = all_parameters[i];
+            double sigma_rt = Grid::sigma_rt(parameters);
+            if (peak.rt + 4 * sigma_rt < parameters.bounds.max_rt) {
+                indexes.push_back(i);
+                break;
+            }
+            // If we ran out of parameters this peak is assigned to the last
+            // one.
+            if (i == all_parameters.size() - 1) {
+                indexes.push_back(i);
+            }
+        }
+    }
+    return indexes;
 }
 
 int main(int argc, char* argv[]) {
@@ -614,8 +645,18 @@ int main(int argc, char* argv[]) {
                 return -1;
             }
             std::cout << "Loaded " << all_peaks.size() << " peaks" << std::endl;
-
-            split_parameters(parameters, 4);
+            auto all_parameters = split_parameters(parameters, 4);
+            std::vector<Grid::Peak> debug_peaks = {
+                {2000, 2000, 2000}, {2100, 2100, 2100}, {2200, 2200, 2200},
+                {2400, 2400, 2400}, {2600, 2600, 2600}, {2800, 2800, 2800},
+                {2900, 2900, 2900},
+            };
+            // auto indexes = assign_peaks(all_parameters, debug_peaks);
+            // for (const auto& index : indexes) {
+            // std::cout << index << std::endl;
+            //}
+            auto indexes = assign_peaks(all_parameters, all_peaks);
+            std::cout << "Indexes size: " << indexes.size() << std::endl;
 
             //// Perform grid splatting.
             // std::cout << "Splatting peaks into grid..." << std::endl;
