@@ -275,6 +275,11 @@ int main(int argc, char* argv[]) {
         {"-out_dir", {"The output directory", true}},
         {"-help", {"Display available options", false}},
         {"-config", {"Specify the configuration file", true}},
+        {"-parallel", {"Enable parallel processing", true}},
+        {"-n_threads",
+         {"Specify the maximum number of threads that will be used for the "
+          "calculations",
+          true}},
     };
 
     if (argc == 1) {
@@ -679,6 +684,26 @@ int main(int argc, char* argv[]) {
                 return -1;
             }
 
+            // Set up maximum concurrency.
+            unsigned int max_threads = std::thread::hardware_concurrency();
+            if (!max_threads) {
+                std::cout
+                    << "error: this system does not support parallel processing"
+                    << std::endl;
+                return -1;
+            }
+            if (options.find("-n_threads") != options.end()) {
+                auto n_threads = options["-n_threads"];
+                if (!is_unsigned_int(n_threads)) {
+                    std::cout << "error: "
+                              << "n_threads"
+                              << " has to be a positive integer" << std::endl;
+                    print_usage();
+                    return -1;
+                }
+                max_threads = std::stoi(n_threads);
+            }
+
             // Load the peaks into memory.
             std::vector<Grid::Peak> all_peaks;
             if (!Grid::Files::Rawdump::read(stream, all_peaks)) {
@@ -693,15 +718,6 @@ int main(int argc, char* argv[]) {
             }
             std::cout << "Loaded " << all_peaks.size() << " peaks" << std::endl;
 
-            unsigned int max_threads = std::thread::hardware_concurrency();
-            if (!max_threads) {
-                std::cout << "error: this system does not support threads"
-                          << std::endl;
-                return -1;
-            }
-
-            // TODO(alex): hardcoded value of number of threads, we should offer
-            // the option of selecting less.
             auto all_parameters = split_parameters(parameters, max_threads);
             auto groups = assign_peaks(all_parameters, all_peaks);
             std::cout << "Indexes size: " << groups.size() << std::endl;
