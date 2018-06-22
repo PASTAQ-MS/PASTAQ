@@ -174,26 +174,60 @@ std::vector<Grid::Parameters> split_parameters(
     return all_parameters;
 }
 
-std::vector<unsigned int> assign_peaks(
+std::vector<std::vector<Grid::Peak>> assign_peaks(
     const std::vector<Grid::Parameters>& all_parameters,
     const std::vector<Grid::Peak>& peaks) {
-    std::vector<unsigned int> indexes;
+    std::vector<std::vector<Grid::Peak>> groups(all_parameters.size());
+
     for (const auto& peak : peaks) {
         for (size_t i = 0; i < all_parameters.size(); ++i) {
             auto parameters = all_parameters[i];
             double sigma_rt = Grid::sigma_rt(parameters);
             if (peak.rt + 4 * sigma_rt < parameters.bounds.max_rt) {
-                indexes.push_back(i);
+                groups[i].push_back(peak);
                 break;
             }
             // If we ran out of parameters this peak is assigned to the last
             // one.
             if (i == all_parameters.size() - 1) {
-                indexes.push_back(i);
+                groups[i].push_back(peak);
             }
         }
     }
-    return indexes;
+    return groups;
+}
+
+std::vector<double> merge_groups(
+    std::vector<Grid::Parameters>& parameters_array,
+    std::vector<std::vector<double>>& data_array) {
+    std::vector<double> merged;
+    if (data_array.empty()) {
+        return merged;
+    }
+    merged.insert(end(merged), begin(data_array[0]), end(data_array[0]));
+
+    // TODO(alex): loopsssss
+    auto previous_max_rt = parameters_array[0].bounds.max_rt;
+    auto beg_next = Grid::y_index(previous_max_rt, parameters_array[1]) + 1;
+    merged.insert(
+        end(merged),
+        begin(data_array[1]) + beg_next * parameters_array[1].dimensions.n,
+        end(data_array[1]));
+    previous_max_rt = parameters_array[1].bounds.max_rt;
+    beg_next = Grid::y_index(previous_max_rt, parameters_array[2]) + 1;
+    merged.insert(
+        end(merged),
+        begin(data_array[2]) + beg_next * parameters_array[2].dimensions.n,
+        end(data_array[2]));
+    previous_max_rt = parameters_array[2].bounds.max_rt;
+    beg_next = Grid::y_index(previous_max_rt, parameters_array[3]) + 1;
+    merged.insert(
+        end(merged),
+        begin(data_array[3]) + beg_next * parameters_array[3].dimensions.n,
+        end(data_array[3]));
+
+    // TODO(alex): add overlapping range
+    return merged;
 }
 
 int main(int argc, char* argv[]) {
@@ -610,11 +644,12 @@ int main(int argc, char* argv[]) {
             }
         } else if (lowercase_extension == ".rawdump") {
             // Instantiate memory.
-            std::vector<double> data(parameters.dimensions.n *
-                                     parameters.dimensions.m);
+            // std::vector<double> data(parameters.dimensions.n *
+            // parameters.dimensions.m);
             // Prepare the name of the output file.
-            auto datfile_name = options["-out_dir"] /
-                                input_file.filename().replace_extension(".dat");
+            // auto datfile_name = options["-out_dir"] /
+            // input_file.filename().replace_extension(".dat");
+            auto datfile_name = "concurrent_datfile.dat";
             std::ofstream datfile_stream;
             datfile_stream.open(datfile_name, std::ios::out | std::ios::binary);
             if (!datfile_stream) {
@@ -646,29 +681,78 @@ int main(int argc, char* argv[]) {
             }
             std::cout << "Loaded " << all_peaks.size() << " peaks" << std::endl;
             auto all_parameters = split_parameters(parameters, 4);
-            std::vector<Grid::Peak> debug_peaks = {
-                {2000, 2000, 2000}, {2100, 2100, 2100}, {2200, 2200, 2200},
-                {2400, 2400, 2400}, {2600, 2600, 2600}, {2800, 2800, 2800},
-                {2900, 2900, 2900},
-            };
+            // std::vector<Grid::Peak> debug_peaks = {
+            //{2000, 2000, 2000}, {2100, 2100, 2100}, {2200, 2200, 2200},
+            //{2400, 2400, 2400}, {2600, 2600, 2600}, {2800, 2800, 2800},
+            //{2900, 2900, 2900},
+            //};
             // auto indexes = assign_peaks(all_parameters, debug_peaks);
             // for (const auto& index : indexes) {
             // std::cout << index << std::endl;
             //}
-            auto indexes = assign_peaks(all_parameters, all_peaks);
-            std::cout << "Indexes size: " << indexes.size() << std::endl;
+            auto groups = assign_peaks(all_parameters, all_peaks);
+            std::cout << "Indexes size: " << groups.size() << std::endl;
+            if (groups.size() != all_parameters.size()) {
+                std::cout << "error: could not divide the peaks into 4 groups"
+                          << std::endl;
+                return -1;
+            }
+
+            // Allocate memory for all parameter splits.
+            std::vector<std::vector<double>> data_array;
+            for (const auto& parameters : all_parameters) {
+                auto n_points =
+                    parameters.dimensions.n * parameters.dimensions.m;
+                data_array.emplace_back(std::vector<double>(n_points));
+            }
+
+            // TODO(alex): DEBUG
+            int sum = 0;
+            for (const auto& group : groups) {
+                std::cout << "SIZE GROUP: " << group.size() << std::endl;
+                sum += group.size();
+            }
+            std::cout << "TOTAL PEAKS: " << sum << std::endl;
+
+            std::cout << "SPLATTING..." << std::endl;
+            for (size_t i = 0; i < groups.size(); ++i) {
+                auto peaks = groups[i];
+                auto parameters = all_parameters[i];
+                for (const auto& peak : peaks) {
+                    Grid::splat(peak, parameters, data_array[i]);
+                }
+            }
+
+            std::cout << "MERGING GROUPS..." << std::endl;
+            auto data = merge_groups(all_parameters, data_array);
+            std::cout << "data_array[0].size(): " << data_array[0].size()
+                      << std::endl;
+            std::cout << "data.size(): " << data.size() << std::endl;
+            std::cout << parameters.dimensions.n * parameters.dimensions.m
+                      << std::endl;
+            // for (const auto& e : data) {
+            // std::cout << e << " " << std::endl;
+            //}
+            // Separate peaks into
+
+            // Perform grid splatting per parameter bag.
+            // for (size_t i = 0; i < all_peaks.size(); ++i) {
+            // auto parameters = all_parameters[i];
+            // auto peak = all_peaks[i];
+            // Grid::splat(all_peaks[i], all_parameters[i], indexes[i]);
+            //}
 
             //// Perform grid splatting.
             // std::cout << "Splatting peaks into grid..." << std::endl;
             // for (const auto& peak : all_peaks) {
             // Grid::splat(peak, parameters, data);
             //}
-            // std::cout << "Saving grid into dat file..." << std::endl;
-            // if (!Grid::Files::Dat::write(datfile_stream, data, parameters)) {
-            // std::cout << "error: the grid could not be saved properly"
-            //<< std::endl;
-            // return -1;
-            //}
+            std::cout << "Saving grid into dat file..." << std::endl;
+            if (!Grid::Files::Dat::write(datfile_stream, data, parameters)) {
+                std::cout << "error: the grid could not be saved properly"
+                          << std::endl;
+                return -1;
+            }
         } else {
             std::cout << "error: unknown file format for file " << input_file
                       << std::endl;
