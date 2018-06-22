@@ -228,3 +228,27 @@ TEST_CASE("Writing data/parameters to the stream") {
         CHECK(dest_parameters.flags == source_parameters.flags);
     }
 }
+
+TEST_CASE("Writing rawdump to the stream") {
+    SUBCASE("Testing on MockStream") {
+        std::vector<Grid::Peak> source_data = {
+            {1, 2, 3},
+            {4, 5, 6},
+            {7, 8, 9},
+        };
+        std::vector<char> stream_data(sizeof(Grid::Peak) * source_data.size() +
+                                      sizeof(uint64_t));
+        MockStream<char> stream(stream_data);
+        CHECK(Grid::Files::Rawdump::write(stream, source_data));
+        std::vector<Grid::Peak> dest_data = {};
+        Grid::Parameters dest_parameters = {};
+        CHECK(Grid::Files::Rawdump::load(stream, dest_data));
+
+        // Check that the data is restored succesfully.
+        for (int i = 0; i < dest_data.size(); ++i) {
+            CHECK(source_data[i].mz == dest_data[i].mz);
+            CHECK(source_data[i].rt == dest_data[i].rt);
+            CHECK(source_data[i].value == dest_data[i].value);
+        }
+    }
+}
