@@ -129,6 +129,26 @@ void print_parameters_summary(const Grid::Parameters& parameters) {
     std::cout << "APPROXIMATE MEMORY USAGE (BYTES):" << x << std::endl;
 }
 
+bool write_rawdump(std::ostream& stream, std::vector<Grid::Peak>& peaks) {
+    uint64_t n_peaks = peaks.size();
+    stream.write(reinterpret_cast<const char*>(&n_peaks), sizeof(uint64_t));
+    stream.write(reinterpret_cast<const char*>(&peaks[0]),
+                 sizeof(Grid::Peak) * n_peaks);
+    return stream.good();
+}
+
+bool load_rawdump(std::istream& stream, std::vector<Grid::Peak>& peaks) {
+    uint64_t n_peaks = 0;
+    stream.read(reinterpret_cast<char*>(&n_peaks), sizeof(uint64_t));
+    if (stream.bad()) {
+        return false;
+    }
+    peaks.resize(n_peaks);
+    stream.read(reinterpret_cast<char*>(&peaks[0]),
+                sizeof(Grid::Peak) * n_peaks);
+    return stream.good();
+}
+
 int main(int argc, char* argv[]) {
     // Flag format is map where the key is the flag name and contains a tuple
     // with the description and if it takes extra parameters or not:
@@ -488,10 +508,23 @@ int main(int argc, char* argv[]) {
             // Prepare the name of the output file.
             auto datfile_name = options["-out_dir"] /
                                 input_file.filename().replace_extension(".dat");
-            std::ofstream datfile;
-            datfile.open(datfile_name, std::ios::out | std::ios::binary);
-            if (!datfile) {
+            std::ofstream datfile_stream;
+            datfile_stream.open(datfile_name, std::ios::out | std::ios::binary);
+            if (!datfile_stream) {
                 std::cout << "error: could not open file " << datfile_name
+                          << " for writing" << std::endl;
+                return -1;
+            }
+
+            // Prepare the name of the rawdump output file.
+            // TODO(alex): this should be optional.
+            auto rawdump_name =
+                options["-out_dir"] /
+                input_file.filename().replace_extension(".rawdump");
+            std::ofstream rawdump_stream;
+            rawdump_stream.open(rawdump_name, std::ios::out | std::ios::binary);
+            if (!rawdump_stream) {
+                std::cout << "error: could not open file " << rawdump_name
                           << " for writing" << std::endl;
                 return -1;
             }
@@ -510,13 +543,73 @@ int main(int argc, char* argv[]) {
                 peaks = XmlReader::read_next_scan(stream, parameters);
             } while (peaks != std::nullopt);
 
-            std::cout << "Splatting points into grid..." << std::endl;
+            // TODO(alex): this should be optional.
+            if (!write_rawdump(rawdump_stream, all_peaks)) {
+                std::cout << "error: the raw dump could not be saved properly"
+                          << std::endl;
+                return -1;
+            }
+
+            // Perform grid splatting.
+            std::cout << "Splatting peaks into grid..." << std::endl;
             for (const auto& peak : all_peaks) {
                 Grid::splat(peak, parameters, data);
             }
-
             std::cout << "Saving grid into dat file..." << std::endl;
-            Grid::File::write(datfile, data, parameters);
+            if (!Grid::File::write(datfile_stream, data, parameters)) {
+                std::cout << "error: the grid could not be saved properly"
+                          << std::endl;
+                return -1;
+            }
+        } else if (lowercase_extension == ".rawdump") {
+            // Instantiate memory.
+            std::vector<double> data(parameters.dimensions.n *
+                                     parameters.dimensions.m);
+            // Prepare the name of the output file.
+            auto datfile_name = options["-out_dir"] /
+                                input_file.filename().replace_extension(".dat");
+            std::ofstream datfile_stream;
+            datfile_stream.open(datfile_name, std::ios::out | std::ios::binary);
+            if (!datfile_stream) {
+                std::cout << "error: could not open file " << datfile_name
+                          << " for writing" << std::endl;
+                return -1;
+            }
+
+            // Open the file for reading.
+            std::ifstream stream;
+            stream.open(input_file, std::ios::in | std::ios::binary);
+            if (!stream) {
+                std::cout << "error: could not open input file " << input_file
+                          << std::endl;
+                return -1;
+            }
+
+            // Load the peaks into memory.
+            std::vector<Grid::Peak> all_peaks;
+            if (!load_rawdump(stream, all_peaks)) {
+                std::cout << "error: the raw dump could not be loaded properly"
+                          << std::endl;
+                return -1;
+            }
+            if (all_peaks.empty()) {
+                std::cout << "error: the raw dump does not contain any peaks"
+                          << std::endl;
+                return -1;
+            }
+            std::cout << "Loaded " << all_peaks.size() << " peaks" << std::endl;
+
+            // Perform grid splatting.
+            std::cout << "Splatting peaks into grid..." << std::endl;
+            for (const auto& peak : all_peaks) {
+                Grid::splat(peak, parameters, data);
+            }
+            std::cout << "Saving grid into dat file..." << std::endl;
+            if (!Grid::File::write(datfile_stream, data, parameters)) {
+                std::cout << "error: the grid could not be saved properly"
+                          << std::endl;
+                return -1;
+            }
         } else {
             std::cout << "error: unknown file format for file " << input_file
                       << std::endl;
