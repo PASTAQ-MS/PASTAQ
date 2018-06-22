@@ -161,7 +161,15 @@ std::vector<Grid::Parameters> split_parameters(
     // How many segments do we have with the given segment_width.
     unsigned int num_segments = original_params.dimensions.m / segment_width;
     if (original_params.dimensions.m % segment_width) {
-        ++num_segments;
+        // If we need more segments that the maximum we specify we need to try one
+        // less split and adjust the sizes accordingly.
+        if (num_segments + 1 > n_splits) {
+            segment_width = original_params.dimensions.m / (n_splits - 1);
+            num_segments = original_params.dimensions.m / segment_width;
+            if (original_params.dimensions.m % segment_width) {
+                ++num_segments;
+            }
+        }
     }
 
     std::vector<Grid::Parameters> all_parameters;
