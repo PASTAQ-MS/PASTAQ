@@ -693,9 +693,16 @@ int main(int argc, char* argv[]) {
             }
             std::cout << "Loaded " << all_peaks.size() << " peaks" << std::endl;
 
-            // TODO(alex): hardcoded value of number of splits
-            int n_splits = 12;
-            auto all_parameters = split_parameters(parameters, n_splits);
+            unsigned int max_threads = std::thread::hardware_concurrency();
+            if (!max_threads) {
+                std::cout << "error: this system does not support threads"
+                          << std::endl;
+                return -1;
+            }
+
+            // TODO(alex): hardcoded value of number of threads, we should offer
+            // the option of selecting less.
+            auto all_parameters = split_parameters(parameters, max_threads);
             auto groups = assign_peaks(all_parameters, all_peaks);
             std::cout << "Indexes size: " << groups.size() << std::endl;
             if (groups.size() != all_parameters.size()) {
