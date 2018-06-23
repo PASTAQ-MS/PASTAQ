@@ -89,8 +89,8 @@ std::vector<Grid::Parameters> Grid::Runners::Parallel::split_segments(
 
     std::vector<Grid::Parameters> all_parameters;
     for (size_t i = 0; i < num_segments; ++i) {
-        auto min_i = 0;
-        auto max_i = 0;
+        unsigned int min_i = 0;
+        unsigned int max_i = 0;
         if (i == 0) {
             min_i = 0;
         } else {

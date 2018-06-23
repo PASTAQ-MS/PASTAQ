@@ -11,37 +11,40 @@
 // an error when using the stream. This is not a robust class and should be used
 // with caution.
 template <class T>
-struct MockStream : public std::iostream {
-    struct VectorStream : public std::streambuf {
-        VectorStream(std::vector<T> &data) {
-            auto begin = reinterpret_cast<char *>(&data[0]);
-            auto end =
-                reinterpret_cast<char *>(&data[0]) + sizeof(T) * data.size();
-            setg(begin, begin, end);
-            setp(begin, end);
-        }
-        pos_type seekoff(
-            off_type off, std::ios_base::seekdir dir,
-            std::ios_base::openmode which = std::ios_base::in) override {
-            if (which == std::ios_base::in) {
-                switch (dir) {
-                    case std::ios::beg: {
-                        setg(eback(), eback() + off, egptr());
-                    } break;
-                    case std::ios::cur: {
-                        setg(eback(), gptr() + off, egptr());
-                    } break;
-                    case std::ios::end: {
-                        setg(eback(), egptr() + off, egptr());
-                    } break;
-                    default: {
-                        // ...
-                    } break;
-                }
+struct VectorStream : public std::streambuf {
+    VectorStream(std::vector<T> &data) {
+        auto begin = reinterpret_cast<char *>(&data[0]);
+        auto end =
+            reinterpret_cast<char *>(&data[0]) + sizeof(T) * data.size();
+        setg(begin, begin, end);
+        setp(begin, end);
+    }
+    pos_type seekoff(
+        off_type off, std::ios_base::seekdir dir,
+        std::ios_base::openmode which = std::ios_base::in) override {
+        if (which == std::ios_base::in) {
+            switch (dir) {
+                case std::ios::beg: {
+                    setg(eback(), eback() + off, egptr());
+                } break;
+                case std::ios::cur: {
+                    setg(eback(), gptr() + off, egptr());
+                } break;
+                case std::ios::end: {
+                    setg(eback(), egptr() + off, egptr());
+                } break;
+                default: {
+                    // ...
+                } break;
             }
-            return gptr() - eback();
         }
-    } m_vs;
+        return gptr() - eback();
+    }
+};
+
+template <class T>
+struct MockStream : public std::iostream {
+    VectorStream<T> m_vs;
     MockStream(std::vector<T> &data) : m_vs(data), std::iostream(&m_vs) {}
     pos_type seekg(off_type off, std::ios_base::seekdir dir,
                    std::ios_base::openmode which = std::ios_base::in) {

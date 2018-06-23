@@ -22,7 +22,7 @@ std::optional<std::vector<Grid::Peak>> XmlReader::read_next_scan(
             if (scan_attributes.find("peaksCount") == scan_attributes.end()) {
                 return std::nullopt;
             }
-            int peaks_count = std::stoi(scan_attributes["peaksCount"]);
+            size_t peaks_count = std::stoi(scan_attributes["peaksCount"]);
 
             // Extract the retention time.
             if (scan_attributes.find("retentionTime") ==
