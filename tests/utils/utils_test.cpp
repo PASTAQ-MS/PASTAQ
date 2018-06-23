@@ -87,7 +87,7 @@ TEST_CASE("MockStream") {
         for (const auto& e : data_source) {
             stream.write((char*)&e, sizeof(int));
         }
-        for (int i = 0; i < data_source.size(); ++i) {
+        for (size_t i = 0; i < data_source.size(); ++i) {
             CHECK(data_source[i] == data_destination[i]);
         }
         // Attempting to write past the number of elements contained results in
@@ -108,7 +108,7 @@ TEST_CASE("MockStream") {
         for (const auto& e : data_source) {
             stream.write((char*)&e, sizeof(double));
         }
-        for (int i = 0; i < data_source.size(); ++i) {
+        for (size_t i = 0; i < data_source.size(); ++i) {
             CHECK(data_source[i] == data_destination[i]);
         }
         // Attempting to write past the number of elements contained results in
@@ -135,7 +135,7 @@ TEST_CASE("MockStream") {
             CHECK(ret == e);
             CHECK(stream.good());
         }
-        for (int i = 0; i < data_source.size(); ++i) {
+        for (size_t i = 0; i < data_source.size(); ++i) {
             CHECK(data_source[i] == data_destination[i]);
         }
         // Attempting to write past the number of elements contained results in
@@ -162,7 +162,7 @@ TEST_CASE("MockStream") {
             CHECK(ret == e);
             CHECK(stream.good());
         }
-        for (int i = 0; i < data_source.size(); ++i) {
+        for (size_t i = 0; i < data_source.size(); ++i) {
             CHECK(data_source[i] == data_destination[i]);
         }
         // Attempting to write past the number of elements contained results in

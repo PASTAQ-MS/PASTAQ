@@ -175,7 +175,7 @@ TEST_CASE("Reading scans") {
         if (scan) {
             CHECK(expected.size() == scan.value().size());
             if (expected.size() == scan.value().size()) {
-                for (int i = 0; i < expected.size(); ++i) {
+                for (size_t i = 0; i < expected.size(); ++i) {
                     CHECK(round_double(scan.value()[i].mz) ==
                           round_double(expected[i].mz));
                     CHECK(round_double(scan.value()[i].rt) ==
@@ -249,7 +249,7 @@ TEST_CASE("Reading scans") {
         if (scan) {
             CHECK(expected.size() == scan.value().size());
             if (expected.size() == scan.value().size()) {
-                for (int i = 0; i < expected.size(); ++i) {
+                for (size_t i = 0; i < expected.size(); ++i) {
                     CHECK(round_double(scan.value()[i].mz) ==
                           round_double(expected[i].mz));
                     CHECK(round_double(scan.value()[i].rt) ==

@@ -296,7 +296,7 @@ int main(int argc, char* argv[]) {
     // Parse arguments and extract options and file names.
     options_map options;
     std::vector<std::string> files;
-    for (size_t i = 1; i < argc; ++i) {
+    for (int i = 1; i < argc; ++i) {
         auto arg = argv[i];
         if (arg[0] == '-') {
             if (accepted_flags.find(arg) == accepted_flags.end()) {
@@ -326,7 +326,7 @@ int main(int argc, char* argv[]) {
     if (options.find("-help") != options.end()) {
         print_usage();
         // Find maximum option length to adjust text padding.
-        auto padding = 0;
+        size_t padding = 0;
         for (const auto& e : accepted_flags) {
             if (e.first.size() > padding) {
                 padding = e.first.size();

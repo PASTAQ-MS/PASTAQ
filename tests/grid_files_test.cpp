@@ -79,7 +79,7 @@ TEST_CASE("Writing data/parameters to the stream") {
         CHECK(Grid::Files::Dat::read(stream, &dest_data, &dest_parameters));
 
         // Check that the data is restored succesfully.
-        for (int i = 0; i < dest_data.size(); ++i) {
+        for (size_t i = 0; i < dest_data.size(); ++i) {
             CHECK(source_data[i] == dest_data[i]);
         }
 
@@ -206,7 +206,7 @@ TEST_CASE("Writing data/parameters to the stream") {
         CHECK(Grid::Files::Dat::read(filein, &dest_data, &dest_parameters));
 
         // Check that the data is restored succesfully.
-        for (int i = 0; i < dest_data.size(); ++i) {
+        for (size_t i = 0; i < dest_data.size(); ++i) {
             CHECK(source_data[i] == dest_data[i]);
         }
 
@@ -241,11 +241,10 @@ TEST_CASE("Writing rawdump to the stream") {
         MockStream<char> stream(stream_data);
         CHECK(Grid::Files::Rawdump::write(stream, source_data));
         std::vector<Grid::Peak> dest_data = {};
-        Grid::Parameters dest_parameters = {};
         CHECK(Grid::Files::Rawdump::read(stream, dest_data));
 
         // Check that the data is restored succesfully.
-        for (int i = 0; i < dest_data.size(); ++i) {
+        for (size_t i = 0; i < dest_data.size(); ++i) {
             CHECK(source_data[i].mz == dest_data[i].mz);
             CHECK(source_data[i].rt == dest_data[i].rt);
             CHECK(source_data[i].value == dest_data[i].value);
