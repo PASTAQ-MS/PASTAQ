@@ -105,6 +105,23 @@ double sigma_rt(const Parameters& parameters);
 // delta (As defined on the smoothing parameters) and the instrument.
 bool calculate_dimensions(Grid::Parameters& parameters);
 
+std::vector<double> run_parallel(unsigned int max_threads,
+                                 const Grid::Parameters& parameters,
+                                 const std::vector<Grid::Peak>& all_peaks);
+
+std::vector<double> run_serial(const Grid::Parameters& parameters,
+                               const std::vector<Grid::Peak>& all_peaks);
+
+std::vector<double> merge_groups(
+    std::vector<Grid::Parameters>& parameters_array,
+    std::vector<std::vector<double>>& data_array);
+
+std::vector<Grid::Parameters> split_parameters(
+    const Grid::Parameters& original_params, unsigned int n_splits);
+
+std::vector<std::vector<Grid::Peak>> assign_peaks(
+    const std::vector<Grid::Parameters>& all_parameters,
+    const std::vector<Grid::Peak>& peaks);
 }  // namespace Grid
 
 #endif /* GRID_GRID_HPP */

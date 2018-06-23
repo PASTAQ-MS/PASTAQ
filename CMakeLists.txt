@@ -15,6 +15,8 @@ if (MSVC)
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} /W4")
 endif()
 
+find_package(Threads REQUIRED)
+
 # Include library target.
 add_library(gridlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/grid.cpp"
@@ -22,12 +24,12 @@ add_library(gridlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/xml_reader.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/base64.cpp"
     )
-target_include_directories(gridlib PUBLIC src)
+target_include_directories(gridlib PUBLIC src )
+target_link_libraries(gridlib ${CMAKE_THREAD_LIBS_INIT})
 
 # Include executable target.
-find_package(Threads REQUIRED)
 add_executable(grid
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid_command.cpp"
     )
 target_link_libraries(grid stdc++ stdc++fs gridlib ${CMAKE_THREAD_LIBS_INIT})
 
