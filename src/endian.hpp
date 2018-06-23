@@ -1,6 +1,6 @@
 namespace Endian {
 
-inline uint32_t swap_uint32(uint32_t b, bool little_endian) {
+inline uint32_t swap_uint32(const uint32_t &b, bool little_endian) {
     uint64_t ret;
     uint8_t *data = reinterpret_cast<uint8_t *>(&ret);
 
@@ -18,7 +18,7 @@ inline uint32_t swap_uint32(uint32_t b, bool little_endian) {
     return ret;
 }
 
-inline uint64_t swap_uint64(uint64_t b, bool little_endian) {
+inline uint64_t swap_uint64(const uint64_t &b, bool little_endian) {
     uint64_t ret;
     uint8_t *data = reinterpret_cast<uint8_t *>(&ret);
 
