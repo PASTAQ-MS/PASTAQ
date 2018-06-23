@@ -97,7 +97,7 @@ std::vector<Grid::Parameters> Grid::Runners::Parallel::split_segments(
         if (i == 0) {
             min_i = 0;
         } else {
-            min_i = segment_width * i - kernel_width;
+            min_i = segment_width * i - min_segment_width;
         }
         max_i = segment_width * (i + 1) - 1;
         if (max_i > original_params.dimensions.m) {
