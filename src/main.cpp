@@ -34,7 +34,8 @@ void trim_space(std::string& s) {
     s.erase(std::find_if(s.rbegin(), s.rend(), not_space).base(), s.end());
 }
 
-void parse_json(const std::filesystem::path& path, options_map& options) {
+void parse_json(const std::filesystem::path& path, options_map& options,
+                std::vector<std::string>& files) {
     std::ifstream stream(path);
     std::string line;
     std::string content;
@@ -69,9 +70,32 @@ void parse_json(const std::filesystem::path& path, options_map& options) {
     // Furthermore, we are not performing any validation on the JSON file, so a
     // malformed file in principle could be accepted.
     {
+        // Parse file paths.
         auto pos = content.find("\"paths\"");
         if (pos != std::string::npos) {
-            // TODO(alex): parse the file array and include them on the list
+            auto begin = content.find("[", pos) + 1;
+            auto end = content.find("]", begin) - 1;
+            if (begin == std::string::npos || end == std::string::npos ||
+                begin < 0 || end - begin < 0) {
+                std::cout << "error: malformed config file" << std::endl;
+                std::exit(-1);
+            }
+
+            auto config_files = content.substr(begin, end - begin);
+            for (auto& ch : config_files) {
+                if (ch == ',' || ch == '"') {
+                    ch = ' ';
+                }
+            }
+            std::stringstream ss(config_files);
+            while (ss.good()) {
+                std::string file_name;
+                ss >> file_name;
+                if (!file_name.empty() && std::find(files.begin(), files.end(),
+                                                    file_name) == files.end()) {
+                    files.push_back(file_name);
+                }
+            }
         }
     }
 
@@ -539,7 +563,7 @@ int main(int argc, char* argv[]) {
         // TODO(alex): accept both json and hdr for now.
         auto extension = config_path.extension();
         if (extension == ".json") {
-            parse_json(config_path, options);
+            parse_json(config_path, options, files);
         } else if (extension == ".hdr") {
             parse_hdr(config_path, options);
         } else {
