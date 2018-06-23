@@ -206,14 +206,6 @@ bool parse_hdr(const std::filesystem::path& path, options_map& options) {
             if (options.find("-sigma_rt") == options.end()) {
                 options["-sigma_rt"] = parameter;
             }
-        } else if (name == "ConversionMeanDeltaMass") {
-            if (options.find("-delta_mz") == options.end()) {
-                options["-delta_mz"] = parameter;
-            }
-        } else if (name == "ConversionMeanDeltaTime") {
-            if (options.find("-delta_rt") == options.end()) {
-                options["-delta_rt"] = parameter;
-            }
         } else if (name == "ConversionMassSpecType") {
             if (options.find("-instrument") == options.end()) {
                 options["-instrument"] = parameter;
@@ -445,13 +437,6 @@ int main(int argc, char* argv[]) {
     // with the description and if it takes extra parameters or not:
     // <description, takes_parameters>
     const std::map<std::string, std::pair<std::string, bool>> accepted_flags = {
-        // Dimensions.
-        {"-num_mz", {"The number of sampling points for the grid on mz", true}},
-        {"-num_rt", {"The number of sampling points for the grid on rt", true}},
-        {"-delta_mz",
-         {"The interval between sampling points for the grid on mz", true}},
-        {"-delta_rt",
-         {"The interval between sampling points for the grid on mz", true}},
         // Bounds.
         {"-min_rt", {"The minimum rt value", true}},
         {"-max_rt", {"The maximum rt value", true}},
@@ -689,75 +674,11 @@ int main(int argc, char* argv[]) {
         (options["-warped"] == "true" || options["-warped"] == "")) {
         // Set up the flags.
         parameters.flags |= Grid::Flags::WARPED_MESH;
-
-        // Manually specifying delta/number of sampling points is
-        // not valid when using a warped grid. To calculate the dimensions of
-        // the warped grid we need to use the bounds and the reference sigma_mz
-        // at a given mass for the given instrument.
-        Grid::calculate_dimensions(parameters);
-
-        // When we encounter a warped grid, the rest of dimensions options are
-        // ignored.
-    } else {
-        // Get the dimensions. The number of sampling points in either direction
-        // can be set manually specifying -num_mz and -num_rt or indirectly
-        // using -delta_mz and -delta_rt. The former will take priority over the
-        // later.
-        if ((options.find("-delta_mz") != options.end()) &&
-            (options.find("-num_mz") == options.end())) {
-            auto delta_mz = options["-delta_mz"];
-            if (!is_number(delta_mz)) {
-                std::cout << "error: "
-                          << "delta_mz"
-                          << " has to be a number" << std::endl;
-                print_usage();
-                return -1;
-            }
-            unsigned int num_mz =
-                (parameters.bounds.max_mz - parameters.bounds.min_mz) /
-                std::stod(delta_mz);
-            options["-num_mz"] = std::to_string(num_mz);
-        }
-        if ((options.find("-delta_rt") != options.end()) &&
-            (options.find("-num_rt") == options.end())) {
-            auto delta_rt = options["-delta_rt"];
-            if (!is_number(delta_rt)) {
-                std::cout << "error: "
-                          << "delta_rt"
-                          << " has to be a number" << std::endl;
-                print_usage();
-                return -1;
-            }
-            unsigned int num_rt =
-                (parameters.bounds.max_rt - parameters.bounds.min_rt) /
-                std::stod(delta_rt);
-            options["-num_rt"] = std::to_string(num_rt);
-        }
-        if ((options.find("-num_mz") == options.end()) ||
-            (options.find("-num_rt") == options.end())) {
-            std::cout << "Grid dimensions (num_mz, num_rt) not specified"
-                      << std::endl;
-            return -1;
-        }
-        auto num_mz = options["-num_mz"];
-        auto num_rt = options["-num_rt"];
-        if (!is_unsigned_int(num_mz)) {
-            std::cout << "error: "
-                      << "num_mz"
-                      << " has to be a positive integer" << std::endl;
-            print_usage();
-            return -1;
-        }
-        if (!is_unsigned_int(num_rt)) {
-            std::cout << "error: "
-                      << "num_rt"
-                      << " has to be a positive integer" << std::endl;
-            print_usage();
-            return -1;
-        }
-        parameters.dimensions.n = std::stoi(num_mz);
-        parameters.dimensions.m = std::stoi(num_rt);
     }
+
+    // To calculate the dimensions of the grid we need to use the bounds and
+    // the reference sigma_mz at a given mass for the given instrument.
+    Grid::calculate_dimensions(parameters);
 
     // Set up the output directory and check if it exists.
     if (options.find("-out_dir") == options.end()) {
