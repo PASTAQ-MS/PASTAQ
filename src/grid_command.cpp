@@ -616,13 +616,15 @@ int main(int argc, char* argv[]) {
                 }
             }
 
+            std::cout << "Performing grid splatting..." << std::endl;
             std::vector<double> data;
             if ((options.find("-parallel") != options.end()) &&
                 (options["-parallel"] == "true" ||
                  options["-parallel"] == "")) {
-                data = run_parallel(max_threads, parameters, all_peaks);
+                data = Grid::Runners::Parallel::run(max_threads, parameters,
+                                                    all_peaks);
             } else {
-                data = run_serial(parameters, all_peaks);
+                data = Grid::Runners::Serial::run(parameters, all_peaks);
             }
 
             std::cout << "Saving grid into dat file..." << std::endl;
@@ -668,13 +670,15 @@ int main(int argc, char* argv[]) {
             }
             std::cout << "Loaded " << all_peaks.size() << " peaks" << std::endl;
 
+            std::cout << "Performing grid splatting..." << std::endl;
             std::vector<double> data;
             if ((options.find("-parallel") != options.end()) &&
                 (options["-parallel"] == "true" ||
                  options["-parallel"] == "")) {
-                data = run_parallel(max_threads, parameters, all_peaks);
+                data = Grid::Runners::Parallel::run(max_threads, parameters,
+                                                    all_peaks);
             } else {
-                data = run_serial(parameters, all_peaks);
+                data = Grid::Runners::Serial::run(parameters, all_peaks);
             }
 
             std::cout << "Saving grid into dat file..." << std::endl;

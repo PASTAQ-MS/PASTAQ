@@ -230,11 +230,24 @@ bool Grid::calculate_dimensions(Grid::Parameters& parameters) {
     return true;
 }
 
-std::vector<double> Grid::run_parallel(
+std::vector<double> Grid::Runners::Serial::run(
+    const Grid::Parameters& parameters,
+    const std::vector<Grid::Peak>& all_peaks) {
+    // Instantiate memory.
+    std::vector<double> data(parameters.dimensions.n * parameters.dimensions.m);
+
+    // Perform grid splatting.
+    for (const auto& peak : all_peaks) {
+        Grid::splat(peak, parameters, data);
+    }
+    return data;
+}
+
+std::vector<double> Grid::Runners::Parallel::run(
     unsigned int max_threads, const Grid::Parameters& parameters,
     const std::vector<Grid::Peak>& all_peaks) {
     // Split parameters and peaks into the corresponding  groups.
-    auto all_parameters = split_parameters(parameters, max_threads);
+    auto all_parameters = split_segments(parameters, max_threads);
     auto groups = assign_peaks(all_parameters, all_peaks);
 
     // Allocate data memory.
@@ -261,53 +274,10 @@ std::vector<double> Grid::run_parallel(
         thread.join();
     }
 
-    return merge_groups(all_parameters, data_array);
+    return merge_segments(all_parameters, data_array);
 }
 
-std::vector<double> Grid::run_serial(const Grid::Parameters& parameters,
-                                     const std::vector<Grid::Peak>& all_peaks) {
-    // Instantiate memory.
-    std::vector<double> data(parameters.dimensions.n * parameters.dimensions.m);
-
-    // Perform grid splatting.
-    for (const auto& peak : all_peaks) {
-        Grid::splat(peak, parameters, data);
-    }
-    return data;
-}
-
-std::vector<double> Grid::merge_groups(
-    std::vector<Grid::Parameters>& parameters_array,
-    std::vector<std::vector<double>>& data_array) {
-    std::vector<double> merged;
-    // Early return if there are errors.
-    if (data_array.empty() || parameters_array.empty() ||
-        parameters_array.size() != data_array.size()) {
-        return merged;
-    }
-    merged.insert(end(merged), begin(data_array[0]), end(data_array[0]));
-
-    for (size_t n = 1; n < data_array.size(); ++n) {
-        auto beg_next = 1 + Grid::y_index(parameters_array[n - 1].bounds.max_rt,
-                                          parameters_array[n]);
-        // Sum the overlapping sections.
-        int i = merged.size() - beg_next * parameters_array[n - 1].dimensions.n;
-        for (size_t j = 0;
-             j < (parameters_array[n - 1].dimensions.n * beg_next); ++j) {
-            merged[i] += data_array[n][j];
-            ++i;
-        }
-        // Insert the next slice.
-        merged.insert(
-            end(merged),
-            begin(data_array[n]) + beg_next * parameters_array[n].dimensions.n,
-            end(data_array[n]));
-    }
-    return merged;
-}
-
-// Splits the parameters into n_split sections of the same dimensions.n.
-std::vector<Grid::Parameters> Grid::split_parameters(
+std::vector<Grid::Parameters> Grid::Runners::Parallel::split_segments(
     const Grid::Parameters& original_params, unsigned int n_splits) {
     // In order to determine the overlapping of the splits we need to calculate
     // what is the maximum distance that will be used by the kernel smoothing.
@@ -371,10 +341,7 @@ std::vector<Grid::Parameters> Grid::split_parameters(
     return all_parameters;
 }
 
-// TODO(alex): this is very memory inefficient, we should avoid copying the
-// array of peaks into the different groups. We can either store the references
-// or move the values.
-std::vector<std::vector<Grid::Peak>> Grid::assign_peaks(
+std::vector<std::vector<Grid::Peak>> Grid::Runners::Parallel::assign_peaks(
     const std::vector<Grid::Parameters>& all_parameters,
     const std::vector<Grid::Peak>& peaks) {
     std::vector<std::vector<Grid::Peak>> groups(all_parameters.size());
@@ -395,4 +362,34 @@ std::vector<std::vector<Grid::Peak>> Grid::assign_peaks(
         }
     }
     return groups;
+}
+
+std::vector<double> Grid::Runners::Parallel::merge_segments(
+    std::vector<Grid::Parameters>& parameters_array,
+    std::vector<std::vector<double>>& data_array) {
+    std::vector<double> merged;
+    // Early return if there are errors.
+    if (data_array.empty() || parameters_array.empty() ||
+        parameters_array.size() != data_array.size()) {
+        return merged;
+    }
+    merged.insert(end(merged), begin(data_array[0]), end(data_array[0]));
+
+    for (size_t n = 1; n < data_array.size(); ++n) {
+        auto beg_next = 1 + Grid::y_index(parameters_array[n - 1].bounds.max_rt,
+                                          parameters_array[n]);
+        // Sum the overlapping sections.
+        int i = merged.size() - beg_next * parameters_array[n - 1].dimensions.n;
+        for (size_t j = 0;
+             j < (parameters_array[n - 1].dimensions.n * beg_next); ++j) {
+            merged[i] += data_array[n][j];
+            ++i;
+        }
+        // Insert the next slice.
+        merged.insert(
+            end(merged),
+            begin(data_array[n]) + beg_next * parameters_array[n].dimensions.n,
+            end(data_array[n]));
+    }
+    return merged;
 }
