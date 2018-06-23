@@ -21,6 +21,7 @@ find_package(Threads REQUIRED)
 add_library(gridlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/grid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/grid_files.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid_runners.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/xml_reader.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/base64.cpp"
     )

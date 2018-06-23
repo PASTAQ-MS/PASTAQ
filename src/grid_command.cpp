@@ -8,6 +8,7 @@
 
 #include "grid.hpp"
 #include "grid_files.hpp"
+#include "grid_runners.hpp"
 #include "xml_reader.hpp"
 
 // Type aliases.
