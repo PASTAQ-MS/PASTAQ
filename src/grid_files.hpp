@@ -6,6 +6,9 @@
 
 #include "grid.hpp"
 
+// TODO(alex): These files do not account for the platform endianness. This
+// should be fixed if we plan on using "grid" on non little endian machines.
+
 // This binary file contains the data at the beginning followed by
 // a header with the parameters that we need to interpret the data properly.
 // The data is stored in little endian format and using 64 bits of precision for

@@ -353,12 +353,6 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if (files.empty()) {
-        std::cout << "No input files specified." << std::endl;
-        print_usage();
-        return -1;
-    }
-
     // If config file is provided, read it and parse it. The parameters
     // specified as command line arguments will override the config file.
     if (options.find("-config") != options.end()) {
@@ -383,6 +377,12 @@ int main(int argc, char* argv[]) {
             print_usage();
             return -1;
         }
+    }
+
+    if (files.empty()) {
+        std::cout << "No input files specified." << std::endl;
+        print_usage();
+        return -1;
     }
 
     // Parse the options to build the Grid::Parameters struct.
