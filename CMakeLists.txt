@@ -29,7 +29,7 @@ find_package(Threads REQUIRED)
 add_executable(grid
     "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
     )
-target_link_libraries(grid stdc++fs gridlib ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(grid stdc++ stdc++fs gridlib ${CMAKE_THREAD_LIBS_INIT})
 
 # Include tests if testing library is present.
 unset(DOCTEST_LIBRARY_PATH CACHE)
@@ -51,14 +51,14 @@ if (DOCTEST_LIBRARY_PATH)
         tests/xml_reader_test.cpp
         )
     add_test(NAME grid_test COMMAND grid_test)
-    target_link_libraries(grid_test doctest gridlib)
+    target_link_libraries(grid_test stdc++ doctest gridlib)
 
     add_executable(
         test-utils_test
         tests/utils/utils_test.cpp
         )
     add_test(NAME test-utils_test COMMAND test-utils_test)
-    target_link_libraries(test-utils_test doctest)
+    target_link_libraries(test-utils_test stdc++ doctest)
 else()
     message("-- Testing library not found. Ignoring tests...")
 endif()
