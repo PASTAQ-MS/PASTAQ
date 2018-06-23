@@ -1,6 +1,7 @@
 #include "base64.hpp"
+#include "endian.hpp"
 
-Base64::Base64(unsigned char *string_pointer, int precision, int little_endian)
+Base64::Base64(unsigned char *string_pointer, int precision, bool little_endian)
     : m_string_pointer(string_pointer),
       m_precision(precision),
       m_little_endian(little_endian) {}
@@ -50,10 +51,12 @@ uint64_t Base64::get_uint64() {
 double Base64::get_double() {
     if (m_precision == 32) {
         uint32_t b = get_uint32();
+        b = Endian::swap_uint32(b, m_little_endian);
         return reinterpret_cast<float &>(b);
     }
     if (m_precision == 64) {
         uint64_t b = get_uint64();
+        b = Endian::swap_uint64(b, m_little_endian);
         return reinterpret_cast<double &>(b);
     }
     return 0;
