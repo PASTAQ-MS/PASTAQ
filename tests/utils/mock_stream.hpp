@@ -14,8 +14,7 @@ template <class T>
 struct VectorStream : public std::streambuf {
     VectorStream(std::vector<T> &data) {
         auto begin = reinterpret_cast<char *>(&data[0]);
-        auto end =
-            reinterpret_cast<char *>(&data[0]) + sizeof(T) * data.size();
+        auto end = reinterpret_cast<char *>(&data[0]) + sizeof(T) * data.size();
         setg(begin, begin, end);
         setp(begin, end);
     }
@@ -45,7 +44,7 @@ struct VectorStream : public std::streambuf {
 template <class T>
 struct MockStream : public std::iostream {
     VectorStream<T> m_vs;
-    MockStream(std::vector<T> &data) : m_vs(data), std::iostream(&m_vs) {}
+    MockStream(std::vector<T> &data) : std::iostream(&m_vs), m_vs(data) {}
     pos_type seekg(off_type off, std::ios_base::seekdir dir,
                    std::ios_base::openmode which = std::ios_base::in) {
         if (!good()) {
