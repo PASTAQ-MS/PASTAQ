@@ -754,7 +754,8 @@ int main(int argc, char* argv[]) {
         return -1;
     }
     if ((options.find("-n_threads") != options.end()) &&
-        (options.find("-parallel") != options.end())) {
+        ((options.find("-parallel") != options.end()) &&
+         (options["-parallel"] == "true" || options["-parallel"] == ""))) {
         auto n_threads = options["-n_threads"];
         if (!is_unsigned_int(n_threads)) {
             std::cout << "error: "
@@ -841,7 +842,9 @@ int main(int argc, char* argv[]) {
             }
 
             std::vector<double> data;
-            if (options.find("-parallel") != options.end()) {
+            if ((options.find("-parallel") != options.end()) &&
+                (options["-parallel"] == "true" ||
+                 options["-parallel"] == "")) {
                 data = run_parallel(max_threads, parameters, all_peaks);
             } else {
                 data = run_serial(parameters, all_peaks);
@@ -891,7 +894,9 @@ int main(int argc, char* argv[]) {
             std::cout << "Loaded " << all_peaks.size() << " peaks" << std::endl;
 
             std::vector<double> data;
-            if (options.find("-parallel") != options.end()) {
+            if ((options.find("-parallel") != options.end()) &&
+                (options["-parallel"] == "true" ||
+                 options["-parallel"] == "")) {
                 data = run_parallel(max_threads, parameters, all_peaks);
             } else {
                 data = run_serial(parameters, all_peaks);
