@@ -1,12 +1,12 @@
 #include "base64.hpp"
 
-Base64::Base64(char *string_pointer, int precision, int little_endian)
+Base64::Base64(unsigned char *string_pointer, int precision, int little_endian)
     : m_string_pointer(string_pointer),
       m_precision(precision),
       m_little_endian(little_endian) {}
 
 uint32_t Base64::get_uint32() {
-    unsigned int b = 0;
+    uint32_t b = 0;
     switch (m_bit) {
         case 0:
             b = m_translation_table[*m_string_pointer++] << 26;
@@ -40,21 +40,21 @@ uint32_t Base64::get_uint32() {
 }
 
 uint64_t Base64::get_uint64() {
-    uint64_t b = 0;
-    uint32_t b1 = get_uint32();
-    uint32_t b2 = get_uint32();
-    b = (uint64_t)b1 << 32;
-    b |= b2;
-    return b;
+    uint64_t b1 = get_uint32();
+    uint64_t b2 = get_uint32();
+    b1 <<= 32;
+    b1 |= b2;
+    return b1;
 }
 
 double Base64::get_double() {
     if (m_precision == 32) {
         uint32_t b = get_uint32();
-        return *(float *)&b;
-    } else if (m_precision == 64) {
+        return reinterpret_cast<float &>(b);
+    }
+    if (m_precision == 64) {
         uint64_t b = get_uint64();
-        return *(double *)&b;
+        return reinterpret_cast<double &>(b);
     }
     return 0;
 }

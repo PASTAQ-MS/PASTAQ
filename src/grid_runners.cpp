@@ -22,23 +22,20 @@ std::vector<double> Grid::Runners::Parallel::run(
     auto all_parameters = split_segments(parameters, max_threads);
     auto groups = assign_peaks(all_parameters, all_peaks);
 
-    // Allocate data memory.
-    std::vector<std::vector<double>> data_array;
-    for (const auto& parameters : all_parameters) {
-        data_array.emplace_back(std::vector<double>(parameters.dimensions.n *
-                                                    parameters.dimensions.m));
-    }
-
     // Splatting!
-    std::vector<std::thread> threads;
+    std::vector<std::thread> threads(groups.size());
+    std::vector<std::vector<double>> data_array(groups.size());
     for (size_t i = 0; i < groups.size(); ++i) {
-        threads.push_back(
-            std::thread([&groups, &all_parameters, &data_array, i]() {
-                // Perform splatting in this group.
-                for (const auto& peak : groups[i]) {
-                    Grid::splat(peak, all_parameters[i], data_array[i]);
-                }
-            }));
+        // Allocate data memory.
+        data_array[i] = std::vector<double>(all_parameters[i].dimensions.n *
+                                            all_parameters[i].dimensions.m);
+
+        // Perform splatting in this group.
+        threads[i] = std::thread([&groups, &all_parameters, &data_array, i]() {
+            for (const auto& peak : groups[i]) {
+                Grid::splat(peak, all_parameters[i], data_array[i]);
+            }
+        });
     }
 
     // Wait for the threads to finish.
@@ -91,9 +88,9 @@ std::vector<Grid::Parameters> Grid::Runners::Parallel::split_segments(
     }
 
     std::vector<Grid::Parameters> all_parameters;
-    auto min_i = 0;
-    auto max_i = 0;
     for (size_t i = 0; i < num_segments; ++i) {
+        auto min_i = 0;
+        auto max_i = 0;
         if (i == 0) {
             min_i = 0;
         } else {

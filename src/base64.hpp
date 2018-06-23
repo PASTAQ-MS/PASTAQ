@@ -4,10 +4,10 @@
 
 struct Base64 {
     int m_bit = 0;
-    int m_little_endian;
+    unsigned char *m_string_pointer;
     int m_precision;
-    char *m_string_pointer;
-    const unsigned char m_translation_table[256] = {
+    int m_little_endian;
+    static constexpr unsigned char m_translation_table[256] = {
         64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
         64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
         64, 64, 64, 64, 64, 64, 64, 62, 64, 64, 64, 63, 52, 53, 54, 55, 56, 57,
@@ -24,7 +24,7 @@ struct Base64 {
         64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
         64, 64, 64, 64};
 
-    Base64(char *string_pointer, int precision, int little_endian);
+    Base64(unsigned char *string_pointer, int precision, int little_endian);
     uint32_t get_uint32();
     uint64_t get_uint64();
     double get_double();

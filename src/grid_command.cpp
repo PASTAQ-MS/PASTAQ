@@ -52,7 +52,7 @@ void parse_json(const std::filesystem::path& path, options_map& options,
     }
 
     // Find the contents of the grid configuration.
-    std::regex grid_regex("\"grid\"[[:space:]]*:[[:space:]]*\\{(.*)\\}");
+    std::regex grid_regex(R"("grid"[[:space:]]*:[[:space:]]*\{(.*)\})");
     std::smatch matches;
     std::regex_search(content, matches, grid_regex);
     if (matches.size() != 2 || matches[1].str().empty()) {
@@ -74,10 +74,10 @@ void parse_json(const std::filesystem::path& path, options_map& options,
         // Parse file paths.
         auto pos = content.find("\"paths\"");
         if (pos != std::string::npos) {
-            auto begin = content.find("[", pos) + 1;
-            auto end = content.find("]", begin) - 1;
+            auto begin = content.find('[', pos) + 1;
+            auto end = content.find(']', begin) - 1;
             if (begin == std::string::npos || end == std::string::npos ||
-                begin < 0 || end - begin < 0) {
+                end < begin) {
                 std::cout << "error: malformed config file" << std::endl;
                 std::exit(-1);
             }
@@ -104,10 +104,10 @@ void parse_json(const std::filesystem::path& path, options_map& options,
         // Parse parameters.
         auto pos = content.find("\"parameters\"");
         if (pos != std::string::npos) {
-            auto begin = content.find("{", pos) + 1;
-            auto end = content.find("}", begin) - 1;
+            auto begin = content.find('{', pos) + 1;
+            auto end = content.find('}', begin) - 1;
             if (begin == std::string::npos || end == std::string::npos ||
-                begin < 0 || end - begin < 0) {
+                end < begin) {
                 std::cout << "error: malformed config file" << std::endl;
                 std::exit(-1);
             }
@@ -125,7 +125,7 @@ void parse_json(const std::filesystem::path& path, options_map& options,
                 std::string value;
                 ss >> name;
                 ss >> value;
-                name = "-" + name;
+                name.insert(0, "-");
                 if (options.find(name) == options.end()) {
                     options[name] = value;
                 }
@@ -137,10 +137,10 @@ void parse_json(const std::filesystem::path& path, options_map& options,
         // Parse config.
         auto pos = content.find("\"config\"");
         if (pos != std::string::npos) {
-            auto begin = content.find("{", pos) + 1;
-            auto end = content.find("}", begin) - 1;
+            auto begin = content.find('{', pos) + 1;
+            auto end = content.find('}', begin) - 1;
             if (begin == std::string::npos || end == std::string::npos ||
-                begin < 0 || end - begin < 0) {
+                end < begin) {
                 std::cout << "error: malformed config file" << std::endl;
                 std::exit(-1);
             }
@@ -158,7 +158,7 @@ void parse_json(const std::filesystem::path& path, options_map& options,
                 std::string value;
                 ss >> name;
                 ss >> value;
-                name = "-" + name;
+                name.insert(0, "-");
                 if (options.find(name) == options.end()) {
                     options[name] = value;
                 }
@@ -497,7 +497,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (options.find("-warped") != options.end() &&
-        (options["-warped"] == "true" || options["-warped"] == "")) {
+        (options["-warped"] == "true" || options["-warped"].empty())) {
         // Set up the flags.
         parameters.flags |= Grid::Flags::WARPED_MESH;
     }
@@ -526,7 +526,7 @@ int main(int argc, char* argv[]) {
     }
     if ((options.find("-n_threads") != options.end()) &&
         ((options.find("-parallel") != options.end()) &&
-         (options["-parallel"] == "true" || options["-parallel"] == ""))) {
+         (options["-parallel"] == "true" || options["-parallel"].empty()))) {
         auto n_threads = options["-n_threads"];
         if (!is_unsigned_int(n_threads)) {
             std::cout << "error: "
@@ -593,7 +593,8 @@ int main(int argc, char* argv[]) {
             } while (peaks != std::nullopt);
 
             if (options.find("-rawdump") != options.end() &&
-                (options["-rawdump"] == "true" || options["-rawdump"] == "")) {
+                (options["-rawdump"] == "true" ||
+                 options["-rawdump"].empty())) {
                 std::cout << "Generating rawdump file..." << std::endl;
                 // Prepare the name of the rawdump output file.
                 auto rawdump_name =
@@ -621,7 +622,7 @@ int main(int argc, char* argv[]) {
             std::vector<double> data;
             if ((options.find("-parallel") != options.end()) &&
                 (options["-parallel"] == "true" ||
-                 options["-parallel"] == "")) {
+                 options["-parallel"].empty())) {
                 data = Grid::Runners::Parallel::run(max_threads, parameters,
                                                     all_peaks);
             } else {
@@ -675,7 +676,7 @@ int main(int argc, char* argv[]) {
             std::vector<double> data;
             if ((options.find("-parallel") != options.end()) &&
                 (options["-parallel"] == "true" ||
-                 options["-parallel"] == "")) {
+                 options["-parallel"].empty())) {
                 data = Grid::Runners::Parallel::run(max_threads, parameters,
                                                     all_peaks);
             } else {

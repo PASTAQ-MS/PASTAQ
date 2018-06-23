@@ -118,7 +118,8 @@ std::optional<std::vector<Grid::Peak>> XmlReader::read_next_scan(
             std::vector<Grid::Peak> peaks;
 
             // Initialize Base64 decoder.
-            Base64 decoder(&data.value()[0], precision, little_endian);
+            Base64 decoder(reinterpret_cast<unsigned char *>(&data.value()[0]),
+                           precision, little_endian);
             for (size_t i = 0; i < peaks_count; ++i) {
                 auto mz = decoder.get_double();
                 auto intensity = decoder.get_double();

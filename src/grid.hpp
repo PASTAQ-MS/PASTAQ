@@ -13,7 +13,7 @@ enum Type : char { QUAD, TOF, FTICR, ORBITRAP };
 namespace Grid {
 
 // Flags
-enum Flags : char { WARPED_MESH = 0b00000001 };
+enum Flags : unsigned char { WARPED_MESH = 0b00000001 };
 
 // Represent the grid dimensions in index coordinates:
 //   (n == number of columns == Number of points in mz)
@@ -52,7 +52,7 @@ struct Parameters {
     Bounds bounds;
     SmoothingParams smoothing_params;
     Instrument::Type instrument_type;
-    char flags = 0x00;
+    unsigned char flags = 0x00;
 };
 
 // A Grid::Peak represents a single measured value at a given mz and rt.
