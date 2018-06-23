@@ -350,7 +350,6 @@ std::vector<double> merge_groups(
     std::vector<std::vector<double>>& data_array) {
     std::vector<double> merged;
     // Early return if there are errors.
-    // TODO(alex): we could return a std::nullopt here.
     if (data_array.empty() || parameters_array.empty() ||
         parameters_array.size() != data_array.size()) {
         return merged;
@@ -456,6 +455,8 @@ int main(int argc, char* argv[]) {
         {"-out_dir", {"The output directory", true}},
         {"-help", {"Display available options", false}},
         {"-config", {"Specify the configuration file", true}},
+        {"-rawdump",
+         {"Enable the dump of the raw peaks inside the given bounds", false}},
         {"-parallel", {"Enable parallel processing", false}},
         {"-n_threads",
          {"Specify the maximum number of threads that will be used for the "
@@ -545,7 +546,8 @@ int main(int argc, char* argv[]) {
             return -1;
         }
 
-        // TODO(alex): accept both json and hdr for now.
+        // FIXME(alex): accept both json and hdr for now. Ideally we would stick
+        // with just one configuration format.
         auto extension = config_path.extension();
         if (extension == ".json") {
             parse_json(config_path, options, files);
@@ -752,19 +754,6 @@ int main(int argc, char* argv[]) {
                 return -1;
             }
 
-            // Prepare the name of the rawdump output file.
-            // TODO(alex): this should be optional.
-            auto rawdump_name =
-                options["-out_dir"] /
-                input_file.filename().replace_extension(".rawdump");
-            std::ofstream rawdump_stream;
-            rawdump_stream.open(rawdump_name, std::ios::out | std::ios::binary);
-            if (!rawdump_stream) {
-                std::cout << "error: could not open file " << rawdump_name
-                          << " for writing" << std::endl;
-                return -1;
-            }
-
             std::cout << "Parsing file..." << std::endl;
             auto peaks = XmlReader::read_next_scan(stream, parameters);
             if (peaks == std::nullopt) {
@@ -779,11 +768,29 @@ int main(int argc, char* argv[]) {
                 peaks = XmlReader::read_next_scan(stream, parameters);
             } while (peaks != std::nullopt);
 
-            // TODO(alex): this should be optional.
-            if (!Grid::Files::Rawdump::write(rawdump_stream, all_peaks)) {
-                std::cout << "error: the raw dump could not be saved properly"
-                          << std::endl;
-                return -1;
+            if (options.find("-rawdump") != options.end() &&
+                (options["-rawdump"] == "true" || options["-rawdump"] == "")) {
+                std::cout << "Generating rawdump file..." << std::endl;
+                // Prepare the name of the rawdump output file.
+                auto rawdump_name =
+                    options["-out_dir"] /
+                    input_file.filename().replace_extension(".rawdump");
+                std::ofstream rawdump_stream;
+                rawdump_stream.open(rawdump_name,
+                                    std::ios::out | std::ios::binary);
+                if (!rawdump_stream) {
+                    std::cout << "error: could not open file " << rawdump_name
+                              << " for writing" << std::endl;
+                    return -1;
+                }
+
+                // Write rawdump to disk.
+                if (!Grid::Files::Rawdump::write(rawdump_stream, all_peaks)) {
+                    std::cout
+                        << "error: the raw dump could not be saved properly"
+                        << std::endl;
+                    return -1;
+                }
             }
 
             std::vector<double> data;
