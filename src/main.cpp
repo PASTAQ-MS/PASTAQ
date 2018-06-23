@@ -34,6 +34,114 @@ void trim_space(std::string& s) {
     s.erase(std::find_if(s.rbegin(), s.rend(), not_space).base(), s.end());
 }
 
+void parse_json(const std::filesystem::path& path, options_map& options) {
+    std::ifstream stream(path);
+    std::string line;
+    std::string content;
+
+    // Read all the lines.
+    while (stream.good()) {
+        std::getline(stream, line);
+        trim_space(line);
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        content += line + " ";
+    }
+
+    // Find the contents of the grid configuration.
+    std::regex grid_regex("\"grid\"[[:space:]]*:[[:space:]]*\\{(.*)\\}");
+    std::smatch matches;
+    std::regex_search(content, matches, grid_regex);
+    if (matches.size() != 2 || matches[1].str().empty()) {
+        std::cout << "error: could not find \"grid\" on the config file"
+                  << std::endl;
+        std::exit(-1);
+    }
+    content = matches[1];
+
+    // Match the different parts of the grid configuration. Note that we are
+    // performing a very simplistic parsing, the right thing to do would be to
+    // create an AST and walk it to perform the parsing. This simplistic
+    // approach means that if the user mistakenly puts the "paths" inside
+    // "parameters" or "config" it will still be accepted properly.
+    //
+    // Furthermore, we are not performing any validation on the JSON file, so a
+    // malformed file in principle could be accepted.
+    {
+        auto pos = content.find("\"paths\"");
+        if (pos != std::string::npos) {
+            // TODO(alex): parse the file array and include them on the list
+        }
+    }
+
+    {
+        // Parse parameters.
+        auto pos = content.find("\"parameters\"");
+        if (pos != std::string::npos) {
+            auto begin = content.find("{", pos) + 1;
+            auto end = content.find("}", begin) - 1;
+            if (begin == std::string::npos || end == std::string::npos ||
+                begin < 0 || end - begin < 0) {
+                std::cout << "error: malformed config file" << std::endl;
+                std::exit(-1);
+            }
+
+            auto config_parameters = content.substr(begin, end - begin);
+            for (auto& ch : config_parameters) {
+                if (ch == ',' || ch == ':' || ch == '"') {
+                    ch = ' ';
+                }
+            }
+
+            std::stringstream ss(config_parameters);
+            while (ss.good()) {
+                std::string name;
+                std::string value;
+                ss >> name;
+                ss >> value;
+                name = "-" + name;
+                if (options.find(name) == options.end()) {
+                    options[name] = value;
+                }
+            }
+        }
+    }
+
+    {
+        // Parse config.
+        auto pos = content.find("\"config\"");
+        if (pos != std::string::npos) {
+            auto begin = content.find("{", pos) + 1;
+            auto end = content.find("}", begin) - 1;
+            if (begin == std::string::npos || end == std::string::npos ||
+                begin < 0 || end - begin < 0) {
+                std::cout << "error: malformed config file" << std::endl;
+                std::exit(-1);
+            }
+
+            auto config_config = content.substr(begin, end - begin);
+            for (auto& ch : config_config) {
+                if (ch == ',' || ch == ':' || ch == '"') {
+                    ch = ' ';
+                }
+            }
+
+            std::stringstream ss(config_config);
+            while (ss.good()) {
+                std::string name;
+                std::string value;
+                ss >> name;
+                ss >> value;
+                name = "-" + name;
+                if (options.find(name) == options.end()) {
+                    options[name] = value;
+                }
+            }
+        }
+    }
+}
+
 bool parse_hdr(const std::filesystem::path& path, options_map& options) {
     std::ifstream stream(path);
     std::string parameter;
@@ -88,7 +196,7 @@ bool parse_hdr(const std::filesystem::path& path, options_map& options) {
             }
         } else if (name == "ConversionWarpedMesh" && parameter == "1") {
             if (options.find("-warped") == options.end()) {
-                options["-warped"] = parameter;
+                options["-warped"] = "true";
             }
         } else {
             // ignoring unknown parameters...
@@ -431,7 +539,7 @@ int main(int argc, char* argv[]) {
         // TODO(alex): accept both json and hdr for now.
         auto extension = config_path.extension();
         if (extension == ".json") {
-            // TODO(alex): parse .json file...
+            parse_json(config_path, options);
         } else if (extension == ".hdr") {
             parse_hdr(config_path, options);
         } else {
@@ -553,7 +661,8 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    if (options.find("-warped") != options.end()) {
+    if (options.find("-warped") != options.end() &&
+        (options["-warped"] == "true" || options["-warped"] == "")) {
         // Set up the flags.
         parameters.flags |= Grid::Flags::WARPED_MESH;
 
@@ -745,6 +854,8 @@ int main(int argc, char* argv[]) {
                 return -1;
             }
         } else if (lowercase_extension == ".rawdump") {
+            print_parameters_summary(parameters);
+
             // Prepare the name of the output file.
             auto datfile_name = options["-out_dir"] /
                                 input_file.filename().replace_extension(".dat");
