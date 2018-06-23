@@ -50,6 +50,7 @@ if (DOCTEST_LIBRARY_PATH)
         grid_test
         tests/main.cpp
         tests/grid_test.cpp
+        tests/grid_runners_test.cpp
         tests/grid_files_test.cpp
         tests/xml_reader_test.cpp
         )
