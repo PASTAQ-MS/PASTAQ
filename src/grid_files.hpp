@@ -61,6 +61,8 @@ bool write_parameters(std::ostream &stream, const Grid::Parameters &parameters);
 // number of peaks contained in the file, followed by a vector of Grid::Peak
 // objects.
 namespace Grid::Files::Rawdump {
+// TODO(alex): Should we write the parameters into the rawdump? This would allow
+// us to load the rawdump independently of the datfile or parameters.
 
 // Write the entire source vector in the given binary stream.
 bool write(std::ostream &stream, const std::vector<Grid::Peak> &peaks);
