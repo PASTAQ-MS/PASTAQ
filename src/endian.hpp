@@ -1,3 +1,6 @@
+#ifndef GRID_ENDIAN_HPP
+#define GRID_ENDIAN_HPP
+
 namespace Endian {
 
 inline uint32_t swap_uint32(const uint32_t &b, bool little_endian) {
@@ -45,3 +48,5 @@ inline uint64_t swap_uint64(const uint64_t &b, bool little_endian) {
 }
 
 }  // namespace Endian
+
+#endif /* GRID_ENDIAN_HPP */
