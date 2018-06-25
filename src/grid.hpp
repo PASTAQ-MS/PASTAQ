@@ -103,7 +103,7 @@ double sigma_rt(const Parameters& parameters);
 // Set up the Grid::Dimensions inside the given Grid::Parameters. The dimensions
 // of the grid depend on it being a warped mesh or not, the bounds, the sampling
 // delta (As defined on the smoothing parameters) and the instrument.
-bool calculate_dimensions(Grid::Parameters& parameters);
+bool calculate_dimensions(Parameters& parameters);
 
 }  // namespace Grid
 
