@@ -70,4 +70,4 @@ lint:cppcheck:
 lint:clang-tidy:
     stage: lint
     script:
-        - clang-tidy -quiet -checks="-*,bugprone-*,cert-*,clang-analyzer-*,cppcoreguidelines-*,misc-*,modernize-*,mpi-*,performance-*,readability-*,hicpp-*,cert-*,-cppcoreguidelines-pro-type-reinterpret-cast,-cppcoreguidelines-pro-bounds-constant-array-index,-cppcoreguidelines-pro-bounds-pointer-arithmetic,-readability-implicit-bool-conversion,-hicpp-signed-bitwise" -p=build src/*
+        - clang-tidy -quiet -checks="-*,bugprone-*,cert-*,clang-analyzer-*,cppcoreguidelines-*,misc-*,modernize-*,mpi-*,performance-*,readability-*,hicpp-*,cert-*,-cppcoreguidelines-pro-type-reinterpret-cast,-cppcoreguidelines-pro-bounds-constant-array-index,-cppcoreguidelines-pro-bounds-pointer-arithmetic,-readability-implicit-bool-conversion,-hicpp-signed-bitwise,-hicpp-use-noexcept,-misc-unused-parameters,-modernize-use-noexcept" -p=build src/*
