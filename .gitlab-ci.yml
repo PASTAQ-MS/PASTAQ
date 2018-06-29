@@ -62,6 +62,7 @@ lint:clang-format:
             echo "Linter errors found, please run clang-format and try again";
             exit 1;
           fi
+    dependencies: []
 
 lint:cppcheck:
     stage: lint
@@ -72,6 +73,7 @@ lint:cppcheck:
             cat cppcheck.txt;
             exit 1;
           fi
+    dependencies: []
 
 lint:clang-tidy:
     stage: lint
