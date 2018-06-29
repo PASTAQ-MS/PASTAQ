@@ -22,8 +22,7 @@ build:linux:
     script:
         # Install required packages.
         - apt-get update
-        - apt-get -y install
-            cmake ninja-build build-essential git gcc-8 g++-8
+        - apt-get -y install cmake ninja-build build-essential git gcc-8 g++-8
         - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 700 --slave /usr/bin/g++ g++ /usr/bin/g++-7
         - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8
         # Initialize submodules.
@@ -43,8 +42,7 @@ test:linux:
     script:
         # Install required packages.
         - apt-get update
-        - apt-get -y install
-            cmake ninja-build build-essential git gcc-8 g++-8
+        - apt-get -y install ninja-build git
         - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 700 --slave /usr/bin/g++ g++ /usr/bin/g++-7
         - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8
         # Initialize submodules.
@@ -79,3 +77,10 @@ lint:cppcheck:
             cat cppcheck.txt;
             exit 1;
           fi
+
+lint:clang-tidy:
+    stage: lint
+    script:
+        - apt-get update
+        - apt-get -y install clang-tidy
+        - clang-tidy -quiet -checks="-*,bugprone-*,cert-*,clang-analyzer-*,cppcoreguidelines-*,misc-*,modernize-*,mpi-*,performance-*,readability-*,hicpp-*,cert-*,-cppcoreguidelines-pro-type-reinterpret-cast,-cppcoreguidelines-pro-bounds-constant-array-index,-cppcoreguidelines-pro-bounds-pointer-arithmetic,-readability-implicit-bool-conversion,-hicpp-signed-bitwise" -p=build -warnings-as-errors="*" src/*
