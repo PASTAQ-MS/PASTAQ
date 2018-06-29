@@ -2,8 +2,8 @@
 
 #include "grid.hpp"
 
-bool Grid::splat(const Grid::Point& point, const Grid::Parameters& parameters,
-                 std::vector<double>& data) {
+bool Grid::splat(const Grid::Point &point, const Grid::Parameters &parameters,
+                 std::vector<double> &data) {
     // For some instruments the peaks get wider in proportion to the adquired
     // mass. In order to maintain the same number of sampling points we will
     // scale the sigm_mz accordingly.
@@ -58,7 +58,7 @@ bool Grid::splat(const Grid::Point& point, const Grid::Parameters& parameters,
     return true;
 }
 
-double Grid::mz_at(unsigned int i, const Grid::Parameters& parameters) {
+double Grid::mz_at(unsigned int i, const Grid::Parameters &parameters) {
     // Warped grid.
     if (parameters.flags & Grid::Flags::WARPED_MESH) {
         switch (parameters.instrument_type) {
@@ -97,14 +97,14 @@ double Grid::mz_at(unsigned int i, const Grid::Parameters& parameters) {
     return parameters.bounds.min_mz + delta_mz * i;
 }
 
-double Grid::rt_at(unsigned int j, const Grid::Parameters& parameters) {
+double Grid::rt_at(unsigned int j, const Grid::Parameters &parameters) {
     double delta_rt = (parameters.bounds.max_rt - parameters.bounds.min_rt) /
                       static_cast<double>(parameters.dimensions.m - 1);
     return parameters.bounds.min_rt + delta_rt * j;
 }
 
 // TODO(alex): add unit tests for warped grid
-unsigned int Grid::x_index(double mz, const Grid::Parameters& parameters) {
+unsigned int Grid::x_index(double mz, const Grid::Parameters &parameters) {
     // Regular grid.
     if (!(parameters.flags & Grid::Flags::WARPED_MESH)) {
         // In order to be consistent, the maximum value is mz + delta_mz. This
@@ -147,14 +147,14 @@ unsigned int Grid::x_index(double mz, const Grid::Parameters& parameters) {
     return 0;
 }
 
-unsigned int Grid::y_index(double rt, const Grid::Parameters& parameters) {
+unsigned int Grid::y_index(double rt, const Grid::Parameters &parameters) {
     // In order to be consistent, the maximum value is rt + delta_rt. This
     // ensures all intervals contain the same number of points.
     double d = rt - parameters.bounds.min_rt;
     return static_cast<unsigned int>(d / parameters.smoothing_params.sigma_rt);
 }
 
-double Grid::sigma_mz(double mz, const Grid::Parameters& parameters) {
+double Grid::sigma_mz(double mz, const Grid::Parameters &parameters) {
     double sigma_mz = 0.0;
     switch (parameters.instrument_type) {
         case Instrument::ORBITRAP: {
@@ -178,11 +178,11 @@ double Grid::sigma_mz(double mz, const Grid::Parameters& parameters) {
     return sigma_mz;
 }
 
-double Grid::sigma_rt(const Grid::Parameters& parameters) {
+double Grid::sigma_rt(const Grid::Parameters &parameters) {
     return parameters.smoothing_params.sigma_rt;
 }
 
-bool Grid::calculate_dimensions(Grid::Parameters& parameters) {
+bool Grid::calculate_dimensions(Grid::Parameters &parameters) {
     if ((parameters.bounds.min_mz >= parameters.bounds.max_mz) ||
         (parameters.bounds.min_rt >= parameters.bounds.max_rt)) {
         return false;

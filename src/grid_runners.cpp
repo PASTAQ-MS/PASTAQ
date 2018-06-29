@@ -3,21 +3,21 @@
 #include "grid_runners.hpp"
 
 std::vector<double> Grid::Runners::Serial::run(
-    const Grid::Parameters& parameters,
-    const std::vector<Grid::Point>& all_points) {
+    const Grid::Parameters &parameters,
+    const std::vector<Grid::Point> &all_points) {
     // Instantiate memory.
     std::vector<double> data(parameters.dimensions.n * parameters.dimensions.m);
 
     // Perform grid splatting.
-    for (const auto& point : all_points) {
+    for (const auto &point : all_points) {
         Grid::splat(point, parameters, data);
     }
     return data;
 }
 
 std::vector<double> Grid::Runners::Parallel::run(
-    unsigned int max_threads, const Grid::Parameters& parameters,
-    const std::vector<Grid::Point>& all_points) {
+    unsigned int max_threads, const Grid::Parameters &parameters,
+    const std::vector<Grid::Point> &all_points) {
     // Split parameters and points into the corresponding  groups.
     auto all_parameters = split_segments(parameters, max_threads);
     auto groups = assign_points(all_parameters, all_points);
@@ -32,14 +32,14 @@ std::vector<double> Grid::Runners::Parallel::run(
 
         // Perform splatting in this group.
         threads[i] = std::thread([&groups, &all_parameters, &data_array, i]() {
-            for (const auto& point : groups[i]) {
+            for (const auto &point : groups[i]) {
                 Grid::splat(point, all_parameters[i], data_array[i]);
             }
         });
     }
 
     // Wait for the threads to finish.
-    for (auto& thread : threads) {
+    for (auto &thread : threads) {
         thread.join();
     }
 
@@ -47,7 +47,7 @@ std::vector<double> Grid::Runners::Parallel::run(
 }
 
 std::vector<Grid::Parameters> Grid::Runners::Parallel::split_segments(
-    const Grid::Parameters& original_params, unsigned int n_splits) {
+    const Grid::Parameters &original_params, unsigned int n_splits) {
     // In order to determine the overlapping of the splits we need to calculate
     // what is the maximum distance that will be used by the kernel smoothing.
     // To avoid aliasing we will overlap at least the maximum kernel width.
@@ -111,11 +111,11 @@ std::vector<Grid::Parameters> Grid::Runners::Parallel::split_segments(
 }
 
 std::vector<std::vector<Grid::Point>> Grid::Runners::Parallel::assign_points(
-    const std::vector<Grid::Parameters>& all_parameters,
-    const std::vector<Grid::Point>& points) {
+    const std::vector<Grid::Parameters> &all_parameters,
+    const std::vector<Grid::Point> &points) {
     std::vector<std::vector<Grid::Point>> groups(all_parameters.size());
 
-    for (const auto& point : points) {
+    for (const auto &point : points) {
         for (size_t i = 0; i < all_parameters.size(); ++i) {
             auto parameters = all_parameters[i];
             double sigma_rt = Grid::sigma_rt(parameters);
@@ -134,8 +134,8 @@ std::vector<std::vector<Grid::Point>> Grid::Runners::Parallel::assign_points(
 }
 
 std::vector<double> Grid::Runners::Parallel::merge_segments(
-    std::vector<Grid::Parameters>& parameters_array,
-    std::vector<std::vector<double>>& data_array) {
+    std::vector<Grid::Parameters> &parameters_array,
+    std::vector<std::vector<double>> &data_array) {
     std::vector<double> merged;
     // Early return if there are errors.
     if (data_array.empty() || parameters_array.empty() ||

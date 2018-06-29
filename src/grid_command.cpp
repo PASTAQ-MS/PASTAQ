@@ -19,24 +19,24 @@ void print_usage() {
 }
 
 // Helper functions to check if the given string contains a number.
-bool is_unsigned_int(std::string& s) {
+bool is_unsigned_int(std::string &s) {
     std::regex double_regex("^([[:digit:]]+)$");
     return std::regex_search(s, double_regex);
 }
-bool is_number(std::string& s) {
+bool is_number(std::string &s) {
     std::regex double_regex("^([[:digit:]]+[\\.]?[[:digit:]]*)$");
     return std::regex_search(s, double_regex);
 }
 
 // Helper function to trim the whitespace surrounding a string.
-void trim_space(std::string& s) {
+void trim_space(std::string &s) {
     auto not_space = [](int ch) { return !std::isspace(ch); };
     s.erase(s.begin(), std::find_if(s.begin(), s.end(), not_space));
     s.erase(std::find_if(s.rbegin(), s.rend(), not_space).base(), s.end());
 }
 
-void parse_json(const std::filesystem::path& path, options_map& options,
-                std::vector<std::string>& files) {
+void parse_json(const std::filesystem::path &path, options_map &options,
+                std::vector<std::string> &files) {
     std::ifstream stream(path);
     std::string line;
     std::string content;
@@ -83,7 +83,7 @@ void parse_json(const std::filesystem::path& path, options_map& options,
             }
 
             auto config_files = content.substr(begin, end - begin);
-            for (auto& ch : config_files) {
+            for (auto &ch : config_files) {
                 if (ch == ',' || ch == '"') {
                     ch = ' ';
                 }
@@ -113,7 +113,7 @@ void parse_json(const std::filesystem::path& path, options_map& options,
             }
 
             auto config_parameters = content.substr(begin, end - begin);
-            for (auto& ch : config_parameters) {
+            for (auto &ch : config_parameters) {
                 if (ch == ',' || ch == ':' || ch == '"') {
                     ch = ' ';
                 }
@@ -146,7 +146,7 @@ void parse_json(const std::filesystem::path& path, options_map& options,
             }
 
             auto config_config = content.substr(begin, end - begin);
-            for (auto& ch : config_config) {
+            for (auto &ch : config_config) {
                 if (ch == ',' || ch == ':' || ch == '"') {
                     ch = ' ';
                 }
@@ -167,7 +167,7 @@ void parse_json(const std::filesystem::path& path, options_map& options,
     }
 }
 
-bool parse_hdr(const std::filesystem::path& path, options_map& options) {
+bool parse_hdr(const std::filesystem::path &path, options_map &options) {
     std::ifstream stream(path);
     std::string parameter;
     const std::string delimiter = "<==>";
@@ -222,7 +222,7 @@ bool parse_hdr(const std::filesystem::path& path, options_map& options) {
     return false;
 }
 
-void print_parameters_summary(const Grid::Parameters& parameters) {
+void print_parameters_summary(const Grid::Parameters &parameters) {
     std::cout << "The following parameters were set:" << std::endl;
     // Dimensions.
     std::cout << "DIMENSIONS:" << std::endl;
@@ -255,7 +255,7 @@ void print_parameters_summary(const Grid::Parameters& parameters) {
     std::cout << "APPROXIMATE MEMORY USAGE (BYTES):" << x << std::endl;
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     // Flag format is map where the key is the flag name and contains a tuple
     // with the description and if it takes extra parameters or not:
     // <description, takes_parameters>
@@ -327,7 +327,7 @@ int main(int argc, char* argv[]) {
         print_usage();
         // Find maximum option length to adjust text padding.
         size_t padding = 0;
-        for (const auto& e : accepted_flags) {
+        for (const auto &e : accepted_flags) {
             if (e.first.size() > padding) {
                 padding = e.first.size();
             }
@@ -336,7 +336,7 @@ int main(int argc, char* argv[]) {
         // Print options with a 4 space padding between flag name and
         // description.
         std::cout << "OPTIONS:" << std::endl;
-        for (const auto& e : accepted_flags) {
+        for (const auto &e : accepted_flags) {
             std::cout << e.first;
             // If the option requires an argument we have to specify it,
             // otherwise we add padding.
@@ -480,7 +480,7 @@ int main(int argc, char* argv[]) {
     }
     auto instrument = options["-instrument"];
     // Transform instrument to lowercase to prevent typos.
-    for (auto& ch : instrument) {
+    for (auto &ch : instrument) {
         ch = std::tolower(ch);
     }
     if (instrument == "orbitrap") {
@@ -539,7 +539,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Execute the program here.
-    for (const auto& file_name : files) {
+    for (const auto &file_name : files) {
         std::filesystem::path input_file = file_name;
         // Check if the files exist.
         if (!std::filesystem::exists(input_file)) {
@@ -552,7 +552,7 @@ int main(int argc, char* argv[]) {
         // Check if the file has the appropriate format.
         std::string extension = input_file.extension();
         std::string lowercase_extension = extension;
-        for (auto& ch : lowercase_extension) {
+        for (auto &ch : lowercase_extension) {
             ch = std::tolower(ch);
         }
         if (lowercase_extension == ".mzxml") {
