@@ -8,6 +8,11 @@ stages:
     - test
     - lint
 
+cache:
+    key: "$CI_PROJECT_PATH_SLUG $CI_COMMIT_SHA linux"
+    paths:
+        - apt-cache/
+
 before_script:
     # Configure gitlab runner credentials.
     - echo -e "machine 129.125.166.241
@@ -17,8 +22,9 @@ before_script:
     - sed -i "s/http:\\/\\/129.125.166.241\\//..\\/..\\//g" .gitmodules
     - sed -i "s/git@129.125.166.241:/..\\/..\\//g" .gitmodules
     # Install required packages.
-    - apt-get update
-    - apt-get -y install cmake ninja-build build-essential git gcc-8 g++-8 clang-format clang-tidy cppcheck
+    - export APT_CACHE_DIR=apt-cache && mkdir -pv $APT_CACHE_DIR
+    - apt-get update -yq
+    - apt-get -o dir::cache::archives="$APT_CACHE_DIR" -y install cmake ninja-build build-essential git gcc-8 g++-8 clang-format clang-tidy cppcheck
     - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 700 --slave /usr/bin/g++ g++ /usr/bin/g++-7
     - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8
     # Initialize submodules.
@@ -69,7 +75,7 @@ lint:cppcheck:
 lint:clang-tidy:
     stage: lint
     script:
-        - clang-tidy -quiet -checks="-*,bugprone-*,cert-*,clang-analyzer-*,cppcoreguidelines-*,misc-*,modernize-*,mpi-*,performance-*,readability-*,hicpp-*,cert-*,-cppcoreguidelines-pro-type-reinterpret-cast,-cppcoreguidelines-pro-bounds-constant-array-index,-cppcoreguidelines-pro-bounds-pointer-arithmetic,-readability-implicit-bool-conversion,-hicpp-signed-bitwise" -p=build -warnings-as-errors="*" src/*
+        - clang-tidy -quiet -checks="-*,bugprone-*,cert-*,clang-analyzer-*,cppcoreguidelines-*,misc-*,modernize-*,mpi-*,performance-*,readability-*,hicpp-*,cert-*,-cppcoreguidelines-pro-type-reinterpret-cast,-cppcoreguidelines-pro-bounds-constant-array-index,-cppcoreguidelines-pro-bounds-pointer-arithmetic,-readability-implicit-bool-conversion,-hicpp-signed-bitwise" -p=build src/*
     cache:
         key: "$CI_PROJECT_PATH_SLUG $CI_COMMIT_SHA linux"
         paths:
