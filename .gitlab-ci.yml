@@ -23,8 +23,8 @@ before_script:
     - sed -i "s/git@129.125.166.241:/..\\/..\\//g" .gitmodules
     # Install required packages.
     - export APT_CACHE_DIR=apt-cache && mkdir -pv $APT_CACHE_DIR
-    - apt-get update -yq
-    - apt-get -o dir::cache::archives="$APT_CACHE_DIR" -y install cmake ninja-build build-essential git gcc-8 g++-8 clang-format clang-tidy cppcheck
+    - apt-get -yq update
+    - apt-get -q -o dir::cache::archives="$APT_CACHE_DIR" -y install cmake ninja-build build-essential git gcc-8 g++-8 clang-format clang-tidy cppcheck
     - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 700 --slave /usr/bin/g++ g++ /usr/bin/g++-7
     - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8
     # Initialize submodules.
