@@ -42,7 +42,7 @@ test:linux:
     script:
         # Install required packages.
         - apt-get update
-        - apt-get -y install ninja-build git
+        - apt-get -y install cmake ninja-build git
         # Initialize submodules.
         - git submodule sync
         - git submodule update --init
