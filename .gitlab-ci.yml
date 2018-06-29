@@ -73,9 +73,9 @@ lint:cppcheck:
     script:
         - apt-get update
         - apt-get -y install cppcheck
-        - cppcheck --enable=all --suppress=unusedFunction --quiet src/*.cpp &> cppcheck.txt
+        - cppcheck --enable=all --quiet src/*.cpp &> cppcheck.txt
         - if [[ $(wc -l < cppcheck.txt) -gt 1 ]]; then
             echo "cppcheck errors found:";
-            cat cppcheck.txt
+            cat cppcheck.txt;
             exit 1;
           fi
