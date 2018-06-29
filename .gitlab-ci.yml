@@ -9,10 +9,9 @@ stages:
     - lint
 
 cache:
-    key: "$CI_PROJECT_PATH_SLUG $CI_COMMIT_SHA linux"
+    key: "$CI_PROJECT_PATH_SLUG $CI_COMMIT_SHA"
     paths:
         - apt-cache/
-        - build/
 
 before_script:
     # Configure gitlab runner credentials.
@@ -41,6 +40,11 @@ build:linux:
         - cd build
         - cmake .. -G Ninja
         - ninja
+    artifacts:
+        when: on_success
+        expire_in: 1 day
+        paths:
+            - build/
 
 test:linux:
     stage: test
@@ -48,6 +52,8 @@ test:linux:
         # Start test
         - cd build
         - ninja test
+    dependencies:
+        - build:linux
 
 lint:clang-format:
     stage: lint
@@ -71,3 +77,5 @@ lint:clang-tidy:
     stage: lint
     script:
         - clang-tidy -quiet -checks="-*,bugprone-*,cert-*,clang-analyzer-*,cppcoreguidelines-*,misc-*,modernize-*,mpi-*,performance-*,readability-*,hicpp-*,cert-*,-cppcoreguidelines-pro-type-reinterpret-cast,-cppcoreguidelines-pro-bounds-constant-array-index,-cppcoreguidelines-pro-bounds-pointer-arithmetic,-readability-implicit-bool-conversion,-hicpp-signed-bitwise,-hicpp-use-noexcept,-misc-unused-parameters,-modernize-use-noexcept" -p=build src/*
+    dependencies:
+        - build:linux
