@@ -102,8 +102,8 @@ std::vector<Grid::Parameters> Grid::Runners::Parallel::split_segments(
         }
         // Prepare the next Grid::Parameters object.
         Grid::Parameters parameters(original_params);
-        parameters.bounds.min_rt = Grid::rt_at(min_i, original_params).value();
-        parameters.bounds.max_rt = Grid::rt_at(max_i, original_params).value();
+        parameters.bounds.min_rt = Grid::rt_at(min_i, original_params);
+        parameters.bounds.max_rt = Grid::rt_at(max_i, original_params);
         parameters.dimensions.m = max_i - min_i + 1;
         all_parameters.emplace_back(parameters);
     }

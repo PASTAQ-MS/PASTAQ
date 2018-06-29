@@ -40,8 +40,7 @@ TEST_CASE("Gaussian splatting") {
         for (size_t j = 0; j < 7; j++) {
             for (size_t i = 0; i < 7; ++i) {
                 CHECK(expected_weights[i + 7 * j] ==
-                      std::to_string(
-                          Grid::value_at(i, j, parameters, data).value()));
+                      std::to_string(data[i + 7 * j]));
             }
         }
     }
@@ -91,27 +90,14 @@ TEST_CASE("Gaussian splatting") {
         for (size_t j = 0; j < 7; j++) {
             for (size_t i = 0; i < 7; ++i) {
                 CHECK(expected_weights[i + 7 * j] ==
-                      std::to_string(
-                          Grid::value_at(i, j, parameters, data).value()));
+                      std::to_string(data[i + 7 * j]));
             }
         }
     }
 }
 
 TEST_CASE("Test the fetching of real world parameters from index") {
-    SUBCASE("An empty mesh should always return std::nullopt") {
-        Grid::Parameters parameters = {{0, 0},
-                                       {0.0, 75.0, 200.0, 800.0},
-                                       {200, 0.01, 1.0},
-                                       Instrument::QUAD};
-        CHECK(Grid::mz_at(0, parameters) == std::nullopt);
-        CHECK(Grid::mz_at(1, parameters) == std::nullopt);
-        CHECK(Grid::mz_at(2, parameters) == std::nullopt);
-        CHECK(Grid::rt_at(0, parameters) == std::nullopt);
-        CHECK(Grid::rt_at(1, parameters) == std::nullopt);
-        CHECK(Grid::rt_at(2, parameters) == std::nullopt);
-    };
-    SUBCASE("Proper interpolation if inside bounds or std::nullopt") {
+    SUBCASE("Check for proper interpolation") {
         Grid::Parameters parameters = {{4, 4},
                                        {0.0, 75.0, 200.0, 800.0},
                                        {200, 0.01, 1.0},
@@ -120,12 +106,10 @@ TEST_CASE("Test the fetching of real world parameters from index") {
         CHECK(Grid::mz_at(1, parameters) == 400.0);
         CHECK(Grid::mz_at(2, parameters) == 600.0);
         CHECK(Grid::mz_at(3, parameters) == 800.0);
-        CHECK(Grid::mz_at(4, parameters) == std::nullopt);
         CHECK(Grid::rt_at(0, parameters) == 0.0);
         CHECK(Grid::rt_at(1, parameters) == 25.0);
         CHECK(Grid::rt_at(2, parameters) == 50.0);
         CHECK(Grid::rt_at(3, parameters) == 75.0);
-        CHECK(Grid::rt_at(4, parameters) == std::nullopt);
     };
     SUBCASE("Using a warped grid") {
         auto round_double = [](double d) {
@@ -149,11 +133,11 @@ TEST_CASE("Test the fetching of real world parameters from index") {
                                            Instrument::ORBITRAP,
                                            Grid::Flags::WARPED_MESH};
             Grid::calculate_dimensions(parameters);
-            CHECK(round_double(Grid::mz_at(0, parameters).value()) == 200.0);
-            CHECK(round_double(Grid::mz_at(1, parameters).value()) == 202.015);
-            CHECK(round_double(Grid::mz_at(2, parameters).value()) == 204.06);
-            CHECK(round_double(Grid::mz_at(3, parameters).value()) == 206.137);
-            CHECK(round_double(Grid::mz_at(100, parameters).value()) == 800.0);
+            CHECK(round_double(Grid::mz_at(0, parameters)) == 200.0);
+            CHECK(round_double(Grid::mz_at(1, parameters)) == 202.015);
+            CHECK(round_double(Grid::mz_at(2, parameters)) == 204.06);
+            CHECK(round_double(Grid::mz_at(3, parameters)) == 206.137);
+            CHECK(round_double(Grid::mz_at(100, parameters)) == 800.0);
         }
         SUBCASE("FTICR") {
             Grid::Parameters parameters = {{},
@@ -162,12 +146,12 @@ TEST_CASE("Test the fetching of real world parameters from index") {
                                            Instrument::FTICR,
                                            Grid::Flags::WARPED_MESH};
             Grid::calculate_dimensions(parameters);
-            CHECK(round_double(Grid::mz_at(0, parameters).value()) == 200.0);
-            CHECK(round_double(Grid::mz_at(1, parameters).value()) == 201.005);
-            CHECK(round_double(Grid::mz_at(2, parameters).value()) == 202.02);
-            CHECK(round_double(Grid::mz_at(3, parameters).value()) == 203.045);
-            CHECK(round_double(Grid::mz_at(100, parameters).value()) == 400);
-            CHECK(round_double(Grid::mz_at(150, parameters).value()) == 800);
+            CHECK(round_double(Grid::mz_at(0, parameters)) == 200.0);
+            CHECK(round_double(Grid::mz_at(1, parameters)) == 201.005);
+            CHECK(round_double(Grid::mz_at(2, parameters)) == 202.02);
+            CHECK(round_double(Grid::mz_at(3, parameters)) == 203.045);
+            CHECK(round_double(Grid::mz_at(100, parameters)) == 400);
+            CHECK(round_double(Grid::mz_at(150, parameters)) == 800);
         }
         SUBCASE("TOF") {
             Grid::Parameters parameters = {{},
@@ -176,10 +160,10 @@ TEST_CASE("Test the fetching of real world parameters from index") {
                                            Instrument::TOF,
                                            Grid::Flags::WARPED_MESH};
             Grid::calculate_dimensions(parameters);
-            CHECK(round_double(Grid::mz_at(0, parameters).value()) == 200.0);
-            CHECK(round_double(Grid::mz_at(1, parameters).value()) == 201.002);
-            CHECK(round_double(Grid::mz_at(2, parameters).value()) == 202.01);
-            CHECK(round_double(Grid::mz_at(3, parameters).value()) == 203.022);
+            CHECK(round_double(Grid::mz_at(0, parameters)) == 200.0);
+            CHECK(round_double(Grid::mz_at(1, parameters)) == 201.002);
+            CHECK(round_double(Grid::mz_at(2, parameters)) == 202.01);
+            CHECK(round_double(Grid::mz_at(3, parameters)) == 203.022);
         }
     }
 }

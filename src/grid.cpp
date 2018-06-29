@@ -43,8 +43,8 @@ bool Grid::splat(const Grid::Peak& peak, const Grid::Parameters& parameters,
         for (size_t i = i_min; i <= i_max; ++i) {
             // No need to do boundary check, since we are sure we are inside the
             // grid.
-            double x = Grid::mz_at(i, parameters).value();
-            double y = Grid::rt_at(j, parameters).value();
+            double x = Grid::mz_at(i, parameters);
+            double y = Grid::rt_at(j, parameters);
 
             // Calculate the gaussian weight for this point.
             double a = (x - peak.mz) / sigma_mz;
@@ -52,89 +52,54 @@ bool Grid::splat(const Grid::Peak& peak, const Grid::Parameters& parameters,
             double weight = std::exp(-0.5 * (a * a + b * b));
 
             // Set the value, weight and counts.
-            auto old_value = Grid::value_at(i, j, parameters, data);
-            Grid::set_value(i, j, old_value.value() + peak.value * weight,
-                            parameters, data);
+            data[i + j * parameters.dimensions.n] += weight * peak.value;
         }
     }
     return true;
 }
 
-std::optional<double> Grid::value_at(unsigned int i, unsigned int j,
-                                     const Grid::Parameters& parameters,
-                                     const std::vector<double>& data) {
-    if (data.empty() || i > parameters.dimensions.n - 1 ||
-        j > parameters.dimensions.m - 1) {
-        return std::nullopt;
-    }
-    return data[i + j * parameters.dimensions.n];
-}
-
-bool Grid::set_value(unsigned int i, unsigned int j, double value,
-                     const Grid::Parameters& parameters,
-                     std::vector<double>& data) {
-    if (data.empty() || i > parameters.dimensions.n - 1 ||
-        j > parameters.dimensions.m - 1) {
-        return false;
-    }
-    data[i + j * parameters.dimensions.n] = value;
-    return true;
-}
-
-std::optional<double> Grid::mz_at(unsigned int i,
-                                  const Grid::Parameters& parameters) {
-    if (parameters.dimensions.n * parameters.dimensions.m == 0 ||
-        i > parameters.dimensions.n - 1) {
-        return std::nullopt;
+double Grid::mz_at(unsigned int i, const Grid::Parameters& parameters) {
+    // Warped grid.
+    if (parameters.flags & Grid::Flags::WARPED_MESH) {
+        switch (parameters.instrument_type) {
+            case Instrument::ORBITRAP: {
+                double a = 1 / std::sqrt(parameters.bounds.min_mz);
+                double b = parameters.smoothing_params.sigma_mz /
+                           std::pow(parameters.smoothing_params.mz, 1.5) * i;
+                double c = (a - b);
+                return 1 / (c * c);
+            } break;
+            case Instrument::FTICR: {
+                double a = parameters.smoothing_params.sigma_mz *
+                           parameters.bounds.min_mz;
+                double b = parameters.smoothing_params.mz *
+                           parameters.smoothing_params.mz;
+                return parameters.bounds.min_mz / (1 - (a / b) * i);
+            } break;
+            case Instrument::TOF: {
+                return parameters.bounds.min_mz *
+                       std::exp(parameters.smoothing_params.sigma_mz /
+                                parameters.smoothing_params.mz * i);
+            } break;
+            case Instrument::QUAD: {
+                // Same as regular grid.
+                double delta_mz =
+                    (parameters.bounds.max_mz - parameters.bounds.min_mz) /
+                    static_cast<double>(parameters.dimensions.n - 1);
+                return parameters.bounds.min_mz + delta_mz * i;
+            } break;
+        }
     }
 
     // Regular grid.
-    if (!(parameters.flags & Grid::Flags::WARPED_MESH)) {
-        auto delta_mz = (parameters.bounds.max_mz - parameters.bounds.min_mz) /
-                        static_cast<double>(parameters.dimensions.n - 1);
-        return parameters.bounds.min_mz + delta_mz * i;
-    }
-
-    // Warped grid.
-    switch (parameters.instrument_type) {
-        case Instrument::ORBITRAP: {
-            double a = 1 / std::sqrt(parameters.bounds.min_mz);
-            double b = parameters.smoothing_params.sigma_mz /
-                       std::pow(parameters.smoothing_params.mz, 1.5) * i;
-            double c = (a - b);
-            return 1 / (c * c);
-        } break;
-        case Instrument::FTICR: {
-            double a =
-                parameters.smoothing_params.sigma_mz * parameters.bounds.min_mz;
-            double b =
-                parameters.smoothing_params.mz * parameters.smoothing_params.mz;
-            return parameters.bounds.min_mz / (1 - (a / b) * i);
-        } break;
-        case Instrument::TOF: {
-            return parameters.bounds.min_mz *
-                   std::exp(parameters.smoothing_params.sigma_mz /
-                            parameters.smoothing_params.mz * i);
-        } break;
-        case Instrument::QUAD: {
-            // Same as regular grid.
-            auto delta_mz =
-                (parameters.bounds.max_mz - parameters.bounds.min_mz) /
-                static_cast<double>(parameters.dimensions.n - 1);
-            return parameters.bounds.min_mz + delta_mz * i;
-        } break;
-    }
-    return std::nullopt;
+    double delta_mz = (parameters.bounds.max_mz - parameters.bounds.min_mz) /
+                      static_cast<double>(parameters.dimensions.n - 1);
+    return parameters.bounds.min_mz + delta_mz * i;
 }
 
-std::optional<double> Grid::rt_at(unsigned int j,
-                                  const Grid::Parameters& parameters) {
-    if (parameters.dimensions.n * parameters.dimensions.m == 0 ||
-        j > parameters.dimensions.m - 1) {
-        return std::nullopt;
-    }
-    auto delta_rt = (parameters.bounds.max_rt - parameters.bounds.min_rt) /
-                    static_cast<double>(parameters.dimensions.m - 1);
+double Grid::rt_at(unsigned int j, const Grid::Parameters& parameters) {
+    double delta_rt = (parameters.bounds.max_rt - parameters.bounds.min_rt) /
+                      static_cast<double>(parameters.dimensions.m - 1);
     return parameters.bounds.min_rt + delta_rt * j;
 }
 

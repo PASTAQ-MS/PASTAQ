@@ -57,10 +57,10 @@ bool Grid::Files::Dat::read_range(std::istream &stream,
 
         // Get the precise bounds for sliced range.
         Grid::Bounds sliced_bounds = {};
-        sliced_bounds.min_mz = Grid::mz_at(i_min, file_parameters).value();
-        sliced_bounds.max_mz = Grid::mz_at(i_max, file_parameters).value();
-        sliced_bounds.min_rt = Grid::rt_at(j_min, file_parameters).value();
-        sliced_bounds.max_rt = Grid::rt_at(j_max, file_parameters).value();
+        sliced_bounds.min_mz = Grid::mz_at(i_min, file_parameters);
+        sliced_bounds.max_mz = Grid::mz_at(i_max, file_parameters);
+        sliced_bounds.min_rt = Grid::rt_at(j_min, file_parameters);
+        sliced_bounds.max_rt = Grid::rt_at(j_max, file_parameters);
 
         // Get dimensions for sliced range.
         Grid::Dimensions sliced_dimensions = {};
@@ -119,10 +119,10 @@ bool Grid::Files::Dat::write_range(std::ostream &stream,
 
     // Get the precise bounds for sliced range.
     Grid::Bounds sliced_bounds = {};
-    sliced_bounds.min_mz = Grid::mz_at(i_min, parameters).value();
-    sliced_bounds.max_mz = Grid::mz_at(i_max, parameters).value();
-    sliced_bounds.min_rt = Grid::rt_at(j_min, parameters).value();
-    sliced_bounds.max_rt = Grid::rt_at(j_max, parameters).value();
+    sliced_bounds.min_mz = Grid::mz_at(i_min, parameters);
+    sliced_bounds.max_mz = Grid::mz_at(i_max, parameters);
+    sliced_bounds.min_rt = Grid::rt_at(j_min, parameters);
+    sliced_bounds.max_rt = Grid::rt_at(j_max, parameters);
 
     // Get dimensions for sliced range.
     Grid::Dimensions sliced_dimensions = {};

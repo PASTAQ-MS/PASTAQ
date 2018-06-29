@@ -1,7 +1,6 @@
 #ifndef GRID_GRID_HPP
 #define GRID_GRID_HPP
 
-#include <optional>
 #include <vector>
 
 namespace Instrument {
@@ -67,22 +66,12 @@ struct Peak {
 bool splat(const Peak& peak, const Parameters& parameters,
            std::vector<double>& data);
 
-// Get the value stored at the given position of the given data vector.
-std::optional<double> value_at(unsigned int i, unsigned int j,
-                               const Parameters& parameters,
-                               const std::vector<double>& data);
-
-// Set the value at the given position for the given data vector. Returns the
-// success or failure of the operation.
-bool set_value(unsigned int i, unsigned int j, double value,
-               const Parameters& parameters, std::vector<double>& data);
-
 // Get the real world mass/charge stored in the given index for the given
 // parameters.
-std::optional<double> mz_at(unsigned int i, const Parameters& parameters);
+double mz_at(unsigned int i, const Parameters& parameters);
 
 // Get the real world retention time stored in the given index.
-std::optional<double> rt_at(unsigned int j, const Parameters& parameters);
+double rt_at(unsigned int j, const Parameters& parameters);
 
 // Get the x index of the closest point (rounded down) for a given mz. It
 // doesn't perform any boundary checks.
