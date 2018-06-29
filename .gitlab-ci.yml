@@ -16,22 +16,20 @@ before_script:
     # Transform local submodules into relative paths.
     - sed -i "s/http:\\/\\/129.125.166.241\\//..\\/..\\//g" .gitmodules
     - sed -i "s/git@129.125.166.241:/..\\/..\\//g" .gitmodules
-    # Install required packages.
-    - apt-get update
-    - apt-get -y install
-        cmake ninja-build build-essential git gcc-8 g++-8 clang-format
-    - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 700 --slave /usr/bin/g++ g++ /usr/bin/g++-7
-    - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8
-    # Initialize submodules.
-    - git submodule sync
-    - git submodule update --init
 
 build:linux:
     stage: build
     script:
+        # Install required packages.
+        - apt-get update
+        - apt-get -y install
+            cmake ninja-build build-essential git gcc-8 g++-8
+        - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 700 --slave /usr/bin/g++ g++ /usr/bin/g++-7
+        - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8
+        # Initialize submodules.
+        - git submodule sync
+        - git submodule update --init
         # Perform build.
-        - echo $CI_PROJECT_PATH_SLUG
-        - echo $CI_COMMIT_SHA
         - cd build
         - cmake .. -G Ninja
         - ninja
@@ -43,8 +41,16 @@ build:linux:
 test:linux:
     stage: test
     script:
-        - echo $CI_PROJECT_PATH_SLUG
-        - echo $CI_COMMIT_SHA
+        # Install required packages.
+        - apt-get update
+        - apt-get -y install
+            cmake ninja-build build-essential git gcc-8 g++-8
+        - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 700 --slave /usr/bin/g++ g++ /usr/bin/g++-7
+        - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8
+        # Initialize submodules.
+        - git submodule sync
+        - git submodule update --init
+        # Start test
         - cd build
         - ninja test
     cache:
@@ -52,10 +58,24 @@ test:linux:
         paths:
             - build/
 
-lint:linux:
+lint:clang-format:
     stage: lint
     script:
+        - apt-get update
+        - apt-get -y install clang-format
         - if (clang-format $(find src tests -name "*.[ch]pp") -output-replacements-xml | grep -c "<replacement " >/dev/null); then
             echo "Linter errors found, please run clang-format and try again";
+            exit 1;
+          fi
+
+lint:cppcheck:
+    stage: lint
+    script:
+        - apt-get update
+        - apt-get -y install cppcheck
+        - cppcheck --enable=all --suppress=unusedFunction --quiet src/*.cpp &> cppcheck.txt
+        - if [[ $(wc -l < cppcheck.txt) -gt 1 ]]; then
+            echo "cppcheck errors found:";
+            cat cppcheck.txt
             exit 1;
           fi
