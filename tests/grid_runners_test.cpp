@@ -14,7 +14,7 @@ TEST_CASE("Parallel and serial execution offer the same results") {
         calculate_dimensions(parameters);
 
         // Generate dummy peaks for testing.
-        std::vector<Grid::Peak> dummy_peaks;
+        std::vector<Grid::Point> dummy_peaks;
         for (size_t i = 0; i < 1000; ++i) {
             double d = i;
             dummy_peaks.push_back({d, d, d});
@@ -74,7 +74,7 @@ TEST_CASE("Parallel and serial execution offer the same results") {
         calculate_dimensions(parameters);
 
         // Generate dummy peaks for testing.
-        std::vector<Grid::Peak> dummy_peaks;
+        std::vector<Grid::Point> dummy_peaks;
         for (size_t i = 0; i < 1000; ++i) {
             double d = i;
             dummy_peaks.push_back({d, d, d});

@@ -7,7 +7,7 @@
 #include "grid.hpp"
 
 // XmlReader handles reading xml tags and the supported xml files. This is not
-// a generic module, it is tailored to read Grid::Peak objects to use for
+// a generic module, it is tailored to read Grid::Point objects to use for
 // splatting on the grid.
 namespace XmlReader {
 
@@ -19,8 +19,8 @@ struct Tag {
 };
 
 // Reads the next scan that fit into the given parameters from a mzXML file into
-// a vector of Grid::Peak.
-std::optional<std::vector<Grid::Peak>> read_next_scan(
+// a vector of Grid::Point.
+std::optional<std::vector<Grid::Point>> read_next_scan(
     std::istream &stream, const Grid::Parameters &parameters);
 
 // Reads the contents of the next tag in the stream.

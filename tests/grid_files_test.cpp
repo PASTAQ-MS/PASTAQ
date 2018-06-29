@@ -231,16 +231,16 @@ TEST_CASE("Writing data/parameters to the stream") {
 
 TEST_CASE("Writing rawdump to the stream") {
     SUBCASE("Testing on MockStream") {
-        std::vector<Grid::Peak> source_data = {
+        std::vector<Grid::Point> source_data = {
             {1, 2, 3},
             {4, 5, 6},
             {7, 8, 9},
         };
-        std::vector<char> stream_data(sizeof(Grid::Peak) * source_data.size() +
+        std::vector<char> stream_data(sizeof(Grid::Point) * source_data.size() +
                                       sizeof(uint64_t));
         MockStream<char> stream(stream_data);
         CHECK(Grid::Files::Rawdump::write(stream, source_data));
-        std::vector<Grid::Peak> dest_data = {};
+        std::vector<Grid::Point> dest_data = {};
         CHECK(Grid::Files::Rawdump::read(stream, dest_data));
 
         // Check that the data is restored succesfully.

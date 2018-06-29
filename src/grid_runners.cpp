@@ -4,23 +4,23 @@
 
 std::vector<double> Grid::Runners::Serial::run(
     const Grid::Parameters& parameters,
-    const std::vector<Grid::Peak>& all_peaks) {
+    const std::vector<Grid::Point>& all_points) {
     // Instantiate memory.
     std::vector<double> data(parameters.dimensions.n * parameters.dimensions.m);
 
     // Perform grid splatting.
-    for (const auto& peak : all_peaks) {
-        Grid::splat(peak, parameters, data);
+    for (const auto& point : all_points) {
+        Grid::splat(point, parameters, data);
     }
     return data;
 }
 
 std::vector<double> Grid::Runners::Parallel::run(
     unsigned int max_threads, const Grid::Parameters& parameters,
-    const std::vector<Grid::Peak>& all_peaks) {
-    // Split parameters and peaks into the corresponding  groups.
+    const std::vector<Grid::Point>& all_points) {
+    // Split parameters and points into the corresponding  groups.
     auto all_parameters = split_segments(parameters, max_threads);
-    auto groups = assign_peaks(all_parameters, all_peaks);
+    auto groups = assign_points(all_parameters, all_points);
 
     // Splatting!
     std::vector<std::thread> threads(groups.size());
@@ -32,8 +32,8 @@ std::vector<double> Grid::Runners::Parallel::run(
 
         // Perform splatting in this group.
         threads[i] = std::thread([&groups, &all_parameters, &data_array, i]() {
-            for (const auto& peak : groups[i]) {
-                Grid::splat(peak, all_parameters[i], data_array[i]);
+            for (const auto& point : groups[i]) {
+                Grid::splat(point, all_parameters[i], data_array[i]);
             }
         });
     }
@@ -110,23 +110,23 @@ std::vector<Grid::Parameters> Grid::Runners::Parallel::split_segments(
     return all_parameters;
 }
 
-std::vector<std::vector<Grid::Peak>> Grid::Runners::Parallel::assign_peaks(
+std::vector<std::vector<Grid::Point>> Grid::Runners::Parallel::assign_points(
     const std::vector<Grid::Parameters>& all_parameters,
-    const std::vector<Grid::Peak>& peaks) {
-    std::vector<std::vector<Grid::Peak>> groups(all_parameters.size());
+    const std::vector<Grid::Point>& points) {
+    std::vector<std::vector<Grid::Point>> groups(all_parameters.size());
 
-    for (const auto& peak : peaks) {
+    for (const auto& point : points) {
         for (size_t i = 0; i < all_parameters.size(); ++i) {
             auto parameters = all_parameters[i];
             double sigma_rt = Grid::sigma_rt(parameters);
-            if (peak.rt + 2 * sigma_rt < parameters.bounds.max_rt) {
-                groups[i].push_back(peak);
+            if (point.rt + 2 * sigma_rt < parameters.bounds.max_rt) {
+                groups[i].push_back(point);
                 break;
             }
-            // If we ran out of parameters this peak is assigned to the last
+            // If we ran out of parameters this point is assigned to the last
             // one.
             if (i == all_parameters.size() - 1) {
-                groups[i].push_back(peak);
+                groups[i].push_back(point);
             }
         }
     }

@@ -173,23 +173,23 @@ bool Grid::Files::Dat::write_parameters(std::ostream &stream,
 }
 
 bool Grid::Files::Rawdump::write(std::ostream &stream,
-                                 const std::vector<Grid::Peak> &peaks) {
-    uint64_t n_peaks = peaks.size();
-    stream.write(reinterpret_cast<const char *>(&n_peaks), sizeof(uint64_t));
-    stream.write(reinterpret_cast<const char *>(&peaks[0]),
-                 sizeof(Grid::Peak) * n_peaks);
+                                 const std::vector<Grid::Point> &points) {
+    uint64_t n_points = points.size();
+    stream.write(reinterpret_cast<const char *>(&n_points), sizeof(uint64_t));
+    stream.write(reinterpret_cast<const char *>(&points[0]),
+                 sizeof(Grid::Point) * n_points);
     return stream.good();
 }
 
 bool Grid::Files::Rawdump::read(std::istream &stream,
-                                std::vector<Grid::Peak> &peaks) {
-    uint64_t n_peaks = 0;
-    stream.read(reinterpret_cast<char *>(&n_peaks), sizeof(uint64_t));
+                                std::vector<Grid::Point> &points) {
+    uint64_t n_points = 0;
+    stream.read(reinterpret_cast<char *>(&n_points), sizeof(uint64_t));
     if (stream.bad()) {
         return false;
     }
-    peaks.resize(n_peaks);
-    stream.read(reinterpret_cast<char *>(&peaks[0]),
-                sizeof(Grid::Peak) * n_peaks);
+    points.resize(n_points);
+    stream.read(reinterpret_cast<char *>(&points[0]),
+                sizeof(Grid::Point) * n_points);
     return stream.good();
 }

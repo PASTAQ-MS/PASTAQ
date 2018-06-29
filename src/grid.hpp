@@ -54,8 +54,8 @@ struct Parameters {
     unsigned char flags = 0x00;
 };
 
-// A Grid::Peak represents a single measured value at a given mz and rt.
-struct Peak {
+// A Grid::Point represents a single measured value at a given mz and rt.
+struct Point {
     double mz;
     double rt;
     double value;
@@ -63,7 +63,7 @@ struct Peak {
 
 // Perform gaussian splatting of the given point into the grid, returns the
 // success or failure of the operation.
-bool splat(const Peak& peak, const Parameters& parameters,
+bool splat(const Point& point, const Parameters& parameters,
            std::vector<double>& data);
 
 // Get the real world mass/charge stored in the given index for the given

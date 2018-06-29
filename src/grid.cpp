@@ -2,20 +2,20 @@
 
 #include "grid.hpp"
 
-bool Grid::splat(const Grid::Peak& peak, const Grid::Parameters& parameters,
+bool Grid::splat(const Grid::Point& point, const Grid::Parameters& parameters,
                  std::vector<double>& data) {
     // For some instruments the peaks get wider in proportion to the adquired
     // mass. In order to maintain the same number of sampling points we will
     // scale the sigm_mz accordingly.
-    double sigma_mz = Grid::sigma_mz(peak.mz, parameters);
+    double sigma_mz = Grid::sigma_mz(point.mz, parameters);
     double sigma_rt = Grid::sigma_rt(parameters);
 
     // Get the gaussian square dimensions. Note that we are using a square
     // kernel approximation for simplicity and computational efficiency.
-    double min_rt = peak.rt - 2 * sigma_rt;
-    double max_rt = peak.rt + 2 * sigma_rt;
-    double min_mz = peak.mz - 2 * sigma_mz;
-    double max_mz = peak.mz + 2 * sigma_mz;
+    double min_rt = point.rt - 2 * sigma_rt;
+    double max_rt = point.rt + 2 * sigma_rt;
+    double min_mz = point.mz - 2 * sigma_mz;
+    double max_mz = point.mz + 2 * sigma_mz;
 
     if ((max_rt < parameters.bounds.min_rt) ||
         (max_mz < parameters.bounds.min_mz) ||
@@ -47,12 +47,12 @@ bool Grid::splat(const Grid::Peak& peak, const Grid::Parameters& parameters,
             double y = Grid::rt_at(j, parameters);
 
             // Calculate the gaussian weight for this point.
-            double a = (x - peak.mz) / sigma_mz;
-            double b = (y - peak.rt) / sigma_rt;
+            double a = (x - point.mz) / sigma_mz;
+            double b = (y - point.rt) / sigma_rt;
             double weight = std::exp(-0.5 * (a * a + b * b));
 
             // Set the value, weight and counts.
-            data[i + j * parameters.dimensions.n] += weight * peak.value;
+            data[i + j * parameters.dimensions.n] += weight * point.value;
         }
     }
     return true;

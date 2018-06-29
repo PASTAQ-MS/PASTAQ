@@ -280,7 +280,7 @@ int main(int argc, char* argv[]) {
         {"-help", {"Display available options", false}},
         {"-config", {"Specify the configuration file", true}},
         {"-rawdump",
-         {"Enable the dump of the raw peaks inside the given bounds", false}},
+         {"Enable the dump of the raw points inside the given bounds", false}},
         {"-parallel", {"Enable parallel processing", false}},
         {"-n_threads",
          {"Specify the maximum number of threads that will be used for the "
@@ -579,18 +579,18 @@ int main(int argc, char* argv[]) {
             }
 
             std::cout << "Parsing file..." << std::endl;
-            auto peaks = XmlReader::read_next_scan(stream, parameters);
-            if (peaks == std::nullopt) {
-                std::cout << "error: no peaks found on file " << input_file
+            auto points = XmlReader::read_next_scan(stream, parameters);
+            if (points == std::nullopt) {
+                std::cout << "error: no points found on file " << input_file
                           << " for the given parameters" << std::endl;
                 return -1;
             }
-            std::vector<Grid::Peak> all_peaks = {};
+            std::vector<Grid::Point> all_points = {};
             do {
-                all_peaks.insert(end(all_peaks), begin(peaks.value()),
-                                 end(peaks.value()));
-                peaks = XmlReader::read_next_scan(stream, parameters);
-            } while (peaks != std::nullopt);
+                all_points.insert(end(all_points), begin(points.value()),
+                                  end(points.value()));
+                points = XmlReader::read_next_scan(stream, parameters);
+            } while (points != std::nullopt);
 
             if (options.find("-rawdump") != options.end() &&
                 (options["-rawdump"] == "true" ||
@@ -610,7 +610,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 // Write rawdump to disk.
-                if (!Grid::Files::Rawdump::write(rawdump_stream, all_peaks)) {
+                if (!Grid::Files::Rawdump::write(rawdump_stream, all_points)) {
                     std::cout
                         << "error: the raw dump could not be saved properly"
                         << std::endl;
@@ -624,9 +624,9 @@ int main(int argc, char* argv[]) {
                 (options["-parallel"] == "true" ||
                  options["-parallel"].empty())) {
                 data = Grid::Runners::Parallel::run(max_threads, parameters,
-                                                    all_peaks);
+                                                    all_points);
             } else {
-                data = Grid::Runners::Serial::run(parameters, all_peaks);
+                data = Grid::Runners::Serial::run(parameters, all_points);
             }
 
             std::cout << "Saving grid into dat file..." << std::endl;
@@ -658,19 +658,20 @@ int main(int argc, char* argv[]) {
                 return -1;
             }
 
-            // Load the peaks into memory.
-            std::vector<Grid::Peak> all_peaks;
-            if (!Grid::Files::Rawdump::read(stream, all_peaks)) {
+            // Load the points into memory.
+            std::vector<Grid::Point> all_points;
+            if (!Grid::Files::Rawdump::read(stream, all_points)) {
                 std::cout << "error: the raw dump could not be loaded properly"
                           << std::endl;
                 return -1;
             }
-            if (all_peaks.empty()) {
-                std::cout << "error: the raw dump does not contain any peaks"
+            if (all_points.empty()) {
+                std::cout << "error: the raw dump does not contain any points"
                           << std::endl;
                 return -1;
             }
-            std::cout << "Loaded " << all_peaks.size() << " peaks" << std::endl;
+            std::cout << "Loaded " << all_points.size() << " points"
+                      << std::endl;
 
             std::cout << "Performing grid splatting..." << std::endl;
             std::vector<double> data;
@@ -678,9 +679,9 @@ int main(int argc, char* argv[]) {
                 (options["-parallel"] == "true" ||
                  options["-parallel"].empty())) {
                 data = Grid::Runners::Parallel::run(max_threads, parameters,
-                                                    all_peaks);
+                                                    all_points);
             } else {
-                data = Grid::Runners::Serial::run(parameters, all_peaks);
+                data = Grid::Runners::Serial::run(parameters, all_points);
             }
 
             std::cout << "Saving grid into dat file..." << std::endl;

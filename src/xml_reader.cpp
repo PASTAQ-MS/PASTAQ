@@ -5,7 +5,7 @@
 #include "xml_reader.hpp"
 
 // Read the next mz1 scan from the stream.
-std::optional<std::vector<Grid::Peak>> XmlReader::read_next_scan(
+std::optional<std::vector<Grid::Point>> XmlReader::read_next_scan(
     std::istream &stream, const Grid::Parameters &parameters) {
     while (stream.good()) {
         auto tag = XmlReader::read_tag(stream);
@@ -114,8 +114,8 @@ std::optional<std::vector<Grid::Peak>> XmlReader::read_next_scan(
                 return std::nullopt;
             }
 
-            // Decode the peaks from the base 64 string.
-            std::vector<Grid::Peak> peaks;
+            // Decode the points from the base 64 string.
+            std::vector<Grid::Point> points;
 
             // Initialize Base64 decoder.
             Base64 decoder(reinterpret_cast<unsigned char *>(&data.value()[0]),
@@ -134,10 +134,10 @@ std::optional<std::vector<Grid::Peak>> XmlReader::read_next_scan(
                 // Not the most efficient way. It would be better to
                 // preallocate but we don't know at this point how many peaks
                 // from peak_count are inside our bounds.
-                peaks.push_back({mz, retention_time, intensity});
+                points.push_back({mz, retention_time, intensity});
             }
 
-            return peaks;
+            return points;
         }
     }
     return std::nullopt;
