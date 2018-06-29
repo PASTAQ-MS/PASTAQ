@@ -82,3 +82,7 @@ lint:clang-tidy:
         - apt-get update
         - apt-get -y install clang-tidy
         - clang-tidy -quiet -checks="-*,bugprone-*,cert-*,clang-analyzer-*,cppcoreguidelines-*,misc-*,modernize-*,mpi-*,performance-*,readability-*,hicpp-*,cert-*,-cppcoreguidelines-pro-type-reinterpret-cast,-cppcoreguidelines-pro-bounds-constant-array-index,-cppcoreguidelines-pro-bounds-pointer-arithmetic,-readability-implicit-bool-conversion,-hicpp-signed-bitwise" -p=build -warnings-as-errors="*" src/*
+    cache:
+        key: "$CI_PROJECT_PATH_SLUG $CI_COMMIT_SHA linux"
+        paths:
+            - build/
