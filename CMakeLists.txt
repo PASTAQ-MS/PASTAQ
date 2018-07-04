@@ -17,17 +17,31 @@ endif()
 
 find_package(Threads REQUIRED)
 
+# Add gridlib.
+# TODO(alex): This should be added using find_module, this is prone to breakage
+# when making build changes on this dependency.
+add_library(gridlib
+    "${CMAKE_CURRENT_SOURCE_DIR}/../grid/src/grid.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../grid/src/grid_files.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../grid/src/grid_runners.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../grid/src/xml_reader.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../grid/src/base64.cpp"
+    )
+target_include_directories(gridlib PUBLIC ../grid/src )
+target_link_libraries(gridlib ${CMAKE_THREAD_LIBS_INIT})
+
 # Include library target.
 add_library(centroidlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/centroid.cpp"
     )
-target_include_directories(centroidlib PUBLIC src )
-target_link_libraries(centroidlib ${CMAKE_THREAD_LIBS_INIT})
+# TODO(alex): Don't add grid/src directly! Use find_module...
+target_include_directories(centroidlib PUBLIC src ../grid/src)
+target_link_libraries(centroidlib ${CMAKE_THREAD_LIBS_INIT} gridlib)
 
 # Include executable target.
 #add_executable(centroid
-    #"${CMAKE_CURRENT_SOURCE_DIR}/src/centroid_command.cpp"
-    #)
+#"${CMAKE_CURRENT_SOURCE_DIR}/src/centroid_command.cpp"
+#)
 #target_link_libraries(centroid stdc++ stdc++fs centroidlib ${CMAKE_THREAD_LIBS_INIT})
 
 # Include tests if testing library is present.
