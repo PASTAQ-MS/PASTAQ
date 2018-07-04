@@ -22,11 +22,22 @@ struct Peak {
     // double volume;
 };
 
-// Find all candidate peaks on the given mesh calculating the local maxima at
-// each point of the grid. The local maxima is defined as follows: For the given
-// indexes i and j the point at data[i][j] is greater than the neighbors in all
-// 8 directions.
-std::vector<Peak> find_local_maxima(const Grid::Parameters &parameters,
+struct Point {
+    unsigned int i;
+    unsigned int j;
+    double height;
+};
+
+// Find all candidate points on the given mesh by calculating the local maxima
+// at each point of the grid. The local maxima is defined as follows: For the
+// given indexes i and j the point at data[i][j] is greater than the neighbors
+// in all 8 directions.
+std::vector<Point> find_local_maxima(const Grid::Parameters &parameters,
+                                     const std::vector<double> &data);
+
+// Find all points that belong to a given local max point.
+std::vector<Point> find_peak_points(const Point &point,
+                                    const Grid::Parameters &parameters,
                                     const std::vector<double> &data);
 
 }  // namespace Centroid

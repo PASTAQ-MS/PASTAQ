@@ -1,8 +1,8 @@
 #include "centroid.hpp"
 
-std::vector<Centroid::Peak> Centroid::find_local_maxima(
+std::vector<Centroid::Point> Centroid::find_local_maxima(
     const Grid::Parameters &parameters, const std::vector<double> &data) {
-    std::vector<Centroid::Peak> ret;
+    std::vector<Centroid::Point> ret;
     unsigned int n_mz = parameters.dimensions.n;
     unsigned int n_rt = parameters.dimensions.m;
     for (size_t j = 1; j < n_rt; ++j) {
@@ -23,7 +23,7 @@ std::vector<Centroid::Peak> Centroid::find_local_maxima(
                 (value > top_value) && (value > top_right_value) &&
                 (value > top_left_value) && (value > bottom_value) &&
                 (value > bottom_left_value) && (value > bottom_right_value)) {
-                Centroid::Peak peak = {};
+                Centroid::Point peak = {};
                 peak.i = i;
                 peak.j = j;
                 peak.height = value;
@@ -31,5 +31,129 @@ std::vector<Centroid::Peak> Centroid::find_local_maxima(
             }
         }
     }
+    return ret;
+}
+
+std::vector<Centroid::Point> Centroid::find_peak_points(
+    const Centroid::Point &point, const Grid::Parameters &parameters,
+    const std::vector<double> &data) {
+    std::vector<Centroid::Point> ret;
+    ret.push_back(point);
+
+    // TODO(alex): Set to a greater value, select by user or calculate it (For
+    // example accounting for maximum floating point precision.
+    double threshold = 0;
+
+    // Find right boundary.
+    unsigned int max_i = 0;
+    unsigned int min_i = 0;
+    unsigned int max_j = 0;
+    unsigned int min_j = 0;
+    for (unsigned int i = point.i; i < parameters.dimensions.n; ++i) {
+        int index = i + point.j * parameters.dimensions.n;
+        double value = data[index];
+        if (value == threshold || value > point.height) {
+            max_i = i;
+            break;
+        }
+        if (i != point.i) {
+            ret.push_back({i, point.j, value});
+        }
+    }
+    for (unsigned int i = point.i; i + 1 > 0; --i) {
+        int index = i + point.j * parameters.dimensions.n;
+        double value = data[index];
+        if (value == threshold || value > point.height) {
+            min_i = i;
+            break;
+        }
+        if (i != point.i) {
+            ret.push_back({i, point.j, value});
+        }
+    }
+    for (unsigned int j = point.j; j < parameters.dimensions.m; ++j) {
+        int index = point.i + j * parameters.dimensions.n;
+        double value = data[index];
+        if (value == threshold || value > point.height) {
+            max_j = j;
+            break;
+        }
+        if (j != point.j) {
+            ret.push_back({point.i, j, value});
+        }
+    }
+    for (unsigned int j = point.j; j + 1 > 0; --j) {
+        int index = point.i + j * parameters.dimensions.n;
+        double value = data[index];
+        if (value == threshold || value > point.height) {
+            min_j = j;
+            break;
+        }
+        if (j != point.j) {
+            ret.push_back({point.i, j, value});
+        }
+    }
+
+    // Peak quadrants:
+    //
+    // |----|----|
+    // | Q4 | Q1 |
+    // |----|----|
+    // | Q3 | Q2 |
+    // |----|----|
+    //
+    // Find Q1 points
+    for (unsigned int j = point.j - 1; j + 1 > min_j; --j) {
+        for (unsigned int i = point.i + 1; i < max_i; ++i) {
+            int index = i + j * parameters.dimensions.n;
+            double value = data[index];
+            if (value == 0 || value > point.height) {
+                break;
+            }
+            if (i != point.i || j != point.j) {
+                ret.push_back({i, j, value});
+            }
+        }
+    }
+    // Find Q2 points
+    for (unsigned int j = point.j + 1; j < max_j; ++j) {
+        for (unsigned int i = point.i + 1; i < max_i; ++i) {
+            int index = i + j * parameters.dimensions.n;
+            double value = data[index];
+            if (value == 0 || value > point.height) {
+                break;
+            }
+            if (i != point.i || j != point.j) {
+                ret.push_back({i, j, value});
+            }
+        }
+    }
+    // Find Q3 points
+    for (unsigned int j = point.j - 1; j + 1 > min_j; --j) {
+        for (unsigned int i = point.i - 1; i + 1 > min_i; --i) {
+            int index = i + j * parameters.dimensions.n;
+            double value = data[index];
+            if (value == 0 || value > point.height) {
+                break;
+            }
+            if (i != point.i || j != point.j) {
+                ret.push_back({i, j, value});
+            }
+        }
+    }
+    // Find Q4 points
+    for (unsigned int j = point.j + 1; j < max_j; ++j) {
+        for (unsigned int i = point.i - 1; i + 1 > min_i; --i) {
+            int index = i + j * parameters.dimensions.n;
+            double value = data[index];
+            if (value == 0 || value > point.height) {
+                break;
+            }
+            if (i != point.i || j != point.j) {
+                ret.push_back({i, j, value});
+            }
+        }
+    }
+
     return ret;
 }
