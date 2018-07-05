@@ -37,6 +37,7 @@ std::vector<Centroid::Point> Centroid::find_local_maxima(
 std::vector<Centroid::Point> Centroid::find_peak_points(
     const Centroid::Point &point, const Grid::Parameters &parameters,
     const std::vector<double> &data) {
+    // Initialize return vector.
     std::vector<Centroid::Point> ret;
     ret.push_back(point);
 
@@ -44,53 +45,73 @@ std::vector<Centroid::Point> Centroid::find_peak_points(
     // example accounting for maximum floating point precision.
     double threshold = 0;
 
-    // Find right boundary.
     unsigned int max_i = 0;
     unsigned int min_i = 0;
     unsigned int max_j = 0;
     unsigned int min_j = 0;
-    for (unsigned int i = point.i; i < parameters.dimensions.n; ++i) {
-        int index = i + point.j * parameters.dimensions.n;
-        double value = data[index];
-        if (value == threshold || value > point.height) {
-            max_i = i;
-            break;
-        }
-        if (i != point.i) {
-            ret.push_back({i, point.j, value});
-        }
-    }
-    for (unsigned int i = point.i; i + 1 > 0; --i) {
-        int index = i + point.j * parameters.dimensions.n;
-        double value = data[index];
-        if (value == threshold || value > point.height) {
-            min_i = i;
-            break;
-        }
-        if (i != point.i) {
-            ret.push_back({i, point.j, value});
+
+    // Find right boundary.
+    {
+        double previous_value = point.height;
+        for (unsigned int i = point.i; i < parameters.dimensions.n; ++i) {
+            int index = i + point.j * parameters.dimensions.n;
+            double value = data[index];
+            if (value <= threshold || value > previous_value) {
+                max_i = i;
+                break;
+            }
+            if (i != point.i) {
+                ret.push_back({i, point.j, value});
+            }
+            previous_value = value;
         }
     }
-    for (unsigned int j = point.j; j < parameters.dimensions.m; ++j) {
-        int index = point.i + j * parameters.dimensions.n;
-        double value = data[index];
-        if (value == threshold || value > point.height) {
-            max_j = j;
-            break;
-        }
-        if (j != point.j) {
-            ret.push_back({point.i, j, value});
+    // Find left boundary.
+    {
+        double previous_value = point.height;
+        for (unsigned int i = point.i; i + 1 > 0; --i) {
+            int index = i + point.j * parameters.dimensions.n;
+            double value = data[index];
+            if (value <= threshold || value > previous_value) {
+                min_i = i;
+                break;
+            }
+            if (i != point.i) {
+                ret.push_back({i, point.j, value});
+            }
+            previous_value = value;
         }
     }
-    for (unsigned int j = point.j; j + 1 > 0; --j) {
-        int index = point.i + j * parameters.dimensions.n;
-        double value = data[index];
-        if (value == threshold || value > point.height) {
-            min_j = j;
-            break;
+    // Find bottom boundary.
+    {
+        double previous_value = point.height;
+        for (unsigned int j = point.j; j < parameters.dimensions.m; ++j) {
+            int index = point.i + j * parameters.dimensions.n;
+            double value = data[index];
+            if (value <= threshold || value > previous_value) {
+                max_j = j;
+                break;
+            }
+            if (j != point.j) {
+                ret.push_back({point.i, j, value});
+            }
+            previous_value = value;
         }
-        if (j != point.j) {
-            ret.push_back({point.i, j, value});
+    }
+    // Find top boundary.
+    {
+        double previous_value = point.height;
+        for (unsigned int j = point.j; j + 1 > 0; --j) {
+            int index = point.i + j * parameters.dimensions.n;
+            double value = data[index];
+            if (value <= threshold || value > previous_value) {
+                min_j = j;
+                break;
+            }
+            if (j != point.j) {
+                ret.push_back({point.i, j, value});
+            }
+            previous_value = value;
         }
     }
 
@@ -104,56 +125,65 @@ std::vector<Centroid::Point> Centroid::find_peak_points(
     //
     // Find Q1 points
     for (unsigned int j = point.j - 1; j + 1 > min_j; --j) {
+        double previous_value = data[point.i + j * parameters.dimensions.n];
         for (unsigned int i = point.i + 1; i < max_i; ++i) {
             int index = i + j * parameters.dimensions.n;
             double value = data[index];
-            if (value == 0 || value > point.height) {
+            if (value <= threshold || value > previous_value) {
                 break;
             }
             if (i != point.i || j != point.j) {
                 ret.push_back({i, j, value});
             }
+            previous_value = value;
         }
     }
     // Find Q2 points
     for (unsigned int j = point.j + 1; j < max_j; ++j) {
+        double previous_value = data[point.i + j * parameters.dimensions.n];
         for (unsigned int i = point.i + 1; i < max_i; ++i) {
             int index = i + j * parameters.dimensions.n;
             double value = data[index];
-            if (value == 0 || value > point.height) {
+            if (value <= threshold || value > previous_value) {
                 break;
             }
             if (i != point.i || j != point.j) {
                 ret.push_back({i, j, value});
             }
+            previous_value = value;
         }
     }
     // Find Q3 points
     for (unsigned int j = point.j - 1; j + 1 > min_j; --j) {
+        double previous_value = data[point.i + j * parameters.dimensions.n];
         for (unsigned int i = point.i - 1; i + 1 > min_i; --i) {
             int index = i + j * parameters.dimensions.n;
             double value = data[index];
-            if (value == 0 || value > point.height) {
+            if (value <= threshold || value > previous_value) {
                 break;
             }
             if (i != point.i || j != point.j) {
                 ret.push_back({i, j, value});
             }
+            previous_value = value;
         }
     }
     // Find Q4 points
     for (unsigned int j = point.j + 1; j < max_j; ++j) {
+        double previous_value = data[point.i + j * parameters.dimensions.n];
         for (unsigned int i = point.i - 1; i + 1 > min_i; --i) {
             int index = i + j * parameters.dimensions.n;
             double value = data[index];
-            if (value == 0 || value > point.height) {
+            if (value <= threshold || value > previous_value) {
                 break;
             }
             if (i != point.i || j != point.j) {
                 ret.push_back({i, j, value});
             }
+            previous_value = value;
         }
     }
 
     return ret;
 }
+
