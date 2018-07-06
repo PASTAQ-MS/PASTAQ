@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "centroid.hpp"
 
 std::vector<Centroid::Point> Centroid::find_local_maxima(
@@ -187,3 +189,47 @@ std::vector<Centroid::Point> Centroid::find_peak_points(
     return ret;
 }
 
+std::vector<Centroid::Point> Centroid::find_boundary(
+    const std::vector<Centroid::Point> &points) {
+    size_t n_points = points.size();
+    // Creates a copy of the input vector to avoid modifying the original.
+    std::vector<Centroid::Point> points_copy(n_points);
+    std::copy(points.begin(), points.end(), points_copy.begin());
+
+    // Under the constraints of the grid coordinates, we need at least 5 points
+    // in order to have a boundary that does not contain all the points in the
+    // initial set.
+    if (n_points < 5) {
+        return points_copy;
+    }
+
+    // Sort the points by y and then x coordinates.
+    auto sort_points = [](const Centroid::Point &p1,
+                          const Centroid::Point &p2) -> bool {
+        return (p1.j < p2.j) || ((p1.j == p2.j) && (p1.i < p2.i));
+    };
+    std::stable_sort(points_copy.begin(), points_copy.end(), sort_points);
+
+    // Peeking the first and last points to get the minimum and maximum row
+    // number.
+    size_t min_j = points_copy[0].j;
+    size_t max_j = points_copy[n_points - 1].j;
+
+    // Extract the boundary points through row major iteration of the virtual
+    // grid created by the bag of points.
+    std::vector<Centroid::Point> boundary_points;
+    for (size_t k = 0; k < n_points; ++k) {
+        auto point = points_copy[k];
+        if (point.j == min_j || point.j == max_j) {
+            boundary_points.push_back(point);
+        } else {
+            boundary_points.push_back(point);
+            // Find last element in the row.
+            while (k + 1 < n_points && points_copy[k + 1].j == point.j) {
+                ++k;
+            }
+            boundary_points.push_back(points_copy[k]);
+        }
+    }
+    return boundary_points;
+}

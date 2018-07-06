@@ -40,6 +40,9 @@ std::vector<Point> find_peak_points(const Point &point,
                                     const Grid::Parameters &parameters,
                                     const std::vector<double> &data);
 
+// Find the boundary of the given bag of points.
+std::vector<Point> find_boundary(const std::vector<Point> &points);
+
 }  // namespace Centroid
 
 #endif /* CENTROID_CENTROID_HPP */
