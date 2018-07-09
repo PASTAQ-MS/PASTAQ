@@ -36,6 +36,8 @@ std::vector<Centroid::Point> Centroid::find_local_maxima(
     return ret;
 }
 
+// FIXME(alex): This does not account for the case where a peak might be
+// contained in another peak. Local search is necessary in that case.
 std::vector<Centroid::Point> Centroid::find_peak_points(
     const Centroid::Point &point, const Grid::Parameters &parameters,
     const std::vector<double> &data) {
@@ -232,4 +234,49 @@ std::vector<Centroid::Point> Centroid::find_boundary(
         }
     }
     return boundary_points;
+}
+
+void Centroid::explore_peak_slope(unsigned int i, unsigned int j,
+                                  double previous_value,
+                                  const Grid::Parameters &parameters,
+                                  const std::vector<double> &data,
+                                  std::vector<Centroid::Point> &points) {
+    // Check that the point has not being already included.
+    for (const auto &point : points) {
+        if (point.i == i && point.j == j) {
+            return;
+        }
+    }
+
+    // here set threshold to MAXIMUM of fractional peak height and a min
+    // value
+    // double bestthresh = thresh * pheight;
+    // if (bestthresh < peakheightmin) bestthresh = peakheightmin;
+    // TODO(alex): Set to a greater value, select by user or calculate it (For
+    // example accounting for maximum floating point precision.
+    double threshold = 0;
+
+    double value = data[i + j * parameters.dimensions.n];
+    if (previous_value >= 0 && (previous_value < value || value <= threshold)) {
+        return;
+    }
+
+    points.push_back({i, j, value});
+
+    // Return if we are at the edge of the grid.
+    // FIXME(alex): Can this cause problems if we could continue exploring
+    // downwards?
+    if (i < 1 || i >= parameters.dimensions.n - 1 || j < 1 ||
+        j >= parameters.dimensions.m - 1) {
+        return;
+    }
+
+    Centroid::explore_peak_slope(i - 1, j, value, parameters, data, points);
+    Centroid::explore_peak_slope(i + 1, j, value, parameters, data, points);
+    Centroid::explore_peak_slope(i, j + 1, value, parameters, data, points);
+    Centroid::explore_peak_slope(i, j - 1, value, parameters, data, points);
+    Centroid::explore_peak_slope(i - 1, j - 1, value, parameters, data, points);
+    Centroid::explore_peak_slope(i + 1, j + 1, value, parameters, data, points);
+    Centroid::explore_peak_slope(i - 1, j + 1, value, parameters, data, points);
+    Centroid::explore_peak_slope(i + 1, j - 1, value, parameters, data, points);
 }

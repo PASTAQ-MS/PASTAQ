@@ -43,6 +43,11 @@ std::vector<Point> find_peak_points(const Point &point,
 // Find the boundary of the given bag of points.
 std::vector<Point> find_boundary(const std::vector<Point> &points);
 
+void explore_peak_slope(unsigned int i, unsigned int j, double previous_value,
+                        const Grid::Parameters &parameters,
+                        const std::vector<double> &data,
+                        std::vector<Point> &points);
+
 }  // namespace Centroid
 
 #endif /* CENTROID_CENTROID_HPP */
