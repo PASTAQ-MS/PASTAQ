@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 
 #include "centroid.hpp"
 
@@ -280,3 +281,86 @@ void Centroid::explore_peak_slope(unsigned int i, unsigned int j,
     Centroid::explore_peak_slope(i - 1, j + 1, value, parameters, data, points);
     Centroid::explore_peak_slope(i + 1, j - 1, value, parameters, data, points);
 }
+
+Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
+                                    const Grid::Parameters &parameters,
+                                    const std::vector<double> &data) {
+    Centroid::Peak peak = {};
+    peak.i = local_max.i;
+    peak.j = local_max.j;
+    peak.height = local_max.height;
+    peak.mz = Grid::mz_at(local_max.i, parameters);
+    peak.rt = Grid::rt_at(local_max.j, parameters);
+
+    // Extract the peak points and the boundary.
+    Centroid::explore_peak_slope(local_max.i, local_max.j, -1, parameters, data,
+                                 peak.points);
+    peak.boundary = Centroid::find_boundary(peak.points);
+    // TODO(alex): error handling. What happens if the number of points is very
+    // small? We should probably ignore peaks with less than 5 points so that it
+    // has dimensionality in both mz and rt:
+    //
+    //   | |+| |
+    //   |+|c|+|
+    //   | |+| |
+
+    // TODO(alex): Sort peaks here.
+    
+    // Calculate the average background intensity from the boundary.
+    {
+        double boundary_sum = 0;
+        for (const auto &point : peak.boundary) {
+            boundary_sum += point.height;
+        }
+        peak.border_background = boundary_sum / peak.boundary.size();
+    }
+
+    // Calculate the total ion intensity on the peak for the values on the grid
+    // and the sigma in mz and rt. The sigma is calculated by using the
+    // algebraic formula for the variance of the random variable X:
+    //
+    //     Var(X) = E[X^2] - E[X]
+    //
+    // Where E[X] is the estimated value for X.
+    //
+    // In order to generalize this formula for the 2D blob, all values at the
+    // same index will be aggregated together.
+    {
+        double height_sum = 0;
+        double x_sum = 0;
+        double y_sum = 0;
+        double x_sig = 0;
+        double y_sig = 0;
+        for (const auto &point : peak.points) {
+            height_sum += point.height;
+            auto mz = Grid::mz_at(point.i, parameters);
+            auto rt = Grid::rt_at(point.j, parameters);
+            x_sum += point.height * mz;
+            y_sum += point.height * rt;
+            x_sig += point.height * mz * mz;
+            y_sig += point.height * rt * rt;
+        }
+        // TODO(alex): Note that this can cause catastrophic cancellation or
+        // loss of significance. Review stable algorithms for sigma calculation.
+        peak.sigma_mz =
+            std::sqrt((x_sig / height_sum) - std::pow(x_sum / height_sum, 2));
+        peak.sigma_rt =
+            std::sqrt((y_sig / height_sum) - std::pow(y_sum / height_sum, 2));
+
+        // Make sure we don't have negative sigma values due to floating point
+        // precision errors.
+        peak.sigma_mz = peak.sigma_mz < 0 ? 1 : peak.sigma_mz;
+        peak.sigma_rt = peak.sigma_rt < 0 ? 1 : peak.sigma_rt;
+
+        peak.total_intensity = height_sum;
+    }
+
+    return peak;
+}
+
+// TODO(alex): move to Centroid::Runners with parallel and serial versions.
+// std::vector<Centroid::Peak> Centroid::find_peaks(
+// const Grid::Parameters &parameters, const std::vector<double> &data) {
+// std::vector<Centroid::Peak> ret;
+// return ret;
+//}
