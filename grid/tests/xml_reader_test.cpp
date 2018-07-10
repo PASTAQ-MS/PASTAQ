@@ -3,7 +3,7 @@
 #include <vector>
 
 #include "doctest.h"
-#include "xml_reader.hpp"
+#include "grid/xml_reader.hpp"
 
 TEST_CASE("Reading a well formed tag") {
     SUBCASE("No spaces on the attributes") {

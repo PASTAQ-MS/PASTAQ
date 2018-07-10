@@ -17,26 +17,18 @@ endif()
 
 find_package(Threads REQUIRED)
 
-# Add gridlib.
-# TODO(alex): This should be added using find_module, this is prone to breakage
-# when making build changes on this dependency.
-add_library(gridlib
-    "${CMAKE_CURRENT_SOURCE_DIR}/../grid/src/grid.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../grid/src/grid_files.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../grid/src/grid_runners.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../grid/src/xml_reader.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../grid/src/base64.cpp"
-    )
-target_include_directories(gridlib PUBLIC ../grid/src )
-target_link_libraries(gridlib ${CMAKE_THREAD_LIBS_INIT})
+# Add grid dependency
+# TODO(alex): This should be added using find_module, this is prone to breakage?
+if (NOT TARGET gridlib)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../grid" ${CMAKE_CURRENT_BINARY_DIR}/grid)
+endif()
 
 # Include library target.
 add_library(centroidlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/centroid.cpp"
     )
-# TODO(alex): Don't add grid/src directly! Use find_module...
-target_include_directories(centroidlib PUBLIC src ../grid/src)
-target_link_libraries(centroidlib ${CMAKE_THREAD_LIBS_INIT} gridlib)
+target_include_directories(centroidlib PUBLIC src)
+target_link_libraries(centroidlib gridlib ${CMAKE_THREAD_LIBS_INIT})
 
 # Include executable target.
 #add_executable(centroid
@@ -45,24 +37,30 @@ target_link_libraries(centroidlib ${CMAKE_THREAD_LIBS_INIT} gridlib)
 #target_link_libraries(centroid stdc++ stdc++fs centroidlib ${CMAKE_THREAD_LIBS_INIT})
 
 # Include tests if testing library is present.
-unset(DOCTEST_LIBRARY_PATH CACHE)
-find_path(
-    DOCTEST_LIBRARY_PATH
-    "doctest.h"
-    PATHS "${CMAKE_CURRENT_SOURCE_DIR}"
-    PATH_SUFFIX "ext/doctest/doctest"
-    )
-if (DOCTEST_LIBRARY_PATH)
-    add_library(doctest INTERFACE)
-    target_include_directories(doctest INTERFACE ext/doctest/doctest)
-    enable_testing()
-    add_executable(
-        centroid_test
-        tests/main.cpp
-        tests/centroid_test.cpp
+if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} OR (${CENTROID_ADD_TESTS}))
+    unset(DOCTEST_LIBRARY_PATH CACHE)
+    find_path(
+        DOCTEST_LIBRARY_PATH
+        "doctest.h"
+        PATHS "${CMAKE_CURRENT_SOURCE_DIR}"
+        PATH_SUFFIX "${CMAKE_CURRENT_SOURCE_DIR}/../ext/doctest/doctest"
         )
-    add_test(NAME centroid_test COMMAND centroid_test)
-    target_link_libraries(centroid_test stdc++ doctest centroidlib)
-else()
-    message("-- Testing library not found. Ignoring tests...")
+    if (DOCTEST_LIBRARY_PATH)
+        if(NOT TARGET doctest)
+            add_library(doctest INTERFACE)
+            target_include_directories(doctest
+                INTERFACE
+                "${CMAKE_CURRENT_SOURCE_DIR}/../ext/doctest/doctest")
+        endif()
+        enable_testing()
+        add_executable(
+            centroid_test
+            tests/main.cpp
+            tests/centroid_test.cpp
+            )
+        add_test(NAME centroid_test COMMAND centroid_test)
+        target_link_libraries(centroid_test stdc++ doctest centroidlib)
+    else()
+        message("-- [${PROJECT_NAME}] Testing library not found. Ignoring tests...")
+    endif()
 endif()

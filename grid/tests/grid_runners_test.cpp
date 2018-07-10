@@ -1,4 +1,4 @@
-#include "grid_runners.hpp"
+#include "grid/grid_runners.hpp"
 #include "doctest.h"
 
 TEST_CASE("Parallel and serial execution offer the same results") {

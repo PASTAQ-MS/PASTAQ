@@ -3,7 +3,7 @@
 
 #include <vector>
 
-#include "grid.hpp"
+#include "grid/grid.hpp"
 
 namespace Centroid {
 

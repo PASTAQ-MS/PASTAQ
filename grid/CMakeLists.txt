@@ -19,50 +19,56 @@ find_package(Threads REQUIRED)
 
 # Include library target.
 add_library(gridlib
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid_files.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid_runners.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/xml_reader.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/base64.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_files.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_runners.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/xml_reader.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/base64.cpp"
     )
-target_include_directories(gridlib PUBLIC src )
+target_include_directories(gridlib PUBLIC src)
 target_link_libraries(gridlib ${CMAKE_THREAD_LIBS_INIT})
 
 # Include executable target.
 add_executable(grid
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid_command.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_command.cpp"
     )
 target_link_libraries(grid stdc++ stdc++fs gridlib ${CMAKE_THREAD_LIBS_INIT})
 
 # Include tests if testing library is present.
-unset(DOCTEST_LIBRARY_PATH CACHE)
-find_path(
-    DOCTEST_LIBRARY_PATH
-    "doctest.h"
-    PATHS "${CMAKE_CURRENT_SOURCE_DIR}"
-    PATH_SUFFIX "ext/doctest/doctest"
-    )
-if (DOCTEST_LIBRARY_PATH)
-    add_library(doctest INTERFACE)
-    target_include_directories(doctest INTERFACE ext/doctest/doctest)
-    enable_testing()
-    add_executable(
-        grid_test
-        tests/main.cpp
-        tests/grid_test.cpp
-        tests/grid_runners_test.cpp
-        tests/grid_files_test.cpp
-        tests/xml_reader_test.cpp
+if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} OR (${GRID_ADD_TESTS}))
+    unset(DOCTEST_LIBRARY_PATH CACHE)
+    find_path(
+        DOCTEST_LIBRARY_PATH
+        "doctest.h"
+        PATHS "${CMAKE_CURRENT_SOURCE_DIR}"
+        PATH_SUFFIX "${CMAKE_CURRENT_SOURCE_DIR}/../ext/doctest/doctest"
         )
-    add_test(NAME grid_test COMMAND grid_test)
-    target_link_libraries(grid_test stdc++ doctest gridlib)
+    if (DOCTEST_LIBRARY_PATH)
+        if(NOT TARGET doctest)
+            add_library(doctest INTERFACE)
+            target_include_directories(doctest
+                INTERFACE
+                "${CMAKE_CURRENT_SOURCE_DIR}/../ext/doctest/doctest")
+        endif()
+        enable_testing()
+        add_executable(
+            grid_test
+            tests/main.cpp
+            tests/grid_test.cpp
+            tests/grid_runners_test.cpp
+            tests/grid_files_test.cpp
+            tests/xml_reader_test.cpp
+            )
+        add_test(NAME grid_test COMMAND grid_test)
+        target_link_libraries(grid_test stdc++ doctest gridlib)
 
-    add_executable(
-        test-utils_test
-        tests/utils/utils_test.cpp
-        )
-    add_test(NAME test-utils_test COMMAND test-utils_test)
-    target_link_libraries(test-utils_test stdc++ doctest)
-else()
-    message("-- Testing library not found. Ignoring tests...")
+        add_executable(
+            test-utils_test
+            tests/utils/utils_test.cpp
+            )
+        add_test(NAME test-utils_test COMMAND test-utils_test)
+        target_link_libraries(test-utils_test stdc++ doctest)
+    else()
+        message("-- [${PROJECT_NAME}] Testing library not found. Ignoring tests...")
+    endif()
 endif()

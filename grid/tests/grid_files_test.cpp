@@ -2,7 +2,7 @@
 #include <streambuf>
 
 #include "doctest.h"
-#include "grid_files.hpp"
+#include "grid/grid_files.hpp"
 #include "utils/mock_stream.hpp"
 
 TEST_CASE("Writing parameters to the stream") {
