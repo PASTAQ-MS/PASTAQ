@@ -267,42 +267,104 @@ TEST_CASE("Find peaks") {
         35,
     };
 
+    std::vector<Centroid::Peak> expected_peaks = {
+        {
+            2,         // i
+            2,         // j
+            10,        // mz
+            10,        // rt
+            4,         // height
+            24.6757,   // total_intensity
+            4.80706,   // sigma_mz
+            4.80706,   // sigma_rt
+            9.4237,    // mz_centroid
+            9.4237,    // rt_centroid
+            2.28256,   // height_centroid
+            22.0599,   // total_intensity_centroid
+            0.317821,  // border_background
+            {},        // points
+            {},        // boundary
+        },
+        {
+            4,         // i
+            12,        // j
+            20,        // mz
+            60,        // rt
+            17.8731,   // height
+            175.126,   // total_intensity
+            4.80706,   // sigma_mz
+            8.85391,   // sigma_rt
+            19.4237,   // mz_centroid
+            57.4271,   // rt_centroid
+            8.76881,   // height_centroid
+            160.357,   // total_intensity_centroid
+            0.814667,  // border_background
+            {},        // points
+            {},        // boundary
+        },
+        {
+            10,        // i
+            12,        // j
+            50,        // mz
+            60,        // rt
+            15.4607,   // height
+            132.077,   // total_intensity
+            4.80706,   // sigma_mz
+            6.82431,   // sigma_rt
+            49.4237,   // mz_centroid
+            58.7364,   // rt_centroid
+            8.51286,   // height_centroid
+            122.656,   // total_intensity_centroid
+            0.749546,  // border_background
+            {},        // points
+            {},        // boundary
+        },
+        {
+            16,        // i
+            12,        // j
+            80,        // mz
+            60,        // rt
+            12.4776,   // height
+            88.9893,   // total_intensity
+            4.80706,   // sigma_mz
+            5.53369,   // sigma_rt
+            79.4237,   // mz_centroid
+            60.1546,   // rt_centroid
+            6.90168,   // height_centroid
+            83.5048,   // total_intensity_centroid
+            0.542793,  // border_background
+            {},        // points
+            {},        // boundary
+        },
+    };
+
+    auto round_double = [](double d) {
+        return (long long int)(d * 1000.0) / 1000.0;
+    };
     for (size_t i = 0; i < local_max_points.size(); ++i) {
         auto local_max = local_max_points[i];
         auto peak = Centroid::build_peak(local_max, parameters, data);
-        std::cout << "peak.i: " << peak.i << std::endl;
-        std::cout << "peak.j: " << peak.j << std::endl;
-        std::cout << "peak.mz: " << peak.mz << std::endl;
-        std::cout << "peak.rt: " << peak.rt << std::endl;
-        std::cout << "peak.sigma_mz: " << peak.sigma_mz << std::endl;
-        std::cout << "peak.sigma_rt: " << peak.sigma_rt << std::endl;
-        //std::cout << "peak.fwhm_mz: " << peak.fwhm_mz << std::endl;
-        //std::cout << "peak.fwhm_rt: " << peak.fwhm_rt << std::endl;
-        std::cout << "peak.height: " << peak.height << std::endl;
-        std::cout << "peak.total_intensity: " << peak.total_intensity
-                  << std::endl;
-        std::cout << "peak.mz_centroid: " << peak.mz_centroid << std::endl;
-        std::cout << "peak.rt_centroid: " << peak.rt_centroid << std::endl;
-        std::cout << "peak.height_centroid: " << peak.height_centroid << std::endl;
-        std::cout << "peak.total_intensity_centroid: " << peak.total_intensity_centroid << std::endl;
-        // std::vector<Centroid::Point> peak_points;
-        // Centroid::explore_peak_slope(local_max.i, local_max.j, -1,
-        // parameters, data, peak_points);
-        // std::vector<Centroid::Point> boundary_points =
-        // Centroid::find_boundary(peak_points);
-        // CHECK(expected_size[i] == peak_points.size());
-        // std::cout << "INNER POINTS: " << std::endl;
-        // for (const auto &point : peak_points) {
-        // std::cout << "i: " << point.i << " j: " << point.j
-        //<< " height: " << point.height << std::endl;
-        //}
-        // std::cout << "BOUNDARY POINTS: " << std::endl;
-        // for (const auto &point : boundary_points) {
-        // std::cout << "i: " << point.i << " j: " << point.j
-        //<< " height: " << point.height << std::endl;
-        //}
-        CHECK(1 == 0);
-        // break;
-        std::cout << "------------" << std::endl;
+        CHECK(peak.i == expected_peaks[i].i);
+        CHECK(peak.j == expected_peaks[i].j);
+        CHECK(round_double(peak.mz) == round_double(expected_peaks[i].mz));
+        CHECK(round_double(peak.rt) == round_double(expected_peaks[i].rt));
+        CHECK(round_double(peak.height) ==
+              round_double(expected_peaks[i].height));
+        CHECK(round_double(peak.total_intensity) ==
+              round_double(expected_peaks[i].total_intensity));
+        CHECK(round_double(peak.sigma_mz) ==
+              round_double(expected_peaks[i].sigma_mz));
+        CHECK(round_double(peak.sigma_rt) ==
+              round_double(expected_peaks[i].sigma_rt));
+        CHECK(round_double(peak.mz_centroid) ==
+              round_double(expected_peaks[i].mz_centroid));
+        CHECK(round_double(peak.rt_centroid) ==
+              round_double(expected_peaks[i].rt_centroid));
+        CHECK(round_double(peak.height_centroid) ==
+              round_double(expected_peaks[i].height_centroid));
+        CHECK(round_double(peak.total_intensity_centroid) ==
+              round_double(expected_peaks[i].total_intensity_centroid));
+        CHECK(round_double(peak.border_background) ==
+              round_double(expected_peaks[i].border_background));
     }
 }

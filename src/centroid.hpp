@@ -14,16 +14,22 @@ struct Point {
 };
 
 struct Peak {
-    // Center of the peak in index space.
+    // Center of the peak in index space (Coordinates of local maxima).
     unsigned int i;
     unsigned int j;
 
-    // Real mz/rt values for the center of this peak.
+    // Real mz/rt values for the center of this peak (From the local maxima
+    // coordinates).
     double mz;
     double rt;
+    // Height of the peak (Height of local maxima).
+    double height;
+    // Sumation of all intensities within the peak boundary. (Ignores holes,
+    // i.e. does not interpolate values in case of non closed set).
+    double total_intensity;
 
     // Estimated mz/rt values for the standard deviation of the peak in both
-    // axes.
+    // axes. (Ignores holes).
     double sigma_mz;
     double sigma_rt;
 
@@ -39,10 +45,6 @@ struct Peak {
     // double fwhm_rt;
     // TODO(alex): Store SN values? sn_height or sn_centroid
 
-    // Height of the peak centroid.
-    double height;
-    // Sumation of all intensities within the peak boundary.
-    double total_intensity;
     // Average intensity on the boundary of the peak.
     double border_background;
 
