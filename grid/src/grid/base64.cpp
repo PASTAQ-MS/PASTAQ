@@ -1,3 +1,5 @@
+#include <cstring>
+
 #include "base64.hpp"
 #include "endian.hpp"
 
@@ -52,12 +54,16 @@ double Base64::get_double() {
     if (m_precision == 32) {
         uint32_t b = get_uint32();
         b = Endian::swap_uint32(b, m_little_endian);
-        return reinterpret_cast<float &>(b);
+        float ret;
+        std::memcpy(&ret, &b, sizeof(b));
+        return ret;
     }
     if (m_precision == 64) {
         uint64_t b = get_uint64();
         b = Endian::swap_uint64(b, m_little_endian);
-        return reinterpret_cast<double &>(b);
+        double ret;
+        std::memcpy(&ret, &b, sizeof(b));
+        return ret;
     }
     return 0;
 }

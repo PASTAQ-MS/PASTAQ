@@ -51,7 +51,7 @@ struct Parameters {
     Bounds bounds;
     SmoothingParams smoothing_params;
     Instrument::Type instrument_type;
-    unsigned char flags = 0x00;
+    unsigned char flags;
 };
 
 // A Grid::Point represents a single measured value at a given mz and rt.
@@ -67,10 +67,11 @@ bool splat(const Point &point, const Parameters &parameters,
            std::vector<double> &data);
 
 // Get the real world mass/charge stored in the given index for the given
-// parameters.
+// parameters. It doesn't perform any boundary checks.
 double mz_at(unsigned int i, const Parameters &parameters);
 
-// Get the real world retention time stored in the given index.
+// Get the real world retention time stored in the given index. It doesn't
+// perform any boundary checks.
 double rt_at(unsigned int j, const Parameters &parameters);
 
 // Get the x index of the closest point (rounded down) for a given mz. It

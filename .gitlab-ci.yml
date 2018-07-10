@@ -68,7 +68,7 @@ lint:clang-format:
 lint:cppcheck:
     stage: lint
     script:
-        - cppcheck --enable=all --suppress=unusedFunction --quiet */src/*/*.cpp 
+        - cppcheck --enable=all --suppress=unusedFunction --quiet */src/*/*.cpp
         - if [[ $(wc -l < cppcheck.txt) -gt 1 ]]; then
             echo "cppcheck errors found:";
             cat cppcheck.txt;

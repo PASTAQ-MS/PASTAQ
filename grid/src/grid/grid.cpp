@@ -2,6 +2,7 @@
 
 #include "grid.hpp"
 
+// TODO(alex): Add optional normalization here.
 bool Grid::splat(const Grid::Point &point, const Grid::Parameters &parameters,
                  std::vector<double> &data) {
     // For some instruments the peaks get wider in proportion to the adquired

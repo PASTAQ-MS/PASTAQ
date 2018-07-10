@@ -16,7 +16,8 @@ TEST_CASE("Gaussian splatting") {
             {},
             {-3.0 * sigma_rt, 3.0 * sigma_rt, -3.0 * sigma_mz, 3.0 * sigma_mz},
             {1.0, sigma_mz, 1.0},
-            Instrument::QUAD};
+            Instrument::QUAD,
+            0x00};
         CHECK(calculate_dimensions(parameters));
         std::vector<double> data(parameters.dimensions.n *
                                  parameters.dimensions.m);
@@ -50,7 +51,8 @@ TEST_CASE("Gaussian splatting") {
             {7, 7},
             {-3.0 * sigma_rt, 3.0 * sigma_rt, -3.0 * sigma_mz, 3.0 * sigma_mz},
             {1.0, sigma_mz, 1.0},
-            Instrument::QUAD};
+            Instrument::QUAD,
+            0x00};
         std::vector<double> data(parameters.dimensions.n *
                                  parameters.dimensions.m);
         CHECK_FALSE(Grid::splat({-20.0, -20.0, 1}, parameters, data));
@@ -64,7 +66,8 @@ TEST_CASE("Gaussian splatting") {
             {7, 7},
             {-3.0 * sigma_rt, 3.0 * sigma_rt, -3.0 * sigma_mz, 3.0 * sigma_mz},
             {1.0, sigma_mz, 1.0},
-            Instrument::QUAD};
+            Instrument::QUAD,
+            0x00};
         std::vector<double> data(parameters.dimensions.n *
                                  parameters.dimensions.m);
         CHECK(Grid::splat({-5.0, 0.0, 1}, parameters, data));
@@ -101,7 +104,8 @@ TEST_CASE("Test the fetching of real world parameters from index") {
         Grid::Parameters parameters = {{4, 4},
                                        {0.0, 75.0, 200.0, 800.0},
                                        {200, 0.01, 1.0},
-                                       Instrument::QUAD};
+                                       Instrument::QUAD,
+                                       0x00};
         CHECK(Grid::mz_at(0, parameters) == 200.0);
         CHECK(Grid::mz_at(1, parameters) == 400.0);
         CHECK(Grid::mz_at(2, parameters) == 600.0);

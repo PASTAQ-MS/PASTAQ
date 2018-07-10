@@ -11,7 +11,7 @@ TEST_CASE("Writing parameters to the stream") {
                                sizeof(Grid::Files::Dat::Parameters));
         MockStream<char> stream(data);
         Grid::Parameters source_parameters = {
-            {6, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD};
+            {6, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD, 0x00};
         CHECK(Grid::Files::Dat::write_parameters(stream, source_parameters));
         Grid::Parameters dest_parameters = {};
         CHECK(Grid::Files::Dat::read_parameters(stream, &dest_parameters));
@@ -34,7 +34,7 @@ TEST_CASE("Writing parameters to the stream") {
 
     SUBCASE("Testing on file stream") {
         Grid::Parameters source_parameters = {
-            {6, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD};
+            {6, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD, 0x00};
         std::ofstream fileout("test_dat_file.dat",
                               std::ios::out | std::ios::binary);
         CHECK(Grid::Files::Dat::write_parameters(fileout, source_parameters));
@@ -68,7 +68,7 @@ TEST_CASE("Writing data/parameters to the stream") {
             6, 5, 4, 3, 2,  // Row 2
         };
         Grid::Parameters source_parameters = {
-            {5, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD};
+            {5, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD, 0x00};
         std::vector<char> stream_data(sizeof(double) * source_data.size() +
                                       sizeof(Grid::Parameters) +
                                       sizeof(Grid::Files::Dat::Parameters));
@@ -107,7 +107,7 @@ TEST_CASE("Writing data/parameters to the stream") {
             6, 5, 4, 3, 2,  // Row 2
         };
         Grid::Parameters source_parameters = {
-            {5, 2}, {0, 1, 0, 4}, {1, 1, 1}, Instrument::QUAD};
+            {5, 2}, {0, 1, 0, 4}, {1, 1, 1}, Instrument::QUAD, 0x00};
         std::vector<char> stream_data(sizeof(double) * source_data.size() +
                                       sizeof(Grid::Parameters) +
                                       sizeof(Grid::Files::Dat::Parameters));
@@ -150,7 +150,7 @@ TEST_CASE("Writing data/parameters to the stream") {
             6, 5, 4, 3, 2,  // Row 2
         };
         Grid::Parameters source_parameters = {
-            {5, 2}, {0, 1, 0, 4}, {1, 1, 1}, Instrument::QUAD};
+            {5, 2}, {0, 1, 0, 4}, {1, 1, 1}, Instrument::QUAD, 0x00};
         std::vector<char> stream_data(sizeof(double) * 6 +
                                       sizeof(Grid::Parameters) +
                                       sizeof(Grid::Files::Dat::Parameters));
@@ -194,7 +194,7 @@ TEST_CASE("Writing data/parameters to the stream") {
             6, 5, 4, 3, 2,  // Row 2
         };
         Grid::Parameters source_parameters = {
-            {5, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD};
+            {5, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD, 0x00};
         std::ofstream fileout("test_dat_file_all.dat",
                               std::ios::out | std::ios::binary);
         CHECK(Grid::Files::Dat::write(fileout, source_data, source_parameters));

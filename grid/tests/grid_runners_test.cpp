@@ -10,7 +10,8 @@ TEST_CASE("Parallel and serial execution offer the same results") {
         Grid::Parameters parameters = {{0, 0},
                                        {0.0, 1000, 0.0, 1000},
                                        {200, 1.0, 1.0},
-                                       Instrument::ORBITRAP};
+                                       Instrument::ORBITRAP,
+                                       0x00};
         calculate_dimensions(parameters);
 
         // Generate dummy peaks for testing.

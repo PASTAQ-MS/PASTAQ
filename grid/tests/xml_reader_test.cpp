@@ -144,7 +144,8 @@ TEST_CASE("Reading scans") {
         Grid::Parameters parameters = {{4, 4},
                                        {0.0, 75.0, 600.0, 650.0},
                                        {200, 0.01, 1.0},
-                                       Instrument::QUAD};
+                                       Instrument::QUAD,
+                                       0x00};
         std::vector<Grid::Point> expected = {{
                                                  603.0617,
                                                  0.105449,
@@ -196,7 +197,8 @@ TEST_CASE("Reading scans") {
         Grid::Parameters parameters = {{4, 4},
                                        {0.0, 4000.0, 500.0, 500.5},
                                        {200, 0.01, 1.0},
-                                       Instrument::QUAD};
+                                       Instrument::QUAD,
+                                       0x00};
         std::vector<Grid::Point> expected = {
             {
                 500.301,
