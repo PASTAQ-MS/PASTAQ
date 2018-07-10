@@ -305,7 +305,7 @@ Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
     //   | |+| |
 
     // TODO(alex): Sort peaks here.
-    
+
     // Calculate the average background intensity from the boundary.
     {
         double boundary_sum = 0;
@@ -325,6 +325,14 @@ Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
     //
     // In order to generalize this formula for the 2D blob, all values at the
     // same index will be aggregated together.
+    //
+    // TODO(alex): Note that this can cause catastrophic cancellation or
+    // loss of significance. Probably the best option is to use a variant of
+    // the Welford's method for computing the variance in a single pass. See:
+    //
+    //     http://jonisalonen.com/2013/deriving-welfords-method-for-computing-variance/
+    //     https://ipfs.io/ipfs/QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco/wiki/Algorithms_for_calculating_variance.html
+    //
     {
         double height_sum = 0;
         double x_sum = 0;
@@ -340,8 +348,6 @@ Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
             x_sig += point.height * mz * mz;
             y_sig += point.height * rt * rt;
         }
-        // TODO(alex): Note that this can cause catastrophic cancellation or
-        // loss of significance. Review stable algorithms for sigma calculation.
         peak.sigma_mz =
             std::sqrt((x_sig / height_sum) - std::pow(x_sum / height_sum, 2));
         peak.sigma_rt =
