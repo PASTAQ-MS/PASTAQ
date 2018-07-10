@@ -281,6 +281,10 @@ TEST_CASE("Find peaks") {
         std::cout << "peak.height: " << peak.height << std::endl;
         std::cout << "peak.total_intensity: " << peak.total_intensity
                   << std::endl;
+        std::cout << "peak.mz_centroid: " << peak.mz_centroid << std::endl;
+        std::cout << "peak.rt_centroid: " << peak.rt_centroid << std::endl;
+        std::cout << "peak.height_centroid: " << peak.height_centroid << std::endl;
+        std::cout << "peak.total_intensity_centroid: " << peak.total_intensity_centroid << std::endl;
         // std::vector<Centroid::Point> peak_points;
         // Centroid::explore_peak_slope(local_max.i, local_max.j, -1,
         // parameters, data, peak_points);

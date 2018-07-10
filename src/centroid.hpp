@@ -22,14 +22,22 @@ struct Peak {
     double mz;
     double rt;
 
-    // Real mz/rt values for the standard deviation of the peak in both axis.
+    // Estimated mz/rt values for the standard deviation of the peak in both
+    // axes.
     double sigma_mz;
     double sigma_rt;
+
+    // Metrics from the fitted weighted centroid.
+    double mz_centroid;
+    double rt_centroid;
+    double height_centroid;
+    double total_intensity_centroid;
 
     // TODO(alex): Do we want to store these values? If so, should we calculate
     // this over the height or the height/noise?
     // double fwhm_mz;
     // double fwhm_rt;
+    // TODO(alex): Store SN values? sn_height or sn_centroid
 
     // Height of the peak centroid.
     double height;

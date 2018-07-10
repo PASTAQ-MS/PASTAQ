@@ -12,6 +12,13 @@ std::vector<Centroid::Point> Centroid::find_local_maxima(
         for (size_t i = 1; i < n_mz; ++i) {
             int index = i + j * n_mz;
 
+            // ---------------------------------------------------------
+            // | top_left_value    | top_value    | top_right_value    |
+            // ---------------------------------------------------------
+            // | left_value        | value        | right_value        |
+            // ---------------------------------------------------------
+            // | bottom_left_value | bottom_value | bottom_right_value |
+            // ---------------------------------------------------------
             double value = data[index];
             double right_value = data[index + 1];
             double left_value = data[index - 1];
@@ -207,6 +214,8 @@ std::vector<Centroid::Point> Centroid::find_boundary(
     }
 
     // Sort the points by y and then x coordinates.
+    // TODO(alex): Don't sort here or copy values, expect find_boundary to take
+    // a list of already sorted peaks instead.
     auto sort_points = [](const Centroid::Point &p1,
                           const Centroid::Point &p2) -> bool {
         return (p1.j < p2.j) || ((p1.j == p2.j) && (p1.i < p2.i));
@@ -340,9 +349,10 @@ Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
         double x_sig = 0;
         double y_sig = 0;
         for (const auto &point : peak.points) {
+            double mz = Grid::mz_at(point.i, parameters);
+            double rt = Grid::rt_at(point.j, parameters);
+
             height_sum += point.height;
-            auto mz = Grid::mz_at(point.i, parameters);
-            auto rt = Grid::rt_at(point.j, parameters);
             x_sum += point.height * mz;
             y_sum += point.height * rt;
             x_sig += point.height * mz * mz;
@@ -359,6 +369,69 @@ Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
         peak.sigma_rt = peak.sigma_rt < 0 ? 1 : peak.sigma_rt;
 
         peak.total_intensity = height_sum;
+    }
+
+    // Fit a weighted centroid to our data for the calculation of mz_centroid,
+    // rt_centroid, height_centroid and total_intensity_centroid.
+    // NOTE(alex): The original implementation uses +/- 4 points surrounding the
+    // local maxima. Here we are using 2 * sigma_{rt,mz} to establish the size
+    // of the window. We must verify that this does not have negative
+    // implications on the performance and accuracy of the following tools in
+    // the pipeline.
+    {
+        double sigma_rt = peak.sigma_rt;
+        double sigma_mz = peak.sigma_mz;
+
+        double min_rt = peak.rt - 2 * sigma_rt;
+        double max_rt = peak.rt + 2 * sigma_rt;
+        double min_mz = peak.mz - 2 * sigma_mz;
+        double max_mz = peak.mz + 2 * sigma_mz;
+
+        // Even if the point lays outside the current grid, we still want to
+        // account for it's contribution to the points in the frontier.
+        auto i_min = min_mz < parameters.bounds.min_mz
+                         ? 0
+                         : Grid::x_index(min_mz, parameters);
+        auto j_min = min_rt < parameters.bounds.min_rt
+                         ? 0
+                         : Grid::y_index(min_rt, parameters);
+        auto i_max = max_mz > parameters.bounds.max_mz
+                         ? parameters.dimensions.n - 1
+                         : Grid::x_index(max_mz, parameters);
+        auto j_max = max_rt > parameters.bounds.max_rt
+                         ? parameters.dimensions.m - 1
+                         : Grid::y_index(max_rt, parameters);
+
+        double height_sum = 0;
+        double weights_sum = 0;
+        double weighted_height_sum = 0;
+        double x_sum = 0;
+        double y_sum = 0;
+        for (size_t j = j_min; j <= j_max; ++j) {
+            for (size_t i = i_min; i <= i_max; ++i) {
+                // No need to do boundary check, since we are sure we are inside
+                // the grid.
+                double mz = Grid::mz_at(i, parameters);
+                double rt = Grid::rt_at(j, parameters);
+
+                // Calculate the gaussian weight for this point.
+                double a = (mz - peak.mz) / sigma_mz;
+                double b = (rt - peak.rt) / sigma_rt;
+                double weight = std::exp(-0.5 * (a * a + b * b));
+
+                double height = data[i + j * parameters.dimensions.n];
+                height_sum += height;
+                weights_sum += weight;
+                weighted_height_sum += height * weight;
+                x_sum += height * mz;
+                y_sum += height * rt;
+            }
+        }
+
+        peak.mz_centroid = x_sum / height_sum;
+        peak.rt_centroid = y_sum / height_sum;
+        peak.total_intensity_centroid = height_sum;
+        peak.height_centroid = weighted_height_sum / weights_sum;
     }
 
     return peak;
