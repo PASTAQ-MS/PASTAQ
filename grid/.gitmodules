@@ -1,3 +1,0 @@
-[submodule "ext/doctest"]
-	path = grid/ext/doctest
-	url = https://github.com/onqtam/doctest

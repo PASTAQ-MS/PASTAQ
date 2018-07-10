@@ -1,3 +1,0 @@
-[submodule "ext/doctest"]
-	path = centroid/ext/doctest
-	url = https://github.com/onqtam/doctest
