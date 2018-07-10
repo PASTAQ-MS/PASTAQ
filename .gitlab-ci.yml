@@ -37,6 +37,7 @@ build:linux:
     stage: build
     script:
         # Perform build.
+        - mkdir -p build
         - cd build
         - cmake .. -G Ninja
         - ninja
