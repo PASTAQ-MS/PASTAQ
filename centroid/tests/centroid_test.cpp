@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "centroid.hpp"
+#include "centroid/centroid.hpp"
 #include "doctest.h"
 
 TEST_CASE("Find local maxima") {

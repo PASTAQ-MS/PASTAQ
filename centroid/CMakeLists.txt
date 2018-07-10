@@ -25,7 +25,7 @@ endif()
 
 # Include library target.
 add_library(centroidlib
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/centroid.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/centroid/centroid.cpp"
     )
 target_include_directories(centroidlib PUBLIC src)
 target_link_libraries(centroidlib gridlib ${CMAKE_THREAD_LIBS_INIT})
