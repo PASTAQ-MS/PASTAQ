@@ -59,7 +59,7 @@ test:linux:
 lint:clang-format:
     stage: lint
     script:
-        - if (clang-format $(find src tests -name "*.[ch]pp") -output-replacements-xml | grep -c "<replacement " >/dev/null); then
+        - if (clang-format $(find */src */tests -name "*.[ch]pp") -output-replacements-xml | grep -c "<replacement " >/dev/null); then
             echo "Linter errors found, please run clang-format and try again";
             exit 1;
           fi
@@ -68,7 +68,7 @@ lint:clang-format:
 lint:cppcheck:
     stage: lint
     script:
-        - cppcheck --enable=all --quiet src/*.cpp &> cppcheck.txt
+        - cppcheck --enable=all --quiet */src/*.cpp &> cppcheck.txt
         - if [[ $(wc -l < cppcheck.txt) -gt 1 ]]; then
             echo "cppcheck errors found:";
             cat cppcheck.txt;
@@ -79,6 +79,6 @@ lint:cppcheck:
 lint:clang-tidy:
     stage: lint
     script:
-        - clang-tidy -quiet -checks="-*,bugprone-*,cert-*,clang-analyzer-*,cppcoreguidelines-*,misc-*,modernize-*,mpi-*,performance-*,readability-*,hicpp-*,cert-*,-cppcoreguidelines-pro-type-reinterpret-cast,-cppcoreguidelines-pro-bounds-constant-array-index,-cppcoreguidelines-pro-bounds-pointer-arithmetic,-readability-implicit-bool-conversion,-hicpp-signed-bitwise,-hicpp-use-noexcept,-misc-unused-parameters,-modernize-use-noexcept" -p=build src/*
+        - clang-tidy -quiet -checks="-*,bugprone-*,cert-*,clang-analyzer-*,cppcoreguidelines-*,misc-*,modernize-*,mpi-*,performance-*,readability-*,hicpp-*,cert-*,-cppcoreguidelines-pro-type-reinterpret-cast,-cppcoreguidelines-pro-bounds-constant-array-index,-cppcoreguidelines-pro-bounds-pointer-arithmetic,-readability-implicit-bool-conversion,-hicpp-signed-bitwise,-hicpp-use-noexcept,-misc-unused-parameters,-modernize-use-noexcept" -p=build */src/*
     dependencies:
         - build:linux
