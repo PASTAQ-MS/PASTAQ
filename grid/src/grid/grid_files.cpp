@@ -87,8 +87,12 @@ bool Grid::Files::Dat::read_range(std::istream &stream,
             stream.seekg(
                 (j * file_parameters.dimensions.n + i_min) * sizeof(double),
                 std::ios::beg);
-            stream.read(reinterpret_cast<char *>(&(*destination)[read_offset]),
-                        sizeof(double) * parameters->dimensions.n);
+            // Read the row values
+            for (size_t i = 0; i < parameters->dimensions.n; ++i) {
+                double read_double = 0;
+                Serialization::read_double(stream, &read_double);
+                (*destination)[read_offset + i] = read_double;
+            }
             read_offset += parameters->dimensions.n;
             if (stream.bad()) {
                 return false;
@@ -142,8 +146,9 @@ bool Grid::Files::Dat::write_range(std::ostream &stream,
 
     for (size_t j = j_min; j <= j_max; ++j) {
         size_t offset = j * parameters.dimensions.n + i_min;
-        stream.write(reinterpret_cast<const char *>(&source[offset]),
-                     sizeof(double) * sliced_parameters.dimensions.n);
+        for (size_t i = 0; i < sliced_parameters.dimensions.n; ++i) {
+            Serialization::write_double(stream, source[offset + i]);
+        }
     }
     return Grid::Files::Dat::write_parameters(stream, sliced_parameters);
 }
