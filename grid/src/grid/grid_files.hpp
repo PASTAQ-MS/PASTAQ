@@ -9,6 +9,11 @@
 // TODO(alex): These files do not account for the platform endianness. This
 // should be fixed if we plan on using "grid" on non little endian machines.
 
+namespace Grid::Serialize {
+bool read_parameters(std::istream &stream, Grid::Parameters *parameters);
+bool write_parameters(std::ostream &stream, const Grid::Parameters &parameters);
+}  // namespace Grid::Serialize
+
 // This binary file contains the data at the beginning followed by
 // a header with the parameters that we need to interpret the data properly.
 // The data is stored in little endian format and using 64 bits of precision for
@@ -20,7 +25,7 @@ namespace Grid::Files::Dat {
 // spec_version in case we need to do revisions to the format in the future.
 struct Parameters {
     char spec_version;
-    char footer_length;
+    char footer_size;
 };
 
 // Load an entire file from the binary stream into the destination vector and
@@ -49,6 +54,21 @@ bool write_range(std::ostream &stream, const Grid::Bounds &bounds,
 // or failure of the operation.
 bool read_parameters(std::istream &stream, Grid::Parameters *parameters);
 bool write_parameters(std::ostream &stream, const Grid::Parameters &parameters);
+
+constexpr static uint64_t footer_size =
+    sizeof(uint32_t)    // Grid::Parameters.dimensions.n
+    + sizeof(uint32_t)  // Grid::Parameters.dimensions.m
+    + sizeof(double)    // Grid::Parameters.bounds.min_rt
+    + sizeof(double)    // Grid::Parameters.bounds.max_rt
+    + sizeof(double)    // Grid::Parameters.bounds.min_mz
+    + sizeof(double)    // Grid::Parameters.bounds.max_mz
+    + sizeof(double)    // Grid::Parameters.smoothing_params.mz
+    + sizeof(double)    // Grid::Parameters.smoothing_params.sigma_mz
+    + sizeof(double)    // Grid::Parameters.smoothing_params.sigma_rt
+    + sizeof(uint8_t)   // Grid::Parameters.instrument_type
+    + sizeof(uint8_t)   // Grid::Parameters.flags
+    + sizeof(uint8_t)   // Grid::Files::Dat::Parameters.spec_version
+    + sizeof(uint8_t);  // Grid::Files::Dat::Parameters.footer_length
 
 }  // namespace Grid::Files::Dat
 

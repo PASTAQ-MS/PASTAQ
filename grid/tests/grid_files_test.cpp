@@ -7,8 +7,7 @@
 
 TEST_CASE("Writing parameters to the stream") {
     SUBCASE("Testing on MockStream") {
-        std::vector<char> data(sizeof(Grid::Parameters) +
-                               sizeof(Grid::Files::Dat::Parameters));
+        std::vector<char> data(Grid::Files::Dat::footer_size);
         MockStream<char> stream(data);
         Grid::Parameters source_parameters = {
             {6, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD, 0x00};
@@ -70,8 +69,7 @@ TEST_CASE("Writing data/parameters to the stream") {
         Grid::Parameters source_parameters = {
             {5, 2}, {3, 4, 5, 6}, {7, 8, 9}, Instrument::QUAD, 0x00};
         std::vector<char> stream_data(sizeof(double) * source_data.size() +
-                                      sizeof(Grid::Parameters) +
-                                      sizeof(Grid::Files::Dat::Parameters));
+                                      Grid::Files::Dat::footer_size);
         MockStream<char> stream(stream_data);
         CHECK(Grid::Files::Dat::write(stream, source_data, source_parameters));
         std::vector<double> dest_data = {};
@@ -109,8 +107,7 @@ TEST_CASE("Writing data/parameters to the stream") {
         Grid::Parameters source_parameters = {
             {5, 2}, {0, 1, 0, 4}, {1, 1, 1}, Instrument::QUAD, 0x00};
         std::vector<char> stream_data(sizeof(double) * source_data.size() +
-                                      sizeof(Grid::Parameters) +
-                                      sizeof(Grid::Files::Dat::Parameters));
+                                      Grid::Files::Dat::footer_size);
         MockStream<char> stream(stream_data);
         CHECK(Grid::Files::Dat::write(stream, source_data, source_parameters));
         std::vector<double> dest_data = {};
@@ -152,8 +149,7 @@ TEST_CASE("Writing data/parameters to the stream") {
         Grid::Parameters source_parameters = {
             {5, 2}, {0, 1, 0, 4}, {1, 1, 1}, Instrument::QUAD, 0x00};
         std::vector<char> stream_data(sizeof(double) * 6 +
-                                      sizeof(Grid::Parameters) +
-                                      sizeof(Grid::Files::Dat::Parameters));
+                                      Grid::Files::Dat::footer_size);
         MockStream<char> stream(stream_data);
         CHECK(Grid::Files::Dat::write_range(stream, {0, 1, 1, 3}, source_data,
                                             source_parameters));

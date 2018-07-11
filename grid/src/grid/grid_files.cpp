@@ -1,6 +1,7 @@
 #include <string>
 
 #include "grid_files.hpp"
+#include "utils/serialization.hpp"
 
 bool Grid::Files::Dat::read(std::istream &stream,
                             std::vector<double> *destination,
@@ -145,6 +146,40 @@ bool Grid::Files::Dat::write_range(std::ostream &stream,
     return Grid::Files::Dat::write_parameters(stream, sliced_parameters);
 }
 
+bool Grid::Serialize::read_parameters(std::istream &stream,
+                                      Grid::Parameters *parameters) {
+    Grid::Parameters read_params = {};
+    Serialization::read_uint32(stream, &read_params.dimensions.n);
+    Serialization::read_uint32(stream, &read_params.dimensions.m);
+    Serialization::read_double(stream, &read_params.bounds.min_rt);
+    Serialization::read_double(stream, &read_params.bounds.max_rt);
+    Serialization::read_double(stream, &read_params.bounds.min_mz);
+    Serialization::read_double(stream, &read_params.bounds.max_mz);
+    Serialization::read_double(stream, &read_params.smoothing_params.mz);
+    Serialization::read_double(stream, &read_params.smoothing_params.sigma_mz);
+    Serialization::read_double(stream, &read_params.smoothing_params.sigma_rt);
+    Serialization::read_uint8(stream, &read_params.instrument_type);
+    Serialization::read_uint8(stream, &read_params.flags);
+    *parameters = read_params;
+    return stream.good();
+}
+
+bool Grid::Serialize::write_parameters(std::ostream &stream,
+                                       const Grid::Parameters &parameters) {
+    Serialization::write_uint32(stream, parameters.dimensions.n);
+    Serialization::write_uint32(stream, parameters.dimensions.m);
+    Serialization::write_double(stream, parameters.bounds.min_rt);
+    Serialization::write_double(stream, parameters.bounds.max_rt);
+    Serialization::write_double(stream, parameters.bounds.min_mz);
+    Serialization::write_double(stream, parameters.bounds.max_mz);
+    Serialization::write_double(stream, parameters.smoothing_params.mz);
+    Serialization::write_double(stream, parameters.smoothing_params.sigma_mz);
+    Serialization::write_double(stream, parameters.smoothing_params.sigma_rt);
+    Serialization::write_uint8(stream, parameters.instrument_type);
+    Serialization::write_uint8(stream, parameters.flags);
+    return stream.good();
+}
+
 bool Grid::Files::Dat::read_parameters(std::istream &stream,
                                        Grid::Parameters *parameters) {
     if (parameters == nullptr) {
@@ -156,19 +191,17 @@ bool Grid::Files::Dat::read_parameters(std::istream &stream,
     // Read the parameters into the Grid::Parameters object. Note that we are
     // not making use of the Grid::Files::Dat::Parameters.spec_version yet, for
     // now we always read the data in the same way.
-    stream.read(reinterpret_cast<char *>(parameters), sizeof(Grid::Parameters));
+    Grid::Serialize::read_parameters(stream, parameters);
     return stream.good();
 }
 
 bool Grid::Files::Dat::write_parameters(std::ostream &stream,
                                         const Grid::Parameters &parameters) {
-    auto footer_size = static_cast<char>(sizeof(Grid::Parameters) +
-                                         sizeof(Grid::Files::Dat::Parameters));
-    Grid::Files::Dat::Parameters file_parameters = {1, footer_size};
-    stream.write(reinterpret_cast<const char *>(&parameters),
-                 sizeof(parameters));
-    stream.write(reinterpret_cast<const char *>(&file_parameters),
-                 sizeof(file_parameters));
+    Grid::Files::Dat::Parameters file_parameters = {
+        0, Grid::Files::Dat::footer_size};
+    Grid::Serialize::write_parameters(stream, parameters);
+    Serialization::write_uint8(stream, file_parameters.spec_version);
+    Serialization::write_uint8(stream, file_parameters.footer_size);
     return stream.good();
 }
 

@@ -5,7 +5,7 @@
 
 namespace Instrument {
 
-enum Type : char { QUAD, TOF, FTICR, ORBITRAP };
+enum Type : unsigned char { QUAD, TOF, FTICR, ORBITRAP };
 
 }  // namespace Instrument
 
@@ -50,7 +50,7 @@ struct Parameters {
     Dimensions dimensions;
     Bounds bounds;
     SmoothingParams smoothing_params;
-    Instrument::Type instrument_type;
+    unsigned char instrument_type;
     unsigned char flags;
 };
 
