@@ -23,6 +23,7 @@ endif()
 if (NOT TARGET utilslib)
     add_library(utilslib
         "${CMAKE_CURRENT_SOURCE_DIR}/src/utils/utils/base64.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/utils/utils/serialization.cpp"
         )
     target_include_directories(utilslib PUBLIC src/utils)
 endif()
@@ -49,9 +50,10 @@ if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} OR (${UTILS_ADD_TEST
                 utils_test
                 tests/main.cpp
                 tests/mock_stream_test.cpp
+                tests/serialization_test.cpp
                 )
             add_test(NAME utils_test COMMAND utils_test)
-            target_link_libraries(utils_test stdc++ doctest testutilslib)
+            target_link_libraries(utils_test stdc++ doctest utilslib testutilslib)
         endif()
     else()
         message("-- [${PROJECT_NAME}] Testing library not found. Ignoring tests...")

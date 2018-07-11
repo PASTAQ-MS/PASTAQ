@@ -8,8 +8,8 @@ namespace Centroid::Files::Bpks {
 
 struct Header {
     uint64_t header_length;
-    unsigned char spec_version;
     uint64_t num_peaks;
+    unsigned char spec_version;
     Grid::Parameters grid_parameters;
 };
 
@@ -26,10 +26,6 @@ bool read_peaks(std::istream &stream, Header &header,
                 std::vector<Centroid::Peak> &peak);
 bool write_peaks(std::ostream &stream, Header &header,
                  const std::vector<Centroid::Peak> &peak);
-
-// TODO(alex): Move to file utils.
-bool write_double(std::ostream &stream, double value);
-bool read_double(std::istream &stream, double *value);
 
 }  // namespace Centroid::Files::Bpks
 
