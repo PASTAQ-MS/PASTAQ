@@ -1,7 +1,7 @@
 #include <regex>
 #include <sstream>
 
-#include "base64.hpp"
+#include "utils/base64.hpp"
 #include "xml_reader.hpp"
 
 // Read the next mz1 scan from the stream.

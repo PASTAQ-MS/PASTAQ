@@ -20,6 +20,12 @@ if (NOT TARGET testutilslib)
     add_library(testutilslib INTERFACE)
     target_include_directories(testutilslib INTERFACE src/testutils)
 endif()
+if (NOT TARGET utilslib)
+    add_library(utilslib
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/utils/utils/base64.cpp"
+        )
+    target_include_directories(utilslib PUBLIC src/utils)
+endif()
 
 # Include tests if testing library is present.
 if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} OR (${UTILS_ADD_TESTS}))
