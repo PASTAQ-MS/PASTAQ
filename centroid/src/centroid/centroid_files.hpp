@@ -4,8 +4,11 @@
 
 #include "centroid/centroid.hpp"
 
+// TODO(alex): Rename to Centroid::Serialization?
 namespace Centroid::Files::Bpks {
 
+// The header contains the necessary information for proper interpretation of
+// the serialized data.
 struct Header {
     uint64_t header_length;
     uint64_t num_peaks;
@@ -14,7 +17,7 @@ struct Header {
 };
 
 // Read/Write the header from the given binary stream.
-bool read_header(std::istream &stream, Header &header);
+bool read_header(std::istream &stream, Header *header);
 bool write_header(std::ostream &stream, const Header &header);
 
 // Read/Write a single peak from the given binary stream.
