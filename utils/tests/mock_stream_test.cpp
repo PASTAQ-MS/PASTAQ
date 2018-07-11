@@ -1,4 +1,5 @@
 #include "doctest.h"
+
 #include "testutils/mock_stream.hpp"
 
 TEST_CASE("MockStream") {
