@@ -215,21 +215,27 @@ bool Grid::Files::Dat::write_parameters(std::ostream &stream,
 bool Grid::Files::Rawdump::write(std::ostream &stream,
                                  const std::vector<Grid::Point> &points) {
     uint64_t n_points = points.size();
-    stream.write(reinterpret_cast<const char *>(&n_points), sizeof(uint64_t));
-    stream.write(reinterpret_cast<const char *>(&points[0]),
-                 sizeof(Grid::Point) * n_points);
+    Serialization::write_uint64(stream, n_points);
+    for (const auto &point : points) {
+        Serialization::write_double(stream, point.mz);
+        Serialization::write_double(stream, point.rt);
+        Serialization::write_double(stream, point.value);
+    }
     return stream.good();
 }
 
 bool Grid::Files::Rawdump::read(std::istream &stream,
                                 std::vector<Grid::Point> &points) {
     uint64_t n_points = 0;
-    stream.read(reinterpret_cast<char *>(&n_points), sizeof(uint64_t));
+    Serialization::read_uint64(stream, &n_points);
     if (stream.bad()) {
         return false;
     }
     points.resize(n_points);
-    stream.read(reinterpret_cast<char *>(&points[0]),
-                sizeof(Grid::Point) * n_points);
+    for (auto &point : points) {
+        Serialization::read_double(stream, &point.mz);
+        Serialization::read_double(stream, &point.rt);
+        Serialization::read_double(stream, &point.value);
+    }
     return stream.good();
 }

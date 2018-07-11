@@ -6,9 +6,6 @@
 
 #include "grid.hpp"
 
-// TODO(alex): These files do not account for the platform endianness. This
-// should be fixed if we plan on using "grid" on non little endian machines.
-
 namespace Grid::Serialize {
 bool read_parameters(std::istream &stream, Grid::Parameters *parameters);
 bool write_parameters(std::ostream &stream, const Grid::Parameters &parameters);
