@@ -18,6 +18,7 @@ enum Flags : unsigned char { WARPED_MESH = 0b00000001 };
 //   (n == number of columns == Number of points in mz)
 //   (m == number of rows == Number of points in rt)
 struct Dimensions {
+    // TODO(alex): use uint64_t instead.
     unsigned int n;
     unsigned int m;
 };

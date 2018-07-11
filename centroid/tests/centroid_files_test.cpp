@@ -7,11 +7,12 @@
 
 TEST_CASE("Read/Write header from/to stream") {
     std::vector<Centroid::Files::Bpks::Header> source_data = {
-        {1,2,3,{}},
-        {4,5,6,{}},
+        {1, 2, 3, {}},
+        {4, 5, 6, {}},
     };
     std::vector<Centroid::Files::Bpks::Header> destination_data;
-    std::vector<char> stream_data(sizeof(Centroid::Files::Bpks::Header) * source_data.size());
+    std::vector<char> stream_data(sizeof(Centroid::Files::Bpks::Header) *
+                                  source_data.size());
     MockStream<char> stream(stream_data);
     // Write data to stream.
     for (const auto &value : source_data) {
