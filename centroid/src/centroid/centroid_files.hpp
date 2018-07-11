@@ -27,6 +27,10 @@ bool read_peaks(std::istream &stream, Header &header,
 bool write_peaks(std::ostream &stream, Header &header,
                  const std::vector<Centroid::Peak> &peak);
 
+// TODO(alex): Move to file utils.
+bool write_double(std::ostream &stream, double value);
+bool read_double(std::istream &stream, double *value);
+
 }  // namespace Centroid::Files::Bpks
 
 namespace Centroid::Files::Csv {

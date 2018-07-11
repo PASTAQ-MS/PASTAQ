@@ -4,7 +4,7 @@
 namespace Endian {
 
 inline uint32_t swap_uint32(const uint32_t &b, bool little_endian) {
-    uint64_t ret;
+    uint32_t ret;
     uint8_t *data = reinterpret_cast<uint8_t *>(&ret);
 
     if (little_endian) {
