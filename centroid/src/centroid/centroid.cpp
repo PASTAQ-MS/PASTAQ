@@ -304,7 +304,8 @@ Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
     // Extract the peak points and the boundary.
     Centroid::explore_peak_slope(local_max.i, local_max.j, -1, parameters, data,
                                  peak.points);
-    peak.boundary = Centroid::find_boundary(peak.points);
+
+    // TODO(alex): Sort peaks here.
     // TODO(alex): error handling. What happens if the number of points is very
     // small? We should probably ignore peaks with less than 5 points so that it
     // has dimensionality in both mz and rt:
@@ -312,8 +313,7 @@ Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
     //   | |+| |
     //   |+|c|+|
     //   | |+| |
-
-    // TODO(alex): Sort peaks here.
+    peak.boundary = Centroid::find_boundary(peak.points);
 
     // Calculate the average background intensity from the boundary.
     {

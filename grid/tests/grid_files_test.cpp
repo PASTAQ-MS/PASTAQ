@@ -3,7 +3,7 @@
 
 #include "doctest.h"
 #include "grid/grid_files.hpp"
-#include "utils/mock_stream.hpp"
+#include "testutils/mock_stream.hpp"
 
 TEST_CASE("Writing parameters to the stream") {
     SUBCASE("Testing on MockStream") {

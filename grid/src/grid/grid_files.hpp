@@ -72,4 +72,9 @@ bool read(std::istream &stream, std::vector<Grid::Point> &points);
 
 }  // namespace Grid::Files::Rawdump
 
+namespace Grid::Files::Csv {
+// TODO(alex): Read/write grid as a CSV file that can be opened in Excel, R,
+// Python or other statistical software. Should this be implemented?
+}  // namespace Grid::Files::Csv
+
 #endif /* GRID_GRIDFILES_HPP */

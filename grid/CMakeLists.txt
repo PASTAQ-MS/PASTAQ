@@ -17,22 +17,29 @@ endif()
 
 find_package(Threads REQUIRED)
 
+# Add utils dependency.
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../utils" ${CMAKE_CURRENT_BINARY_DIR}/utils)
+
 # Include library target.
-add_library(gridlib
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_files.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_runners.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/xml_reader.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/base64.cpp"
-    )
-target_include_directories(gridlib PUBLIC src)
-target_link_libraries(gridlib ${CMAKE_THREAD_LIBS_INIT})
+if (NOT TARGET gridlib)
+    add_library(gridlib
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_files.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_runners.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/xml_reader.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/base64.cpp"
+        )
+    target_include_directories(gridlib PUBLIC src)
+    target_link_libraries(gridlib ${CMAKE_THREAD_LIBS_INIT})
+endif()
 
 # Include executable target.
-add_executable(grid
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_command.cpp"
-    )
-target_link_libraries(grid stdc++ stdc++fs gridlib ${CMAKE_THREAD_LIBS_INIT})
+if (NOT TARGET grid)
+    add_executable(grid
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_command.cpp"
+        )
+    target_link_libraries(grid stdc++ stdc++fs gridlib ${CMAKE_THREAD_LIBS_INIT})
+endif()
 
 # Include tests if testing library is present.
 if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} OR (${GRID_ADD_TESTS}))
@@ -51,23 +58,18 @@ if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} OR (${GRID_ADD_TESTS
                 "${CMAKE_CURRENT_SOURCE_DIR}/../ext/doctest/doctest")
         endif()
         enable_testing()
-        add_executable(
-            grid_test
-            tests/main.cpp
-            tests/grid_test.cpp
-            tests/grid_runners_test.cpp
-            tests/grid_files_test.cpp
-            tests/xml_reader_test.cpp
-            )
-        add_test(NAME grid_test COMMAND grid_test)
-        target_link_libraries(grid_test stdc++ doctest gridlib)
-
-        add_executable(
-            test-utils_test
-            tests/utils/utils_test.cpp
-            )
-        add_test(NAME test-utils_test COMMAND test-utils_test)
-        target_link_libraries(test-utils_test stdc++ doctest)
+        if (NOT TARGET grid_test)
+            add_executable(
+                grid_test
+                tests/main.cpp
+                tests/grid_test.cpp
+                tests/grid_runners_test.cpp
+                tests/grid_files_test.cpp
+                tests/xml_reader_test.cpp
+                )
+            add_test(NAME grid_test COMMAND grid_test)
+            target_link_libraries(grid_test stdc++ doctest gridlib testutilslib)
+        endif()
     else()
         message("-- [${PROJECT_NAME}] Testing library not found. Ignoring tests...")
     endif()

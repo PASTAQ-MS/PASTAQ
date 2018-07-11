@@ -386,7 +386,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Parse the options to build the Grid::Parameters struct.
-    Grid::Parameters parameters;
+    Grid::Parameters parameters = {};
 
     // Get the bounds.
     if ((options.find("-min_rt") == options.end()) ||

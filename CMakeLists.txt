@@ -20,6 +20,7 @@ find_package(Threads REQUIRED)
 # Configure the tests.
 option(CENTROID_ADD_TESTS "run centroid tests" ON)
 option(GRID_ADD_TESTS "run grid tests" ON)
+option(UTILS_ADD_TESTS "run utils tests" ON)
 
 # Include library target.
 add_subdirectory(${CMAKE_SOURCE_DIR}/grid)

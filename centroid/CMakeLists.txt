@@ -17,24 +17,29 @@ endif()
 
 find_package(Threads REQUIRED)
 
+# Add utils dependency.
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../utils" ${CMAKE_CURRENT_BINARY_DIR}/utils)
+
 # Add grid dependency
-# TODO(alex): This should be added using find_module, this is prone to breakage?
-if (NOT TARGET gridlib)
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../grid" ${CMAKE_CURRENT_BINARY_DIR}/grid)
-endif()
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../grid" ${CMAKE_CURRENT_BINARY_DIR}/grid)
 
 # Include library target.
-add_library(centroidlib
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/centroid/centroid.cpp"
-    )
-target_include_directories(centroidlib PUBLIC src)
-target_link_libraries(centroidlib gridlib ${CMAKE_THREAD_LIBS_INIT})
+if (NOT TARGET centroidlib)
+    add_library(centroidlib
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/centroid/centroid.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/centroid/centroid_files.cpp"
+        )
+    target_include_directories(centroidlib PUBLIC src)
+    target_link_libraries(centroidlib gridlib ${CMAKE_THREAD_LIBS_INIT})
+endif()
 
 # Include executable target.
+#if (NOT TARGET centroid)
 #add_executable(centroid
 #"${CMAKE_CURRENT_SOURCE_DIR}/src/centroid_command.cpp"
 #)
 #target_link_libraries(centroid stdc++ stdc++fs centroidlib ${CMAKE_THREAD_LIBS_INIT})
+#endif()
 
 # Include tests if testing library is present.
 if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} OR (${CENTROID_ADD_TESTS}))
@@ -53,13 +58,16 @@ if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} OR (${CENTROID_ADD_T
                 "${CMAKE_CURRENT_SOURCE_DIR}/../ext/doctest/doctest")
         endif()
         enable_testing()
-        add_executable(
-            centroid_test
-            tests/main.cpp
-            tests/centroid_test.cpp
-            )
-        add_test(NAME centroid_test COMMAND centroid_test)
-        target_link_libraries(centroid_test stdc++ doctest centroidlib)
+        if (NOT TARGET centroid_test)
+            add_executable(
+                centroid_test
+                tests/main.cpp
+                tests/centroid_test.cpp
+                tests/centroid_files_test.cpp
+                )
+            add_test(NAME centroid_test COMMAND centroid_test)
+            target_link_libraries(centroid_test stdc++ doctest testutilslib centroidlib)
+        endif()
     else()
         message("-- [${PROJECT_NAME}] Testing library not found. Ignoring tests...")
     endif()
