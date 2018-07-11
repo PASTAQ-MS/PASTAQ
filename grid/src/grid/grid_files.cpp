@@ -13,8 +13,9 @@ bool Grid::Files::Dat::read(std::istream &stream,
         auto n_points = parameters->dimensions.n * parameters->dimensions.m;
         destination->resize(n_points);
         stream.seekg(0, std::ios::beg);
-        stream.read(reinterpret_cast<char *>(&(*destination)[0]),
-                    sizeof(double) * n_points);
+        for (auto &value : *destination) {
+            Serialization::read_double(stream, &value);
+        }
     } else {
         return false;
     }
@@ -24,8 +25,9 @@ bool Grid::Files::Dat::read(std::istream &stream,
 bool Grid::Files::Dat::write(std::ostream &stream,
                              const std::vector<double> &source,
                              const Grid::Parameters &parameters) {
-    stream.write(reinterpret_cast<const char *>(&source[0]),
-                 sizeof(double) * source.size());
+    for (const auto &value : source) {
+        Serialization::write_double(stream, value);
+    }
     Grid::Files::Dat::write_parameters(stream, parameters);
     return stream.good();
 }
