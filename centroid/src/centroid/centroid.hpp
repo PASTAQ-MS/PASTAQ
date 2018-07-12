@@ -5,14 +5,17 @@
 
 #include "grid/grid.hpp"
 
+// TODO(alex): Add doc.
 namespace Centroid {
 
+// TODO(alex): Add doc.
 struct Point {
     unsigned int i;
     unsigned int j;
     double height;
 };
 
+// TODO(alex): Add doc.
 struct Peak {
     // Center of the peak in index space (Coordinates of local maxima).
     unsigned int i;
@@ -82,13 +85,16 @@ std::vector<Point> find_peak_points(const Point &point,
 // Find the boundary of the given bag of points.
 std::vector<Point> find_boundary(const std::vector<Point> &points);
 
+// TODO(alex): Add doc.
 void explore_peak_slope(unsigned int i, unsigned int j, double previous_value,
                         const Grid::Parameters &parameters,
                         const std::vector<double> &data,
                         std::vector<Point> &points);
 
+// TODO(alex): Add doc.
 Peak build_peak(const Point &local_max, const Grid::Parameters &parameters,
                 const std::vector<double> &data);
+
 }  // namespace Centroid
 
 #endif /* CENTROID_CENTROID_HPP */
