@@ -24,6 +24,7 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../utils" ${CMAKE_CURRENT_BINARY_D
 if (NOT TARGET gridlib)
     add_library(gridlib
         "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_serialize.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_files.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_runners.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/xml_reader.cpp"

@@ -1,3 +1,8 @@
+#ifndef UTILS_SERIALIZATION_HPP
+#define UTILS_SERIALIZATION_HPP
+
+#include <iostream>
+
 // This namespace contains necessary functions to serialize commonly used types
 // into a binary stream using the little endian byte order.
 namespace Serialization {
@@ -25,3 +30,5 @@ bool read_double(std::istream &stream, double *value);
 bool write_double(std::ostream &stream, double value);
 
 }  // namespace Serialization
+
+#endif /* UTILS_SERIALIZATION_HPP */

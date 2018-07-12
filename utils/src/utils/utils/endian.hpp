@@ -1,5 +1,5 @@
-#ifndef GRID_ENDIAN_HPP
-#define GRID_ENDIAN_HPP
+#ifndef UTILS_ENDIAN_HPP
+#define UTILS_ENDIAN_HPP
 
 namespace Endian {
 
@@ -49,4 +49,4 @@ inline uint64_t swap_uint64(const uint64_t &b, bool little_endian) {
 
 }  // namespace Endian
 
-#endif /* GRID_ENDIAN_HPP */
+#endif /* UTILS_ENDIAN_HPP */

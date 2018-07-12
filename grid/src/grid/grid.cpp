@@ -1,6 +1,7 @@
 #include <cmath>
 
 #include "grid.hpp"
+#include "utils/serialization.hpp"
 
 // TODO(alex): Add optional normalization here.
 bool Grid::splat(const Grid::Point &point, const Grid::Parameters &parameters,

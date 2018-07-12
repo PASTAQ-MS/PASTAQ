@@ -1,5 +1,5 @@
-#ifndef GRID_BASE64_HPP
-#define GRID_BASE64_HPP
+#ifndef UTILS_BASE64_HPP
+#define UTILS_BASE64_HPP
 #include <cstdint>
 
 struct Base64 {
@@ -30,4 +30,4 @@ struct Base64 {
     double get_double();
 };
 
-#endif /* GRID_BASE64_HPP */
+#endif /* UTILS_BASE64_HPP */
