@@ -27,8 +27,11 @@ bool write_peaks(std::ostream &stream, const Grid::Parameters &grid_parameters,
 }  // namespace Centroid::Files::Bpks
 
 namespace Centroid::Files::Csv {
-// TODO(alex): Dump peaks to csv.
-// TODO(alex): Read peaks from csv.
+// Write the most significant peak values on the CSV format.
+bool write_peaks(std::ostream &stream,
+                 const std::vector<Centroid::Peak> &peaks);
+// TODO(alex): Read peaks from csv?
+// bool read_peaks(std::istream &stream, std::vector<Centroid::Peak> *peaks);
 }  // namespace Centroid::Files::Csv
 
 #endif /* CENTROID_CENTROIDFILES_HPP */

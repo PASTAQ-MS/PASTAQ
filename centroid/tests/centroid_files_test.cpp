@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 
 #include "doctest.h"
 
@@ -185,74 +186,101 @@ TEST_CASE("Read/Write found peaks to bpks stream") {
         CHECK(round_double(peak.border_background) ==
               round_double(expected_peaks[i].border_background));
     }
-    // Writing data to stream.
-    std::vector<char> stream_data(1024 * 1024);
-    MockStream<char> stream(stream_data);
-    CHECK(Centroid::Files::Bpks::write_peaks(stream, parameters, peaks));
-    // Reading data from stream.
-    std::vector<Centroid::Peak> read_peaks;
-    Grid::Parameters read_parameters;
-    CHECK(Centroid::Files::Bpks::read_peaks(stream, &read_parameters,
-                                            &read_peaks));
+    SUBCASE("Writing to BPKS") {
+        // Writing data to stream.
+        std::vector<char> stream_data(1024 * 1024);
+        MockStream<char> stream(stream_data);
+        CHECK(Centroid::Files::Bpks::write_peaks(stream, parameters, peaks));
+        // Reading data from stream.
+        std::vector<Centroid::Peak> read_peaks;
+        Grid::Parameters read_parameters;
+        CHECK(Centroid::Files::Bpks::read_peaks(stream, &read_parameters,
+                                                &read_peaks));
 
-    // Check that parameters were read successfully.
-    CHECK(parameters.dimensions.n == read_parameters.dimensions.n);
-    CHECK(parameters.dimensions.m == read_parameters.dimensions.m);
-    CHECK(round_double(parameters.bounds.min_rt) ==
-          round_double(read_parameters.bounds.min_rt));
-    CHECK(round_double(parameters.bounds.max_rt) ==
-          round_double(read_parameters.bounds.max_rt));
-    CHECK(round_double(parameters.bounds.min_mz) ==
-          round_double(read_parameters.bounds.min_mz));
-    CHECK(round_double(parameters.bounds.max_mz) ==
-          round_double(read_parameters.bounds.max_mz));
-    CHECK(round_double(parameters.smoothing_params.mz) ==
-          round_double(read_parameters.smoothing_params.mz));
-    CHECK(round_double(parameters.smoothing_params.sigma_mz) ==
-          round_double(read_parameters.smoothing_params.sigma_mz));
-    CHECK(round_double(parameters.smoothing_params.sigma_rt) ==
-          round_double(read_parameters.smoothing_params.sigma_rt));
-    CHECK(parameters.instrument_type == read_parameters.instrument_type);
-    CHECK(parameters.flags == read_parameters.flags);
+        // Check that parameters were read successfully.
+        CHECK(parameters.dimensions.n == read_parameters.dimensions.n);
+        CHECK(parameters.dimensions.m == read_parameters.dimensions.m);
+        CHECK(round_double(parameters.bounds.min_rt) ==
+              round_double(read_parameters.bounds.min_rt));
+        CHECK(round_double(parameters.bounds.max_rt) ==
+              round_double(read_parameters.bounds.max_rt));
+        CHECK(round_double(parameters.bounds.min_mz) ==
+              round_double(read_parameters.bounds.min_mz));
+        CHECK(round_double(parameters.bounds.max_mz) ==
+              round_double(read_parameters.bounds.max_mz));
+        CHECK(round_double(parameters.smoothing_params.mz) ==
+              round_double(read_parameters.smoothing_params.mz));
+        CHECK(round_double(parameters.smoothing_params.sigma_mz) ==
+              round_double(read_parameters.smoothing_params.sigma_mz));
+        CHECK(round_double(parameters.smoothing_params.sigma_rt) ==
+              round_double(read_parameters.smoothing_params.sigma_rt));
+        CHECK(parameters.instrument_type == read_parameters.instrument_type);
+        CHECK(parameters.flags == read_parameters.flags);
 
-    // Check that peaks were read successfully.
-    CHECK(peaks.size() == read_peaks.size());
-    for (size_t i = 0; i < peaks.size(); ++i) {
-        CHECK(peaks[i].i == read_peaks[i].i);
-        CHECK(peaks[i].j == read_peaks[i].j);
-        CHECK(round_double(peaks[i].mz) == round_double(read_peaks[i].mz));
-        CHECK(round_double(peaks[i].rt) == round_double(read_peaks[i].rt));
-        CHECK(round_double(peaks[i].total_intensity) ==
-              round_double(read_peaks[i].total_intensity));
-        CHECK(round_double(peaks[i].sigma_mz) ==
-              round_double(read_peaks[i].sigma_mz));
-        CHECK(round_double(peaks[i].sigma_rt) ==
-              round_double(read_peaks[i].sigma_rt));
-        CHECK(round_double(peaks[i].mz_centroid) ==
-              round_double(read_peaks[i].mz_centroid));
-        CHECK(round_double(peaks[i].rt_centroid) ==
-              round_double(read_peaks[i].rt_centroid));
-        CHECK(round_double(peaks[i].height_centroid) ==
-              round_double(read_peaks[i].height_centroid));
-        CHECK(round_double(peaks[i].total_intensity_centroid) ==
-              round_double(read_peaks[i].total_intensity_centroid));
-        CHECK(round_double(peaks[i].border_background) ==
-              round_double(read_peaks[i].border_background));
+        // Check that peaks were read successfully.
+        CHECK(peaks.size() == read_peaks.size());
+        for (size_t i = 0; i < peaks.size(); ++i) {
+            CHECK(peaks[i].i == read_peaks[i].i);
+            CHECK(peaks[i].j == read_peaks[i].j);
+            CHECK(round_double(peaks[i].mz) == round_double(read_peaks[i].mz));
+            CHECK(round_double(peaks[i].rt) == round_double(read_peaks[i].rt));
+            CHECK(round_double(peaks[i].total_intensity) ==
+                  round_double(read_peaks[i].total_intensity));
+            CHECK(round_double(peaks[i].sigma_mz) ==
+                  round_double(read_peaks[i].sigma_mz));
+            CHECK(round_double(peaks[i].sigma_rt) ==
+                  round_double(read_peaks[i].sigma_rt));
+            CHECK(round_double(peaks[i].mz_centroid) ==
+                  round_double(read_peaks[i].mz_centroid));
+            CHECK(round_double(peaks[i].rt_centroid) ==
+                  round_double(read_peaks[i].rt_centroid));
+            CHECK(round_double(peaks[i].height_centroid) ==
+                  round_double(read_peaks[i].height_centroid));
+            CHECK(round_double(peaks[i].total_intensity_centroid) ==
+                  round_double(read_peaks[i].total_intensity_centroid));
+            CHECK(round_double(peaks[i].border_background) ==
+                  round_double(read_peaks[i].border_background));
 
-        CHECK(peaks[i].points.size() == read_peaks[i].points.size());
-        for (size_t j = 0; j < peaks[i].points.size(); ++j) {
-            CHECK(peaks[i].points[j].i == read_peaks[i].points[j].i);
-            CHECK(peaks[i].points[j].j == read_peaks[i].points[j].j);
-            CHECK(round_double(peaks[i].points[j].height) ==
-                  round_double(read_peaks[i].points[j].height));
+            CHECK(peaks[i].points.size() == read_peaks[i].points.size());
+            for (size_t j = 0; j < peaks[i].points.size(); ++j) {
+                CHECK(peaks[i].points[j].i == read_peaks[i].points[j].i);
+                CHECK(peaks[i].points[j].j == read_peaks[i].points[j].j);
+                CHECK(round_double(peaks[i].points[j].height) ==
+                      round_double(read_peaks[i].points[j].height));
+            }
+
+            CHECK(peaks[i].boundary.size() == read_peaks[i].boundary.size());
+            for (size_t j = 0; j < peaks[i].boundary.size(); ++j) {
+                CHECK(peaks[i].boundary[j].i == read_peaks[i].boundary[j].i);
+                CHECK(peaks[i].boundary[j].j == read_peaks[i].boundary[j].j);
+                CHECK(round_double(peaks[i].boundary[j].height) ==
+                      round_double(read_peaks[i].boundary[j].height));
+            }
         }
-
-        CHECK(peaks[i].boundary.size() == read_peaks[i].boundary.size());
-        for (size_t j = 0; j < peaks[i].boundary.size(); ++j) {
-            CHECK(peaks[i].boundary[j].i == read_peaks[i].boundary[j].i);
-            CHECK(peaks[i].boundary[j].j == read_peaks[i].boundary[j].j);
-            CHECK(round_double(peaks[i].boundary[j].height) ==
-                  round_double(read_peaks[i].boundary[j].height));
+    }
+    SUBCASE("Writing to CSV") {
+        std::vector<std::string> expected_lines = {
+            {"N X Y Height Volume VCentroid XSigma YSigma Count LocalBkgnd "
+             "SNVolume SNHeight SNCentroid"},
+            {"0 10 10 4 24.6757 22.0599 4.80706 4.80706 25 0.317821 77.6403 "
+             "12."
+             "5857 69.4097"},
+            {"1 20 60 17.8731 175.126 160.357 4.80706 8.85391 50 0.814667 "
+             "214."
+             "967 21.9392 196.838"},
+            {"2 50 60 15.4607 132.078 122.656 4.80706 6.82431 40 0.749546 "
+             "176."
+             "21 20.6268 163.641"},
+            {"3 80 60 12.4776 88.9893 83.5048 4.80706 5.53369 35 0.542793 "
+             "163."
+             "947 22.9877 153.843"}};
+        std::string line;
+        std::stringstream stream;
+        CHECK(Centroid::Files::Csv::write_peaks(stream, peaks));
+        size_t i = 0;
+        while (std::getline(stream, line)) {
+            CHECK(line == expected_lines[i]);
+            ++i;
         }
     }
 }
