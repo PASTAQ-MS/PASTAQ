@@ -187,6 +187,21 @@ bool Grid::Serialize::write_parameters(std::ostream &stream,
     return stream.good();
 }
 
+bool Grid::Serialize::read_point(std::istream &stream, Grid::Point *point) {
+    Serialization::read_double(stream, &point->mz);
+    Serialization::read_double(stream, &point->rt);
+    Serialization::read_double(stream, &point->value);
+    return stream.good();
+}
+
+bool Grid::Serialize::write_point(std::ostream &stream,
+                                  const Grid::Point &point) {
+    Serialization::write_double(stream, point.mz);
+    Serialization::write_double(stream, point.rt);
+    Serialization::write_double(stream, point.value);
+    return stream.good();
+}
+
 bool Grid::Files::Dat::read_parameters(std::istream &stream,
                                        Grid::Parameters *parameters) {
     if (parameters == nullptr) {
@@ -217,9 +232,7 @@ bool Grid::Files::Rawdump::write(std::ostream &stream,
     uint64_t n_points = points.size();
     Serialization::write_uint64(stream, n_points);
     for (const auto &point : points) {
-        Serialization::write_double(stream, point.mz);
-        Serialization::write_double(stream, point.rt);
-        Serialization::write_double(stream, point.value);
+        Grid::Serialize::write_point(stream, point);
     }
     return stream.good();
 }
@@ -233,9 +246,7 @@ bool Grid::Files::Rawdump::read(std::istream &stream,
     }
     points.resize(n_points);
     for (auto &point : points) {
-        Serialization::read_double(stream, &point.mz);
-        Serialization::read_double(stream, &point.rt);
-        Serialization::read_double(stream, &point.value);
+        Grid::Serialize::read_point(stream, &point);
     }
     return stream.good();
 }
