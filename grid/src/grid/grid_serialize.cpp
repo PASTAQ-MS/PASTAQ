@@ -3,19 +3,17 @@
 
 bool Grid::Serialize::read_parameters(std::istream &stream,
                                       Grid::Parameters *parameters) {
-    Grid::Parameters read_params = {};
-    Serialization::read_uint32(stream, &read_params.dimensions.n);
-    Serialization::read_uint32(stream, &read_params.dimensions.m);
-    Serialization::read_double(stream, &read_params.bounds.min_rt);
-    Serialization::read_double(stream, &read_params.bounds.max_rt);
-    Serialization::read_double(stream, &read_params.bounds.min_mz);
-    Serialization::read_double(stream, &read_params.bounds.max_mz);
-    Serialization::read_double(stream, &read_params.smoothing_params.mz);
-    Serialization::read_double(stream, &read_params.smoothing_params.sigma_mz);
-    Serialization::read_double(stream, &read_params.smoothing_params.sigma_rt);
-    Serialization::read_uint8(stream, &read_params.instrument_type);
-    Serialization::read_uint8(stream, &read_params.flags);
-    *parameters = read_params;
+    Serialization::read_uint32(stream, &parameters->dimensions.n);
+    Serialization::read_uint32(stream, &parameters->dimensions.m);
+    Serialization::read_double(stream, &parameters->bounds.min_rt);
+    Serialization::read_double(stream, &parameters->bounds.max_rt);
+    Serialization::read_double(stream, &parameters->bounds.min_mz);
+    Serialization::read_double(stream, &parameters->bounds.max_mz);
+    Serialization::read_double(stream, &parameters->smoothing_params.mz);
+    Serialization::read_double(stream, &parameters->smoothing_params.sigma_mz);
+    Serialization::read_double(stream, &parameters->smoothing_params.sigma_rt);
+    Serialization::read_uint8(stream, &parameters->instrument_type);
+    Serialization::read_uint8(stream, &parameters->flags);
     return stream.good();
 }
 

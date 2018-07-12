@@ -18,17 +18,11 @@ struct Header {
 bool read_header(std::istream &stream, Header *header);
 bool write_header(std::ostream &stream, const Header &header);
 
-// TODO(alex): Move to Centroid::Serialization?
-// Read/Write a single peak from the given binary stream.
-bool read_peak(std::istream &stream, Centroid::Peak &peak);
-bool write_peak(std::ostream &stream, const Centroid::Peak &peak);
-
-// TODO(alex): Move to Centroid::Serialization?
 // Read/Write all peaks from the given binary stream.
-bool read_peaks(std::istream &stream, Header &header,
-                std::vector<Centroid::Peak> &peak);
-bool write_peaks(std::ostream &stream, Header &header,
-                 const std::vector<Centroid::Peak> &peak);
+bool read_peaks(std::istream &stream, Grid::Parameters *grid_parameters,
+                std::vector<Centroid::Peak> *peaks);
+bool write_peaks(std::ostream &stream, const Grid::Parameters &grid_parameters,
+                 const std::vector<Centroid::Peak> &peaks);
 
 }  // namespace Centroid::Files::Bpks
 

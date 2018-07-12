@@ -12,13 +12,13 @@ namespace Centroid {
 struct Point {
     unsigned int i;
     unsigned int j;
-    double height;
+    double height;  // TODO(alex): Rename to "value"
 };
 
 // TODO(alex): Add doc.
 struct Peak {
     // Center of the peak in index space (Coordinates of local maxima).
-    unsigned int i;
+    unsigned int i;  // TODO(alex): Re-type all these to uint64_t
     unsigned int j;
 
     // Real mz/rt values for the center of this peak (From the local maxima
