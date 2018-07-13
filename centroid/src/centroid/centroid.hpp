@@ -8,6 +8,12 @@
 
 namespace Centroid {
 
+struct Parameters {
+    uint64_t n_peaks;
+    double threshold;
+    Grid::Parameters grid_params;
+};
+
 // A Point represents the coordinates and value of those coordinates in the
 // Grid.
 struct Point {
@@ -67,8 +73,10 @@ struct Peak {
 // Find all candidate points on the given mesh by calculating the local maxima
 // at each point of the grid. The local maxima is defined as follows: For the
 // given indexes i and j the point at data[i][j] is greater than the neighbors
-// in all 8 directions.
-std::vector<Point> find_local_maxima(const Grid::Parameters &parameters,
+// in all 8 directions. The resulting points are sorted in descending value
+// order. If a maximum number of peaks is given on Centroid::Parameters.n_peaks,
+// only the first n_peaks Points will be returned.
+std::vector<Point> find_local_maxima(const Centroid::Parameters &parameters,
                                      const std::vector<double> &data);
 
 // Find the boundary of the given bag of points. Note that this fuction sorts
@@ -78,12 +86,12 @@ std::vector<Point> find_boundary(std::vector<Point> &points);
 // Find all points that belong to a given local max point via recursive local
 // search of the slope of the peaks.
 void explore_peak_slope(uint64_t i, uint64_t j, double previous_value,
-                        const Grid::Parameters &parameters,
+                        const Centroid::Parameters &parameters,
                         const std::vector<double> &data,
                         std::vector<Point> &points);
 
 // Builds a Peak object for the given local_max.
-Peak build_peak(const Point &local_max, const Grid::Parameters &parameters,
+Peak build_peak(const Point &local_max, const Centroid::Parameters &parameters,
                 const std::vector<double> &data);
 
 }  // namespace Centroid

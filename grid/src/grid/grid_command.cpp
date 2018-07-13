@@ -529,9 +529,8 @@ int main(int argc, char *argv[]) {
          (options["-parallel"] == "true" || options["-parallel"].empty()))) {
         auto n_threads = options["-n_threads"];
         if (!is_unsigned_int(n_threads)) {
-            std::cout << "error: "
-                      << "n_threads"
-                      << " has to be a positive integer" << std::endl;
+            std::cout << "error: n_threads has to be a positive integer"
+                      << std::endl;
             print_usage();
             return -1;
         }

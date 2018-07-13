@@ -4,94 +4,79 @@
 #include "doctest.h"
 
 TEST_CASE("Find local maxima") {
-    Grid::Parameters parameters = {
+    Grid::Parameters grid_params = {
         {}, {0, 100, 0, 100}, {50.0, 5.0, 5.0}, Instrument::QUAD, 0x00};
-    Grid::calculate_dimensions(parameters);
-    std::vector<double> data(parameters.dimensions.n * parameters.dimensions.m);
+    Grid::calculate_dimensions(grid_params);
+    std::vector<double> data(grid_params.dimensions.n *
+                             grid_params.dimensions.m);
     // Simulating one isotope with three adjacent peaks and an artifact peak.
     // Peak 1
-    CHECK(Grid::splat({20, 40, 3}, parameters, data));
-    CHECK(Grid::splat({20, 50, 5}, parameters, data));
-    CHECK(Grid::splat({20, 57, 5.5}, parameters, data));
-    CHECK(Grid::splat({20, 60, 6}, parameters, data));
-    CHECK(Grid::splat({20, 63, 5}, parameters, data));
-    CHECK(Grid::splat({20, 65, 4}, parameters, data));
+    CHECK(Grid::splat({20, 40, 3}, grid_params, data));
+    CHECK(Grid::splat({20, 50, 5}, grid_params, data));
+    CHECK(Grid::splat({20, 57, 5.5}, grid_params, data));
+    CHECK(Grid::splat({20, 60, 6}, grid_params, data));
+    CHECK(Grid::splat({20, 63, 5}, grid_params, data));
+    CHECK(Grid::splat({20, 65, 4}, grid_params, data));
     // Peak 2
-    CHECK(Grid::splat({50, 50, 4}, parameters, data));
-    CHECK(Grid::splat({50, 57, 4.5}, parameters, data));
-    CHECK(Grid::splat({50, 60, 6}, parameters, data));
-    CHECK(Grid::splat({50, 63, 4}, parameters, data));
-    CHECK(Grid::splat({50, 65, 3}, parameters, data));
+    CHECK(Grid::splat({50, 50, 4}, grid_params, data));
+    CHECK(Grid::splat({50, 57, 4.5}, grid_params, data));
+    CHECK(Grid::splat({50, 60, 6}, grid_params, data));
+    CHECK(Grid::splat({50, 63, 4}, grid_params, data));
+    CHECK(Grid::splat({50, 65, 3}, grid_params, data));
     // Peak 3
-    CHECK(Grid::splat({80, 57, 4.5}, parameters, data));
-    CHECK(Grid::splat({80, 60, 5}, parameters, data));
-    CHECK(Grid::splat({80, 63, 3}, parameters, data));
-    CHECK(Grid::splat({80, 65, 2}, parameters, data));
+    CHECK(Grid::splat({80, 57, 4.5}, grid_params, data));
+    CHECK(Grid::splat({80, 60, 5}, grid_params, data));
+    CHECK(Grid::splat({80, 63, 3}, grid_params, data));
+    CHECK(Grid::splat({80, 65, 2}, grid_params, data));
     // Artifact peak
-    CHECK(Grid::splat({10, 10, 4}, parameters, data));
+    CHECK(Grid::splat({10, 10, 4}, grid_params, data));
 
-    auto points = Centroid::find_local_maxima(parameters, data);
+    auto points = Centroid::find_local_maxima({0, 0, grid_params}, data);
     CHECK(points.size() == 4);
 }
 
 TEST_CASE("Find peak boundaries") {
-    Grid::Parameters parameters = {
+    Grid::Parameters grid_params = {
         {}, {0, 100, 0, 100}, {50.0, 5.0, 5.0}, Instrument::QUAD, 0x00};
-    Grid::calculate_dimensions(parameters);
-    std::vector<double> data(parameters.dimensions.n * parameters.dimensions.m);
+    Grid::calculate_dimensions(grid_params);
+    std::vector<double> data(grid_params.dimensions.n *
+                             grid_params.dimensions.m);
     // Simulating one isotope with three adjacent peaks and an artifact peak.
     // Peak 1
-    CHECK(Grid::splat({20, 40, 3}, parameters, data));
-    CHECK(Grid::splat({20, 50, 5}, parameters, data));
-    CHECK(Grid::splat({20, 57, 5.5}, parameters, data));
-    CHECK(Grid::splat({20, 60, 6}, parameters, data));
-    CHECK(Grid::splat({20, 63, 5}, parameters, data));
-    CHECK(Grid::splat({20, 65, 4}, parameters, data));
+    CHECK(Grid::splat({20, 40, 3}, grid_params, data));
+    CHECK(Grid::splat({20, 50, 5}, grid_params, data));
+    CHECK(Grid::splat({20, 57, 5.5}, grid_params, data));
+    CHECK(Grid::splat({20, 60, 6}, grid_params, data));
+    CHECK(Grid::splat({20, 63, 5}, grid_params, data));
+    CHECK(Grid::splat({20, 65, 4}, grid_params, data));
     // Peak 2
-    CHECK(Grid::splat({50, 50, 4}, parameters, data));
-    CHECK(Grid::splat({50, 57, 4.5}, parameters, data));
-    CHECK(Grid::splat({50, 60, 6}, parameters, data));
-    CHECK(Grid::splat({50, 63, 4}, parameters, data));
-    CHECK(Grid::splat({50, 65, 3}, parameters, data));
+    CHECK(Grid::splat({50, 50, 4}, grid_params, data));
+    CHECK(Grid::splat({50, 57, 4.5}, grid_params, data));
+    CHECK(Grid::splat({50, 60, 6}, grid_params, data));
+    CHECK(Grid::splat({50, 63, 4}, grid_params, data));
+    CHECK(Grid::splat({50, 65, 3}, grid_params, data));
     // Peak 3
-    CHECK(Grid::splat({80, 57, 4.5}, parameters, data));
-    CHECK(Grid::splat({80, 60, 5}, parameters, data));
-    CHECK(Grid::splat({80, 63, 3}, parameters, data));
-    CHECK(Grid::splat({80, 65, 2}, parameters, data));
+    CHECK(Grid::splat({80, 57, 4.5}, grid_params, data));
+    CHECK(Grid::splat({80, 60, 5}, grid_params, data));
+    CHECK(Grid::splat({80, 63, 3}, grid_params, data));
+    CHECK(Grid::splat({80, 65, 2}, grid_params, data));
     // Artifact peak
-    CHECK(Grid::splat({10, 10, 4}, parameters, data));
+    CHECK(Grid::splat({10, 10, 4}, grid_params, data));
 
-    auto local_max_points = Centroid::find_local_maxima(parameters, data);
+    auto local_max_points =
+        Centroid::find_local_maxima({0, 0, grid_params}, data);
     CHECK(local_max_points.size() == 4);
 
     std::vector<size_t> expected_size = {
-        25,
         50,
         40,
         35,
+        25,
     };
 
     // Only interested in the indices, ignoring the value for now, but we assume
     // it's correct.
     std::vector<std::vector<Centroid::Point>> expected_boundary = {
-        {
-            {0, 0, 0},
-            {1, 0, 0},
-            {2, 0, 0},
-            {3, 0, 0},
-            {4, 0, 0},
-            {0, 1, 0},
-            {4, 1, 0},
-            {0, 2, 0},
-            {4, 2, 0},
-            {0, 3, 0},
-            {4, 3, 0},
-            {0, 4, 0},
-            {1, 4, 0},
-            {2, 4, 0},
-            {3, 4, 0},
-            {4, 4, 0},
-        },
         {
             {2, 6, 0},  {3, 6, 0},  {4, 6, 0},  {5, 6, 0},  {6, 6, 0},
             {2, 7, 0},  {6, 7, 0},  {2, 8, 0},  {6, 8, 0},  {2, 9, 0},
@@ -112,12 +97,31 @@ TEST_CASE("Find peak boundaries") {
             {14, 10, 0}, {18, 10, 0}, {14, 11, 0}, {18, 11, 0}, {14, 12, 0},
             {18, 12, 0}, {14, 13, 0}, {18, 13, 0}, {14, 14, 0}, {18, 14, 0},
             {14, 15, 0}, {15, 15, 0}, {16, 15, 0}, {17, 15, 0}, {18, 15, 0},
-        }};
+        },
+        {
+            {0, 0, 0},
+            {1, 0, 0},
+            {2, 0, 0},
+            {3, 0, 0},
+            {4, 0, 0},
+            {0, 1, 0},
+            {4, 1, 0},
+            {0, 2, 0},
+            {4, 2, 0},
+            {0, 3, 0},
+            {4, 3, 0},
+            {0, 4, 0},
+            {1, 4, 0},
+            {2, 4, 0},
+            {3, 4, 0},
+            {4, 4, 0},
+        },
+    };
     for (size_t i = 0; i < local_max_points.size(); ++i) {
         auto local_max = local_max_points[i];
         std::vector<Centroid::Point> peak_points;
-        Centroid::explore_peak_slope(local_max.i, local_max.j, -1, parameters,
-                                     data, peak_points);
+        Centroid::explore_peak_slope(local_max.i, local_max.j, -1,
+                                     {0, 0, grid_params}, data, peak_points);
         CHECK(expected_size[i] == peak_points.size());
         auto boundary = Centroid::find_boundary(peak_points);
         CHECK(boundary.size() == expected_boundary[i].size());
@@ -129,60 +133,45 @@ TEST_CASE("Find peak boundaries") {
 }
 
 TEST_CASE("Find peaks") {
-    Grid::Parameters parameters = {
+    Grid::Parameters grid_params = {
         {}, {0, 100, 0, 100}, {50.0, 5.0, 5.0}, Instrument::QUAD, 0x00};
-    Grid::calculate_dimensions(parameters);
-    std::vector<double> data(parameters.dimensions.n * parameters.dimensions.m);
+    Grid::calculate_dimensions(grid_params);
+    std::vector<double> data(grid_params.dimensions.n *
+                             grid_params.dimensions.m);
     // Simulating one isotope with three adjacent peaks and an artifact peak.
     // Peak 1
-    CHECK(Grid::splat({20, 40, 3}, parameters, data));
-    CHECK(Grid::splat({20, 50, 5}, parameters, data));
-    CHECK(Grid::splat({20, 57, 5.5}, parameters, data));
-    CHECK(Grid::splat({20, 60, 6}, parameters, data));
-    CHECK(Grid::splat({20, 63, 5}, parameters, data));
-    CHECK(Grid::splat({20, 65, 4}, parameters, data));
+    CHECK(Grid::splat({20, 40, 3}, grid_params, data));
+    CHECK(Grid::splat({20, 50, 5}, grid_params, data));
+    CHECK(Grid::splat({20, 57, 5.5}, grid_params, data));
+    CHECK(Grid::splat({20, 60, 6}, grid_params, data));
+    CHECK(Grid::splat({20, 63, 5}, grid_params, data));
+    CHECK(Grid::splat({20, 65, 4}, grid_params, data));
     // Peak 2
-    CHECK(Grid::splat({50, 50, 4}, parameters, data));
-    CHECK(Grid::splat({50, 57, 4.5}, parameters, data));
-    CHECK(Grid::splat({50, 60, 6}, parameters, data));
-    CHECK(Grid::splat({50, 63, 4}, parameters, data));
-    CHECK(Grid::splat({50, 65, 3}, parameters, data));
+    CHECK(Grid::splat({50, 50, 4}, grid_params, data));
+    CHECK(Grid::splat({50, 57, 4.5}, grid_params, data));
+    CHECK(Grid::splat({50, 60, 6}, grid_params, data));
+    CHECK(Grid::splat({50, 63, 4}, grid_params, data));
+    CHECK(Grid::splat({50, 65, 3}, grid_params, data));
     // Peak 3
-    CHECK(Grid::splat({80, 57, 4.5}, parameters, data));
-    CHECK(Grid::splat({80, 60, 5}, parameters, data));
-    CHECK(Grid::splat({80, 63, 3}, parameters, data));
-    CHECK(Grid::splat({80, 65, 2}, parameters, data));
+    CHECK(Grid::splat({80, 57, 4.5}, grid_params, data));
+    CHECK(Grid::splat({80, 60, 5}, grid_params, data));
+    CHECK(Grid::splat({80, 63, 3}, grid_params, data));
+    CHECK(Grid::splat({80, 65, 2}, grid_params, data));
     // Artifact peak
-    CHECK(Grid::splat({10, 10, 4}, parameters, data));
+    CHECK(Grid::splat({10, 10, 4}, grid_params, data));
 
-    auto local_max_points = Centroid::find_local_maxima(parameters, data);
+    auto local_max_points =
+        Centroid::find_local_maxima({0, 0, grid_params}, data);
     CHECK(local_max_points.size() == 4);
 
     std::vector<size_t> expected_size = {
-        25,
         50,
         40,
         35,
+        25,
     };
 
     std::vector<Centroid::Peak> expected_peaks = {
-        {
-            2,         // i
-            2,         // j
-            10,        // mz
-            10,        // rt
-            4,         // height
-            24.6757,   // total_intensity
-            4.80706,   // sigma_mz
-            4.80706,   // sigma_rt
-            9.4237,    // mz_centroid
-            9.4237,    // rt_centroid
-            2.28256,   // height_centroid
-            22.0599,   // total_intensity_centroid
-            0.317821,  // border_background
-            {},        // points
-            {},        // boundary
-        },
         {
             4,         // i
             12,        // j
@@ -234,6 +223,23 @@ TEST_CASE("Find peaks") {
             {},        // points
             {},        // boundary
         },
+        {
+            2,         // i
+            2,         // j
+            10,        // mz
+            10,        // rt
+            4,         // height
+            24.6757,   // total_intensity
+            4.80706,   // sigma_mz
+            4.80706,   // sigma_rt
+            9.4237,    // mz_centroid
+            9.4237,    // rt_centroid
+            2.28256,   // height_centroid
+            22.0599,   // total_intensity_centroid
+            0.317821,  // border_background
+            {},        // points
+            {},        // boundary
+        },
     };
 
     auto round_double = [](double d) {
@@ -241,7 +247,7 @@ TEST_CASE("Find peaks") {
     };
     for (size_t i = 0; i < local_max_points.size(); ++i) {
         auto local_max = local_max_points[i];
-        auto peak = Centroid::build_peak(local_max, parameters, data);
+        auto peak = Centroid::build_peak(local_max, {0, 0, grid_params}, data);
         CHECK(peak.i == expected_peaks[i].i);
         CHECK(peak.j == expected_peaks[i].j);
         CHECK(round_double(peak.mz) == round_double(expected_peaks[i].mz));

@@ -4,10 +4,11 @@
 #include "centroid.hpp"
 
 std::vector<Centroid::Point> Centroid::find_local_maxima(
-    const Grid::Parameters &parameters, const std::vector<double> &data) {
-    std::vector<Centroid::Point> ret;
-    uint64_t n_mz = parameters.dimensions.n;
-    uint64_t n_rt = parameters.dimensions.m;
+    const Centroid::Parameters &parameters, const std::vector<double> &data) {
+    std::vector<Centroid::Point> points;
+    auto grid_params = parameters.grid_params;
+    uint64_t n_mz = grid_params.dimensions.n;
+    uint64_t n_rt = grid_params.dimensions.m;
     for (size_t j = 1; j < n_rt; ++j) {
         for (size_t i = 1; i < n_mz; ++i) {
             int index = i + j * n_mz;
@@ -33,19 +34,30 @@ std::vector<Centroid::Point> Centroid::find_local_maxima(
                 (value > top_value) && (value > top_right_value) &&
                 (value > top_left_value) && (value > bottom_value) &&
                 (value > bottom_left_value) && (value > bottom_right_value)) {
-                Centroid::Point peak = {};
-                peak.i = i;
-                peak.j = j;
-                peak.value = value;
-                ret.push_back(peak);
+                Centroid::Point point = {};
+                point.i = i;
+                point.j = j;
+                point.value = value;
+                points.push_back(point);
             }
         }
     }
-    return ret;
+
+    // Sort the local maxima by descending height.
+    auto sort_by_value = [](const Centroid::Point &p1,
+                            const Centroid::Point &p2) -> bool {
+        return (p1.value > p2.value);
+    };
+    std::stable_sort(points.begin(), points.end(), sort_by_value);
+
+    if (parameters.n_peaks != 0 && parameters.n_peaks < points.size()) {
+        points.resize(parameters.n_peaks);
+    }
+    return points;
 }
 
 void Centroid::explore_peak_slope(uint64_t i, uint64_t j, double previous_value,
-                                  const Grid::Parameters &parameters,
+                                  const Centroid::Parameters &parameters,
                                   const std::vector<double> &data,
                                   std::vector<Centroid::Point> &points) {
     // Check that the point has not being already included.
@@ -55,16 +67,9 @@ void Centroid::explore_peak_slope(uint64_t i, uint64_t j, double previous_value,
         }
     }
 
-    // here set threshold to MAXIMUM of fractional peak height and a min
-    // value
-    // double bestthresh = thresh * pheight;
-    // if (bestthresh < peakheightmin) bestthresh = peakheightmin;
-    // TODO(alex): Set to a greater value, select by user or calculate it (For
-    // example accounting for maximum floating point precision.
-    double threshold = 0;
-
-    double value = data[i + j * parameters.dimensions.n];
-    if (previous_value >= 0 && (previous_value < value || value <= threshold)) {
+    double value = data[i + j * parameters.grid_params.dimensions.n];
+    if (previous_value >= 0 &&
+        (previous_value < value || value <= parameters.threshold)) {
         return;
     }
 
@@ -73,8 +78,8 @@ void Centroid::explore_peak_slope(uint64_t i, uint64_t j, double previous_value,
     // Return if we are at the edge of the grid.
     // FIXME(alex): Can this cause problems if we could continue exploring
     // downwards?
-    if (i < 1 || i >= parameters.dimensions.n - 1 || j < 1 ||
-        j >= parameters.dimensions.m - 1) {
+    if (i < 1 || i >= parameters.grid_params.dimensions.n - 1 || j < 1 ||
+        j >= parameters.grid_params.dimensions.m - 1) {
         return;
     }
 
@@ -131,14 +136,15 @@ std::vector<Centroid::Point> Centroid::find_boundary(
 }
 
 Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
-                                    const Grid::Parameters &parameters,
+                                    const Centroid::Parameters &parameters,
                                     const std::vector<double> &data) {
     Centroid::Peak peak = {};
     peak.i = local_max.i;
     peak.j = local_max.j;
     peak.height = local_max.value;
-    peak.mz = Grid::mz_at(local_max.i, parameters);
-    peak.rt = Grid::rt_at(local_max.j, parameters);
+    auto grid_params = parameters.grid_params;
+    peak.mz = Grid::mz_at(local_max.i, grid_params);
+    peak.rt = Grid::rt_at(local_max.j, grid_params);
 
     // Extract the peak points and the boundary.
     Centroid::explore_peak_slope(local_max.i, local_max.j, -1, parameters, data,
@@ -187,8 +193,8 @@ Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
         double x_sig = 0;
         double y_sig = 0;
         for (const auto &point : peak.points) {
-            double mz = Grid::mz_at(point.i, parameters);
-            double rt = Grid::rt_at(point.j, parameters);
+            double mz = Grid::mz_at(point.i, grid_params);
+            double rt = Grid::rt_at(point.j, grid_params);
 
             height_sum += point.value;
             x_sum += point.value * mz;
@@ -227,18 +233,18 @@ Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
 
         // Even if the point lays outside the current grid, we still want to
         // account for it's contribution to the points in the frontier.
-        auto i_min = min_mz < parameters.bounds.min_mz
+        auto i_min = min_mz < grid_params.bounds.min_mz
                          ? 0
-                         : Grid::x_index(min_mz, parameters);
-        auto j_min = min_rt < parameters.bounds.min_rt
+                         : Grid::x_index(min_mz, grid_params);
+        auto j_min = min_rt < grid_params.bounds.min_rt
                          ? 0
-                         : Grid::y_index(min_rt, parameters);
-        auto i_max = max_mz > parameters.bounds.max_mz
-                         ? parameters.dimensions.n - 1
-                         : Grid::x_index(max_mz, parameters);
-        auto j_max = max_rt > parameters.bounds.max_rt
-                         ? parameters.dimensions.m - 1
-                         : Grid::y_index(max_rt, parameters);
+                         : Grid::y_index(min_rt, grid_params);
+        auto i_max = max_mz > grid_params.bounds.max_mz
+                         ? grid_params.dimensions.n - 1
+                         : Grid::x_index(max_mz, grid_params);
+        auto j_max = max_rt > grid_params.bounds.max_rt
+                         ? grid_params.dimensions.m - 1
+                         : Grid::y_index(max_rt, grid_params);
 
         double height_sum = 0;
         double weights_sum = 0;
@@ -249,15 +255,15 @@ Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
             for (size_t i = i_min; i <= i_max; ++i) {
                 // No need to do boundary check, since we are sure we are inside
                 // the grid.
-                double mz = Grid::mz_at(i, parameters);
-                double rt = Grid::rt_at(j, parameters);
+                double mz = Grid::mz_at(i, grid_params);
+                double rt = Grid::rt_at(j, grid_params);
 
                 // Calculate the gaussian weight for this point.
                 double a = (mz - peak.mz) / sigma_mz;
                 double b = (rt - peak.rt) / sigma_rt;
                 double weight = std::exp(-0.5 * (a * a + b * b));
 
-                double height = data[i + j * parameters.dimensions.n];
+                double height = data[i + j * grid_params.dimensions.n];
                 height_sum += height;
                 weights_sum += weight;
                 weighted_height_sum += height * weight;

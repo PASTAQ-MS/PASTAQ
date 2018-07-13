@@ -46,7 +46,7 @@ TEST_CASE("Read/Write header from/to stream") {
     }
 }
 
-TEST_CASE("Read/Write found peaks to bpks stream") {
+TEST_CASE("Read/Write found peaks to stream") {
     Grid::Parameters parameters = {
         {}, {0, 100, 0, 100}, {50.0, 5.0, 5.0}, Instrument::QUAD, 0x00};
     Grid::calculate_dimensions(parameters);
@@ -73,34 +73,18 @@ TEST_CASE("Read/Write found peaks to bpks stream") {
     // Artifact peak
     CHECK(Grid::splat({10, 10, 4}, parameters, data));
 
-    auto local_max_points = Centroid::find_local_maxima(parameters, data);
+    auto local_max_points =
+        Centroid::find_local_maxima({0, 0, parameters}, data);
     CHECK(local_max_points.size() == 4);
 
     std::vector<size_t> expected_size = {
-        25,
         50,
         40,
         35,
+        25,
     };
 
     std::vector<Centroid::Peak> expected_peaks = {
-        {
-            2,         // i
-            2,         // j
-            10,        // mz
-            10,        // rt
-            4,         // height
-            24.6757,   // total_intensity
-            4.80706,   // sigma_mz
-            4.80706,   // sigma_rt
-            9.4237,    // mz_centroid
-            9.4237,    // rt_centroid
-            2.28256,   // height_centroid
-            22.0599,   // total_intensity_centroid
-            0.317821,  // border_background
-            {},        // points
-            {},        // boundary
-        },
         {
             4,         // i
             12,        // j
@@ -152,6 +136,23 @@ TEST_CASE("Read/Write found peaks to bpks stream") {
             {},        // points
             {},        // boundary
         },
+        {
+            2,         // i
+            2,         // j
+            10,        // mz
+            10,        // rt
+            4,         // height
+            24.6757,   // total_intensity
+            4.80706,   // sigma_mz
+            4.80706,   // sigma_rt
+            9.4237,    // mz_centroid
+            9.4237,    // rt_centroid
+            2.28256,   // height_centroid
+            22.0599,   // total_intensity_centroid
+            0.317821,  // border_background
+            {},        // points
+            {},        // boundary
+        },
     };
 
     // TODO(alex): These should be generalized to testutils module
@@ -161,7 +162,7 @@ TEST_CASE("Read/Write found peaks to bpks stream") {
     std::vector<Centroid::Peak> peaks;
     for (size_t i = 0; i < local_max_points.size(); ++i) {
         auto local_max = local_max_points[i];
-        auto peak = Centroid::build_peak(local_max, parameters, data);
+        auto peak = Centroid::build_peak(local_max, {0, 0, parameters}, data);
         peaks.push_back(peak);
         CHECK(peak.i == expected_peaks[i].i);
         CHECK(peak.j == expected_peaks[i].j);
@@ -262,14 +263,14 @@ TEST_CASE("Read/Write found peaks to bpks stream") {
         std::vector<std::string> expected_lines = {
             {"N X Y Height Volume VCentroid XSigma YSigma Count LocalBkgnd "
              "SNVolume SNHeight SNCentroid"},
-            {"0 10 10 2.28256 24.6757 22.0599 4.80706 4.80706 25 0.317821 "
-             "77.6403 12.5857 69.4097"},
-            {"1 20 60 8.76881 175.126 160.357 4.80706 8.85391 50 0.814667 "
+            {"0 20 60 8.76881 175.126 160.357 4.80706 8.85391 50 0.814667 "
              "214.967 21.9392 196.838"},
-            {"2 50 60 8.51286 132.078 122.656 4.80706 6.82431 40 0.749546 "
+            {"1 50 60 8.51286 132.078 122.656 4.80706 6.82431 40 0.749546 "
              "176.21 20.6268 163.641"},
-            {"3 80 60 6.90168 88.9893 83.5048 4.80706 5.53369 35 0.542793 "
-             "163.947 22.9877 153.843"}};
+            {"2 80 60 6.90168 88.9893 83.5048 4.80706 5.53369 35 0.542793 "
+             "163.947 22.9877 153.843"},
+            {"3 10 10 2.28256 24.6757 22.0599 4.80706 4.80706 25 0.317821 "
+             "77.6403 12.5857 69.4097"}};
 
         std::string line;
         std::stringstream stream;
