@@ -1,8 +1,8 @@
 #ifndef GRID_GRID_HPP
 #define GRID_GRID_HPP
 
-#include <vector>
 #include <cstdint>
+#include <vector>
 
 namespace Instrument {
 
