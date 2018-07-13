@@ -16,12 +16,12 @@ std::vector<double> run(const Grid::Parameters &parameters,
 namespace Grid::Runners::Parallel {
 
 // Perform grid splatting for all given points in parallel.
-std::vector<double> run(unsigned int max_threads, const Parameters &parameters,
+std::vector<double> run(uint64_t max_threads, const Parameters &parameters,
                         const std::vector<Point> &all_points);
 
 // Splits the parameters in retention time into a maximum of n_split segments.
 std::vector<Parameters> split_segments(const Parameters &original_params,
-                                       unsigned int n_splits);
+                                       uint64_t n_splits);
 
 // Assign each of the given points into the appropriate segment.
 std::vector<std::vector<Point>> assign_points(

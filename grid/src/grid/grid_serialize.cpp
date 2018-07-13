@@ -3,8 +3,8 @@
 
 bool Grid::Serialize::read_parameters(std::istream &stream,
                                       Grid::Parameters *parameters) {
-    Serialization::read_uint32(stream, &parameters->dimensions.n);
-    Serialization::read_uint32(stream, &parameters->dimensions.m);
+    Serialization::read_uint64(stream, &parameters->dimensions.n);
+    Serialization::read_uint64(stream, &parameters->dimensions.m);
     Serialization::read_double(stream, &parameters->bounds.min_rt);
     Serialization::read_double(stream, &parameters->bounds.max_rt);
     Serialization::read_double(stream, &parameters->bounds.min_mz);
@@ -19,8 +19,8 @@ bool Grid::Serialize::read_parameters(std::istream &stream,
 
 bool Grid::Serialize::write_parameters(std::ostream &stream,
                                        const Grid::Parameters &parameters) {
-    Serialization::write_uint32(stream, parameters.dimensions.n);
-    Serialization::write_uint32(stream, parameters.dimensions.m);
+    Serialization::write_uint64(stream, parameters.dimensions.n);
+    Serialization::write_uint64(stream, parameters.dimensions.m);
     Serialization::write_double(stream, parameters.bounds.min_rt);
     Serialization::write_double(stream, parameters.bounds.max_rt);
     Serialization::write_double(stream, parameters.bounds.min_mz);

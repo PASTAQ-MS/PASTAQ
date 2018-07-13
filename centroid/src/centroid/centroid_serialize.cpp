@@ -3,24 +3,24 @@
 
 bool Centroid::Serialize::read_point(std::istream &stream,
                                      Centroid::Point *point) {
-    Serialization::read_uint32(stream, &point->i);
-    Serialization::read_uint32(stream, &point->j);
-    Serialization::read_double(stream, &point->height);
+    Serialization::read_uint64(stream, &point->i);
+    Serialization::read_uint64(stream, &point->j);
+    Serialization::read_double(stream, &point->value);
     return stream.good();
 }
 
 bool Centroid::Serialize::write_point(std::ostream &stream,
                                       const Centroid::Point &point) {
-    Serialization::write_uint32(stream, point.i);
-    Serialization::write_uint32(stream, point.j);
-    Serialization::write_double(stream, point.height);
+    Serialization::write_uint64(stream, point.i);
+    Serialization::write_uint64(stream, point.j);
+    Serialization::write_double(stream, point.value);
     return stream.good();
 }
 
 bool Centroid::Serialize::read_peak(std::istream &stream,
                                     Centroid::Peak *peak) {
-    Serialization::read_uint32(stream, &peak->i);
-    Serialization::read_uint32(stream, &peak->j);
+    Serialization::read_uint64(stream, &peak->i);
+    Serialization::read_uint64(stream, &peak->j);
     Serialization::read_double(stream, &peak->mz);
     Serialization::read_double(stream, &peak->rt);
     Serialization::read_double(stream, &peak->height);
@@ -54,8 +54,8 @@ bool Centroid::Serialize::read_peak(std::istream &stream,
 
 bool Centroid::Serialize::write_peak(std::ostream &stream,
                                      const Centroid::Peak &peak) {
-    Serialization::write_uint32(stream, peak.i);
-    Serialization::write_uint32(stream, peak.j);
+    Serialization::write_uint64(stream, peak.i);
+    Serialization::write_uint64(stream, peak.j);
     Serialization::write_double(stream, peak.mz);
     Serialization::write_double(stream, peak.rt);
     Serialization::write_double(stream, peak.height);

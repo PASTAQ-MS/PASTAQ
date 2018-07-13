@@ -518,7 +518,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Set up maximum concurrency.
-    unsigned int max_threads = std::thread::hardware_concurrency();
+    uint64_t max_threads = std::thread::hardware_concurrency();
     if (!max_threads) {
         std::cout << "error: this system does not support parallel processing"
                   << std::endl;

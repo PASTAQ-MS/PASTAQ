@@ -245,16 +245,16 @@ TEST_CASE("Read/Write found peaks to bpks stream") {
             for (size_t j = 0; j < peaks[i].points.size(); ++j) {
                 CHECK(peaks[i].points[j].i == read_peaks[i].points[j].i);
                 CHECK(peaks[i].points[j].j == read_peaks[i].points[j].j);
-                CHECK(round_double(peaks[i].points[j].height) ==
-                      round_double(read_peaks[i].points[j].height));
+                CHECK(round_double(peaks[i].points[j].value) ==
+                      round_double(read_peaks[i].points[j].value));
             }
 
             CHECK(peaks[i].boundary.size() == read_peaks[i].boundary.size());
             for (size_t j = 0; j < peaks[i].boundary.size(); ++j) {
                 CHECK(peaks[i].boundary[j].i == read_peaks[i].boundary[j].i);
                 CHECK(peaks[i].boundary[j].j == read_peaks[i].boundary[j].j);
-                CHECK(round_double(peaks[i].boundary[j].height) ==
-                      round_double(read_peaks[i].boundary[j].height));
+                CHECK(round_double(peaks[i].boundary[j].value) ==
+                      round_double(read_peaks[i].boundary[j].value));
             }
         }
     }
@@ -263,17 +263,13 @@ TEST_CASE("Read/Write found peaks to bpks stream") {
             {"N X Y Height Volume VCentroid XSigma YSigma Count LocalBkgnd "
              "SNVolume SNHeight SNCentroid"},
             {"0 10 10 4 24.6757 22.0599 4.80706 4.80706 25 0.317821 77.6403 "
-             "12."
-             "5857 69.4097"},
+             "12.5857 69.4097"},
             {"1 20 60 17.8731 175.126 160.357 4.80706 8.85391 50 0.814667 "
-             "214."
-             "967 21.9392 196.838"},
+             "214.967 21.9392 196.838"},
             {"2 50 60 15.4607 132.078 122.656 4.80706 6.82431 40 0.749546 "
-             "176."
-             "21 20.6268 163.641"},
+             "176.21 20.6268 163.641"},
             {"3 80 60 12.4776 88.9893 83.5048 4.80706 5.53369 35 0.542793 "
-             "163."
-             "947 22.9877 153.843"}};
+             "163.947 22.9877 153.843"}};
         std::string line;
         std::stringstream stream;
         CHECK(Centroid::Files::Csv::write_peaks(stream, peaks));

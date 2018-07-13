@@ -6,8 +6,8 @@
 std::vector<Centroid::Point> Centroid::find_local_maxima(
     const Grid::Parameters &parameters, const std::vector<double> &data) {
     std::vector<Centroid::Point> ret;
-    unsigned int n_mz = parameters.dimensions.n;
-    unsigned int n_rt = parameters.dimensions.m;
+    uint64_t n_mz = parameters.dimensions.n;
+    uint64_t n_rt = parameters.dimensions.m;
     for (size_t j = 1; j < n_rt; ++j) {
         for (size_t i = 1; i < n_mz; ++i) {
             int index = i + j * n_mz;
@@ -36,7 +36,7 @@ std::vector<Centroid::Point> Centroid::find_local_maxima(
                 Centroid::Point peak = {};
                 peak.i = i;
                 peak.j = j;
-                peak.height = value;
+                peak.value = value;
                 ret.push_back(peak);
             }
         }
@@ -44,159 +44,48 @@ std::vector<Centroid::Point> Centroid::find_local_maxima(
     return ret;
 }
 
-// FIXME(alex): This does not account for the case where a peak might be
-// contained in another peak. Local search is necessary in that case.
-std::vector<Centroid::Point> Centroid::find_peak_points(
-    const Centroid::Point &point, const Grid::Parameters &parameters,
-    const std::vector<double> &data) {
-    // Initialize return vector.
-    std::vector<Centroid::Point> ret;
-    ret.push_back(point);
+void Centroid::explore_peak_slope(uint64_t i, uint64_t j, double previous_value,
+                                  const Grid::Parameters &parameters,
+                                  const std::vector<double> &data,
+                                  std::vector<Centroid::Point> &points) {
+    // Check that the point has not being already included.
+    for (const auto &point : points) {
+        if (point.i == i && point.j == j) {
+            return;
+        }
+    }
 
+    // here set threshold to MAXIMUM of fractional peak height and a min
+    // value
+    // double bestthresh = thresh * pheight;
+    // if (bestthresh < peakheightmin) bestthresh = peakheightmin;
     // TODO(alex): Set to a greater value, select by user or calculate it (For
     // example accounting for maximum floating point precision.
     double threshold = 0;
 
-    unsigned int max_i = 0;
-    unsigned int min_i = 0;
-    unsigned int max_j = 0;
-    unsigned int min_j = 0;
-
-    // Find right boundary.
-    {
-        double previous_value = point.height;
-        for (unsigned int i = point.i; i < parameters.dimensions.n; ++i) {
-            int index = i + point.j * parameters.dimensions.n;
-            double value = data[index];
-            if (value <= threshold || value > previous_value) {
-                max_i = i;
-                break;
-            }
-            if (i != point.i) {
-                ret.push_back({i, point.j, value});
-            }
-            previous_value = value;
-        }
-    }
-    // Find left boundary.
-    {
-        double previous_value = point.height;
-        for (unsigned int i = point.i; i + 1 > 0; --i) {
-            int index = i + point.j * parameters.dimensions.n;
-            double value = data[index];
-            if (value <= threshold || value > previous_value) {
-                min_i = i;
-                break;
-            }
-            if (i != point.i) {
-                ret.push_back({i, point.j, value});
-            }
-            previous_value = value;
-        }
-    }
-    // Find bottom boundary.
-    {
-        double previous_value = point.height;
-        for (unsigned int j = point.j; j < parameters.dimensions.m; ++j) {
-            int index = point.i + j * parameters.dimensions.n;
-            double value = data[index];
-            if (value <= threshold || value > previous_value) {
-                max_j = j;
-                break;
-            }
-            if (j != point.j) {
-                ret.push_back({point.i, j, value});
-            }
-            previous_value = value;
-        }
-    }
-    // Find top boundary.
-    {
-        double previous_value = point.height;
-        for (unsigned int j = point.j; j + 1 > 0; --j) {
-            int index = point.i + j * parameters.dimensions.n;
-            double value = data[index];
-            if (value <= threshold || value > previous_value) {
-                min_j = j;
-                break;
-            }
-            if (j != point.j) {
-                ret.push_back({point.i, j, value});
-            }
-            previous_value = value;
-        }
+    double value = data[i + j * parameters.dimensions.n];
+    if (previous_value >= 0 && (previous_value < value || value <= threshold)) {
+        return;
     }
 
-    // Peak quadrants:
-    //
-    // |----|----|
-    // | Q4 | Q1 |
-    // |----|----|
-    // | Q3 | Q2 |
-    // |----|----|
-    //
-    // Find Q1 points
-    for (unsigned int j = point.j - 1; j + 1 > min_j; --j) {
-        double previous_value = data[point.i + j * parameters.dimensions.n];
-        for (unsigned int i = point.i + 1; i < max_i; ++i) {
-            int index = i + j * parameters.dimensions.n;
-            double value = data[index];
-            if (value <= threshold || value > previous_value) {
-                break;
-            }
-            if (i != point.i || j != point.j) {
-                ret.push_back({i, j, value});
-            }
-            previous_value = value;
-        }
-    }
-    // Find Q2 points
-    for (unsigned int j = point.j + 1; j < max_j; ++j) {
-        double previous_value = data[point.i + j * parameters.dimensions.n];
-        for (unsigned int i = point.i + 1; i < max_i; ++i) {
-            int index = i + j * parameters.dimensions.n;
-            double value = data[index];
-            if (value <= threshold || value > previous_value) {
-                break;
-            }
-            if (i != point.i || j != point.j) {
-                ret.push_back({i, j, value});
-            }
-            previous_value = value;
-        }
-    }
-    // Find Q3 points
-    for (unsigned int j = point.j - 1; j + 1 > min_j; --j) {
-        double previous_value = data[point.i + j * parameters.dimensions.n];
-        for (unsigned int i = point.i - 1; i + 1 > min_i; --i) {
-            int index = i + j * parameters.dimensions.n;
-            double value = data[index];
-            if (value <= threshold || value > previous_value) {
-                break;
-            }
-            if (i != point.i || j != point.j) {
-                ret.push_back({i, j, value});
-            }
-            previous_value = value;
-        }
-    }
-    // Find Q4 points
-    for (unsigned int j = point.j + 1; j < max_j; ++j) {
-        double previous_value = data[point.i + j * parameters.dimensions.n];
-        for (unsigned int i = point.i - 1; i + 1 > min_i; --i) {
-            int index = i + j * parameters.dimensions.n;
-            double value = data[index];
-            if (value <= threshold || value > previous_value) {
-                break;
-            }
-            if (i != point.i || j != point.j) {
-                ret.push_back({i, j, value});
-            }
-            previous_value = value;
-        }
+    points.push_back({i, j, value});
+
+    // Return if we are at the edge of the grid.
+    // FIXME(alex): Can this cause problems if we could continue exploring
+    // downwards?
+    if (i < 1 || i >= parameters.dimensions.n - 1 || j < 1 ||
+        j >= parameters.dimensions.m - 1) {
+        return;
     }
 
-    return ret;
+    Centroid::explore_peak_slope(i - 1, j, value, parameters, data, points);
+    Centroid::explore_peak_slope(i + 1, j, value, parameters, data, points);
+    Centroid::explore_peak_slope(i, j + 1, value, parameters, data, points);
+    Centroid::explore_peak_slope(i, j - 1, value, parameters, data, points);
+    Centroid::explore_peak_slope(i - 1, j - 1, value, parameters, data, points);
+    Centroid::explore_peak_slope(i + 1, j + 1, value, parameters, data, points);
+    Centroid::explore_peak_slope(i - 1, j + 1, value, parameters, data, points);
+    Centroid::explore_peak_slope(i + 1, j - 1, value, parameters, data, points);
 }
 
 std::vector<Centroid::Point> Centroid::find_boundary(
@@ -246,58 +135,13 @@ std::vector<Centroid::Point> Centroid::find_boundary(
     return boundary_points;
 }
 
-void Centroid::explore_peak_slope(unsigned int i, unsigned int j,
-                                  double previous_value,
-                                  const Grid::Parameters &parameters,
-                                  const std::vector<double> &data,
-                                  std::vector<Centroid::Point> &points) {
-    // Check that the point has not being already included.
-    for (const auto &point : points) {
-        if (point.i == i && point.j == j) {
-            return;
-        }
-    }
-
-    // here set threshold to MAXIMUM of fractional peak height and a min
-    // value
-    // double bestthresh = thresh * pheight;
-    // if (bestthresh < peakheightmin) bestthresh = peakheightmin;
-    // TODO(alex): Set to a greater value, select by user or calculate it (For
-    // example accounting for maximum floating point precision.
-    double threshold = 0;
-
-    double value = data[i + j * parameters.dimensions.n];
-    if (previous_value >= 0 && (previous_value < value || value <= threshold)) {
-        return;
-    }
-
-    points.push_back({i, j, value});
-
-    // Return if we are at the edge of the grid.
-    // FIXME(alex): Can this cause problems if we could continue exploring
-    // downwards?
-    if (i < 1 || i >= parameters.dimensions.n - 1 || j < 1 ||
-        j >= parameters.dimensions.m - 1) {
-        return;
-    }
-
-    Centroid::explore_peak_slope(i - 1, j, value, parameters, data, points);
-    Centroid::explore_peak_slope(i + 1, j, value, parameters, data, points);
-    Centroid::explore_peak_slope(i, j + 1, value, parameters, data, points);
-    Centroid::explore_peak_slope(i, j - 1, value, parameters, data, points);
-    Centroid::explore_peak_slope(i - 1, j - 1, value, parameters, data, points);
-    Centroid::explore_peak_slope(i + 1, j + 1, value, parameters, data, points);
-    Centroid::explore_peak_slope(i - 1, j + 1, value, parameters, data, points);
-    Centroid::explore_peak_slope(i + 1, j - 1, value, parameters, data, points);
-}
-
 Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
                                     const Grid::Parameters &parameters,
                                     const std::vector<double> &data) {
     Centroid::Peak peak = {};
     peak.i = local_max.i;
     peak.j = local_max.j;
-    peak.height = local_max.height;
+    peak.height = local_max.value;
     peak.mz = Grid::mz_at(local_max.i, parameters);
     peak.rt = Grid::rt_at(local_max.j, parameters);
 
@@ -319,7 +163,7 @@ Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
     {
         double boundary_sum = 0;
         for (const auto &point : peak.boundary) {
-            boundary_sum += point.height;
+            boundary_sum += point.value;
         }
         peak.border_background = boundary_sum / peak.boundary.size();
     }
@@ -352,11 +196,11 @@ Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
             double mz = Grid::mz_at(point.i, parameters);
             double rt = Grid::rt_at(point.j, parameters);
 
-            height_sum += point.height;
-            x_sum += point.height * mz;
-            y_sum += point.height * rt;
-            x_sig += point.height * mz * mz;
-            y_sig += point.height * rt * rt;
+            height_sum += point.value;
+            x_sum += point.value * mz;
+            y_sum += point.value * rt;
+            x_sig += point.value * mz * mz;
+            y_sig += point.value * rt * rt;
         }
         peak.sigma_mz =
             std::sqrt((x_sig / height_sum) - std::pow(x_sum / height_sum, 2));
@@ -436,10 +280,3 @@ Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
 
     return peak;
 }
-
-// TODO(alex): move to Centroid::Runners with parallel and serial versions.
-// std::vector<Centroid::Peak> Centroid::find_peaks(
-// const Grid::Parameters &parameters, const std::vector<double> &data) {
-// std::vector<Centroid::Peak> ret;
-// return ret;
-//}

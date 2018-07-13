@@ -73,22 +73,44 @@ bool Centroid::Files::Csv::write_peaks(
     // Write each peak as a csv row.
     for (size_t i = 0; i < peaks.size(); ++i) {
         auto peak = peaks[i];
-        stream << i << cell_delimiter                              // N
-               << peak.mz << cell_delimiter                        // X
-               << peak.rt << cell_delimiter                        // Y
-               << peak.height << cell_delimiter                    // Height
-               << peak.total_intensity << cell_delimiter           // Volume
-               << peak.total_intensity_centroid << cell_delimiter  // VCentroid
-               << peak.sigma_mz << cell_delimiter                  // XSigma
-               << peak.sigma_rt << cell_delimiter                  // YSigma
-               << peak.points.size() << cell_delimiter             // Count
-               << peak.border_background << cell_delimiter         // LocalBkgnd
+        // N
+        stream << i
+               << cell_delimiter
+               // X
+               << peak.mz
+               << cell_delimiter
+               // Y
+               << peak.rt
+               << cell_delimiter
+               // Height
+               << peak.height
+               << cell_delimiter
+               // Volume
+               << peak.total_intensity
+               << cell_delimiter
+               // VCentroid
+               << peak.total_intensity_centroid
+               << cell_delimiter
+               // XSigma
+               << peak.sigma_mz
+               << cell_delimiter
+               // YSigma
+               << peak.sigma_rt
+               << cell_delimiter
+               // Count
+               << peak.points.size()
+               << cell_delimiter
+               // LocalBkgnd
+               << peak.border_background
+               << cell_delimiter
+               // SNVolume
                << (peak.total_intensity / peak.border_background)
-               << cell_delimiter  // SNVolume
+               << cell_delimiter
+               // SNHeight
                << (peak.height / peak.border_background)
-               << cell_delimiter  // SNHeight
-               << (peak.total_intensity_centroid /
-                   peak.border_background);  // SNHeight
+               << cell_delimiter
+               // SNHeight
+               << (peak.total_intensity_centroid / peak.border_background);
         if (i != peaks.size() - 1) {
             stream << line_delimiter;
         }

@@ -2,6 +2,7 @@
 #define GRID_GRID_HPP
 
 #include <vector>
+#include <cstdint>
 
 namespace Instrument {
 
@@ -18,9 +19,8 @@ enum Flags : unsigned char { WARPED_MESH = 0b00000001 };
 //   (n == number of columns == Number of points in mz)
 //   (m == number of rows == Number of points in rt)
 struct Dimensions {
-    // TODO(alex): use uint64_t instead.
-    unsigned int n;
-    unsigned int m;
+    uint64_t n;
+    uint64_t m;
 };
 
 // Represent the real world bounds for this grid. Note that the bounds are
@@ -69,19 +69,19 @@ bool splat(const Point &point, const Parameters &parameters,
 
 // Get the real world mass/charge stored in the given index for the given
 // parameters. It doesn't perform any boundary checks.
-double mz_at(unsigned int i, const Parameters &parameters);
+double mz_at(uint64_t i, const Parameters &parameters);
 
 // Get the real world retention time stored in the given index. It doesn't
 // perform any boundary checks.
-double rt_at(unsigned int j, const Parameters &parameters);
+double rt_at(uint64_t j, const Parameters &parameters);
 
 // Get the x index of the closest point (rounded down) for a given mz. It
 // doesn't perform any boundary checks.
-unsigned int x_index(double mz, const Parameters &parameters);
+uint64_t x_index(double mz, const Parameters &parameters);
 
 // Get the y index of the closest point (rounded down) for a given rt. It
 // doesn't perform any boundary checks.
-unsigned int y_index(double rt, const Parameters &parameters);
+uint64_t y_index(double rt, const Parameters &parameters);
 
 // Get the sigma_mz used for smoothing. In order to maintain the same number
 // of sampling points for smoothing across all the mz range of the

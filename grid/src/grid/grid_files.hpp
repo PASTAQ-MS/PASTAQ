@@ -48,8 +48,8 @@ bool read_parameters(std::istream &stream, Grid::Parameters *parameters);
 bool write_parameters(std::ostream &stream, const Grid::Parameters &parameters);
 
 constexpr static uint64_t footer_size =
-    sizeof(uint32_t)    // Grid::Parameters.dimensions.n
-    + sizeof(uint32_t)  // Grid::Parameters.dimensions.m
+    sizeof(uint64_t)    // Grid::Parameters.dimensions.n
+    + sizeof(uint64_t)  // Grid::Parameters.dimensions.m
     + sizeof(double)    // Grid::Parameters.bounds.min_rt
     + sizeof(double)    // Grid::Parameters.bounds.max_rt
     + sizeof(double)    // Grid::Parameters.bounds.min_mz

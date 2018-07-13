@@ -16,7 +16,7 @@ std::vector<double> Grid::Runners::Serial::run(
 }
 
 std::vector<double> Grid::Runners::Parallel::run(
-    unsigned int max_threads, const Grid::Parameters &parameters,
+    uint64_t max_threads, const Grid::Parameters &parameters,
     const std::vector<Grid::Point> &all_points) {
     // Split parameters and points into the corresponding  groups.
     auto all_parameters = split_segments(parameters, max_threads);
@@ -47,13 +47,13 @@ std::vector<double> Grid::Runners::Parallel::run(
 }
 
 std::vector<Grid::Parameters> Grid::Runners::Parallel::split_segments(
-    const Grid::Parameters &original_params, unsigned int n_splits) {
+    const Grid::Parameters &original_params, uint64_t n_splits) {
     // In order to determine the overlapping of the splits we need to calculate
     // what is the maximum distance that will be used by the kernel smoothing.
     // To avoid aliasing we will overlap at least the maximum kernel width.
     //
     // The kernel in rt is always 2 * sigma_rt in both directions.
-    unsigned int kernel_width = Grid::y_index(
+    uint64_t kernel_width = Grid::y_index(
         original_params.bounds.min_rt + 4 * Grid::sigma_rt(original_params),
         original_params);
 
@@ -61,8 +61,8 @@ std::vector<Grid::Parameters> Grid::Runners::Parallel::split_segments(
     // splits. Since we have an overlap of a single kernel_width, we need to
     // have at least twice that amount of points in order to support full
     // overlap in both directions.
-    unsigned int min_segment_width = 2 * kernel_width;
-    unsigned int segment_width = original_params.dimensions.m / n_splits;
+    uint64_t min_segment_width = 2 * kernel_width;
+    uint64_t segment_width = original_params.dimensions.m / n_splits;
     if (segment_width < min_segment_width) {
         segment_width = min_segment_width;
     }
@@ -74,7 +74,7 @@ std::vector<Grid::Parameters> Grid::Runners::Parallel::split_segments(
     }
 
     // How many segments do we have with the given segment_width.
-    unsigned int num_segments = original_params.dimensions.m / segment_width;
+    uint64_t num_segments = original_params.dimensions.m / segment_width;
     if (original_params.dimensions.m % segment_width) {
         // If we need more segments that the maximum we specify we need to try
         // one less split and adjust the sizes accordingly.
@@ -89,8 +89,8 @@ std::vector<Grid::Parameters> Grid::Runners::Parallel::split_segments(
 
     std::vector<Grid::Parameters> all_parameters;
     for (size_t i = 0; i < num_segments; ++i) {
-        unsigned int min_i = 0;
-        unsigned int max_i = 0;
+        uint64_t min_i = 0;
+        uint64_t max_i = 0;
         if (i == 0) {
             min_i = 0;
         } else {
