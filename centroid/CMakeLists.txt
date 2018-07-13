@@ -29,6 +29,7 @@ if (NOT TARGET centroidlib)
         "${CMAKE_CURRENT_SOURCE_DIR}/src/centroid/centroid.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/centroid/centroid_files.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/centroid/centroid_serialize.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/centroid/centroid_runners.cpp"
         )
     target_include_directories(centroidlib PUBLIC src)
     target_link_libraries(centroidlib gridlib ${CMAKE_THREAD_LIBS_INIT})

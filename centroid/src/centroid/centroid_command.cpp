@@ -6,10 +6,10 @@
 #include <thread>
 #include <vector>
 
-#include "centroid.hpp"
-#include "centroid_files.hpp"
+#include "centroid/centroid.hpp"
+#include "centroid/centroid_files.hpp"
+#include "centroid/centroid_runners.hpp"
 #include "grid/grid_files.hpp"
-//#include "centroid_runners.hpp"
 
 // Type aliases.
 using options_map = std::map<std::string, std::string>;
@@ -418,22 +418,23 @@ int main(int argc, char *argv[]) {
                           << std::endl;
                 return -1;
             }
-            std::cout << "Finding local maxima..." << std::endl;
-            auto local_max_points =
-                Centroid::find_local_maxima(parameters, grid_data);
-            if (local_max_points.size() == 0) {
+
+            std::vector<Centroid::Peak> peaks;
+            std::cout << "Building peaks..." << std::endl;
+            if ((options.find("-parallel") != options.end()) &&
+                (options["-parallel"] == "true" ||
+                 options["-parallel"].empty())) {
+                peaks = Centroid::Runners::Parallel::run(max_threads,
+                                                         parameters, grid_data);
+            } else {
+                peaks = Centroid::Runners::Serial::run(parameters, grid_data);
+            }
+            if (peaks.size() == 0) {
                 std::cout << "error: no peaks could be found on " << input_file
                           << std::endl;
                 return -1;
             }
-            // TODO(alex): Move this to Centroid::Runners and create a parallel
-            // version as well.
-            std::cout << "Building peaks..." << std::endl;
-            std::vector<Centroid::Peak> peaks;
-            for (const auto &point : local_max_points) {
-                auto peak = Centroid::build_peak(point, parameters, grid_data);
-                peaks.push_back(peak);
-            }
+
             // TODO(alex): Is this necessary? We are already sorting the peaks
             // by the detected local max.
             std::cout << "Sorting peaks by height (centroid)..." << std::endl;
