@@ -11,8 +11,6 @@ namespace Centroid {
 // A Point represents the coordinates and value of those coordinates in the
 // Grid.
 struct Point {
-    // TODO(alex): should we store instead the mz/rt directly to remove the
-    // Grid::Parameters dependency?
     uint64_t i;
     uint64_t j;
     double value;
@@ -47,26 +45,17 @@ struct Peak {
     double height_centroid;
     double total_intensity_centroid;
 
-    // TODO(alex): Do we want to store these values? If so, should we calculate
-    // this over the height or the height/noise?
-    // double fwhm_mz;
-    // double fwhm_rt;
-    // TODO(alex): Store SN values? sn_height or sn_centroid
-
     // Average intensity on the boundary of the peak.
     double border_background;
 
     // TODO(alex): Do we want to store these values?
-    // Volume of the 3D peak.
-    // double volume;
-    // Area under the curve of the extracted ion chromatogram. (Raw file)
+    // Area under the curve of the extracted ion chromatogram. (Raw data)
     // double area_raw;
     // Area under the curve of the extracted ion chromatogram (Grid file,
     // smoothed data).
     // double area_smooth;
-    // Sumation of all intensities within the peak boundary. (Grid file,
-    // smoothed)
-    // double total_ion_intensity_smooth;
+    // Sumation of all intensities within the peak boundary. (Raw data)
+    // double total_ion_intensity_raw;
     // Number of ions contained within the peak boundary.
     // double number_measured_intensities;
 
@@ -82,8 +71,9 @@ struct Peak {
 std::vector<Point> find_local_maxima(const Grid::Parameters &parameters,
                                      const std::vector<double> &data);
 
-// Find the boundary of the given bag of points.
-std::vector<Point> find_boundary(const std::vector<Point> &points);
+// Find the boundary of the given bag of points. Note that this fuction sorts
+// the points in place, so the original order is not preserved.
+std::vector<Point> find_boundary(std::vector<Point> &points);
 
 // Find all points that belong to a given local max point via recursive local
 // search of the slope of the peaks.
