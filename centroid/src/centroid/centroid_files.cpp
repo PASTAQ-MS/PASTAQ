@@ -83,7 +83,7 @@ bool Centroid::Files::Csv::write_peaks(
                << peak.rt
                << cell_delimiter
                // Height
-               << peak.height
+               << peak.height_centroid
                << cell_delimiter
                // Volume
                << peak.total_intensity
