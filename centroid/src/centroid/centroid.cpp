@@ -95,44 +95,37 @@ void Centroid::explore_peak_slope(uint64_t i, uint64_t j, double previous_value,
 
 std::vector<Centroid::Point> Centroid::find_boundary(
     std::vector<Centroid::Point> &points) {
-    size_t n_points = points.size();
     // Under the constraints of the grid coordinates, we need at least 5 points
     // in order to have a boundary that does not contain all the points in the
     // initial set.
-    if (n_points < 5) {
+    if (points.size() < 5) {
         return points;
     }
 
-    // Sort the points by y and then x coordinates. Note that this modifies the
-    // original order of the peaks.
-    auto sort_points = [](const Centroid::Point &p1,
-                          const Centroid::Point &p2) -> bool {
-        return (p1.j < p2.j) || ((p1.j == p2.j) && (p1.i < p2.i));
-    };
-    std::stable_sort(points.begin(), points.end(), sort_points);
-
-    // Peeking the first and last points to get the minimum and maximum row
-    // number.
-    size_t min_j = points[0].j;
-    size_t max_j = points[n_points - 1].j;
-
-    // Extract the boundary points through row major iteration of the virtual
-    // grid created by the bag of points.
-    std::vector<Centroid::Point> boundary_points;
-    for (size_t k = 0; k < n_points; ++k) {
-        auto point = points[k];
-        if (point.j == min_j || point.j == max_j) {
-            boundary_points.push_back(point);
-        } else {
-            boundary_points.push_back(point);
-            // Find last element in the row.
-            while (k + 1 < n_points && points[k + 1].j == point.j) {
-                ++k;
+    // Check if this point is a boundary by trying to find all 8 neighbours, if
+    // the point does not have all of them, then it is a boundary point.
+    auto point_exists = [&points](const Centroid::Point &p) {
+        for (const auto &point : points) {
+            if (p.i == point.i && p.j == point.j) {
+                return true;
             }
-            boundary_points.push_back(points[k]);
+        }
+        return false;
+    };
+    std::vector<Centroid::Point> boundary;
+    for (const auto &point : points) {
+        if (!point_exists({point.i - 1, point.j - 1, 0.0}) ||
+            !point_exists({point.i, point.j - 1, 0.0}) ||
+            !point_exists({point.i + 1, point.j - 1, 0.0}) ||
+            !point_exists({point.i - 1, point.j, 0.0}) ||
+            !point_exists({point.i + 1, point.j, 0.0}) ||
+            !point_exists({point.i - 1, point.j + 1, 0.0}) ||
+            !point_exists({point.i, point.j + 1, 0.0}) ||
+            !point_exists({point.i + 1, point.j + 1, 0.0})) {
+            boundary.push_back(point);
         }
     }
-    return boundary_points;
+    return boundary;
 }
 
 Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,

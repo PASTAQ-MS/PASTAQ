@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 
 #include "centroid/centroid.hpp"
@@ -124,6 +125,11 @@ TEST_CASE("Find peak boundaries") {
                                      {0, 0, grid_params}, data, peak_points);
         CHECK(expected_size[i] == peak_points.size());
         auto boundary = Centroid::find_boundary(peak_points);
+        auto sort_points = [](const Centroid::Point &p1,
+                              const Centroid::Point &p2) -> bool {
+            return (p1.j < p2.j) || ((p1.j == p2.j) && (p1.i < p2.i));
+        };
+        std::stable_sort(boundary.begin(), boundary.end(), sort_points);
         CHECK(boundary.size() == expected_boundary[i].size());
         for (size_t j = 0; j < boundary.size(); ++j) {
             CHECK(boundary[j].i == expected_boundary[i][j].i);

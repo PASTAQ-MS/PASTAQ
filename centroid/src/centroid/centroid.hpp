@@ -79,8 +79,7 @@ struct Peak {
 std::vector<Point> find_local_maxima(const Centroid::Parameters &parameters,
                                      const std::vector<double> &data);
 
-// Find the boundary of the given bag of points. Note that this fuction sorts
-// the points in place, so the original order is not preserved.
+// Find the boundary of the given bag of points.
 std::vector<Point> find_boundary(std::vector<Point> &points);
 
 // Find all points that belong to a given local max point via recursive local
