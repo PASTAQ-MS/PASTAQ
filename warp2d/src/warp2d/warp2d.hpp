@@ -7,18 +7,14 @@
 #include "centroid/centroid.hpp"
 
 namespace Warp2D {
-// FIXME(alex): Reference function. To be removed.
-int cow_2D(std::vector<Centroid::Peak>& target_peaks,
-           std::vector<Centroid::Peak>& source_peaks, int sample_length,
-           int segment_length, int slack);
-
 // Warp the sample_peaks to target_peaks in the retention time dimension. The
 // warping is performed by using a variant of the Correlation Optimised Warping
 // (COW) that uses the overlaping volume of the peaks as the similarity/benefit
-// function.
-int warp_peaks(std::vector<Centroid::Peak>& target_peaks,
-               std::vector<Centroid::Peak>& source_peaks, int sample_length,
-               int segment_length, int slack);
+// function. Returns the peaks after successful warping.
+std::vector<Centroid::Peak> warp_peaks(
+    const std::vector<Centroid::Peak>& target_peaks,
+    const std::vector<Centroid::Peak>& source_peaks, size_t sample_length,
+    size_t segment_length, size_t slack);
 }  // namespace Warp2D
 
 #endif /* WARP2D_WARP2D_HPP */
