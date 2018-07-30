@@ -16,12 +16,14 @@ struct Level {
     std::vector<Node> nodes;
 };
 
+// TODO(alex): Make sure to verify the integer sizes used here as well as the
+// discrepancy between using size_t and int.
 std::vector<Centroid::Peak> Warp2D::warp_peaks(
     const std::vector<Centroid::Peak>& target_peaks,
     const std::vector<Centroid::Peak>& source_peaks, size_t sample_length,
     size_t segment_length, size_t slack) {
     // The number of segments.
-    size_t num_segments = sample_length / segment_length;
+    int num_segments = sample_length / segment_length;
 
     // Minimum time step.
     // DEBUG: Hardcoding values here.
@@ -42,7 +44,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
         levels[i].start = start;
         levels[i].end = end;
         levels[i].nodes = std::vector<Node>(length);
-        for (size_t j = 0; j < length; ++j) {
+        for (int j = 0; j < length; ++j) {
             levels[i].nodes[j].f = -std::numeric_limits<double>::infinity();
             levels[i].nodes[j].u = -1;
         }
@@ -62,15 +64,16 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
         // TODO: Calculate similarities here and store in vector.
         std::vector<double> benefit_vector(next_level.nodes.size());
 
-        for (int k = 0; k < current_level.nodes.size(); ++k) {
+        for (int k = 0; k < (int)current_level.nodes.size(); ++k) {
             auto& node = current_level.nodes[k];
             for (int u = -t; u <= t; ++u) {
                 int offset =
                     (current_level.start + k + m + u) - next_level.start;
-                if (offset < 0 || offset > next_level.nodes.size() - 1) {
+                if (offset < 0 || offset > (int)next_level.nodes.size() - 1) {
                     continue;
                 }
 
+                // DEBUG
                 std::cout << "offset: " << offset << std::endl;
                 std::cout << "F(i+1, offset): " << next_level.nodes[offset].f
                           << std::endl;
