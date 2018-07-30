@@ -5,18 +5,15 @@
 
 #include "warp2d/warp2d.hpp"
 
-struct FU {
-    /* Used for dynamic programming: f - cummulative function value, u -
-     * position of the optimum predecessor */
-    double f;
-    int u;
+struct Node {
+    double f;  // Cummulative similarity value.
+    int u;     // Optimum predecessor position.
 };
 
-double similarity_func() { return 1.0; }
-
-struct CowNode {
-    double f;  // Cummulative similarity value.
-    size_t u;  // Optimum predecessor position.
+struct Level {
+    int start;
+    int end;
+    std::vector<Node> nodes;
 };
 
 std::vector<Centroid::Peak> Warp2D::warp_peaks(
@@ -32,144 +29,64 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
     // double rt_max = 40.0;
     // double delta_rt = (rt_max - rt_min) / (double)(sample_length - 1);
 
-    //// Allocate data structures.
-    // int *xstart, *xlength, *xend;
-    // FU **nodes, *node, *next_node;
-    // xstart = (int*)malloc((N + 1) * sizeof(int));
-    // xlength = (int*)malloc((N + 1) * sizeof(int));
-    // xend = (int*)malloc((N + 1) * sizeof(int));
-    // nodes = (FU**)malloc((N + 1) * sizeof(FU*));
-
     // Initialize nodes.
-    CowNode** nodes = (CowNode**)malloc((num_segments + 1) * sizeof(CowNode*));
-    assert(nodes);
-    for (size_t i = 0; i < num_segments; ++i) {
-        double x_start = std::max(
-            (i * (segment_length - slack)),
-            (sample_length - (num_segments - i) * (segment_length + slack)));
-        double x_end = std::min(
-            (i * (segment_length + slack)),
-            (sample_length - (num_segments - i) * (segment_length - slack)));
-        nodes[i] = (CowNode*)malloc((x_end - x_start + 1) * sizeof(CowNode*));
-        assert(nodes[i]);
-        nodes[i]->f = -std::numeric_limits<double>::infinity();
-        nodes[i]->u = -1;
+    std::vector<Level> levels(num_segments + 1);
+    int N = num_segments;
+    int t = slack;
+    int m = segment_length;
+    int Lt = sample_length;
+    for (int i = 0; i < num_segments; ++i) {
+        int start = std::max((i * (m - t)), (Lt - (N - i) * (m + t)));
+        int end = std::min((i * (m + t)), (Lt - (N - i) * (m - t)));
+        int length = end - start + 1;
+        levels[i].start = start;
+        levels[i].end = end;
+        levels[i].nodes = std::vector<Node>(length);
+        for (size_t j = 0; j < length; ++j) {
+            levels[i].nodes[j].f = -std::numeric_limits<double>::infinity();
+            levels[i].nodes[j].u = -1;
+        }
     }
-    nodes[num_segments]->f = 0.0;
-    nodes[num_segments]->u = 0;
+    levels[num_segments].start = Lt;
+    levels[num_segments].end = Lt;
+    levels[num_segments].nodes.push_back({0.0, 0});
 
-    //// back-propagate F values
-    //// go through levels backwards
-    //// at each level, find range of allowed segments and find correlation
-    // for (level = N; level > 0; level--) {
-    //// double refTimeSegmt = delta_rt * m;
-    //// double refTimeStart = rt_min + (level - 1) * refTimeSegmt;
-    //// std::vector<Peak> target_peaksd = refWarpDB->getPeaksAtRTBand(
-    //// refTimeStart + refTimeSegmt / 2, refTimeSegmt / 2);
-    //// std::vector<Peak>& target_peaks = target_peaksd;
-    // std::cout << "level: " << level << std::endl;
-    // for (int i = 0; i < xlength[level]; i++) {
-    // int xi, xjmin, xjmax, jmin, jmax;
-    // FU* nodei;
-    //// Position of the node at level.
-    // xi = xstart[level] + i;    // x position of the i-th node at level
-    // nodei = nodes[level] + i;  // ith node at level
-    //// The position of a connected node at level-1 is constrained by the
-    //// position of the node at level and the window size and slack
-    //// constraints. find all connected nodes at level-1
-    // xjmin = std::max(xi - m - t, xstart[level - 1]);
-    // xjmax = std::min(xi - m + t, xend[level - 1]);
-    // jmin = xjmin - xstart[level - 1];
-    // jmax = xjmax - xstart[level - 1];
-    // std::cout << "xi: " << xi << std::endl;
-    // std::cout << "xstart: " << xjmin << std::endl;
-    // std::cout << "xend: " << xjmax << std::endl;
-    // for (int j = jmin; j <= jmax; j++) {
-    // int xj;
-    // FU* nodej;
-    // double d, sum;
-    // nodej =
-    // nodes[level - 1] + j;  // jth node at level-1 to be filled
-    //// in and point to i if best
-    //// compute distance between connected nodes
-    //// x position of the j-th node at level-1
-    // xj = xstart[level - 1] + j;
-    // double smpTimeStart = rt_min + xj * delta_rt;
-    // double smpTimeSegmt = (xi - xj) * delta_rt;
+    // Perform dynamic programming to find optimal warping path.
+    for (int i = num_segments - 1; i >= 0; --i) {
+        auto& current_level = levels[i];
+        const auto& next_level = levels[i + 1];
+        std::cout << "start: " << current_level.start
+                  << " end: " << current_level.end << std::endl;  // DEBUG
 
-    //// this makes a copy of the peaks so the time can be changed in
-    //// the samples
-    //// std::vector<Peak> smpPeakd = smpWarpDB->getPeaksAtRTBand(
-    //// smpTimeStart + smpTimeSegmt / 2, smpTimeSegmt / 2);
-    //// std::vector<Peak>& source_peaks = smpPeakd;
+        // TODO: Warp peaks here and store in vector.
+        // TODO: Calculate similarities here and store in vector.
+        std::vector<double> benefit_vector(next_level.nodes.size());
 
-    //// d = similarity2D(refTimeStart, refTimeSegmt, target_peaks,
-    //// smpTimeStart, smpTimeSegmt, source_peaks);
-    // d = similarity_func();
+        for (int k = 0; k < current_level.nodes.size(); ++k) {
+            auto& node = current_level.nodes[k];
+            for (int u = -t; u <= t; ++u) {
+                int offset =
+                    (current_level.start + k + m + u) - next_level.start;
+                if (offset < 0 || offset > next_level.nodes.size() - 1) {
+                    continue;
+                }
 
-    // sum = d + nodei->f;
-    // if (sum > nodej->f) {
-    // nodej->f = sum;
-    // nodej->u = i;
-    //}
-    //}
+                std::cout << "offset: " << offset << std::endl;
+                std::cout << "F(i+1, offset): " << next_level.nodes[offset].f
+                          << std::endl;
+                std::cout << "U(i+1, offset): " << next_level.nodes[offset].u
+                          << std::endl;
 
-    ////// now need to check for ties and choose the one closest to the
-    ////// middle
-    //// int midj = (jmin + jmax) / 2;
-    //// int bestj = midj;
-    //// int bestjdist = 10000000;
-    //// for (int j = jmin; j <= jmax; j++) {
-    //// FU* nodej;
-    //// nodej =
-    //// nodes[level - 1] + j;  // jth node at level-1 to be filled
-    ////// in and point to i if best
-    ////}
-    //}
-    //}
+                double f_sum =
+                    next_level.nodes[offset].f + benefit_vector[offset];
+                if (f_sum > node.f) {
+                    node.f = f_sum;
+                    node.u = u;
+                }
+            }
+        }
+    }
 
-    //// printf("\n");
-    ////// forward-propagate U values, compute correlation/segment
-    //// int* warping = (int*)malloc((N + 1) * sizeof(int));
-    //// assert(warping);
-
-    ////// here is where the nodes are walked back
-    //// warping[0] = 0;
-    //// int i = 0;
-    //// totalCorr = 0;
-    //// for (int level = 0; level < N; level++) {
-    //// node = nodes[level] + i;
-    //// i = node->u;
-    //// warping[level + 1] = xstart[level + 1] + i;
-    //// next_node = nodes[level + 1] + i;
-    //// double sgCorr = node->f - next_node->f;
-    //// totalCorr += sgCorr;
-    //// segmtCorr.push_back(sgCorr);
-    ////}
-    //// printf("cow_2D()> Total Correlation Warped: %e\n", totalCorr);
-
-    //// double sampleTime = rt_min;
-    //// double refrncTime = rt_min;
-    //// origTime.push_back(sampleTime);
-    //// warpedTime.push_back(refrncTime);
-    //// for (i = 0; i < N; i++) {
-    //// sampleTime += (warping[i + 1] - warping[i]) * delta_rt;
-    //// refrncTime += m * delta_rt;
-    //// origTime.push_back(sampleTime);
-    //// warpedTime.push_back(refrncTime);
-    ////}
-
-    ////[>
-    //// Free data structures
-    ///[>/
-    // for (int i = 0; i <= N; i++) free(nodes[i]);
-    // free(nodes);
-    // free(xend);
-    // free(xlength);
-    // free(xstart);
-    //// free(warping);
-
-    // return (1);
     std::vector<Centroid::Peak> warped_peaks;
     return warped_peaks;
 }
