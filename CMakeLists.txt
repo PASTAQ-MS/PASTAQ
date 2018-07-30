@@ -25,6 +25,7 @@ option(UTILS_ADD_TESTS "run utils tests" ON)
 # Include library target.
 add_subdirectory(${CMAKE_SOURCE_DIR}/grid)
 add_subdirectory(${CMAKE_SOURCE_DIR}/centroid)
+add_subdirectory(${CMAKE_SOURCE_DIR}/warp2d)
 
 # TODO(alex): Ensure library can be linked against using:
 #     target_link_libraries(my_lib ${TAPP_LIBS})
