@@ -8,7 +8,11 @@
 
 namespace Warp2D {
 // Calculate the overlaping area between two peaks.
-double peak_overlap(Centroid::Peak& peak_a, Centroid::Peak& peak_b);
+double peak_overlap(const Centroid::Peak& peak_a, const Centroid::Peak& peak_b);
+
+// Calculate the cummulative similarity between two sets of peaks.
+double similarity_2D(const std::vector<Centroid::Peak>& set_a,
+                     const std::vector<Centroid::Peak>& set_b);
 
 // Warp the sample_peaks to target_peaks in the retention time dimension. The
 // warping is performed by using a variant of the Correlation Optimised Warping

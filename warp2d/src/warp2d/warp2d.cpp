@@ -5,11 +5,13 @@
 
 #include "warp2d/warp2d.hpp"
 
+// TODO(alex): move to header?
 struct Node {
     double f;  // Cummulative similarity value.
     int u;     // Optimum predecessor position.
 };
 
+// TODO(alex): move to header?
 struct Level {
     int start;
     int end;
@@ -29,7 +31,8 @@ std::vector<Centroid::Peak> peaks_in_rt_range(
     return ret;
 }
 
-double Warp2D::peak_overlap(Centroid::Peak& peak_a, Centroid::Peak& peak_b) {
+double Warp2D::peak_overlap(const Centroid::Peak& peak_a,
+                            const Centroid::Peak& peak_b) {
     // TODO(alex): Use rt/mz/height or rt_centroid/mz_centroid/height_centroid?
 
     // Early return if the peaks do not intersect in the +/-2 * sigma_mz/rt
@@ -69,6 +72,17 @@ double Warp2D::peak_overlap(Centroid::Peak& peak_a, Centroid::Peak& peak_b) {
                                             peak_a.sigma_mz, peak_b.sigma_mz);
 
     return rt_contrib * mz_contrib * peak_a.height * peak_b.height;
+}
+
+double Warp2D::similarity_2D(const std::vector<Centroid::Peak>& set_a,
+                             const std::vector<Centroid::Peak>& set_b) {
+    double cummulative_similarity = 0;
+    for (const auto& peak_a : set_a) {
+        for (const auto& peak_b : set_b) {
+            cummulative_similarity += Warp2D::peak_overlap(peak_a, peak_b);
+        }
+    }
+    return cummulative_similarity;
 }
 
 // TODO(alex): Make sure to verify the integer sizes used here as well as the
@@ -182,23 +196,23 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
                 //<< std::endl;
 
                 // Make a copy of the peaks for warping.
-                std::vector<Centroid::Peak> source_peaks_copy;
+                std::vector<Centroid::Peak> source_peaks_warped;
                 for (const auto& peak : source_peaks) {
-                    source_peaks_copy.push_back(peak);
+                    source_peaks_warped.push_back(peak);
                 }
 
                 // Warp the peaks.
                 double time_diff = u * delta_rt;
-                for (auto& peak : source_peaks_copy) {
+                for (auto& peak : source_peaks_warped) {
                     peak.rt += time_diff;
                     peak.rt_centroid += time_diff;
                 }
 
                 // Calculate the peak overlap between the reference and warped
                 // peaks.
-                // TODO: Implement this.
-                double benefit = 1.0;
-                double f_sum = next_level.nodes[offset].f + benefit;
+                double similarity = Warp2D::similarity_2D(target_peaks_segment,
+                                                          source_peaks_warped);
+                double f_sum = next_level.nodes[offset].f + similarity;
                 if (f_sum > node.f) {
                     node.f = f_sum;
                     node.u = u;
