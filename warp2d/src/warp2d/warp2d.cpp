@@ -49,43 +49,26 @@ double Warp2D::peak_overlap(Centroid::Peak& peak_a, Centroid::Peak& peak_b) {
         }
     }
 
-    // Retention time direction.
-    double rt_sigma_sq_a = std::pow(peak_a.sigma_rt, 2);
-    double rt_sigma_sq_b = std::pow(peak_b.sigma_rt, 2);
-    double rt_sigma_sq_total =
-        (rt_sigma_sq_a * rt_sigma_sq_b) / (rt_sigma_sq_a + rt_sigma_sq_b);
+    // Calculate the gaussian contribution of the overlap between two points in
+    // one dimension.
+    auto gaussian_contribution = [](double x_a, double x_b, double sigma_a,
+                                    double sigma_b) -> double {
+        double var_a = std::pow(sigma_a, 2);
+        double var_b = std::pow(sigma_b, 2);
 
-    double rt_mu_a = peak_a.rt;
-    double rt_mu_b = peak_b.rt;
-    double rt_mu_total = (rt_mu_a * rt_sigma_sq_b + rt_mu_b * rt_sigma_sq_a) /
-                         (rt_sigma_sq_a + rt_sigma_sq_b);
+        double a = (var_a + var_b) / (var_a * var_b) *
+                   std::pow((x_a * var_b + x_b * var_a) / (var_a + var_b), 2);
+        double b = (x_a * x_a) / var_a + (x_b * x_b) / var_b;
 
-    double rt_mu_totaldiff = (rt_mu_total * rt_mu_total) / rt_sigma_sq_total -
-                             (rt_mu_a * rt_mu_a) / rt_sigma_sq_a -
-                             (rt_mu_b * rt_mu_b) / rt_sigma_sq_b;
+        return std::exp(0.5 * (a - b)) / std::sqrt(var_a + var_b);
+    };
 
-    double rt_exp_fact = std::exp(0.5 * rt_mu_totaldiff);
-    rt_exp_fact /= std::sqrt(rt_sigma_sq_a + rt_sigma_sq_b);
+    auto rt_contrib = gaussian_contribution(peak_a.rt, peak_b.rt,
+                                            peak_a.sigma_rt, peak_b.sigma_rt);
+    auto mz_contrib = gaussian_contribution(peak_a.mz, peak_b.mz,
+                                            peak_a.sigma_mz, peak_b.sigma_mz);
 
-    // Mz direction.
-    double mz_sigma_sq_a = std::pow(peak_a.sigma_mz, 2);
-    double mz_sigma_sq_b = std::pow(peak_b.sigma_mz, 2);
-    double mz_sigma_sq_total =
-        (mz_sigma_sq_a * mz_sigma_sq_b) / (mz_sigma_sq_a + mz_sigma_sq_b);
-
-    double mz_mu_a = peak_a.mz;
-    double mz_mu_b = peak_b.mz;
-    double mz_mu_total = (mz_mu_a * mz_sigma_sq_b + mz_mu_b * mz_sigma_sq_a) /
-                         (mz_sigma_sq_a + mz_sigma_sq_b);
-
-    double mz_mu_totaldiff = (mz_mu_total * mz_mu_total) / mz_sigma_sq_total -
-                             (mz_mu_a * mz_mu_a) / mz_sigma_sq_a -
-                             (mz_mu_b * mz_mu_b) / mz_sigma_sq_b;
-
-    double mz_exp_fact = std::exp(0.5 * mz_mu_totaldiff);
-    mz_exp_fact /= std::sqrt(mz_sigma_sq_a + mz_sigma_sq_b);
-
-    return rt_exp_fact * mz_exp_fact * peak_a.height * peak_b.height;
+    return rt_contrib * mz_contrib * peak_a.height * peak_b.height;
 }
 
 // TODO(alex): Make sure to verify the integer sizes used here as well as the
