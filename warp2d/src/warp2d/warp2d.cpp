@@ -16,6 +16,19 @@ struct Level {
     std::vector<Node> nodes;
 };
 
+std::vector<Centroid::Peak> peaks_in_rt_range(
+    const std::vector<Centroid::Peak>& source_peaks, double time_start,
+    double time_end) {
+    std::vector<Centroid::Peak> ret;
+    for (const auto& peak : source_peaks) {
+        if (peak.rt >= time_start && peak.rt < time_end) {
+            ret.push_back(peak);
+        }
+        // TODO(alex): Should we use rt or rt_centroid?
+    }
+    return ret;
+}
+
 // TODO(alex): Make sure to verify the integer sizes used here as well as the
 // discrepancy between using size_t and int.
 std::vector<Centroid::Peak> Warp2D::warp_peaks(
@@ -30,6 +43,46 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
     // double rt_min = 0.0;
     // double rt_max = 40.0;
     // double delta_rt = (rt_max - rt_min) / (double)(sample_length - 1);
+
+    // Find min/max retention times.
+    double rt_min = std::numeric_limits<double>::infinity();
+    double rt_max = -std::numeric_limits<double>::infinity();
+    for (const auto& peak : target_peaks) {
+        if (peak.rt < rt_min) {
+            rt_min = peak.rt;
+        }
+        if (peak.rt > rt_max) {
+            rt_max = peak.rt;
+        }
+    }
+    for (const auto& peak : source_peaks) {
+        if (peak.rt < rt_min) {
+            rt_min = peak.rt;
+        }
+        if (peak.rt > rt_max) {
+            rt_max = peak.rt;
+        }
+    }
+    // TODO(alex): Is there a better way of doing this? I thought about adding
+    // the equivalent of an extra sector at the beginning and end of the
+    // retention time extremes, but maybe it's worse that this simple
+    // implementation. Expand the time range by some factor, so we can have
+    // warping at the peaks near the range limits (COW will not warp at the
+    // range limits).
+    double rt_expand_factor = 0.20;  // FIXME: Hardcoding this for now.
+    rt_min -= (rt_max - rt_min) * rt_expand_factor;
+    rt_max += (rt_max - rt_min) * rt_expand_factor;
+    // The minimum time step.
+    double delta_rt = (rt_max - rt_min) / (double)(sample_length - 1);
+    double rt_sample_width = delta_rt * segment_length;
+    // Adjust rt_max to fit all segments.
+    rt_max = rt_min + rt_sample_width * num_segments;
+
+    // DEBUG
+    std::cout << "rt_min: " << rt_min << std::endl;
+    std::cout << "rt_max: " << rt_max << std::endl;
+    std::cout << "rt_sample_width: " << rt_sample_width << std::endl;
+    std::cout << "delta_rt: " << delta_rt << std::endl;
 
     // Initialize nodes.
     std::vector<Level> levels(num_segments + 1);
@@ -57,8 +110,17 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
     for (int i = num_segments - 1; i >= 0; --i) {
         auto& current_level = levels[i];
         const auto& next_level = levels[i + 1];
-        std::cout << "start: " << current_level.start
-                  << " end: " << current_level.end << std::endl;  // DEBUG
+        // std::cout << "start: " << current_level.start
+        //<< " end: " << current_level.end << std::endl;  // DEBUG
+        // TODO: Fetch the peaks belonging to this sector for the reference.
+        double rt_start = rt_min + i * rt_sample_width;
+        double rt_end = rt_start + rt_sample_width;
+        std::cout << "rt_start: " << rt_start << std::endl;
+        std::cout << "rt_end: " << rt_end << std::endl;
+        auto target_peaks_segment =
+            peaks_in_rt_range(target_peaks, rt_start, rt_end);
+        auto source_peaks_segment =
+            peaks_in_rt_range(source_peaks, rt_start, rt_end);
 
         // TODO: Warp peaks here and store in vector.
         // TODO: Calculate similarities here and store in vector.
@@ -67,18 +129,33 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
         for (int k = 0; k < (int)current_level.nodes.size(); ++k) {
             auto& node = current_level.nodes[k];
             for (int u = -t; u <= t; ++u) {
-                int offset =
-                    (current_level.start + k + m + u) - next_level.start;
+                int offset = current_level.start - next_level.start + k + m + u;
                 if (offset < 0 || offset > (int)next_level.nodes.size() - 1) {
                     continue;
                 }
 
                 // DEBUG
-                std::cout << "offset: " << offset << std::endl;
-                std::cout << "F(i+1, offset): " << next_level.nodes[offset].f
-                          << std::endl;
-                std::cout << "U(i+1, offset): " << next_level.nodes[offset].u
-                          << std::endl;
+                // std::cout << "offset: " << offset << std::endl;
+                // std::cout << "F(i+1, offset): " << next_level.nodes[offset].f
+                //<< std::endl;
+                // std::cout << "U(i+1, offset): " << next_level.nodes[offset].u
+                //<< std::endl;
+
+                // Make a copy of the peaks for warping.
+                std::vector<Centroid::Peak> source_peaks_copy;
+                for (const auto& peak : source_peaks) {
+                    source_peaks_copy.push_back(peak);
+                }
+
+                // Warp the peaks.
+                double time_diff = u * delta_rt;
+                for (auto& peak : source_peaks_copy) {
+                    peak.rt += time_diff;
+                    peak.rt_centroid += time_diff;
+                }
+
+                // Calculate the peak overlap between the reference and warped
+                // peaks.
 
                 double f_sum =
                     next_level.nodes[offset].f + benefit_vector[offset];
