@@ -94,12 +94,6 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
     // The number of segments.
     int num_segments = sample_length / segment_length;
 
-    // Minimum time step.
-    // DEBUG: Hardcoding values here.
-    // double rt_min = 0.0;
-    // double rt_max = 40.0;
-    // double delta_rt = (rt_max - rt_min) / (double)(sample_length - 1);
-
     // Find min/max retention times.
     double rt_min = std::numeric_limits<double>::infinity();
     double rt_max = -std::numeric_limits<double>::infinity();
@@ -134,12 +128,6 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
     // Adjust rt_max to fit all segments.
     rt_max = rt_min + rt_sample_width * num_segments;
 
-    // DEBUG
-    std::cout << "rt_min: " << rt_min << std::endl;
-    std::cout << "rt_max: " << rt_max << std::endl;
-    std::cout << "rt_sample_width: " << rt_sample_width << std::endl;
-    std::cout << "delta_rt: " << delta_rt << std::endl;
-
     // Initialize nodes.
     std::vector<Level> levels(num_segments + 1);
     int N = num_segments;
@@ -166,15 +154,10 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
     for (int i = num_segments - 1; i >= 0; --i) {
         auto& current_level = levels[i];
         const auto& next_level = levels[i + 1];
-        // std::cout << "start: " << current_level.start
-        //<< " end: " << current_level.end << std::endl;  // DEBUG
 
         // Fetch the peaks belonging to the next level sector.
         double rt_start = rt_min + i * rt_sample_width;
         double rt_end = rt_start + rt_sample_width;
-        // DEBUG
-        std::cout << "rt_start: " << rt_start << std::endl;
-        std::cout << "rt_end: " << rt_end << std::endl;
         auto target_peaks_segment =
             peaks_in_rt_range(target_peaks, rt_start, rt_end);
         auto source_peaks_segment =
@@ -187,13 +170,6 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
                 if (offset < 0 || offset > (int)next_level.nodes.size() - 1) {
                     continue;
                 }
-
-                // DEBUG
-                // std::cout << "offset: " << offset << std::endl;
-                // std::cout << "F(i+1, offset): " << next_level.nodes[offset].f
-                //<< std::endl;
-                // std::cout << "U(i+1, offset): " << next_level.nodes[offset].u
-                //<< std::endl;
 
                 // Make a copy of the peaks for warping.
                 std::vector<Centroid::Peak> source_peaks_warped;
@@ -221,6 +197,33 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
         }
     }
 
+    // Walk back nodes to find optimal warping path.
+    std::vector<int> offsets;
+    std::vector<int> warp_by;
+    offsets.push_back(0);
+    for (int i = 0; i < num_segments; ++i) {
+        auto u = levels[i].nodes[offsets[i]].u;
+        int offset = offsets[i] + u + m - levels[i + 1].start + levels[i].start;
+        offsets.push_back(offset);
+        warp_by.push_back(u);
+    }
+
+    // Warp the sample peaks based on the optimal path.
     std::vector<Centroid::Peak> warped_peaks;
+    for (int i = 0; i < num_segments; ++i) {
+        double rt_start = rt_min + i * rt_sample_width;
+        double rt_end = rt_start + rt_sample_width;
+        auto source_peaks_segment =
+            peaks_in_rt_range(source_peaks, rt_start, rt_end);
+
+        // Warp the peaks.
+        double time_diff = warp_by[i] * delta_rt;
+        for (auto& peak : source_peaks_segment) {
+            peak.rt += time_diff;
+            peak.rt_centroid += time_diff;
+            warped_peaks.push_back(peak);
+        }
+    }
+
     return warped_peaks;
 }
