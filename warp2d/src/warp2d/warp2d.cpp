@@ -29,6 +29,65 @@ std::vector<Centroid::Peak> peaks_in_rt_range(
     return ret;
 }
 
+double Warp2D::peak_overlap(Centroid::Peak& peak_a, Centroid::Peak& peak_b) {
+    // TODO(alex): Use rt/mz/height or rt_centroid/mz_centroid/height_centroid?
+
+    // Early return if the peaks do not intersect in the +/-2 * sigma_mz/rt
+    {
+        double min_rt_a = peak_a.rt - 2 * peak_a.sigma_rt;
+        double max_rt_a = peak_a.rt + 2 * peak_a.sigma_rt;
+        double min_mz_a = peak_a.mz - 2 * peak_a.sigma_mz;
+        double max_mz_a = peak_a.mz + 2 * peak_a.sigma_mz;
+        double min_rt_b = peak_b.rt - 2 * peak_b.sigma_rt;
+        double max_rt_b = peak_b.rt + 2 * peak_b.sigma_rt;
+        double min_mz_b = peak_b.mz - 2 * peak_b.sigma_mz;
+        double max_mz_b = peak_b.mz + 2 * peak_b.sigma_mz;
+
+        if (max_rt_a < min_rt_b || max_rt_b < min_rt_a || max_mz_a < min_mz_b ||
+            max_mz_b < min_mz_a) {
+            return 0;
+        }
+    }
+
+    // Retention time direction.
+    double rt_sigma_sq_a = std::pow(peak_a.sigma_rt, 2);
+    double rt_sigma_sq_b = std::pow(peak_b.sigma_rt, 2);
+    double rt_sigma_sq_total =
+        (rt_sigma_sq_a * rt_sigma_sq_b) / (rt_sigma_sq_a + rt_sigma_sq_b);
+
+    double rt_mu_a = peak_a.rt;
+    double rt_mu_b = peak_b.rt;
+    double rt_mu_total = (rt_mu_a * rt_sigma_sq_b + rt_mu_b * rt_sigma_sq_a) /
+                         (rt_sigma_sq_a + rt_sigma_sq_b);
+
+    double rt_mu_totaldiff = (rt_mu_total * rt_mu_total) / rt_sigma_sq_total -
+                             (rt_mu_a * rt_mu_a) / rt_sigma_sq_a -
+                             (rt_mu_b * rt_mu_b) / rt_sigma_sq_b;
+
+    double rt_exp_fact = std::exp(0.5 * rt_mu_totaldiff);
+    rt_exp_fact /= std::sqrt(rt_sigma_sq_a + rt_sigma_sq_b);
+
+    // Mz direction.
+    double mz_sigma_sq_a = std::pow(peak_a.sigma_mz, 2);
+    double mz_sigma_sq_b = std::pow(peak_b.sigma_mz, 2);
+    double mz_sigma_sq_total =
+        (mz_sigma_sq_a * mz_sigma_sq_b) / (mz_sigma_sq_a + mz_sigma_sq_b);
+
+    double mz_mu_a = peak_a.mz;
+    double mz_mu_b = peak_b.mz;
+    double mz_mu_total = (mz_mu_a * mz_sigma_sq_b + mz_mu_b * mz_sigma_sq_a) /
+                         (mz_sigma_sq_a + mz_sigma_sq_b);
+
+    double mz_mu_totaldiff = (mz_mu_total * mz_mu_total) / mz_sigma_sq_total -
+                             (mz_mu_a * mz_mu_a) / mz_sigma_sq_a -
+                             (mz_mu_b * mz_mu_b) / mz_sigma_sq_b;
+
+    double mz_exp_fact = std::exp(0.5 * mz_mu_totaldiff);
+    mz_exp_fact /= std::sqrt(mz_sigma_sq_a + mz_sigma_sq_b);
+
+    return rt_exp_fact * mz_exp_fact * peak_a.height * peak_b.height;
+}
+
 // TODO(alex): Make sure to verify the integer sizes used here as well as the
 // discrepancy between using size_t and int.
 std::vector<Centroid::Peak> Warp2D::warp_peaks(
@@ -112,19 +171,17 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
         const auto& next_level = levels[i + 1];
         // std::cout << "start: " << current_level.start
         //<< " end: " << current_level.end << std::endl;  // DEBUG
-        // TODO: Fetch the peaks belonging to this sector for the reference.
+
+        // Fetch the peaks belonging to the next level sector.
         double rt_start = rt_min + i * rt_sample_width;
         double rt_end = rt_start + rt_sample_width;
+        // DEBUG
         std::cout << "rt_start: " << rt_start << std::endl;
         std::cout << "rt_end: " << rt_end << std::endl;
         auto target_peaks_segment =
             peaks_in_rt_range(target_peaks, rt_start, rt_end);
         auto source_peaks_segment =
             peaks_in_rt_range(source_peaks, rt_start, rt_end);
-
-        // TODO: Warp peaks here and store in vector.
-        // TODO: Calculate similarities here and store in vector.
-        std::vector<double> benefit_vector(next_level.nodes.size());
 
         for (int k = 0; k < (int)current_level.nodes.size(); ++k) {
             auto& node = current_level.nodes[k];
@@ -156,9 +213,9 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
 
                 // Calculate the peak overlap between the reference and warped
                 // peaks.
-
-                double f_sum =
-                    next_level.nodes[offset].f + benefit_vector[offset];
+                // TODO: Implement this.
+                double benefit = 1.0;
+                double f_sum = next_level.nodes[offset].f + benefit;
                 if (f_sum > node.f) {
                     node.f = f_sum;
                     node.u = u;

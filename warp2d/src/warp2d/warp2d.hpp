@@ -7,6 +7,9 @@
 #include "centroid/centroid.hpp"
 
 namespace Warp2D {
+// Calculate the overlaping area between two peaks.
+double peak_overlap(Centroid::Peak& peak_a, Centroid::Peak& peak_b);
+
 // Warp the sample_peaks to target_peaks in the retention time dimension. The
 // warping is performed by using a variant of the Correlation Optimised Warping
 // (COW) that uses the overlaping volume of the peaks as the similarity/benefit
