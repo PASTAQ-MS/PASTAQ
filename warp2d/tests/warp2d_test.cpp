@@ -15,7 +15,7 @@ void print_peaks_debug(std::vector<Centroid::Peak> &peaks) {
     }
 }
 
-TEST_CASE("DEBUG ALGORITHM") {
+TEST_CASE("Peak warping using warp2d") {
     std::vector<Centroid::Peak> target_peaks = {
         {0, 0, 100, 300, 1000, 10000, 5, 200, 100, 300, 1000, 10000, 0, {}, {}},
         {0, 0, 120, 300, 900, 9000, 5, 200, 120, 300, 900, 9000, 0, {}, {}},
@@ -35,17 +35,13 @@ TEST_CASE("DEBUG ALGORITHM") {
     };
     auto warped_peaks =
         Warp2D::warp_peaks(target_peaks, source_peaks, 100, 10, 5);
-    std::cout << "ORIGINAL: " << std::endl;
-    print_peaks_debug(target_peaks);
-    std::cout << "-------" << std::endl;
-    std::cout << "SOURCE: " << std::endl;
-    print_peaks_debug(source_peaks);
-    std::cout << "-------" << std::endl;
-    std::cout << "WARPED: " << std::endl;
-    print_peaks_debug(warped_peaks);
-    std::cout << "-------" << std::endl;
-    CHECK(warped_peaks.size() == source_peaks.size());
-    CHECK(1 == 0);
+    bool sizes_match = warped_peaks.size() == source_peaks.size();
+    CHECK(sizes_match);
+    if (sizes_match) {
+        for (size_t i = 0; i < warped_peaks.size(); ++i) {
+            CHECK(std::abs(target_peaks[i].rt - warped_peaks[i].rt) < 1);
+        }
+    }
 }
 
 TEST_CASE("Peak overlapping") {
