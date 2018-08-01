@@ -89,8 +89,13 @@ double Warp2D::similarity_2D(const std::vector<Centroid::Peak>& set_a,
 // discrepancy between using size_t and int.
 std::vector<Centroid::Peak> Warp2D::warp_peaks(
     const std::vector<Centroid::Peak>& target_peaks,
-    const std::vector<Centroid::Peak>& source_peaks, size_t sample_length,
-    size_t segment_length, size_t slack) {
+    const std::vector<Centroid::Peak>& source_peaks,
+    const Warp2D::Parameters& parameters) {
+    // TODO(alex): Use only abbreviated forms in this function (Below).
+    auto sample_length = parameters.num_points;
+    auto segment_length = parameters.window_size;
+    auto slack = parameters.slack;
+
     // The number of segments.
     int num_segments = sample_length / segment_length;
 

@@ -7,6 +7,14 @@
 #include "centroid/centroid.hpp"
 
 namespace Warp2D {
+// The parameters used in Warp2D
+// TODO(alex): add more docs.
+struct Parameters {
+    int slack;
+    int window_size;
+    int num_points;
+};
+
 // Calculate the overlaping area between two peaks.
 double peak_overlap(const Centroid::Peak& peak_a, const Centroid::Peak& peak_b);
 
@@ -20,8 +28,8 @@ double similarity_2D(const std::vector<Centroid::Peak>& set_a,
 // function. Returns the peaks after successful warping.
 std::vector<Centroid::Peak> warp_peaks(
     const std::vector<Centroid::Peak>& target_peaks,
-    const std::vector<Centroid::Peak>& source_peaks, size_t sample_length,
-    size_t segment_length, size_t slack);
+    const std::vector<Centroid::Peak>& source_peaks,
+    const Warp2D::Parameters& parameters);
 }  // namespace Warp2D
 
 #endif /* WARP2D_WARP2D_HPP */
