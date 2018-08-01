@@ -390,7 +390,7 @@ int main(int argc, char *argv[]) {
             ch = std::tolower(ch);
         }
 
-        if (lowercase_extension == ".bpsk") {
+        if (lowercase_extension == ".bpks") {
             // Read into peak array.
             if (!Centroid::Files::Bpks::read_peaks(
                     stream, &reference_grid_params, &reference_peaks)) {
@@ -399,7 +399,7 @@ int main(int argc, char *argv[]) {
                     << std::endl;
                 return -1;
             }
-        } else if (lowercase_extension == ".psk") {
+        } else if (lowercase_extension == ".csv") {
             // TODO: read into peak array.
             // Centroid::Files::Csv::read_peaks(stream, &grid_params,
             // &peaks[0]);
@@ -433,7 +433,7 @@ int main(int argc, char *argv[]) {
 
         std::vector<Centroid::Peak> peaks;
         Grid::Parameters grid_params;
-        if (lowercase_extension == ".bpsk") {
+        if (lowercase_extension == ".bpks") {
             // Read into peak array.
             if (!Centroid::Files::Bpks::read_peaks(stream, &grid_params,
                                                    &peaks)) {
@@ -467,8 +467,7 @@ int main(int argc, char *argv[]) {
         auto warped_peaks =
             Warp2D::warp_peaks(reference_peaks, peaks, parameters);
 
-        if (lowercase_extension == ".bpsk") {
-            // Read into peak array.
+        if (lowercase_extension == ".bpks") {
             if (!Centroid::Files::Bpks::write_peaks(outfile_stream, grid_params,
                                                     warped_peaks)) {
                 std::cout << "error: couldn't write warped peaks into file "
