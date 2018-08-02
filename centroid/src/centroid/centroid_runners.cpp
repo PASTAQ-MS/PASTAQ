@@ -11,7 +11,9 @@ std::vector<Centroid::Peak> Centroid::Runners::Serial::run(
     std::vector<Centroid::Peak> peaks;
     for (const auto &point : local_max_points) {
         auto peak = Centroid::build_peak(point, parameters, data);
-        peaks.push_back(peak);
+        if (peak) {
+            peaks.push_back(peak.value());
+        }
     }
     return peaks;
 }
@@ -53,7 +55,9 @@ std::vector<Centroid::Peak> Centroid::Runners::Parallel::run(
                 // Building peaks.
                 for (const auto &point : groups[i]) {
                     auto peak = Centroid::build_peak(point, parameters, data);
-                    peaks_array[i].push_back(peak);
+                    if (peak) {
+                        peaks_array[i].push_back(peak.value());
+                    }
                 }
             });
     }

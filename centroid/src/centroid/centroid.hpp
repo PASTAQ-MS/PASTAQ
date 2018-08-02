@@ -2,6 +2,7 @@
 #define CENTROID_CENTROID_HPP
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 #include "grid/grid.hpp"
@@ -90,8 +91,9 @@ void explore_peak_slope(uint64_t i, uint64_t j, double previous_value,
                         std::vector<Point> &points);
 
 // Builds a Peak object for the given local_max.
-Peak build_peak(const Point &local_max, const Centroid::Parameters &parameters,
-                const std::vector<double> &data);
+std::optional<Peak> build_peak(const Point &local_max,
+                               const Centroid::Parameters &parameters,
+                               const std::vector<double> &data);
 
 }  // namespace Centroid
 

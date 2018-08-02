@@ -162,30 +162,35 @@ TEST_CASE("Read/Write found peaks to stream") {
     std::vector<Centroid::Peak> peaks;
     for (size_t i = 0; i < local_max_points.size(); ++i) {
         auto local_max = local_max_points[i];
-        auto peak = Centroid::build_peak(local_max, {0, 0, parameters}, data);
-        peaks.push_back(peak);
-        CHECK(peak.i == expected_peaks[i].i);
-        CHECK(peak.j == expected_peaks[i].j);
-        CHECK(round_double(peak.mz) == round_double(expected_peaks[i].mz));
-        CHECK(round_double(peak.rt) == round_double(expected_peaks[i].rt));
-        CHECK(round_double(peak.height) ==
-              round_double(expected_peaks[i].height));
-        CHECK(round_double(peak.total_intensity) ==
-              round_double(expected_peaks[i].total_intensity));
-        CHECK(round_double(peak.sigma_mz) ==
-              round_double(expected_peaks[i].sigma_mz));
-        CHECK(round_double(peak.sigma_rt) ==
-              round_double(expected_peaks[i].sigma_rt));
-        CHECK(round_double(peak.mz_centroid) ==
-              round_double(expected_peaks[i].mz_centroid));
-        CHECK(round_double(peak.rt_centroid) ==
-              round_double(expected_peaks[i].rt_centroid));
-        CHECK(round_double(peak.height_centroid) ==
-              round_double(expected_peaks[i].height_centroid));
-        CHECK(round_double(peak.total_intensity_centroid) ==
-              round_double(expected_peaks[i].total_intensity_centroid));
-        CHECK(round_double(peak.border_background) ==
-              round_double(expected_peaks[i].border_background));
+        auto peak_opt =
+            Centroid::build_peak(local_max, {0, 0, parameters}, data);
+        CHECK(peak_opt);
+        if (peak_opt) {
+            auto peak = peak_opt.value();
+            peaks.push_back(peak);
+            CHECK(peak.i == expected_peaks[i].i);
+            CHECK(peak.j == expected_peaks[i].j);
+            CHECK(round_double(peak.mz) == round_double(expected_peaks[i].mz));
+            CHECK(round_double(peak.rt) == round_double(expected_peaks[i].rt));
+            CHECK(round_double(peak.height) ==
+                  round_double(expected_peaks[i].height));
+            CHECK(round_double(peak.total_intensity) ==
+                  round_double(expected_peaks[i].total_intensity));
+            CHECK(round_double(peak.sigma_mz) ==
+                  round_double(expected_peaks[i].sigma_mz));
+            CHECK(round_double(peak.sigma_rt) ==
+                  round_double(expected_peaks[i].sigma_rt));
+            CHECK(round_double(peak.mz_centroid) ==
+                  round_double(expected_peaks[i].mz_centroid));
+            CHECK(round_double(peak.rt_centroid) ==
+                  round_double(expected_peaks[i].rt_centroid));
+            CHECK(round_double(peak.height_centroid) ==
+                  round_double(expected_peaks[i].height_centroid));
+            CHECK(round_double(peak.total_intensity_centroid) ==
+                  round_double(expected_peaks[i].total_intensity_centroid));
+            CHECK(round_double(peak.border_background) ==
+                  round_double(expected_peaks[i].border_background));
+        }
     }
     SUBCASE("Writing to BPKS") {
         // Writing data to stream.

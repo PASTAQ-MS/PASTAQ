@@ -128,9 +128,9 @@ std::vector<Centroid::Point> Centroid::find_boundary(
     return boundary;
 }
 
-Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
-                                    const Centroid::Parameters &parameters,
-                                    const std::vector<double> &data) {
+std::optional<Centroid::Peak> Centroid::build_peak(
+    const Centroid::Point &local_max, const Centroid::Parameters &parameters,
+    const std::vector<double> &data) {
     Centroid::Peak peak = {};
     peak.i = local_max.i;
     peak.j = local_max.j;
@@ -142,6 +142,9 @@ Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
     // Extract the peak points and the boundary.
     Centroid::explore_peak_slope(local_max.i, local_max.j, -1, parameters, data,
                                  peak.points);
+    if (peak.points.size() <= 1) {
+        return std::nullopt;
+    }
 
     // TODO(alex): error handling. What happens if the number of points is very
     // small? We should probably ignore peaks with less than 5 points so that it
@@ -151,6 +154,9 @@ Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
     //   |+|c|+|
     //   | |+| |
     peak.boundary = Centroid::find_boundary(peak.points);
+    if (peak.boundary.empty()) {
+        return std::nullopt;
+    }
 
     // Calculate the average background intensity from the boundary.
     {
@@ -206,6 +212,12 @@ Centroid::Peak Centroid::build_peak(const Centroid::Point &local_max,
         peak.sigma_rt = peak.sigma_rt < 0 ? 1 : peak.sigma_rt;
 
         peak.total_intensity = height_sum;
+    }
+    if (peak.total_intensity == 0 || peak.sigma_mz == 0 ||
+        std::isnan(peak.sigma_mz) || std::isinf(peak.sigma_mz) ||
+        peak.sigma_rt == 0 || std::isnan(peak.sigma_rt) ||
+        std::isinf(peak.sigma_rt)) {
+        return std::nullopt;
     }
 
     // Fit a weighted centroid to our data for the calculation of mz_centroid,
