@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <iostream>
@@ -22,12 +23,16 @@ std::vector<Centroid::Peak> peaks_in_rt_range(
     const std::vector<Centroid::Peak>& source_peaks, double time_start,
     double time_end) {
     std::vector<Centroid::Peak> ret;
+    ret.reserve(source_peaks.size());
+    int i = 0;
     for (const auto& peak : source_peaks) {
         if (peak.rt >= time_start && peak.rt < time_end) {
             ret.push_back(peak);
+            ++i;
         }
         // TODO(alex): Should we use rt or rt_centroid?
     }
+    ret.resize(i);
     return ret;
 }
 
@@ -133,6 +138,51 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
     // Adjust rt_max to fit all segments.
     rt_max = rt_min + rt_sample_width * num_segments;
 
+    // Filter the peaks in each segment.
+    int n_peaks_per_segment = 50;  // FIXME: Hardcoding this for now.
+    std::vector<Centroid::Peak> target_peaks_filtered;
+    std::vector<Centroid::Peak> source_peaks_filtered;
+    for (int i = 0; i < num_segments; ++i) {
+        double rt_start = rt_min + i * rt_sample_width;
+        double rt_end = rt_start + rt_sample_width;
+        // Filter reference peaks.
+        {
+            auto peaks = peaks_in_rt_range(target_peaks, rt_start, rt_end);
+            int n_peaks_target = peaks.size();
+            n_peaks_target = n_peaks_target < n_peaks_per_segment
+                                 ? n_peaks_target
+                                 : n_peaks_per_segment;
+            if (n_peaks_target != 0) {
+                auto sort_by_height = [](const Centroid::Peak& p1,
+                                         const Centroid::Peak& p2) -> bool {
+                    return (p1.height > p2.height);
+                };
+                std::sort(peaks.begin(), peaks.end(), sort_by_height);
+                target_peaks_filtered.insert(end(target_peaks_filtered),
+                                             begin(peaks),
+                                             begin(peaks) + n_peaks_target);
+            }
+        }
+        // Filter source peaks.
+        {
+            auto peaks = peaks_in_rt_range(source_peaks, rt_start, rt_end);
+            int n_peaks_source = peaks.size();
+            n_peaks_source = n_peaks_source < n_peaks_per_segment
+                                 ? n_peaks_source
+                                 : n_peaks_per_segment;
+            if (n_peaks_source != 0) {
+                auto sort_by_height = [](const Centroid::Peak& p1,
+                                         const Centroid::Peak& p2) -> bool {
+                    return (p1.height > p2.height);
+                };
+                std::sort(peaks.begin(), peaks.end(), sort_by_height);
+                source_peaks_filtered.insert(end(source_peaks_filtered),
+                                             begin(peaks),
+                                             begin(peaks) + n_peaks_source);
+            }
+        }
+    }
+
     // Initialize nodes.
     std::vector<Level> levels(num_segments + 1);
     int N = num_segments;
@@ -164,9 +214,9 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
         double rt_start = rt_min + i * rt_sample_width;
         double rt_end = rt_start + rt_sample_width;
         auto target_peaks_segment =
-            peaks_in_rt_range(target_peaks, rt_start, rt_end);
+            peaks_in_rt_range(target_peaks_filtered, rt_start, rt_end);
         auto source_peaks_segment =
-            peaks_in_rt_range(source_peaks, rt_start, rt_end);
+            peaks_in_rt_range(source_peaks_filtered, rt_start, rt_end);
 
         for (int k = 0; k < (int)current_level.nodes.size(); ++k) {
             auto& node = current_level.nodes[k];
@@ -178,7 +228,8 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
 
                 // Make a copy of the peaks for warping.
                 std::vector<Centroid::Peak> source_peaks_warped;
-                for (const auto& peak : source_peaks) {
+                source_peaks_warped.reserve(source_peaks_segment.size());
+                for (const auto& peak : source_peaks_segment) {
                     source_peaks_warped.push_back(peak);
                 }
 
@@ -204,7 +255,9 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
 
     // Walk back nodes to find optimal warping path.
     std::vector<int> offsets;
+    offsets.reserve(num_segments + 1);
     std::vector<int> warp_by;
+    warp_by.reserve(num_segments);
     offsets.push_back(0);
     for (int i = 0; i < num_segments; ++i) {
         auto u = levels[i].nodes[offsets[i]].u;
@@ -215,6 +268,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
 
     // Warp the sample peaks based on the optimal path.
     std::vector<Centroid::Peak> warped_peaks;
+    warped_peaks.reserve(source_peaks.size());
     for (int i = 0; i < num_segments; ++i) {
         double rt_start = rt_min + i * rt_sample_width;
         double rt_end = rt_start + rt_sample_width;
