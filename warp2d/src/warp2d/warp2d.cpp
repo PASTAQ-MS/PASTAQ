@@ -90,6 +90,28 @@ double Warp2D::similarity_2D(const std::vector<Centroid::Peak>& set_a,
     return cummulative_similarity;
 }
 
+// Filter the peaks based on peak height. Note that this function modifies the
+// given `peaks` argument by sorting the vector in place.
+std::vector<Centroid::Peak> filter_peaks(std::vector<Centroid::Peak>& peaks,
+                                         size_t n_peaks_max) {
+    std::vector<Centroid::Peak> filtered_peaks;
+    size_t n_peaks = n_peaks_max < peaks.size() ? n_peaks_max : peaks.size();
+    if (n_peaks == 0) {
+        return filtered_peaks;
+    }
+    filtered_peaks.reserve(n_peaks);
+    auto sort_by_height = [](const Centroid::Peak& p1,
+                             const Centroid::Peak& p2) -> bool {
+        return (p1.height > p2.height);
+    };
+    std::sort(peaks.begin(), peaks.end(), sort_by_height);
+    for (size_t i = 0; i < n_peaks; ++i) {
+        auto peak = peaks[i];
+        filtered_peaks.push_back(peak);
+    }
+    return filtered_peaks;
+}
+
 // TODO(alex): Make sure to verify the integer sizes used here as well as the
 // discrepancy between using size_t and int.
 std::vector<Centroid::Peak> Warp2D::warp_peaks(
@@ -148,38 +170,18 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
         // Filter reference peaks.
         {
             auto peaks = peaks_in_rt_range(target_peaks, rt_start, rt_end);
-            int n_peaks_target = peaks.size();
-            n_peaks_target = n_peaks_target < n_peaks_per_segment
-                                 ? n_peaks_target
-                                 : n_peaks_per_segment;
-            if (n_peaks_target != 0) {
-                auto sort_by_height = [](const Centroid::Peak& p1,
-                                         const Centroid::Peak& p2) -> bool {
-                    return (p1.height > p2.height);
-                };
-                std::sort(peaks.begin(), peaks.end(), sort_by_height);
-                target_peaks_filtered.insert(end(target_peaks_filtered),
-                                             begin(peaks),
-                                             begin(peaks) + n_peaks_target);
-            }
+            auto filtered_peaks = filter_peaks(peaks, n_peaks_per_segment);
+            target_peaks_filtered.insert(end(target_peaks_filtered),
+                                         begin(filtered_peaks),
+                                         end(filtered_peaks));
         }
         // Filter source peaks.
         {
             auto peaks = peaks_in_rt_range(source_peaks, rt_start, rt_end);
-            int n_peaks_source = peaks.size();
-            n_peaks_source = n_peaks_source < n_peaks_per_segment
-                                 ? n_peaks_source
-                                 : n_peaks_per_segment;
-            if (n_peaks_source != 0) {
-                auto sort_by_height = [](const Centroid::Peak& p1,
-                                         const Centroid::Peak& p2) -> bool {
-                    return (p1.height > p2.height);
-                };
-                std::sort(peaks.begin(), peaks.end(), sort_by_height);
-                source_peaks_filtered.insert(end(source_peaks_filtered),
-                                             begin(peaks),
-                                             begin(peaks) + n_peaks_source);
-            }
+            auto filtered_peaks = filter_peaks(peaks, n_peaks_per_segment);
+            source_peaks_filtered.insert(end(source_peaks_filtered),
+                                         begin(filtered_peaks),
+                                         end(filtered_peaks));
         }
     }
 
