@@ -235,11 +235,34 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
                     source_peaks_warped.push_back(peak);
                 }
 
+                double warped_time_end = rt_end;  // + optimal warping u?
+                // NOTE: Is this what we want instead:
+                // double warped_time_end = rt_end + (next_level_u *
+                // delta_rt);
+                double warped_time_start = rt_start + (u * delta_rt);
+                // std::cout << "u: " << u << std::endl;
+                // std::cout << "warped_end: " << warped_time_end << std::endl;
+                // std::cout << "warped_start: " << warped_time_start
+                //<< std::endl;
+
                 // Warp the peaks.
                 double time_diff = u * delta_rt;
                 for (auto& peak : source_peaks_warped) {
-                    peak.rt += time_diff;
-                    peak.rt_centroid += time_diff;
+                    // std::cout << "current rt: " << peak.rt << std::endl;
+                    // std::cout << "constant displacement: " << time_diff
+                    //<< std::endl;
+                    // TODO: Fix to be numerically stable.
+                    double lerp_peak =
+                        (peak.rt - rt_start) / (rt_end - rt_start) *
+                            (warped_time_end - warped_time_start) +
+                        warped_time_start;
+                    // std::cout << "cd_peak: " << peak.rt + time_diff
+                    //<< std::endl;
+                    // std::cout << "lerp_peak: " << lerp_peak << std::endl;
+                    // peak.rt += time_diff;
+                    // peak.rt_centroid += time_diff;
+                    peak.rt = lerp_peak;
+                    peak.rt_centroid = lerp_peak;
                 }
 
                 // Calculate the peak overlap between the reference and warped
@@ -277,14 +300,60 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
         auto source_peaks_segment =
             peaks_in_rt_range(source_peaks, rt_start, rt_end);
 
+        auto u = warp_by[i];
+
         // Warp the peaks.
-        double time_diff = warp_by[i] * delta_rt;
+        //double time_diff = u * delta_rt;
+        //for (auto& peak : source_peaks_segment) {
+            //peak.rt += time_diff;
+            //peak.rt_centroid += time_diff;
+            //warped_peaks.push_back(peak);
+        //}
+
+        double warped_time_end = rt_end;  // + optimal warping u?
+        // NOTE: Is this what we want instead:
+        // double warped_time_end = rt_end + (next_level_u *
+        // delta_rt);
+        double warped_time_start = rt_start + (u * delta_rt);
+        // std::cout << "u: " << u << std::endl;
+        // std::cout << "warped_end: " << warped_time_end << std::endl;
+        // std::cout << "warped_start: " << warped_time_start
+        //<< std::endl;
+
+        // Warp the peaks.
+        double time_diff = u * delta_rt;
         for (auto& peak : source_peaks_segment) {
-            peak.rt += time_diff;
-            peak.rt_centroid += time_diff;
+            // std::cout << "current rt: " << peak.rt << std::endl;
+            // std::cout << "constant displacement: " << time_diff
+            //<< std::endl;
+            // TODO: Fix to be numerically stable.
+            double lerp_peak = (peak.rt - rt_start) / (rt_end - rt_start) *
+                                   (warped_time_end - warped_time_start) +
+                               warped_time_start;
+            // std::cout << "cd_peak: " << peak.rt + time_diff
+            //<< std::endl;
+            // std::cout << "lerp_peak: " << lerp_peak << std::endl;
+            // peak.rt += time_diff;
+            // peak.rt_centroid += time_diff;
+            peak.rt = lerp_peak;
+            peak.rt_centroid = lerp_peak;
             warped_peaks.push_back(peak);
         }
     }
+
+    // DEBUG
+    std::cout << "DEBUG:" << std::endl;
+    auto target_peaks_copy = target_peaks;
+    auto source_peaks_copy = source_peaks;
+    auto warped_peaks_copy = warped_peaks;
+    auto a = filter_peaks(target_peaks_copy, 1000);
+    auto b = filter_peaks(source_peaks_copy, 1000);
+    auto c = filter_peaks(warped_peaks_copy, 1000);
+    double similarity_before = Warp2D::similarity_2D(a, b);
+    double similarity_after = Warp2D::similarity_2D(a, c);
+    std::cout << "Similarity Before: " << similarity_before << std::endl;
+    std::cout << "Similarity After: " << similarity_after << std::endl;
+    std::cout << "------------" << std::endl;
 
     return warped_peaks;
 }
