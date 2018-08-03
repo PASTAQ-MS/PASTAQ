@@ -206,6 +206,8 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
     levels[num_segments].start = Lt;
     levels[num_segments].end = Lt;
     levels[num_segments].nodes.push_back({0.0, 0});
+    //std::cout << "rt_min: " << rt_min << std::endl;
+    //std::cout << "rt_max: " << rt_max << std::endl;
 
     // Perform dynamic programming to find optimal warping path.
     for (int i = num_segments - 1; i >= 0; --i) {
@@ -219,9 +221,13 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
             peaks_in_rt_range(target_peaks_filtered, rt_start, rt_end);
         auto source_peaks_segment =
             peaks_in_rt_range(source_peaks_filtered, rt_start, rt_end);
+        //std::cout << "rt_start: " << rt_start << std::endl;
+        //std::cout << "rt_end: " << rt_end << std::endl;
 
+        //std::cout << "i: " << i << std::endl;
         for (int k = 0; k < (int)current_level.nodes.size(); ++k) {
             auto& node = current_level.nodes[k];
+            //std::cout << "k: " << k << std::endl;
             for (int u = -t; u <= t; ++u) {
                 int offset = current_level.start - next_level.start + k + m + u;
                 if (offset < 0 || offset > (int)next_level.nodes.size() - 1) {
@@ -301,6 +307,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
             peaks_in_rt_range(source_peaks, rt_start, rt_end);
 
         auto u = warp_by[i];
+        auto u_next = warp_by[i + 1];
 
         // Warp the peaks.
         //double time_diff = u * delta_rt;
@@ -310,7 +317,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
             //warped_peaks.push_back(peak);
         //}
 
-        double warped_time_end = rt_end;  // + optimal warping u?
+        double warped_time_end = rt_end + (u_next * delta_rt);  // + optimal warping u?
         // NOTE: Is this what we want instead:
         // double warped_time_end = rt_end + (next_level_u *
         // delta_rt);
@@ -346,9 +353,9 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
     auto target_peaks_copy = target_peaks;
     auto source_peaks_copy = source_peaks;
     auto warped_peaks_copy = warped_peaks;
-    auto a = filter_peaks(target_peaks_copy, 1000);
-    auto b = filter_peaks(source_peaks_copy, 1000);
-    auto c = filter_peaks(warped_peaks_copy, 1000);
+    auto a = filter_peaks(target_peaks_copy, 100);
+    auto b = filter_peaks(source_peaks_copy, 100);
+    auto c = filter_peaks(warped_peaks_copy, 100);
     double similarity_before = Warp2D::similarity_2D(a, b);
     double similarity_after = Warp2D::similarity_2D(a, c);
     std::cout << "Similarity Before: " << similarity_before << std::endl;

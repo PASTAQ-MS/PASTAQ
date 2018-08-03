@@ -474,6 +474,18 @@ int main(int argc, char *argv[]) {
                           << outfile_name << std::endl;
                 return -1;
             }
+            // DEBUG
+            auto csv_outfile_name =
+                options["-out_dir"] /
+                input_file.filename().replace_extension(".csv");
+            std::ofstream csv_outfile_stream;
+            csv_outfile_stream.open(csv_outfile_name, std::ios::out | std::ios::binary);
+            if (!Centroid::Files::Csv::write_peaks(csv_outfile_stream,
+                                                   warped_peaks)) {
+                std::cout << "error: couldn't write warped peaks into file "
+                          << csv_outfile_name << std::endl;
+                return -1;
+            }
         } else if (lowercase_extension == ".csv") {
             if (!Centroid::Files::Csv::write_peaks(outfile_stream,
                                                    warped_peaks)) {
