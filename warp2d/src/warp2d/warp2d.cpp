@@ -36,6 +36,18 @@ std::vector<Centroid::Peak> peaks_in_rt_range(
     return ret;
 }
 
+// TODO(alex): Move to utils module.
+// Perform numerically stable linear interpolation of x between y_0 and y_1.
+// Note that x is a number between 0 and 1. This is the equivalent of the
+// following formula:
+//
+// (y - y_0) / (y_1 - y_0) = x;
+// y = x * (y_1 - y_0) + y_0;
+//
+double lerp(double y_0, double y_1, double x) {
+    return (1 - x) * y_0 + x * y_1;
+}
+
 double Warp2D::peak_overlap(const Centroid::Peak& peak_a,
                             const Centroid::Peak& peak_b) {
     // TODO(alex): Use rt/mz/height or rt_centroid/mz_centroid/height_centroid?
@@ -107,6 +119,11 @@ std::vector<Centroid::Peak> filter_peaks(std::vector<Centroid::Peak>& peaks,
     std::sort(peaks.begin(), peaks.end(), sort_by_height);
     for (size_t i = 0; i < n_peaks; ++i) {
         auto peak = peaks[i];
+        // We don't need the inner points or boundary points for this algorithm.
+        // In order to reduce the number of allocations and memory consumption
+        // we remove these from the peak object.
+        peak.points = {};
+        peak.boundary = {};
         filtered_peaks.push_back(peak);
     }
     return filtered_peaks;
@@ -244,12 +261,8 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
                 // linear displacement of the center of the peaks, we do not
                 // deform the peak shape by adjusting the sigmas.
                 for (auto& peak : source_peaks_warped) {
-                    // TODO: Fix to be numerically stable.
-                    double lerp_peak = (peak.rt - sample_rt_start) *
-                                           (segment_rt_width) /
-                                           sample_rt_width +
-                                       rt_start;
-                    peak.rt = lerp_peak;
+                    double x = (peak.rt - sample_rt_start) / sample_rt_width;
+                    peak.rt = lerp(rt_start, rt_end, x);
                 }
 
                 // Calculate the peak overlap between the reference and warped
@@ -279,6 +292,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
     warped_peaks.reserve(source_peaks.size());
     for (int i = 0; i < N; ++i) {
         double rt_start = rt_min + i * segment_rt_width;
+        double rt_end = rt_start + segment_rt_width;
 
         int x_start = warp_by[i] + levels[i].start;
         int x_end = warp_by[i + 1] + levels[i + 1].start;
@@ -298,11 +312,8 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
 
         // Warp the peaks.
         for (auto& peak : source_peaks_warped) {
-            // TODO: Fix to be numerically stable.
-            double lerp_peak = (peak.rt - sample_rt_start) *
-                                   (segment_rt_width) / sample_rt_width +
-                               rt_start;
-            peak.rt = lerp_peak;
+            double x = (peak.rt - sample_rt_start) / sample_rt_width;
+            peak.rt = lerp(rt_start, rt_end, x);
             warped_peaks.push_back(peak);
         }
     }
