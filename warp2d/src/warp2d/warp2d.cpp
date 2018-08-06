@@ -243,19 +243,26 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
             peaks_in_rt_range(source_peaks_filtered, rt_start, rt_end);
 
         // DEBUG
-        //std::cout << "rt_start: " << rt_start << std::endl;
-        //std::cout << "rt_end: " << rt_end << std::endl;
-        //std::cout << "current_level.start: " << current_level.start
-                  //<< std::endl;
-        //std::cout << "current_level.end: " << current_level.end << std::endl;
-        //std::cout << "current_level.x: " << current_level.x << std::endl;
-        //std::cout << std::endl;
+        // std::cout << "rt_start: " << rt_start << std::endl;
+        // std::cout << "rt_end: " << rt_end << std::endl;
+        // std::cout << "current_level.start: " << current_level.start
+        //<< std::endl;
+        // std::cout << "current_level.end: " << current_level.end << std::endl;
+        // std::cout << "current_level.x: " << current_level.x << std::endl;
+        // std::cout << std::endl;
+        std::cout << "level: " << i << " refTimeStart: " << rt_start
+                  << " refTimeEnd: " << rt_end << std::endl;
 
         for (int k = 0; k < (int)current_level.nodes.size(); ++k) {
             int x_i = current_level.start + k;
             auto& node_i = current_level.nodes[k];
-            for (int j = 0; j < (int)next_level.nodes.size(); ++j) {
+            int x_j_min = std::max(x_i + m - t, next_level.start);
+            int x_j_max = std::min(x_i + m + t, next_level.end);
+            int j_min = x_j_min - next_level.start;
+            int j_max = x_j_max - next_level.start;
+            for (int j = j_min; j <= j_max; ++j) {
                 int x_j = next_level.start + j;
+                // std::cout << "x_i: " << x_i << " x_j: " << x_j << std::endl;
                 auto& node_j = next_level.nodes[j];
 
                 double warped_time_start = x_i * delta_rt + rt_min;
