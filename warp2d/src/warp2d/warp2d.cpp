@@ -3,6 +3,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <thread>
 
 #include "warp2d/warp2d.hpp"
 
@@ -445,15 +446,61 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
         }
     }
 
-    for (int k = 0; k < N; ++k) {
-        auto& current_level = levels[k];
+    // Prepare which group of levels we are going to send to every core. We
+    // store the index of the levels into a groups array.
+    std::vector<std::vector<int>> groups = {};
+    int max_threads =
+        std::thread::hardware_concurrency();  // FIXME: Hardcoding this for now
+    std::cout << "distributing groups..." << std::endl;
+    if (N < max_threads) {
+        int n_groups = N;
+        for (int i = 0; i < n_groups; ++i) {
+            groups.push_back({i});
+        }
+    } else {
+        // TODO(alex): Implement this...
+        int n_groups = N / max_threads;
+        groups = std::vector<std::vector<int>>(max_threads);
+        // std::cout << "n_groups: " << n_groups << std::endl;
+        // std::cout << "n_levels: " << n_levels << std::endl;
+        // for (int i = 0; i < max_threads - 1; ++i) {
+        //// std::cout << "i: " << i << std::endl;
+        //// std::cout << "k: " << k << std::endl;
+        //// std::cout << "max_threads: " << max_threads << std::endl;
+        //// std::cout << "n_levels: " << n_levels << std::endl;
+        // for (size_t j = 0; j < n_groups; ++j) {
+        // groups[i].push_back(i * n_groups + j);
+        //++k;
+        //}
+        //}
+        int i = 0;
+        int k = 0;
+        while (k < N) {
+            groups[i].push_back(k);
+            ++k;
+            if (i == max_threads - 1) {
+                i = 0;
+            } else {
+                ++i;
+            }
+        }
+    }
+    for (size_t i = 0; i < groups.size(); ++i) {
+        std::cout << "group: " << i << " ";
+        for (const auto& index : groups[i]) {
+            std::cout << "[" << index << "] ";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "levels.size(): " << levels.size() << std::endl;
 
-        double rt_start = rt_min + k * segment_rt_width;
-        double rt_end = rt_start + segment_rt_width;
+    auto perform_warpings = [](auto& level, auto rt_start, auto rt_end,
+                               auto rt_min, auto delta_rt, auto& target_peaks,
+                               auto& source_peaks) {
         auto target_peaks_segment =
-            peaks_in_rt_range(target_peaks_filtered, rt_start, rt_end);
+            peaks_in_rt_range(target_peaks, rt_start, rt_end);
 
-        for (auto& warping : current_level.potential_warpings) {
+        for (auto& warping : level.potential_warpings) {
             int x_start = warping.x_start;
             int x_end = warping.x_end;
 
@@ -461,8 +508,8 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
             double sample_rt_width = (x_end - x_start) * delta_rt;
             double sample_rt_end = sample_rt_start + sample_rt_width;
 
-            auto source_peaks_warped = peaks_in_rt_range(
-                source_peaks_filtered, sample_rt_start, sample_rt_end);
+            auto source_peaks_warped =
+                peaks_in_rt_range(source_peaks, sample_rt_start, sample_rt_end);
 
             // Warp the peaks by linearly interpolating their retention time
             // to the current segment's. Note that we are just performing
@@ -479,8 +526,29 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
                                                       source_peaks_warped);
             warping.warped_similarity = similarity;
         }
+    };
+
+    std::cout << "finding similarities..." << std::endl;
+    std::vector<std::thread> threads(groups.size());
+    for (size_t i = 0; i < groups.size(); ++i) {
+        threads[i] = std::thread([i, &groups, &levels, rt_min, delta_rt,
+                                  segment_rt_width, &target_peaks_filtered,
+                                  &source_peaks_filtered, &perform_warpings]() {
+            for (const auto& k : groups[i]) {
+                auto& current_level = levels[k];
+                double rt_start = rt_min + k * segment_rt_width;
+                double rt_end = rt_start + segment_rt_width;
+                perform_warpings(current_level, rt_start, rt_end, rt_min,
+                                 delta_rt, target_peaks_filtered,
+                                 source_peaks_filtered);
+            }
+        });
+    }
+    for (auto& thread : threads) {
+        thread.join();
     }
 
+    std::cout << "walking back nodes..." << std::endl;
     for (int k = N - 1; k >= 0; --k) {
         auto& current_level = levels[k];
         const auto& next_level = levels[k + 1];
@@ -498,6 +566,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
     }
 
     // Walk back nodes to find optimal warping path.
+    std::cout << "finding optimal path..." << std::endl;
     std::vector<int> warp_by;
     warp_by.reserve(N + 1);
     warp_by.push_back(0);
@@ -506,6 +575,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
         warp_by.push_back(u);
     }
 
+    std::cout << "warping optimal nodes..." << std::endl;
     // Warp the sample peaks based on the optimal path.
     std::vector<Centroid::Peak> warped_peaks;
     warped_peaks.reserve(source_peaks.size());

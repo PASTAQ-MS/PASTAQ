@@ -34,7 +34,7 @@ TEST_CASE("Peak warping using warp2d") {
         {0, 0, 240, 610, 700, 7000, 5, 200, 240, 610, 700, 7000, 0, {}, {}},
     };
     auto warped_peaks =
-        Warp2D::warp_peaks(target_peaks, source_peaks, {5, 10, 100});
+        Warp2D::warp_peaks(target_peaks, source_peaks, {5, 10, 1000});
     bool sizes_match = warped_peaks.size() == source_peaks.size();
     CHECK(sizes_match);
     if (sizes_match) {
