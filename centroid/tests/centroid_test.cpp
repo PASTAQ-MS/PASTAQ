@@ -253,7 +253,8 @@ TEST_CASE("Find peaks") {
     };
     for (size_t i = 0; i < local_max_points.size(); ++i) {
         auto local_max = local_max_points[i];
-        auto peak_opt = Centroid::build_peak(local_max, {0, 0, grid_params}, data);
+        auto peak_opt =
+            Centroid::build_peak(local_max, {0, 0, grid_params}, data);
         CHECK(peak_opt);
         if (peak_opt) {
             auto peak = peak_opt.value();
