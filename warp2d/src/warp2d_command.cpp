@@ -9,6 +9,7 @@
 #include "centroid/centroid_files.hpp"
 #include "grid/grid.hpp"
 #include "warp2d/warp2d.hpp"
+#include "warp2d/warp2d_runners.hpp"
 
 // Type aliases.
 using options_map = std::map<std::string, std::string>;
@@ -435,6 +436,7 @@ int main(int argc, char *argv[]) {
         Grid::Parameters grid_params;
         if (lowercase_extension == ".bpks") {
             // Read into peak array.
+            std::cout << "Reading peaks from file: " << input_file << std::endl;
             if (!Centroid::Files::Bpks::read_peaks(stream, &grid_params,
                                                    &peaks)) {
                 std::cout
@@ -464,10 +466,11 @@ int main(int argc, char *argv[]) {
         }
         // Perform warping.
         std::cout << "Performing warping..." << std::endl;
-        auto warped_peaks =
-            Warp2D::warp_peaks(reference_peaks, peaks, parameters);
+        auto warped_peaks = Warp2D::Runners::Parallel::run(
+            reference_peaks, peaks, parameters, max_threads);
 
         if (lowercase_extension == ".bpks") {
+            std::cout << "Saving peaks to disk in bpks..." << std::endl;
             if (!Centroid::Files::Bpks::write_peaks(outfile_stream, grid_params,
                                                     warped_peaks)) {
                 std::cout << "error: couldn't write warped peaks into file "
@@ -475,11 +478,13 @@ int main(int argc, char *argv[]) {
                 return -1;
             }
             // DEBUG
+            std::cout << "Saving peaks to disk in csv..." << std::endl;
             auto csv_outfile_name =
                 options["-out_dir"] /
                 input_file.filename().replace_extension(".csv");
             std::ofstream csv_outfile_stream;
-            csv_outfile_stream.open(csv_outfile_name, std::ios::out | std::ios::binary);
+            csv_outfile_stream.open(csv_outfile_name,
+                                    std::ios::out | std::ios::binary);
             if (!Centroid::Files::Csv::write_peaks(csv_outfile_stream,
                                                    warped_peaks)) {
                 std::cout << "error: couldn't write warped peaks into file "

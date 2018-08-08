@@ -30,6 +30,7 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../centroid" ${CMAKE_CURRENT_BINAR
 if (NOT TARGET warp2dlib)
     add_library(warp2dlib
         "${CMAKE_CURRENT_SOURCE_DIR}/src/warp2d/warp2d.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/warp2d/warp2d_runners.cpp"
         )
     target_include_directories(warp2dlib PUBLIC src)
     target_link_libraries(warp2dlib gridlib centroidlib ${CMAKE_THREAD_LIBS_INIT})
@@ -65,6 +66,7 @@ if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} OR (${CENTROID_ADD_T
                 warp2d_test
                 tests/main.cpp
                 tests/warp2d_test.cpp
+                tests/warp2d_runners_test.cpp
                 )
             add_test(NAME warp2d_test COMMAND warp2d_test)
             target_link_libraries(warp2d_test stdc++ doctest testutilslib warp2dlib)
