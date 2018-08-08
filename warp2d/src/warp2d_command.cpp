@@ -466,8 +466,15 @@ int main(int argc, char *argv[]) {
         }
         // Perform warping.
         std::cout << "Performing warping..." << std::endl;
-        auto warped_peaks = Warp2D::Runners::Parallel::run(
-            reference_peaks, peaks, parameters, max_threads);
+        std::vector<Centroid::Peak> warped_peaks;
+        if ((options.find("-parallel") != options.end()) &&
+            (options["-parallel"] == "true" || options["-parallel"].empty())) {
+            warped_peaks = Warp2D::Runners::Parallel::run(
+                reference_peaks, peaks, parameters, max_threads);
+        } else {
+            warped_peaks = Warp2D::Runners::Serial::run(reference_peaks, peaks,
+                                                        parameters);
+        }
 
         if (lowercase_extension == ".bpks") {
             std::cout << "Saving peaks to disk in bpks..." << std::endl;

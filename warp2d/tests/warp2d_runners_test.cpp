@@ -72,5 +72,14 @@ TEST_CASE("Peak warping using warp2d") {
         }
     }
     SUBCASE("Serial execution") {
+        auto warped_peaks = Warp2D::Runners::Serial::run(
+            target_peaks, source_peaks, {5, 10, 1000});
+        bool sizes_match = warped_peaks.size() == source_peaks.size();
+        CHECK(sizes_match);
+        if (sizes_match) {
+            for (size_t i = 0; i < warped_peaks.size(); ++i) {
+                CHECK(std::abs(target_peaks[i].rt - warped_peaks[i].rt) < 1);
+            }
+        }
     }
 }
