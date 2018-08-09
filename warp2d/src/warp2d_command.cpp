@@ -195,6 +195,9 @@ int main(int argc, char *argv[]) {
         {"-out_dir", {"The output directory", true}},
         {"-help", {"Display available options", false}},
         {"-config", {"Specify the configuration file", true}},
+        {"-csvdump",
+         {"Dump the warped peaks as a `csv` file in addition to `.bpks`",
+          false}},
         {"-parallel", {"Enable parallel processing", false}},
         {"-n_threads",
          {"Specify the maximum number of threads that will be used for the "
@@ -407,7 +410,8 @@ int main(int argc, char *argv[]) {
     }
 
     // Read the reference file peaks.
-    std::cout << "Reading the reference file peaks" << std::endl;
+    std::cout << "Reading reference peaks from file: " << reference_file
+              << std::endl;
     std::vector<Centroid::Peak> reference_peaks;
     Grid::Parameters reference_grid_params;
     {
@@ -511,15 +515,16 @@ int main(int argc, char *argv[]) {
                                                         parameters);
         }
 
-        if (lowercase_extension == ".bpks") {
-            std::cout << "Saving peaks to disk in bpks..." << std::endl;
-            if (!Centroid::Files::Bpks::write_peaks(outfile_stream, grid_params,
-                                                    warped_peaks)) {
-                std::cout << "error: couldn't write warped peaks into file "
-                          << outfile_name << std::endl;
-                return -1;
-            }
-            // DEBUG
+        std::cout << "Saving peaks to disk in bpks..." << std::endl;
+        if (!Centroid::Files::Bpks::write_peaks(outfile_stream, grid_params,
+                                                warped_peaks)) {
+            std::cout << "error: couldn't write warped peaks into file "
+                      << outfile_name << std::endl;
+            return -1;
+        }
+
+        if (options.find("-csvdump") != options.end() &&
+            (options["-csvdump"] == "true" || options["-csvdump"].empty())) {
             std::cout << "Saving peaks to disk in csv..." << std::endl;
             auto csv_outfile_name =
                 options["-out_dir"] /
@@ -533,18 +538,6 @@ int main(int argc, char *argv[]) {
                           << csv_outfile_name << std::endl;
                 return -1;
             }
-        } else if (lowercase_extension == ".csv") {
-            if (!Centroid::Files::Csv::write_peaks(outfile_stream,
-                                                   warped_peaks)) {
-                std::cout << "error: couldn't write warped peaks into file "
-                          << outfile_name << std::endl;
-                return -1;
-            }
-        } else {
-            std::cout << "error: unknown file format for file " << input_file
-                      << std::endl;
-            print_usage();
-            return -1;
         }
     }
 

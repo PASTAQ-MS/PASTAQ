@@ -211,8 +211,7 @@ int main(int argc, char *argv[]) {
         {"-help", {"Display available options", false}},
         {"-config", {"Specify the configuration file", true}},
         {"-csvdump",
-         {"Dump the detected peaks as a `csv` file in addition to the `.bpks` "
-          "file",
+         {"Dump the detected peaks as a `csv` file in addition to the `.bpks`",
           false}},
         {"-parallel", {"Enable parallel processing", false}},
         {"-n_threads",
