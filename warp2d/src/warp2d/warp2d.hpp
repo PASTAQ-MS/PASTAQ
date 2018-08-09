@@ -7,8 +7,14 @@
 #include "centroid/centroid.hpp"
 
 namespace Warp2D {
-// The parameters used in Warp2D
-// TODO(alex): add more docs.
+// The parameters used in Warp2D.
+//
+// - slack: Determines how much each node can be warped in either direction.
+// - window_size: The number of points for each segment.
+// - num_points: The number of points in which the retention time range will be
+//   divided.
+// - peaks_per_window: The number of peaks that will be used in each of the
+//   segments.
 struct Parameters {
     int slack;
     int window_size;
@@ -16,22 +22,118 @@ struct Parameters {
     int peaks_per_window;
 };
 
-// TODO(alex): add more docs.
+// The main element of the FU matrix used by the Correlation Optimised Warping
+// (COW) algorithm. In the original algorithm it is described the use of two
+// matrices F and U to store the cumulative correlation/similarity and the
+// optimal precursor for a given element, but since the algorithm doesn't
+// require the majority of the elements of that matrix it makes more sense to
+// structure the data as a list FU nodes for each segment.
 struct Node {
-    double f;  // Cummulative similarity value.
+    double f;  // Cumulative similarity value.
     int u;     // Optimal predecessor index.
 };
 
-// TODO(alex): add more docs.
+// This structure describes the required data to perform a warping between two
+// nodes.
 struct PotentialWarping {
-    int i;  // Index of the node on the current level for x_start.
-    int j;  // Index of the node on the next level for x_end.
-    int x_start;
-    int x_end;
-    double warped_similarity;
+    int i;          // Index of the node on the current level for x_start.
+    int j;          // Index of the node on the next level for x_end.
+    int src_start;  // The initial point to warp.
+    int src_end;    // The end point to warp.
+    double warped_similarity;  // The similarity obtained after warping.
 };
 
-// TODO(alex): add more docs.
+// Each level contains the potential warpings for the segment, the FU nodes for
+// optimal warping detection and the start and end points of the level. For
+// example, given the following parameters:
+//
+//     slack = 1
+//     window_size = 5
+//     num_points = 25
+//
+// We will have 5 segments with the nodes distributed in the following way (Note
+// that we will always have 1 extra segment at the end:
+//
+//              0         1         2         3         4
+//     Level 0 |x| | | | | | | | | | | | | | | | | | | | | | | | |
+//     Level 1 | | | | |x|x|x| | | | | | | | | | | | | | | | | | |
+//     Level 2 | | | | | | | | |x|x|x|x|x| | | | | | | | | | | | |
+//     Level 3 | | | | | | | | | | | | | |x|x|x|x|x| | | | | | | |
+//     Level 4 | | | | | | | | | | | | | | | | | | | |x|x|x| | | |
+//     Level 5 | | | | | | | | | | | | | | | | | | | | | | | | |x|
+//
+// - Level 0:
+//     - start: 0
+//     - end: 0
+//     - potential_warpings:
+//         [
+//             i: 0 j: 0 src_start: 0 src_end: 4
+//             i: 0 j: 1 src_start: 0 src_end: 5
+//             i: 0 j: 2 src_start: 0 src_end: 6
+//         ]
+// - level: 1
+//     - start: 4
+//     - end: 6
+//     - potential_warpings:
+//         [
+//              i: 0 j: 0 src_start: 4 src_end: 8
+//              i: 0 j: 1 src_start: 4 src_end: 9
+//              i: 0 j: 2 src_start: 4 src_end: 10
+//              i: 1 j: 1 src_start: 5 src_end: 9
+//              i: 1 j: 2 src_start: 5 src_end: 10
+//              i: 1 j: 3 src_start: 5 src_end: 11
+//              i: 2 j: 2 src_start: 6 src_end: 10
+//              i: 2 j: 3 src_start: 6 src_end: 11
+//              i: 2 j: 4 src_start: 6 src_end: 12
+//         ]
+// - level: 2
+//     - start: 8
+//     - end: 12
+//     - potential_warpings:
+//         [
+//              i: 0 j: 0 src_start: 8 src_end: 13
+//              i: 0 j: 1 src_start: 8 src_end: 14
+//              i: 1 j: 0 src_start: 9 src_end: 13
+//              i: 1 j: 1 src_start: 9 src_end: 14
+//              i: 1 j: 2 src_start: 9 src_end: 15
+//              i: 2 j: 1 src_start: 10 src_end: 14
+//              i: 2 j: 2 src_start: 10 src_end: 15
+//              i: 2 j: 3 src_start: 10 src_end: 16
+//              i: 3 j: 2 src_start: 11 src_end: 15
+//              i: 3 j: 3 src_start: 11 src_end: 16
+//              i: 3 j: 4 src_start: 11 src_end: 17
+//              i: 4 j: 3 src_start: 12 src_end: 16
+//              i: 4 j: 4 src_start: 12 src_end: 17
+//         ]
+// - level: 3
+//     - start: 13
+//     - end: 17
+//     - potential_warpings:
+//         [
+//              i: 0 j: 0 src_start: 13 src_end: 19
+//              i: 1 j: 0 src_start: 14 src_end: 19
+//              i: 1 j: 1 src_start: 14 src_end: 20
+//              i: 2 j: 0 src_start: 15 src_end: 19
+//              i: 2 j: 1 src_start: 15 src_end: 20
+//              i: 2 j: 2 src_start: 15 src_end: 21
+//              i: 3 j: 1 src_start: 16 src_end: 20
+//              i: 3 j: 2 src_start: 16 src_end: 21
+//              i: 4 j: 2 src_start: 17 src_end: 21
+//         ]
+// - level: 4
+//     - start: 19
+//     - end: 21
+//     - potential_warpings:
+//         [
+//              i: 0 j: 0 src_start: 19 src_end: 25
+//              i: 1 j: 0 src_start: 20 src_end: 25
+//              i: 2 j: 0 src_start: 21 src_end: 25
+//         ]
+// - level: 5
+//     - start: 25
+//     - end: 25
+//     - potential_warpings: []
+//
 struct Level {
     int start;
     int end;
@@ -42,38 +144,44 @@ struct Level {
 // Calculate the overlaping area between two peaks.
 double peak_overlap(const Centroid::Peak& peak_a, const Centroid::Peak& peak_b);
 
-// Calculate the cummulative similarity between two sets of peaks.
+// Calculate the cumulative similarity between two sets of peaks.
 double similarity_2D(const std::vector<Centroid::Peak>& set_a,
                      const std::vector<Centroid::Peak>& set_b);
 
-// FIXME: COMMENT NOT CORRECT... Warp the sample_peaks to target_peaks in the
-// retention time dimension. The warping is performed by using a variant of the
-// Correlation Optimised Warping (COW) that uses the overlaping volume of the
-// peaks as the similarity/benefit function. Returns the peaks after successful
-// warping.
+// Warp the peaks by linearly interpolating their retention time to the given
+// reference time. Note that we are just performing linear displacement of the
+// center of the peaks, we do not deform the peak shape by adjusting the sigmas.
 std::vector<Centroid::Peak> warp_peaks(
     const std::vector<Centroid::Peak>& source_peaks, double source_rt_start,
     double source_rt_end, double ref_rt_start, double ref_rt_end);
 
-// TODO(alex): add more docs.
+// Returns a copy of the peaks from source_peaks that are in the given region
+// between time_start and time_end.
 std::vector<Centroid::Peak> peaks_in_rt_range(
     const std::vector<Centroid::Peak>& source_peaks, double time_start,
     double time_end);
 
-// TODO(alex): add more docs.
+// Filter the peaks based on peak height. Note that this function modifies the
+// given `peaks` argument by sorting the vector in place.
 std::vector<Centroid::Peak> filter_peaks(std::vector<Centroid::Peak>& peaks,
                                          size_t n_peaks_max);
 
-// TODO(alex): add more docs.
-std::vector<Level> initialize_levels(int N, int m, int t, int nP);
+// Initialize the vector of Levels, including the potential warpings and FU
+// nodes.
+std::vector<Level> initialize_levels(int num_sectors, int window_size,
+                                     int slack, int num_points);
 
-// TODO(alex): add more docs.
+// Calculate all warped similarities from each PotentialWarping in
+// level.warped_similarities.
 void compute_warped_similarities(
     Warp2D::Level& level, double rt_start, double rt_end, double rt_min,
     double delta_rt, const std::vector<Centroid::Peak>& target_peaks,
     const std::vector<Centroid::Peak>& source_peaks);
 
-// TODO(alex): add more docs.
+// Calculates the optimal set of warping points using the computed warped
+// similarities in levels. It does so in two steps: First it walks back the list
+// of warped similarities and updates the FU nodes, and then it walks forward
+// the FU nodes to find the optimal warping path.
 std::vector<int> find_optimal_warping(std::vector<Level>& levels, int N);
 }  // namespace Warp2D
 

@@ -40,7 +40,7 @@ double Warp2D::peak_overlap(const Centroid::Peak& peak_a,
                             const Centroid::Peak& peak_b) {
     // TODO(alex): Use rt/mz/height or rt_centroid/mz_centroid/height_centroid?
 
-    // Early return if the peaks do not intersect in the +/-2 * sigma_mz/rt
+    // Early return if the peaks do not intersect in the +/-3 * sigma_mz/rt
     {
         double min_rt_a = peak_a.rt - 3 * peak_a.sigma_rt;
         double max_rt_a = peak_a.rt + 3 * peak_a.sigma_rt;
@@ -81,17 +81,15 @@ double Warp2D::peak_overlap(const Centroid::Peak& peak_a,
 
 double Warp2D::similarity_2D(const std::vector<Centroid::Peak>& set_a,
                              const std::vector<Centroid::Peak>& set_b) {
-    double cummulative_similarity = 0;
+    double cumulative_similarity = 0;
     for (const auto& peak_a : set_a) {
         for (const auto& peak_b : set_b) {
-            cummulative_similarity += Warp2D::peak_overlap(peak_a, peak_b);
+            cumulative_similarity += Warp2D::peak_overlap(peak_a, peak_b);
         }
     }
-    return cummulative_similarity;
+    return cumulative_similarity;
 }
 
-// Filter the peaks based on peak height. Note that this function modifies the
-// given `peaks` argument by sorting the vector in place.
 std::vector<Centroid::Peak> Warp2D::filter_peaks(
     std::vector<Centroid::Peak>& peaks, size_t n_peaks_max) {
     std::vector<Centroid::Peak> filtered_peaks;
@@ -142,21 +140,21 @@ std::vector<Warp2D::Level> Warp2D::initialize_levels(int N, int m, int t,
         const auto& next_level = levels[k + 1];
 
         for (int i = 0; i < (int)current_level.nodes.size(); ++i) {
-            int x_start = current_level.start + i;
+            int src_start = current_level.start + i;
 
             // The next node for the next level is subject to the following
             // constrains:
             //
             // x_{i + 1} = x_{i} + m + u, where u <- [-t, t]
             //
-            int x_end_min = std::max(x_start + m - t, next_level.start);
-            int x_end_max = std::min(x_start + m + t, next_level.end);
+            int x_end_min = std::max(src_start + m - t, next_level.start);
+            int x_end_max = std::min(src_start + m + t, next_level.end);
             int j_min = x_end_min - next_level.start;
             int j_max = x_end_max - next_level.start;
             for (int j = j_min; j <= j_max; ++j) {
-                int x_end = next_level.start + j;
+                int src_end = next_level.start + j;
                 levels[k].potential_warpings.push_back(
-                    {i, j, x_start, x_end, 0});
+                    {i, j, src_start, src_end, 0});
             }
         }
     }
@@ -169,10 +167,6 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
     auto warped_peaks =
         Warp2D::peaks_in_rt_range(source_peaks, source_rt_start, source_rt_end);
 
-    // Warp the peaks by linearly interpolating their retention time
-    // to the current segment's. Note that we are just performing
-    // linear displacement of the center of the peaks, we do not
-    // deform the peak shape by adjusting the sigmas.
     for (auto& peak : warped_peaks) {
         double x =
             (peak.rt - source_rt_start) / (source_rt_end - source_rt_start);
@@ -189,18 +183,16 @@ void Warp2D::compute_warped_similarities(
         Warp2D::peaks_in_rt_range(target_peaks, rt_start, rt_end);
 
     for (auto& warping : level.potential_warpings) {
-        int x_start = warping.x_start;
-        int x_end = warping.x_end;
+        int src_start = warping.src_start;
+        int src_end = warping.src_end;
 
-        double sample_rt_start = rt_min + warping.x_start * delta_rt;
-        double sample_rt_width = (x_end - x_start) * delta_rt;
+        double sample_rt_start = rt_min + warping.src_start * delta_rt;
+        double sample_rt_width = (src_end - src_start) * delta_rt;
         double sample_rt_end = sample_rt_start + sample_rt_width;
 
         auto source_peaks_warped = Warp2D::warp_peaks(
             source_peaks, sample_rt_start, sample_rt_end, rt_start, rt_end);
 
-        // Calculate the peak overlap between the reference and warped
-        // peaks for this segment.
         double similarity =
             Warp2D::similarity_2D(target_peaks_segment, source_peaks_warped);
         warping.warped_similarity = similarity;
@@ -213,7 +205,7 @@ std::vector<int> Warp2D::find_optimal_warping(std::vector<Level>& levels,
     // calculated as follows.
     // int N = levels.size() - 2;
 
-    // Perform dynamic programming to update the cummulative similarity and the
+    // Perform dynamic programming to update the cumulative similarity and the
     // optimal predecessor.
     for (int k = N - 1; k >= 0; --k) {
         auto& current_level = levels[k];
