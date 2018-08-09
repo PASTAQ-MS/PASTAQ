@@ -15,11 +15,14 @@ namespace Warp2D {
 //   divided.
 // - peaks_per_window: The number of peaks that will be used in each of the
 //   segments.
+// - rt_expand_factor: The algorithm will not warp at the range limits so we
+//   need to expand the range by some factor.
 struct Parameters {
     int slack;
     int window_size;
     int num_points;
     int peaks_per_window;
+    double rt_expand_factor;
 };
 
 // The main element of the FU matrix used by the Correlation Optimised Warping
@@ -182,7 +185,7 @@ void compute_warped_similarities(
 // similarities in levels. It does so in two steps: First it walks back the list
 // of warped similarities and updates the FU nodes, and then it walks forward
 // the FU nodes to find the optimal warping path.
-std::vector<int> find_optimal_warping(std::vector<Level>& levels, int N);
+std::vector<int> find_optimal_warping(std::vector<Level>& levels);
 }  // namespace Warp2D
 
 #endif /* WARP2D_WARP2D_HPP */

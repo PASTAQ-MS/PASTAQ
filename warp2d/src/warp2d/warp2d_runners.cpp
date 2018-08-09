@@ -35,15 +35,8 @@ std::vector<Centroid::Peak> Warp2D::Runners::Parallel::run(
         }
     }
 
-    // TODO(alex): Is there a better way of doing this? I thought about adding
-    // the equivalent of an extra sector at the beginning and end of the
-    // retention time extremes, but maybe it's worse that this simple
-    // implementation. Expand the time range by some factor, so we can have
-    // warping at the peaks near the range limits (COW will not warp at the
-    // range limits).
-    double rt_expand_factor = 0.20;  // FIXME: Hardcoding this for now.
-    rt_min -= (rt_max - rt_min) * rt_expand_factor;
-    rt_max += (rt_max - rt_min) * rt_expand_factor;
+    rt_min -= (rt_max - rt_min) * parameters.rt_expand_factor;
+    rt_max += (rt_max - rt_min) * parameters.rt_expand_factor;
 
     // The minimum time step.
     double delta_rt = (rt_max - rt_min) / (double)(nP - 1);
@@ -112,7 +105,7 @@ std::vector<Centroid::Peak> Warp2D::Runners::Parallel::run(
         thread.join();
     }
 
-    auto warp_by = Warp2D::find_optimal_warping(levels, N);
+    auto warp_by = Warp2D::find_optimal_warping(levels);
 
     // Warp the sample peaks based on the optimal path.
     std::vector<Centroid::Peak> warped_peaks;
@@ -145,10 +138,10 @@ std::vector<Centroid::Peak> Warp2D::Runners::Serial::run(
     // Initialize parameters.
     int n_peaks_per_segment =
         parameters.peaks_per_window;  // Maximum number of peaks on a window.
-    int t = parameters.slack;        // Slack.
-    int m = parameters.window_size;  // Segment/Window size.
-    int nP = parameters.num_points;  // Number of points.
-    int N = nP / m;                  // Number of segments.
+    int t = parameters.slack;         // Slack.
+    int m = parameters.window_size;   // Segment/Window size.
+    int nP = parameters.num_points;   // Number of points.
+    int N = nP / m;                   // Number of segments.
     nP = N * m;
 
     // Find min/max retention times.
@@ -171,15 +164,8 @@ std::vector<Centroid::Peak> Warp2D::Runners::Serial::run(
         }
     }
 
-    // TODO(alex): Is there a better way of doing this? I thought about adding
-    // the equivalent of an extra sector at the beginning and end of the
-    // retention time extremes, but maybe it's worse that this simple
-    // implementation. Expand the time range by some factor, so we can have
-    // warping at the peaks near the range limits (COW will not warp at the
-    // range limits).
-    double rt_expand_factor = 0.20;  // FIXME: Hardcoding this for now.
-    rt_min -= (rt_max - rt_min) * rt_expand_factor;
-    rt_max += (rt_max - rt_min) * rt_expand_factor;
+    rt_min -= (rt_max - rt_min) * parameters.rt_expand_factor;
+    rt_max += (rt_max - rt_min) * parameters.rt_expand_factor;
 
     // The minimum time step.
     double delta_rt = (rt_max - rt_min) / (double)(nP - 1);
@@ -223,7 +209,7 @@ std::vector<Centroid::Peak> Warp2D::Runners::Serial::run(
             target_peaks_filtered, source_peaks_filtered);
     }
 
-    auto warp_by = Warp2D::find_optimal_warping(levels, N);
+    auto warp_by = Warp2D::find_optimal_warping(levels);
 
     // Warp the sample peaks based on the optimal path.
     std::vector<Centroid::Peak> warped_peaks;

@@ -199,11 +199,8 @@ void Warp2D::compute_warped_similarities(
     }
 };
 
-std::vector<int> Warp2D::find_optimal_warping(std::vector<Level>& levels,
-                                              int N) {
-    // // FIXME: Redundant parameter N as it can be
-    // calculated as follows.
-    // int N = levels.size() - 2;
+std::vector<int> Warp2D::find_optimal_warping(std::vector<Level>& levels) {
+    int N = levels.size() - 1;
 
     // Perform dynamic programming to update the cumulative similarity and the
     // optimal predecessor.

@@ -187,6 +187,10 @@ int main(int argc, char *argv[]) {
          {"The number of time points in which the retention time range will be "
           "divided",
           true}},
+        {"-rt_expand_factor",
+         {"The factor by which the retention time will be expanded in order to "
+          "warp the peaks at the range limit",
+          true}},
         // Command parameters.
         {"-out_dir", {"The output directory", true}},
         {"-help", {"Display available options", false}},
@@ -335,6 +339,19 @@ int main(int argc, char *argv[]) {
         return -1;
     }
     parameters.num_points = std::stoi(num_points);
+
+    if (options.find("-rt_expand_factor") == options.end()) {
+        options["-rt_expand_factor"] = "0.2";  // Default value.
+    }
+    auto rt_expand_factor = options["-rt_expand_factor"];
+    if (!is_number(rt_expand_factor)) {
+        std::cout << "error: "
+                  << "rt_expand_factor"
+                  << " has to be a number" << std::endl;
+        print_usage();
+        return -1;
+    }
+    parameters.rt_expand_factor = std::stoi(rt_expand_factor);
 
     if (options.find("-peaks_per_window") == options.end()) {
         std::cout
