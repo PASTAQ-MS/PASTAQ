@@ -13,6 +13,7 @@ struct Parameters {
     int slack;
     int window_size;
     int num_points;
+    int peaks_per_window;
 };
 
 // TODO(alex): add more docs.

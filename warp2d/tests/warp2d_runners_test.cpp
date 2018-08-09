@@ -24,7 +24,7 @@ TEST_CASE("Peak warping using warp2d") {
     SUBCASE("Parallel execution") {
         {
             auto warped_peaks = Warp2D::Runners::Parallel::run(
-                target_peaks, source_peaks, {5, 10, 1000}, 1);
+                target_peaks, source_peaks, {5, 10, 1000, 50}, 1);
             bool sizes_match = warped_peaks.size() == source_peaks.size();
             CHECK(sizes_match);
             if (sizes_match) {
@@ -36,7 +36,7 @@ TEST_CASE("Peak warping using warp2d") {
         }
         {
             auto warped_peaks = Warp2D::Runners::Parallel::run(
-                target_peaks, source_peaks, {5, 10, 1000}, 4);
+                target_peaks, source_peaks, {5, 10, 1000, 50}, 4);
             bool sizes_match = warped_peaks.size() == source_peaks.size();
             CHECK(sizes_match);
             if (sizes_match) {
@@ -48,7 +48,7 @@ TEST_CASE("Peak warping using warp2d") {
         }
         {
             auto warped_peaks = Warp2D::Runners::Parallel::run(
-                target_peaks, source_peaks, {5, 10, 1000}, 8);
+                target_peaks, source_peaks, {5, 10, 1000, 50}, 8);
             bool sizes_match = warped_peaks.size() == source_peaks.size();
             CHECK(sizes_match);
             if (sizes_match) {
@@ -60,7 +60,7 @@ TEST_CASE("Peak warping using warp2d") {
         }
         {
             auto warped_peaks = Warp2D::Runners::Parallel::run(
-                target_peaks, source_peaks, {5, 10, 1000}, 12);
+                target_peaks, source_peaks, {5, 10, 1000, 50}, 12);
             bool sizes_match = warped_peaks.size() == source_peaks.size();
             CHECK(sizes_match);
             if (sizes_match) {
@@ -73,7 +73,7 @@ TEST_CASE("Peak warping using warp2d") {
     }
     SUBCASE("Serial execution") {
         auto warped_peaks = Warp2D::Runners::Serial::run(
-            target_peaks, source_peaks, {5, 10, 1000});
+            target_peaks, source_peaks, {5, 10, 1000, 50});
         bool sizes_match = warped_peaks.size() == source_peaks.size();
         CHECK(sizes_match);
         if (sizes_match) {

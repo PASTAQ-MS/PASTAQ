@@ -7,10 +7,12 @@ std::vector<Centroid::Peak> Warp2D::Runners::Parallel::run(
     const std::vector<Centroid::Peak>& source_peaks,
     const Warp2D::Parameters& parameters, uint64_t max_threads) {
     // Initialize parameters.
-    int t = parameters.slack;        // Slack.
-    int m = parameters.window_size;  // Segment/Window size.
-    int nP = parameters.num_points;  // Number of points.
-    int N = nP / m;                  // Number of segments.
+    int n_peaks_per_segment =
+        parameters.peaks_per_window;  // Maximum number of peaks on a window.
+    int t = parameters.slack;         // Slack.
+    int m = parameters.window_size;   // Segment/Window size.
+    int nP = parameters.num_points;   // Number of points.
+    int N = nP / m;                   // Number of segments.
     nP = N * m;
 
     // Find min/max retention times.
@@ -48,7 +50,6 @@ std::vector<Centroid::Peak> Warp2D::Runners::Parallel::run(
     double segment_rt_width = delta_rt * m;
 
     // Filter the peaks in each segment.
-    int n_peaks_per_segment = 50;  // FIXME: Hardcoding this for now.
     std::vector<Centroid::Peak> target_peaks_filtered;
     std::vector<Centroid::Peak> source_peaks_filtered;
     for (int i = 0; i < N; ++i) {
@@ -142,6 +143,8 @@ std::vector<Centroid::Peak> Warp2D::Runners::Serial::run(
     const std::vector<Centroid::Peak>& source_peaks,
     const Warp2D::Parameters& parameters) {
     // Initialize parameters.
+    int n_peaks_per_segment =
+        parameters.peaks_per_window;  // Maximum number of peaks on a window.
     int t = parameters.slack;        // Slack.
     int m = parameters.window_size;  // Segment/Window size.
     int nP = parameters.num_points;  // Number of points.
@@ -183,7 +186,6 @@ std::vector<Centroid::Peak> Warp2D::Runners::Serial::run(
     double segment_rt_width = delta_rt * m;
 
     // Filter the peaks in each segment.
-    int n_peaks_per_segment = 50;  // FIXME: Hardcoding this for now.
     std::vector<Centroid::Peak> target_peaks_filtered;
     std::vector<Centroid::Peak> source_peaks_filtered;
     for (int i = 0; i < N; ++i) {

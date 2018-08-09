@@ -180,6 +180,9 @@ int main(int argc, char *argv[]) {
         {"-window_size",
          {"The size of the window that will be used for segmenting the data",
           true}},
+        {"-peaks_per_window",
+         {"The maximum number of peaks that will be used on any given window",
+          true}},
         {"-num_points",
          {"The number of time points in which the retention time range will be "
           "divided",
@@ -332,6 +335,21 @@ int main(int argc, char *argv[]) {
         return -1;
     }
     parameters.num_points = std::stoi(num_points);
+
+    if (options.find("-peaks_per_window") == options.end()) {
+        std::cout
+            << "Number of peaks per window (peaks_per_window) not specified"
+            << std::endl;
+        return -1;
+    }
+    auto peaks_per_window = options["-peaks_per_window"];
+    if (!is_unsigned_int(peaks_per_window)) {
+        std::cout << "error: peaks_per_window has to be a positive integer"
+                  << std::endl;
+        print_usage();
+        return -1;
+    }
+    parameters.peaks_per_window = std::stoi(peaks_per_window);
 
     if (options.find("-reference_file") == options.end()) {
         std::cout << "Reference file (reference_file) not specified"
@@ -511,23 +529,6 @@ int main(int argc, char *argv[]) {
             print_usage();
             return -1;
         }
-
-        // std::vector<double> data;
-        // if ((options.find("-parallel") != options.end()) &&
-        //(options["-parallel"] == "true" ||
-        // options["-parallel"].empty())) {
-        // data = Grid::Runners::Parallel::run(max_threads, parameters,
-        // all_points);
-        //} else {
-        // data = Grid::Runners::Serial::run(parameters, all_points);
-        //}
-
-        // std::cout << "Saving grid into dat file..." << std::endl;
-        // if (!Grid::Files::Dat::write(datfile_stream, data, parameters)) {
-        // std::cout << "error: the grid could not be saved properly"
-        //<< std::endl;
-        // return -1;
-        //}
     }
 
     return 0;
