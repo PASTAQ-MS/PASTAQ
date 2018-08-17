@@ -1,3 +1,5 @@
+#include <sstream>
+
 #include "centroid/centroid_files.hpp"
 #include "centroid/centroid_serialize.hpp"
 #include "grid/grid_serialize.hpp"
@@ -69,6 +71,7 @@ bool Centroid::Files::Csv::write_peaks(
             stream << cell_delimiter;
         }
     }
+    stream.precision(8);
 
     // Write each peak as a csv row.
     for (size_t i = 0; i < peaks.size(); ++i) {
@@ -116,4 +119,97 @@ bool Centroid::Files::Csv::write_peaks(
         }
     }
     return stream.good();
+}
+
+bool Centroid::Files::Csv::read_peaks(std::istream &stream,
+                                      std::vector<Centroid::Peak> *peaks) {
+    char cell_delimiter = ' ';
+    char line_delimiter = '\n';
+
+    // Read the CSV header.
+    // TODO(alex): Must use only the values that we need. Using the old format
+    // for now to test if centroid is working properly.
+    std::vector<std::string> header_columns = {
+        "N",         "X",        "Y",         "Height", "Volume",
+        "VCentroid", "XSigma",   "YSigma",    "Count",  "LocalBkgnd",
+        "SNVolume",  "SNHeight", "SNCentroid"};
+    std::string line;
+    if (!std::getline(stream, line, line_delimiter)) {
+        return false;
+    }
+    std::cout << "line: " << line << std::endl;
+    // Verify that the read header matches the header_columns.
+    std::string token;
+    std::stringstream token_stream(line);
+    int i = 0;
+    while (std::getline(token_stream, token, cell_delimiter)) {
+        if (token != header_columns[i]) {
+            return false;
+        };
+        ++i;
+    }
+
+    // Read the rest of the file and build the list of peaks.
+    // TODO(alex): Should we make the parsing independent of the order of the
+    // columns?
+    while (std::getline(stream, line, line_delimiter)) {
+        Centroid::Peak peak = {};
+        token_stream = std::stringstream(line);
+        // N (Skip).
+        std::getline(token_stream, token, cell_delimiter);
+        // X
+        std::getline(token_stream, token, cell_delimiter);
+        if (!(std::istringstream(token) >> peak.mz).eof()) {
+            return false;
+        };
+        peak.mz_centroid = peak.mz;
+        // Y
+        std::getline(token_stream, token, cell_delimiter);
+        if (!(std::istringstream(token) >> peak.rt).eof()) {
+            return false;
+        };
+        peak.rt_centroid = peak.rt;
+        // Height
+        std::getline(token_stream, token, cell_delimiter);
+        if (!(std::istringstream(token) >> peak.height_centroid).eof()) {
+            return false;
+        };
+        peak.height = peak.height_centroid;
+        // Volume
+        std::getline(token_stream, token, cell_delimiter);
+        if (!(std::istringstream(token) >> peak.total_intensity).eof()) {
+            return false;
+        };
+        // VCentroid
+        std::getline(token_stream, token, cell_delimiter);
+        if (!(std::istringstream(token) >> peak.total_intensity_centroid)
+                 .eof()) {
+            return false;
+        };
+        // XSigma
+        std::getline(token_stream, token, cell_delimiter);
+        if (!(std::istringstream(token) >> peak.sigma_mz).eof()) {
+            return false;
+        };
+        // YSigma
+        std::getline(token_stream, token, cell_delimiter);
+        if (!(std::istringstream(token) >> peak.sigma_rt).eof()) {
+            return false;
+        };
+        // Count (Skip).
+        std::getline(token_stream, token, cell_delimiter);
+        // LocalBkgnd
+        std::getline(token_stream, token, cell_delimiter);
+        if (!(std::istringstream(token) >> peak.border_background).eof()) {
+            return false;
+        };
+        // SNVolume (Skip)
+        // SNHeight (Skip)
+        // SNHeight (Skip)
+
+        // Add the peak to the list.
+        peaks->push_back(peak);
+    }
+
+    return stream.good() || stream.eof();
 }
