@@ -55,8 +55,7 @@ TEST_CASE("DEBUG") {
     }
 
     // ...
-    // MetaMatch::find_candidates(file_peaks);
-    MetaMatch::find_candidates(peaks, 0.01, 15);
+    MetaMatch::find_candidates(peaks, 0.01, 15, 3, 1, 0.6);
 
     CHECK(false);
 }

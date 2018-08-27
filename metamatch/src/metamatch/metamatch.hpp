@@ -21,7 +21,8 @@ struct Peak : Centroid::Peak {
 };
 
 void find_candidates(std::vector<MetaMatch::Peak>& peak_files, double radius_mz,
-                     double radius_rt);
+                     double radius_rt, size_t n_files, size_t n_classes,
+                     double fraction);
 }  // namespace MetaMatch
 
 #endif /* METAMATCH_METAMATCH_HPP */
