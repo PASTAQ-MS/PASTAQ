@@ -532,6 +532,16 @@ int main(int argc, char *argv[]) {
             std::ofstream csv_outfile_stream;
             csv_outfile_stream.open(csv_outfile_name,
                                     std::ios::out | std::ios::binary);
+            std::cout << "Sorting peaks by height (centroid)..." << std::endl;
+            auto sort_peaks = [](const Centroid::Peak &p1,
+                                 const Centroid::Peak &p2) -> bool {
+                return (p1.height_centroid > p2.height_centroid) ||
+                       ((p1.height_centroid == p2.height_centroid) &&
+                        (p1.total_intensity_centroid >
+                         p2.total_intensity_centroid));
+            };
+            std::stable_sort(warped_peaks.begin(), warped_peaks.end(),
+                             sort_peaks);
             if (!Centroid::Files::Csv::write_peaks(csv_outfile_stream,
                                                    warped_peaks)) {
                 std::cout << "error: couldn't write warped peaks into file "
