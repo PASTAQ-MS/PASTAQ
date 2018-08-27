@@ -20,8 +20,6 @@ struct Peak : Centroid::Peak {
     double cluster_rt;
 };
 
-void find_candidates(
-    const std::vector<std::vector<Centroid::Peak>>& peak_files);
 void find_candidates(std::vector<MetaMatch::Peak>& peak_files, double radius_mz,
                      double radius_rt);
 }  // namespace MetaMatch
