@@ -137,7 +137,6 @@ bool Centroid::Files::Csv::read_peaks(std::istream &stream,
     if (!std::getline(stream, line, line_delimiter)) {
         return false;
     }
-    std::cout << "line: " << line << std::endl;
     // Verify that the read header matches the header_columns.
     std::string token;
     std::stringstream token_stream(line);
