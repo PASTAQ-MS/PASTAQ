@@ -139,7 +139,7 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
     }
 
     // DEBUG
-    print_metamatch_peaks(peaks);
+    // print_metamatch_peaks(peaks);
     return;
 }
 
@@ -154,17 +154,68 @@ std::vector<MetaMatch::Peak> MetaMatch::extract_orphans(
 
     for (size_t i = 0; i < peaks.size(); ++i) {
         if (peaks[i].cluster_id != -1) {
-            orphans.insert(orphans.end(),
-                           std::make_move_iterator(peaks.begin()),
-                           std::make_move_iterator(peaks.begin() + i));
+            orphans.insert(orphans.end(), peaks.begin(), peaks.begin() + i);
             peaks.erase(peaks.begin(), peaks.begin() + i);
             break;
         }
     }
     // DEBUG
-    std::cout << "ORPHANS:" << std::endl;
-    print_metamatch_peaks(orphans);
-    std::cout << "NOT ORPHANS:" << std::endl;
-    print_metamatch_peaks(peaks);
+    // std::cout << "ORPHANS:" << std::endl;
+    // print_metamatch_peaks(orphans);
+    // std::cout << "NOT ORPHANS:" << std::endl;
+    // print_metamatch_peaks(peaks);
     return orphans;
+}
+std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
+    std::vector<MetaMatch::Peak>& peaks, size_t n_files) {
+    std::vector<MetaMatch::Cluster> clusters;
+    // TODO(alex): Where does the sorting need to happen?
+    auto sort_by_cluster_id = [](auto p1, auto p2) -> bool {
+        return p1.cluster_id < p2.cluster_id ||
+               (p1.cluster_id == p2.cluster_id && p1.file_id < p2.file_id);
+    };
+    std::stable_sort(peaks.begin(), peaks.end(), sort_by_cluster_id);
+    if (peaks.empty()) {
+        return clusters;
+    }
+    // DEBUG
+    // std::cout << "SORTED METAPEAKS:" << std::endl;
+    // print_metamatch_peaks(peaks);
+
+    int cluster_id = peaks[0].cluster_id;
+    size_t k = 0;
+    for (size_t i = 1; i < peaks.size(); ++i) {
+        if (cluster_id != peaks[i].cluster_id) {
+            MetaMatch::Cluster cluster = {};
+            cluster.id = cluster_id;
+            cluster.mz = peaks[i - 1].cluster_mz;
+            cluster.rt = peaks[i - 1].cluster_rt;
+            cluster.file_heights = std::vector<double>(n_files);
+            for (size_t file_index = 0; file_index < n_files; ++file_index) {
+                if (file_index == peaks[k].file_id) {
+                    cluster.file_heights[file_index] = peaks[k].height;
+                    ++k;
+                } else {
+                    cluster.file_heights[file_index] = 0;
+                }
+            }
+            clusters.push_back(cluster);
+            cluster_id = peaks[i].cluster_id;
+            k = i;
+        }
+    }
+
+    // DEBUG
+    // Print clusters...
+    // for (const auto& cluster : clusters) {
+    // std::cout << "id: " << cluster.id;
+    // std::cout << " mz: " << cluster.mz;
+    // std::cout << " rt: " << cluster.rt;
+    // std::cout << " elements: [";
+    // for (const auto& height : cluster.file_heights) {
+    // std::cout << height << ",";
+    //}
+    // std::cout << "]" << std::endl;
+    //}
+    return clusters;
 }
