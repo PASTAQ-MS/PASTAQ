@@ -15,7 +15,7 @@
 using options_map = std::map<std::string, std::string>;
 
 void print_usage() {
-    std::cout << "USAGE: grid [-help] [options] <files>" << std::endl;
+    std::cout << "USAGE: warp2d [-help] [options] <files>" << std::endl;
 }
 
 // Helper functions to check if the given string contains a number.
@@ -51,18 +51,18 @@ void parse_json(const std::filesystem::path &path, options_map &options,
         content += line + " ";
     }
 
-    // Find the contents of the grid configuration.
-    std::regex grid_regex(R"("warp2d"[[:space:]]*:[[:space:]]*\{(.*)\})");
+    // Find the contents of the configuration.
+    std::regex config_regex(R"("warp2d"[[:space:]]*:[[:space:]]*\{(.*)\})");
     std::smatch matches;
-    std::regex_search(content, matches, grid_regex);
+    std::regex_search(content, matches, config_regex);
     if (matches.size() != 2 || matches[1].str().empty()) {
-        std::cout << "error: could not find \"grid\" on the config file"
+        std::cout << "error: could not find \"warp2d\" on the config file"
                   << std::endl;
         std::exit(-1);
     }
     content = matches[1];
 
-    // Match the different parts of the grid configuration. Note that we are
+    // Match the different parts of the configuration. Note that we are
     // performing a very simplistic parsing, the right thing to do would be to
     // create an AST and walk it to perform the parsing. This simplistic
     // approach means that if the user mistakenly puts the "paths" inside
