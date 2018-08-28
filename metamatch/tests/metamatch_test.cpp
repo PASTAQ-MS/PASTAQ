@@ -55,9 +55,11 @@ TEST_CASE("DEBUG") {
     }
 
     // ...
-    MetaMatch::find_candidates(peaks, {0.01, 15, 3, 1, 0.6});
+    MetaMatch::Parameters parameters = {0.01, 15, 3, 1, 0.6};
+    MetaMatch::find_candidates(peaks, parameters);
     MetaMatch::extract_orphans(peaks);
-    MetaMatch::reduce_cluster(peaks, 3);
+    auto clusters = MetaMatch::reduce_cluster(peaks, 3);
+    MetaMatch::write_clusters(std::cout, clusters, parameters);
 
     CHECK(false);
 }

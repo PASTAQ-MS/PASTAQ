@@ -46,6 +46,10 @@ std::vector<MetaMatch::Peak> extract_orphans(
 std::vector<MetaMatch::Cluster> reduce_cluster(
     std::vector<MetaMatch::Peak>& peaks, size_t n_files);
 
+// TODO(alex): Move to MetaMatch::Files::Csv::write_clusters
+bool write_clusters(std::ostream& stream,
+                    const std::vector<MetaMatch::Cluster>& clusters,
+                    const MetaMatch::Parameters& parameters);
 }  // namespace MetaMatch
 
 #endif /* METAMATCH_METAMATCH_HPP */

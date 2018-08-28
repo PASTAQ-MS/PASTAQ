@@ -222,3 +222,49 @@ std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
     //}
     return clusters;
 }
+
+// TODO(alex): Move to MetaMatch::Files::Csv::write_clusters
+bool MetaMatch::write_clusters(std::ostream& stream,
+                               const std::vector<MetaMatch::Cluster>& clusters,
+                               const MetaMatch::Parameters& parameters) {
+    char cell_delimiter = ' ';
+    char line_delimiter = '\n';
+
+    // Prepare the CSV header.
+    std::vector<std::string> header_columns = {
+        "metapeak",
+        "mz",
+        "rt",
+    };
+    for (size_t i = 0; i < parameters.n_files; ++i) {
+        header_columns.push_back("file_h" + std::to_string(i));
+    }
+    // Write the CSV header.
+    for (size_t i = 0; i < header_columns.size(); ++i) {
+        stream << header_columns[i];
+        if (i == header_columns.size() - 1) {
+            stream << line_delimiter;
+        } else {
+            stream << cell_delimiter;
+        }
+    }
+    stream.precision(8);
+    for (const auto& cluster : clusters) {
+        // metapeak
+        stream << cluster.id << cell_delimiter;
+        // mz
+        stream << cluster.mz << cell_delimiter;
+        // rt
+        stream << cluster.rt << cell_delimiter;
+        // file heights
+        for (size_t i = 0; i < parameters.n_files; ++i) {
+            stream << cluster.file_heights[i];
+            if (i == parameters.n_files - 1) {
+                stream << line_delimiter;
+            } else {
+                stream << cell_delimiter;
+            }
+        }
+    }
+    return stream.good();
+}
