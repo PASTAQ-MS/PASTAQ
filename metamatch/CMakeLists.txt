@@ -37,12 +37,12 @@ if (NOT TARGET metamatchlib)
 endif()
 
 # Include executable target.
-#if (NOT TARGET metamatch)
-    #add_executable(metamatch
-        #"${CMAKE_CURRENT_SOURCE_DIR}/src/metamatch_command.cpp"
-        #)
-    #target_link_libraries(metamatch stdc++ stdc++fs metamatchlib ${CMAKE_THREAD_LIBS_INIT} gridlib centroidlib)
-#endif()
+if (NOT TARGET metamatch)
+    add_executable(metamatch
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/metamatch_command.cpp"
+        )
+    target_link_libraries(metamatch stdc++ stdc++fs metamatchlib ${CMAKE_THREAD_LIBS_INIT} gridlib centroidlib)
+endif()
 
 # Include tests if testing library is present.
 if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} OR (${CENTROID_ADD_TESTS}))
