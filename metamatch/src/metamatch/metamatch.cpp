@@ -91,7 +91,7 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
         // Check if this cluster contains the necessary number of peaks
         // per class. If the fraction is not big enough, free the peaks for
         // future clustering.
-        std::vector<int> file_ids;
+        std::vector<size_t> file_ids;
         std::vector<size_t> class_map(n_classes);
         for (size_t j = i; j < peaks.size(); ++j) {
             auto& peak = peaks[j];
@@ -138,12 +138,33 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
         }
     }
 
+    // DEBUG
+    print_metamatch_peaks(peaks);
+    return;
+}
+
+std::vector<MetaMatch::Peak> MetaMatch::extract_orphans(
+    std::vector<MetaMatch::Peak>& peaks) {
+    std::vector<MetaMatch::Peak> orphans;
+    // TODO(alex): Where does the sorting need to happen?
     auto sort_by_cluster_id = [](auto p1, auto p2) -> bool {
         return p1.cluster_id < p2.cluster_id;
     };
     std::stable_sort(peaks.begin(), peaks.end(), sort_by_cluster_id);
+
+    for (size_t i = 0; i < peaks.size(); ++i) {
+        if (peaks[i].cluster_id != -1) {
+            orphans.insert(orphans.end(),
+                           std::make_move_iterator(peaks.begin()),
+                           std::make_move_iterator(peaks.begin() + i));
+            peaks.erase(peaks.begin(), peaks.begin() + i);
+            break;
+        }
+    }
     // DEBUG
-    // std::cout << "AFTER:" << std::endl;
+    std::cout << "ORPHANS:" << std::endl;
+    print_metamatch_peaks(orphans);
+    std::cout << "NOT ORPHANS:" << std::endl;
     print_metamatch_peaks(peaks);
-    return;
+    return orphans;
 }

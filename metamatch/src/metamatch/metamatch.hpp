@@ -7,10 +7,6 @@
 #include "centroid/centroid_files.hpp"
 
 namespace MetaMatch {
-struct Index {
-    size_t file_index;
-    size_t peak_index;
-};
 
 struct Peak : Centroid::Peak {
     size_t file_id;
@@ -20,9 +16,11 @@ struct Peak : Centroid::Peak {
     double cluster_rt;
 };
 
-void find_candidates(std::vector<MetaMatch::Peak>& peak_files, double radius_mz,
+void find_candidates(std::vector<MetaMatch::Peak>& peaks, double radius_mz,
                      double radius_rt, size_t n_files, size_t n_classes,
                      double fraction);
+
+std::vector<MetaMatch::Peak> extract_orphans(std::vector<MetaMatch::Peak>& peaks);
 }  // namespace MetaMatch
 
 #endif /* METAMATCH_METAMATCH_HPP */
