@@ -55,7 +55,7 @@ TEST_CASE("DEBUG") {
     }
 
     // ...
-    MetaMatch::find_candidates(peaks, 0.01, 15, 3, 1, 0.6);
+    MetaMatch::find_candidates(peaks, {0.01, 15, 3, 1, 0.6});
     MetaMatch::extract_orphans(peaks);
     MetaMatch::reduce_cluster(peaks, 3);
 

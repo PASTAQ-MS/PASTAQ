@@ -17,9 +17,7 @@ void print_metamatch_peaks(const std::vector<MetaMatch::Peak>& peaks) {
 }
 
 void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
-                                double radius_mz, double radius_rt,
-                                size_t n_files, size_t n_classes,
-                                double fraction) {
+                                const MetaMatch::Parameters& parameters) {
     // DEBUG
     // std::cout << "BEFORE:" << std::endl;
     // print_metamatch_peaks(peaks);
@@ -50,13 +48,13 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
         // Mark cluster candidates.
         for (size_t j = (i + 1); j < peaks.size(); ++j) {
             auto& peak_b = peaks[j];
-            if (peak_b.mz > cluster_mz + radius_mz &&
-                peak_b.rt > cluster_rt + radius_rt) {
+            if (peak_b.mz > cluster_mz + parameters.radius_mz &&
+                peak_b.rt > cluster_rt + parameters.radius_rt) {
                 break;
             }
             if (peak_b.cluster_id == -1 && peak_b.file_id != peak_a.file_id &&
-                (peak_b.mz < cluster_mz + radius_mz &&
-                 peak_b.rt < cluster_rt + radius_rt)) {
+                (peak_b.mz < cluster_mz + parameters.radius_mz &&
+                 peak_b.rt < cluster_rt + parameters.radius_rt)) {
                 // Add the peak to this cluster.
                 peak_b.cluster_id = cluster_id;
                 // Update the cluster centroid.
@@ -71,8 +69,8 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
                 for (size_t k = (i + 1); k <= j; ++k) {
                     auto& peak_c = peaks[k];
                     if (peak_c.cluster_id == cluster_id &&
-                        (peak_c.mz > cluster_mz + radius_mz ||
-                         peak_c.rt > cluster_rt + radius_rt)) {
+                        (peak_c.mz > cluster_mz + parameters.radius_mz ||
+                         peak_c.rt > cluster_rt + parameters.radius_rt)) {
                         x_sum -= peak_c.mz * peak_c.height;
                         y_sum -= peak_c.rt * peak_c.height;
                         height_sum -= peak_c.height;
@@ -88,15 +86,16 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
         // TODO: Cull multiple peaks per file.
         // ...
 
-        // Check if this cluster contains the necessary number of peaks
-        // per class. If the fraction is not big enough, free the peaks for
-        // future clustering.
+        // Check if this cluster contains the
+        // necessary number of peaks per class. If the
+        // fraction is not big enough, free the peaks
+        // for future clustering.
         std::vector<size_t> file_ids;
-        std::vector<size_t> class_map(n_classes);
+        std::vector<size_t> class_map(parameters.n_classes);
         for (size_t j = i; j < peaks.size(); ++j) {
             auto& peak = peaks[j];
-            if (peak.mz > cluster_mz + radius_mz &&
-                peak.rt > cluster_rt + radius_rt) {
+            if (peak.mz > cluster_mz + parameters.radius_mz &&
+                peak.rt > cluster_rt + parameters.radius_rt) {
                 break;
             }
             if (peak.cluster_id == cluster_id) {
@@ -115,7 +114,8 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
         }
         bool fraction_achieved = false;
         for (const auto& n_hits : class_map) {
-            if ((double)n_hits / (double)n_files > fraction) {
+            if ((double)n_hits / (double)parameters.n_files >
+                parameters.fraction) {
                 fraction_achieved = true;
                 break;
             }
@@ -123,8 +123,8 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
         if (!fraction_achieved) {
             for (size_t j = i; j < peaks.size(); ++j) {
                 auto& peak = peaks[j];
-                if (peak.mz > cluster_mz + radius_mz &&
-                    peak.rt > cluster_rt + radius_rt) {
+                if (peak.mz > cluster_mz + parameters.radius_mz &&
+                    peak.rt > cluster_rt + parameters.radius_rt) {
                     break;
                 }
                 if (peak.cluster_id == cluster_id) {
@@ -146,7 +146,8 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
 std::vector<MetaMatch::Peak> MetaMatch::extract_orphans(
     std::vector<MetaMatch::Peak>& peaks) {
     std::vector<MetaMatch::Peak> orphans;
-    // TODO(alex): Where does the sorting need to happen?
+    // TODO(alex): Where does the sorting need to
+    // happen?
     auto sort_by_cluster_id = [](auto p1, auto p2) -> bool {
         return p1.cluster_id < p2.cluster_id;
     };
@@ -166,10 +167,12 @@ std::vector<MetaMatch::Peak> MetaMatch::extract_orphans(
     // print_metamatch_peaks(peaks);
     return orphans;
 }
+
 std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
     std::vector<MetaMatch::Peak>& peaks, size_t n_files) {
     std::vector<MetaMatch::Cluster> clusters;
-    // TODO(alex): Where does the sorting need to happen?
+    // TODO(alex): Where does the sorting need to
+    // happen?
     auto sort_by_cluster_id = [](auto p1, auto p2) -> bool {
         return p1.cluster_id < p2.cluster_id ||
                (p1.cluster_id == p2.cluster_id && p1.file_id < p2.file_id);
@@ -212,8 +215,8 @@ std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
     // std::cout << " mz: " << cluster.mz;
     // std::cout << " rt: " << cluster.rt;
     // std::cout << " elements: [";
-    // for (const auto& height : cluster.file_heights) {
-    // std::cout << height << ",";
+    // for (const auto& height : cluster.file_heights)
+    // { std::cout << height << ",";
     //}
     // std::cout << "]" << std::endl;
     //}
