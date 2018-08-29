@@ -39,6 +39,28 @@ const char* file_03 =
 6 300.0 300.0 0.8e+08 5.0e+08 4.0e+08 0.01 10 1 0.6e+05 1000 5000 1000
 )";
 
+std::string file_list =
+    R"(file_01.csv 0
+file_02.csv 0
+file_03.csv 0
+file_03.csv 0
+file_04.csv 0
+file_05.csv 0
+file_06.csv 0
+file_07.csv 0
+file_08.csv 0
+file_09.csv 1
+file_10.csv 1
+file_11.csv 1
+file_12.csv 1
+file_13.csv 1
+file_14.csv 1
+file_15.csv 1
+file_16.csv 1
+file_17.csv 1
+)";
+
+// TODO: Add more thourough testing for all functions explored here.
 TEST_CASE("DEBUG") {
     std::vector<const char*> files = {file_01, file_02, file_03};
     // Read the files.
@@ -59,7 +81,15 @@ TEST_CASE("DEBUG") {
     MetaMatch::find_candidates(peaks, parameters);
     MetaMatch::extract_orphans(peaks);
     auto clusters = MetaMatch::reduce_cluster(peaks, 3);
-    MetaMatch::write_clusters(std::cout, clusters, parameters);
+     MetaMatch::write_clusters(std::cout, clusters, parameters);
+    //{
+        //std::stringstream stream(file_list);
+        //auto files = MetaMatch::read_file_list(stream);
+        //for (const auto& [file, class_id] : files) {
+            //std::cout << "file: " << file << " class_id: " << class_id
+                      //<< std::endl;
+        //}
+    //}
 
     CHECK(false);
 }

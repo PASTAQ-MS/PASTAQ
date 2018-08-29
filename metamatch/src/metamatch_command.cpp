@@ -12,7 +12,7 @@
 using options_map = std::map<std::string, std::string>;
 
 void print_usage() {
-    std::cout << "USAGE: metamatch [-help] [options] <files>" << std::endl;
+    std::cout << "USAGE: metamatch [-help] [options]" << std::endl;
 }
 
 // Helper functions to check if the given string contains a number.
@@ -170,23 +170,16 @@ int main(int argc, char *argv[]) {
     // <description, takes_parameters>
     const std::map<std::string, std::pair<std::string, bool>> accepted_flags = {
         // MetaMatch parameters.
-        {"-reference_file",
-         {"The path to the file to be used as a reference", true}},
-        {"-slack",
-         {"The maximum number of time points that can be warped", true}},
-        {"-window_size",
-         {"The size of the window that will be used for segmenting the data",
+        {"-file_list",
+         {"A file containing the paths and classes of the aligned peak lists",
           true}},
-        {"-peaks_per_window",
-         {"The maximum number of peaks that will be used on any given window",
-          true}},
-        {"-num_points",
-         {"The number of time points in which the retention time range will be "
-          "divided",
-          true}},
-        {"-rt_expand_factor",
-         {"The factor by which the retention time will be expanded in order to "
-          "warp the peaks at the range limit",
+        {"-radius_mz",
+         {"The maximum distance in mz that can be used for clustering", true}},
+        {"-radius_rt",
+         {"The maximum distance in rt that can be used for clustering", true}},
+        {"-fraction",
+         {"The percentage of samples that must contain non zero values to "
+          "consider a cluster valid [0.0,1.0]",
           true}},
         // Command parameters.
         {"-out_dir", {"The output directory", true}},
@@ -288,89 +281,57 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (files.empty()) {
-        std::cout << "No input files specified." << std::endl;
-        print_usage();
-        return -1;
-    }
-
     // Parse the options to build the Grid::Parameters struct.
     MetaMatch::Parameters parameters = {};
 
     // Get the MetaMatch parameters.
-    // if (options.find("-slack") == options.end()) {
-    // std::cout << "Slack (slack) not specified" << std::endl;
-    // return -1;
-    //}
-    // auto slack = options["-slack"];
-    // if (!is_unsigned_int(slack)) {
-    // std::cout << "error: slack has to be a positive integer" << std::endl;
-    // print_usage();
-    // return -1;
-    //}
-    // parameters.slack = std::stoi(slack);
-
-    // if (options.find("-window_size") == options.end()) {
-    // std::cout << "Window size (window_size) not specified" << std::endl;
-    // return -1;
-    //}
-    // auto window_size = options["-window_size"];
-    // if (!is_unsigned_int(window_size)) {
-    // std::cout << "error: window_size has to be a positive integer"
-    //<< std::endl;
-    // print_usage();
-    // return -1;
-    //}
-    // parameters.window_size = std::stoi(window_size);
-
-    // if (options.find("-num_points") == options.end()) {
-    // std::cout << "Number of rt points (num_points) not specified"
-    //<< std::endl;
-    // return -1;
-    //}
-    // auto num_points = options["-num_points"];
-    // if (!is_unsigned_int(num_points)) {
-    // std::cout << "error: num_points has to be a positive integer"
-    //<< std::endl;
-    // print_usage();
-    // return -1;
-    //}
-    // parameters.num_points = std::stoi(num_points);
-
-    // if (options.find("-rt_expand_factor") == options.end()) {
-    // options["-rt_expand_factor"] = "0.2";  // Default value.
-    //}
-    // auto rt_expand_factor = options["-rt_expand_factor"];
-    // if (!is_number(rt_expand_factor)) {
-    // std::cout << "error: "
-    //<< "rt_expand_factor"
-    //<< " has to be a number" << std::endl;
-    // print_usage();
-    // return -1;
-    //}
-    // parameters.rt_expand_factor = std::stoi(rt_expand_factor);
-
-    // if (options.find("-peaks_per_window") == options.end()) {
-    // std::cout
-    //<< "Number of peaks per window (peaks_per_window) not specified"
-    //<< std::endl;
-    // return -1;
-    //}
-    // auto peaks_per_window = options["-peaks_per_window"];
-    // if (!is_unsigned_int(peaks_per_window)) {
-    // std::cout << "error: peaks_per_window has to be a positive integer"
-    //<< std::endl;
-    // print_usage();
-    // return -1;
-    //}
-    // parameters.peaks_per_window = std::stoi(peaks_per_window);
-
-    if (options.find("-reference_file") == options.end()) {
-        std::cout << "Reference file (reference_file) not specified"
-                  << std::endl;
+    if (options.find("-radius_mz") == options.end()) {
+        std::cout << "Radius mz (radius_mz) not specified" << std::endl;
         return -1;
     }
-    auto reference_file = options["-reference_file"];
+    auto radius_mz = options["-radius_mz"];
+    if (!is_number(radius_mz)) {
+        std::cout << "error: radius_mz has to be a number" << std::endl;
+        print_usage();
+        return -1;
+    }
+
+    parameters.radius_mz = std::stod(radius_mz);
+    if (options.find("-radius_rt") == options.end()) {
+        std::cout << "Radius rt (radius_rt) not specified" << std::endl;
+        return -1;
+    }
+    auto radius_rt = options["-radius_rt"];
+    if (!is_number(radius_rt)) {
+        std::cout << "error: radius_rt has to be a number" << std::endl;
+        print_usage();
+        return -1;
+    }
+    parameters.radius_rt = std::stod(radius_rt);
+
+    if (options.find("-fraction") == options.end()) {
+        std::cout << "Radius rt (fraction) not specified" << std::endl;
+        return -1;
+    }
+    auto fraction = options["-fraction"];
+    if (!is_number(fraction)) {
+        std::cout << "error: fraction has to be a number" << std::endl;
+        print_usage();
+        return -1;
+    }
+    parameters.fraction = std::stod(fraction);
+    if (parameters.fraction < 0 || parameters.fraction > 1) {
+        std::cout << "error: fraction has to be a number between 0 and 1"
+                  << std::endl;
+        print_usage();
+        return -1;
+    }
+
+    if (options.find("-file_list") == options.end()) {
+        std::cout << "File list (file_list) not specified" << std::endl;
+        return -1;
+    }
+    auto file_list = options["-file_list"];
 
     // Set up the output directory and check if it exists.
     if (options.find("-out_dir") == options.end()) {
@@ -403,93 +364,22 @@ int main(int argc, char *argv[]) {
         max_threads = std::stoi(n_threads);
     }
 
-    // Read the reference file peaks.
-    //std::cout << "Reading reference peaks from file: " << reference_file
-              //<< std::endl;
-    //std::vector<Centroid::Peak> reference_peaks;
-    //Grid::Parameters reference_grid_params;
-    //{
-        //std::ifstream stream;
-        //stream.open(reference_file);
-        //if (!stream) {
-            //std::cout << "error: could not open reference file "
-                      //<< reference_file << std::endl;
-            //return -1;
-        //}
-        //std::filesystem::path input_file = reference_file;
-        //// Check if the file has the appropriate format.
-        //std::string extension = input_file.extension();
-        //std::string lowercase_extension = extension;
-        //for (auto &ch : lowercase_extension) {
-            //ch = std::tolower(ch);
-        //}
-
-        //if (lowercase_extension == ".bpks") {
-            //// Read into peak array.
-            //if (!Centroid::Files::Bpks::read_peaks(
-                    //stream, &reference_grid_params, &reference_peaks)) {
-                //std::cout
-                    //<< "error: couldn't read peaks from the reference file"
-                    //<< std::endl;
-                //return -1;
-            //}
-        //} else if (lowercase_extension == ".csv") {
-            //// TODO: read into peak array.
-            //// Centroid::Files::Csv::read_peaks(stream, &grid_params,
-            //// &peaks[0]);
-        //} else {
-            //std::cout << "error: unknown file format for file " << input_file
-                      //<< std::endl;
-            //print_usage();
-            //return -1;
-        //}
-    //}
-
-    // Execute the program here.
-    for (const auto &file_name : files) {
-        std::filesystem::path input_file = file_name;
-
-        // Open input file.
+    // Read the file list.
+    std::cout << "Reading file list: " << file_list << std::endl;
+    {
         std::ifstream stream;
-        stream.open(input_file);
+        stream.open(file_list);
         if (!stream) {
-            std::cout << "error: could not open input file " << input_file
+            std::cout << "error: could not open file list " << file_list
                       << std::endl;
             return -1;
         }
 
-        // Check if the file has the appropriate format.
-        std::string extension = input_file.extension();
-        std::string lowercase_extension = extension;
-        for (auto &ch : lowercase_extension) {
-            ch = std::tolower(ch);
-        }
-
-        //std::vector<Centroid::Peak> peaks;
-        //Grid::Parameters grid_params;
-        //if (lowercase_extension == ".bpks") {
-            //// Read into peak array.
-            //std::cout << "Reading peaks from file: " << input_file << std::endl;
-            //if (!Centroid::Files::Bpks::read_peaks(stream, &grid_params,
-                                                   //&peaks)) {
-                //std::cout
-                    //<< "error: couldn't read peaks from the reference file"
-                    //<< std::endl;
-                //return -1;
-            //}
-        //} else if (lowercase_extension == ".csv") {
-            //// TODO: read into peak array.
-            //// Centroid::Files::Csv::read_peaks(stream, &grid_params,
-            //// &peaks[0]);
-        //} else {
-            //std::cout << "error: unknown file format for file " << input_file
-                      //<< std::endl;
-            //print_usage();
-            //return -1;
-        //}
-
         // Prepare the name of the output file.
-        auto outfile_name = options["-out_dir"] / input_file.filename();
+        // TODO(alex): Only check if directory exists, do not open the file for
+        // writing until we are done with the process.
+        std::filesystem::path output_file_name = "metapeaks.csv";
+        auto outfile_name = options["-out_dir"] / output_file_name;
         std::ofstream outfile_stream;
         outfile_stream.open(outfile_name, std::ios::out | std::ios::binary);
         if (!outfile_stream) {
@@ -497,6 +387,76 @@ int main(int argc, char *argv[]) {
                       << " for writing" << std::endl;
             return -1;
         }
+
+        auto files = MetaMatch::read_file_list(stream);
+        std::vector<MetaMatch::Peak> metapeaks;
+        size_t file_id = 0;
+        std::vector<size_t> classes;
+        for (const auto &[file, class_id] : files) {
+            std::filesystem::path input_file = file;
+            std::cout << "Reading file: " << input_file << std::endl;
+            std::ifstream peaks_stream;
+            peaks_stream.open(input_file);
+            // Check if the file has the appropriate format.
+            std::string extension = input_file.extension();
+            std::string lowercase_extension = extension;
+            for (auto &ch : lowercase_extension) {
+                ch = std::tolower(ch);
+            }
+
+            std::vector<Centroid::Peak> peaks;
+            Grid::Parameters grid_params;
+            if (lowercase_extension == ".bpks") {
+                // Read into peak array.
+                std::cout << "Reading peaks from file: " << input_file
+                          << std::endl;
+                if (!Centroid::Files::Bpks::read_peaks(peaks_stream,
+                                                       &grid_params, &peaks)) {
+                    std::cout << "error: couldn't read peaks from the file list"
+                              << std::endl;
+                    return -1;
+                }
+            } else if (lowercase_extension == ".csv") {
+                // TODO: read into peak array.
+                if (!Centroid::Files::Csv::read_peaks(peaks_stream, &peaks)) {
+                    std::cout << "error: couldn't read peaks from the file list"
+                              << std::endl;
+                    return -1;
+                }
+            } else {
+                std::cout << "error: unknown file format for file "
+                          << input_file << std::endl;
+                print_usage();
+                return -1;
+            }
+            for (const auto &peak : peaks) {
+                metapeaks.push_back(
+                    {peak, file_id, class_id, -1, peak.mz, peak.rt});
+            }
+            ++file_id;
+
+            if (std::find(classes.begin(), classes.end(), class_id) ==
+                classes.end()) {
+                classes.push_back(class_id);
+            }
+        }
+        parameters.n_files = file_id;
+        parameters.n_classes = classes.size();
+
+        // Execute MetaMatch here.
+        // TODO(alex): Error checking!
+        std::cout << "Finding candidates..." << std::endl;
+        MetaMatch::find_candidates(metapeaks, parameters);
+        // TODO(alex): Error checking!
+        auto orphans = MetaMatch::extract_orphans(metapeaks);
+        std::cout << "Extracting orphans..." << std::endl;
+        // TODO(alex): Error checking!
+        std::cout << "Building cluster table..." << std::endl;
+        auto clusters =
+            MetaMatch::reduce_cluster(metapeaks, parameters.n_classes);
+        // TODO(alex): Error checking!
+        std::cout << "Writing table to disk..." << std::endl;
+        MetaMatch::write_clusters(outfile_stream, clusters, parameters);
     }
 
     return 0;
