@@ -72,7 +72,7 @@ TEST_CASE("DEBUG") {
         std::string line;
         Centroid::Files::Csv::read_peaks(stream, &file_peaks[i]);
         for (const auto& peak : file_peaks[i]) {
-            peaks.push_back({peak, i, 0, -1, peak.mz, peak.rt});
+            peaks.push_back({peak, i, i % 2, -1, peak.mz, peak.rt});
         }
     }
 
@@ -81,14 +81,14 @@ TEST_CASE("DEBUG") {
     MetaMatch::find_candidates(peaks, parameters);
     MetaMatch::extract_orphans(peaks);
     auto clusters = MetaMatch::reduce_cluster(peaks, 3);
-     MetaMatch::write_clusters(std::cout, clusters, parameters);
+    MetaMatch::write_clusters(std::cout, clusters, parameters);
     //{
-        //std::stringstream stream(file_list);
-        //auto files = MetaMatch::read_file_list(stream);
-        //for (const auto& [file, class_id] : files) {
-            //std::cout << "file: " << file << " class_id: " << class_id
-                      //<< std::endl;
-        //}
+    // std::stringstream stream(file_list);
+    // auto files = MetaMatch::read_file_list(stream);
+    // for (const auto& [file, class_id] : files) {
+    // std::cout << "file: " << file << " class_id: " << class_id
+    //<< std::endl;
+    //}
     //}
 
     CHECK(false);
