@@ -21,8 +21,8 @@ void print_metamatch_peaks(const std::vector<MetaMatch::Peak>& peaks) {
 void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
                                 const MetaMatch::Parameters& parameters) {
     // DEBUG
-    //std::cout << "BEFORE:" << std::endl;
-    //print_metamatch_peaks(peaks);
+    // std::cout << "BEFORE:" << std::endl;
+    // print_metamatch_peaks(peaks);
     std::cout << "Sorting peaks..." << std::endl;
     auto sort_peaks = [](auto p1, auto p2) -> bool {
         return (p1.mz < p2.mz) || ((p1.mz == p2.mz) && (p1.rt < p2.rt)) ||
@@ -35,6 +35,10 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
     // files, number of classes, number of files per class.
     std::cout << "Calculating class/file proportion..." << std::endl;
     std::vector<size_t> file_ids;
+    // FIXME(alex): At the end we are only interested in class_id and
+    // file_ids.size(), that is, the number of files per class. This is
+    // a temporary structure, plus we probably don't want to calculate this
+    // here.
     struct ClassMeta {
         size_t id;
         std::vector<size_t> file_ids;
@@ -62,10 +66,11 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
             classes.push_back({peak.class_id, {peak.file_id}});
         }
     }
-    for (const auto& cls : classes) {
-        std::cout << "class_id: " << cls.id
-                  << " n_files: " << cls.file_ids.size() << std::endl;
-    }
+    // DEBUG
+    // for (const auto& cls : classes) {
+    // std::cout << "class_id: " << cls.id
+    //<< " n_files: " << cls.file_ids.size() << std::endl;
+    //}
 
     std::cout << "Clustering..." << std::endl;
     int cluster_id = 0;
@@ -76,10 +81,10 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
         // print_metamatch_peaks(peaks);
         auto& peak_a = peaks[i];
         // DEBUG
-        if (i % 100000 == 0) {
-            std::cout << "Progress: peak " << i << " out of " << peaks.size()
-                      << std::endl;
-        }
+        // if (i % 100000 == 0) {
+        // std::cout << "Progress: peak " << i << " out of " << peaks.size()
+        //<< std::endl;
+        //}
 
         if (peak_a.cluster_id != -1) {
             continue;
@@ -240,13 +245,14 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
             ++cluster_id;
         }
     }
-    std::cout << "SUM PEAKS VISITED: " << avg_peaks_per_iter << std::endl;
-    std::cout << "AVG PEAKS VISITED PER ITER: "
-              << avg_peaks_per_iter / (double)peaks.size() << std::endl;
+    // DEBUG
+    // std::cout << "SUM PEAKS VISITED: " << avg_peaks_per_iter << std::endl;
+    // std::cout << "AVG PEAKS VISITED PER ITER: "
+    //<< avg_peaks_per_iter / (double)peaks.size() << std::endl;
 
     // DEBUG
-    //std::cout << "AFTER" << std::endl;
-    //print_metamatch_peaks(peaks);
+    // std::cout << "AFTER" << std::endl;
+    // print_metamatch_peaks(peaks);
     return;
 }
 
