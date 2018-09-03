@@ -21,8 +21,8 @@ void print_metamatch_peaks(const std::vector<MetaMatch::Peak>& peaks) {
 void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
                                 const MetaMatch::Parameters& parameters) {
     // DEBUG
-    // std::cout << "BEFORE:" << std::endl;
-    // print_metamatch_peaks(peaks);
+    //std::cout << "BEFORE:" << std::endl;
+    //print_metamatch_peaks(peaks);
     std::cout << "Sorting peaks..." << std::endl;
     auto sort_peaks = [](auto p1, auto p2) -> bool {
         return (p1.mz < p2.mz) || ((p1.mz == p2.mz) && (p1.rt < p2.rt)) ||
@@ -202,7 +202,7 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
         // bool fraction_achieved = false;
         // for (const auto& n_hits : class_map) {
         //// FIXME: Should be n_files_per_class!
-        // if ((double)n_hits / (double)parameters.n_files >
+        // if ((double)n_hits / (double)n_files >
         // parameters.fraction) {
         // fraction_achieved = true;
         // break;
@@ -245,6 +245,8 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
               << avg_peaks_per_iter / (double)peaks.size() << std::endl;
 
     // DEBUG
+    //std::cout << "AFTER" << std::endl;
+    //print_metamatch_peaks(peaks);
     return;
 }
 
@@ -331,7 +333,7 @@ std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
 // TODO(alex): Move to MetaMatch::Files::Csv::write_clusters
 bool MetaMatch::write_clusters(std::ostream& stream,
                                const std::vector<MetaMatch::Cluster>& clusters,
-                               const MetaMatch::Parameters& parameters) {
+                               size_t n_files) {
     char cell_delimiter = ' ';
     char line_delimiter = '\n';
 
@@ -341,7 +343,7 @@ bool MetaMatch::write_clusters(std::ostream& stream,
         "mz",
         "rt",
     };
-    for (size_t i = 0; i < parameters.n_files; ++i) {
+    for (size_t i = 0; i < n_files; ++i) {
         header_columns.push_back("file_h" + std::to_string(i));
     }
     // Write the CSV header.
@@ -362,9 +364,9 @@ bool MetaMatch::write_clusters(std::ostream& stream,
         // rt
         stream << cluster.rt << cell_delimiter;
         // file heights
-        for (size_t i = 0; i < parameters.n_files; ++i) {
+        for (size_t i = 0; i < n_files; ++i) {
             stream << cluster.file_heights[i];
-            if (i == parameters.n_files - 1) {
+            if (i == n_files - 1) {
                 stream << line_delimiter;
             } else {
                 stream << cell_delimiter;

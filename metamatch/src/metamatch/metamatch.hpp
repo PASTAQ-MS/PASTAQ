@@ -12,8 +12,6 @@ namespace MetaMatch {
 struct Parameters {
     double radius_mz;
     double radius_rt;
-    size_t n_files;
-    size_t n_classes;
     double fraction;
 };
 
@@ -49,7 +47,7 @@ std::vector<MetaMatch::Cluster> reduce_cluster(
 // TODO(alex): Move to MetaMatch::Files::Csv::write_clusters
 bool write_clusters(std::ostream& stream,
                     const std::vector<MetaMatch::Cluster>& clusters,
-                    const MetaMatch::Parameters& parameters);
+                    size_t n_files);
 // TODO(alex): Move to MetaMatch::Files::Csv::read_file_list
 std::vector<std::pair<std::string, size_t>> read_file_list(
     std::istream& stream);

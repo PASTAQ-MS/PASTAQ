@@ -440,8 +440,6 @@ int main(int argc, char *argv[]) {
                 classes.push_back(class_id);
             }
         }
-        parameters.n_files = file_id;
-        parameters.n_classes = classes.size();
 
         // Execute MetaMatch here.
         // TODO(alex): Error checking!
@@ -452,11 +450,10 @@ int main(int argc, char *argv[]) {
         std::cout << "Extracting orphans..." << std::endl;
         // TODO(alex): Error checking!
         std::cout << "Building cluster table..." << std::endl;
-        auto clusters =
-            MetaMatch::reduce_cluster(metapeaks, parameters.n_classes);
+        auto clusters = MetaMatch::reduce_cluster(metapeaks, files.size());
         // TODO(alex): Error checking!
         std::cout << "Writing table to disk..." << std::endl;
-        MetaMatch::write_clusters(outfile_stream, clusters, parameters);
+        MetaMatch::write_clusters(outfile_stream, clusters, files.size());
     }
 
     return 0;
