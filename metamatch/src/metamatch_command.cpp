@@ -343,8 +343,8 @@ int main(int argc, char *argv[]) {
         print_usage();
         return -1;
     }
-    parameters.fraction = std::stod(fraction);
-    if (parameters.fraction < 0 || parameters.fraction > 1) {
+    double required_fraction = std::stod(fraction);
+    if (required_fraction < 0 || required_fraction > 1) {
         std::cout << "error: fraction has to be a number between 0 and 1"
                   << std::endl;
         print_usage();
@@ -400,8 +400,8 @@ int main(int argc, char *argv[]) {
         // Prepare the ClassMap for this class.
         size_t n_files = file_names.size();
         size_t required_hits = 0;
-        if (parameters.fraction != 0) {
-            required_hits = n_files * parameters.fraction;
+        if (required_fraction != 0) {
+            required_hits = n_files * required_fraction;
         }
         parameters.class_maps[class_id] = {class_id, n_files, required_hits};
 
