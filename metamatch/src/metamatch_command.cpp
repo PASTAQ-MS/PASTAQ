@@ -12,7 +12,10 @@
 using options_map = std::map<std::string, std::string>;
 
 void print_usage() {
-    std::cout << "USAGE: metamatch [-help] [options]" << std::endl;
+    std::cout << "USAGE: metamatch [-help] [options] "
+                 "<file_01:class_01 "
+                 "file_02:class_01...>"
+              << std::endl;
 }
 
 // Helper functions to check if the given string contains a number.
@@ -170,9 +173,6 @@ int main(int argc, char *argv[]) {
     // <description, takes_parameters>
     const std::map<std::string, std::pair<std::string, bool>> accepted_flags = {
         // MetaMatch parameters.
-        {"-file_list",
-         {"A file containing the paths and classes of the aligned peak lists",
-          true}},
         {"-radius_mz",
          {"The maximum distance in mz that can be used for clustering", true}},
         {"-radius_rt",
@@ -185,11 +185,6 @@ int main(int argc, char *argv[]) {
         {"-out_dir", {"The output directory", true}},
         {"-help", {"Display available options", false}},
         {"-config", {"Specify the configuration file", true}},
-        {"-parallel", {"Enable parallel processing", false}},
-        {"-n_threads",
-         {"Specify the maximum number of threads that will be used for the "
-          "calculations",
-          true}},
     };
 
     if (argc == 1) {
@@ -281,6 +276,12 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    if (files.empty()) {
+        std::cout << "No input files specified." << std::endl;
+        print_usage();
+        return -1;
+    }
+
     // Parse the options to build the Grid::Parameters struct.
     MetaMatch::Parameters parameters = {};
 
@@ -327,12 +328,6 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    if (options.find("-file_list") == options.end()) {
-        std::cout << "File list (file_list) not specified" << std::endl;
-        return -1;
-    }
-    auto file_list = options["-file_list"];
-
     // Set up the output directory and check if it exists.
     if (options.find("-out_dir") == options.end()) {
         options["-out_dir"] = ".";
@@ -344,59 +339,56 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    // Set up maximum concurrency.
-    uint64_t max_threads = std::thread::hardware_concurrency();
-    if (!max_threads) {
-        std::cout << "error: this system does not support parallel processing"
-                  << std::endl;
-        return -1;
+    // Extract unique classes from the file list. We expect the file format
+    // of:
+    //
+    //     file_name:class_name
+    //
+    // In case the class name is blank or only the file name is specified,
+    // we treat those files as belonging to the same class.
+    std::vector<std::pair<std::string, std::vector<std::string>>> classes;
+    for (const auto &file : files) {
+        auto pos = file.find(":");
+        std::string file_class = "";
+        if (pos != std::string::npos) {
+            file_class = file.substr(pos + 1);
+        }
+        std::string file_name = file.substr(0, pos);
+        bool found_class = false;
+        for (auto &[cls, file_names] : classes) {
+            if (cls == file_class) {
+                found_class = true;
+                file_names.push_back(file_name);
+                break;
+            }
+        }
+        if (!found_class) {
+            classes.push_back({file_class, {file_name}});
+        }
     }
-    if ((options.find("-n_threads") != options.end()) &&
-        ((options.find("-parallel") != options.end()) &&
-         (options["-parallel"] == "true" || options["-parallel"].empty()))) {
-        auto n_threads = options["-n_threads"];
-        if (!is_unsigned_int(n_threads)) {
-            std::cout << "error: n_threads has to be a positive integer"
-                      << std::endl;
-            print_usage();
-            return -1;
-        }
-        max_threads = std::stoi(n_threads);
-    }
 
-    // Read the file list.
-    std::cout << "Reading file list: " << file_list << std::endl;
-    {
-        std::ifstream stream;
-        stream.open(file_list);
-        if (!stream) {
-            std::cout << "error: could not open file list " << file_list
-                      << std::endl;
-            return -1;
+    // Buid a class map with the necessary information for the required
+    // number of files hit per class.
+    parameters.class_maps = std::vector<MetaMatch::ClassMap>(classes.size());
+    std::vector<MetaMatch::Peak> metapeaks;
+    size_t file_id = 0;
+    size_t class_id = 0;
+    for (const auto &[cls, file_names] : classes) {
+        // Prepare the ClassMap for this class.
+        size_t n_files = file_names.size();
+        size_t required_hits = 0;
+        if (parameters.fraction != 0) {
+            required_hits = n_files / parameters.fraction;
         }
+        parameters.class_maps[class_id] = {class_id, n_files, required_hits};
 
-        // Prepare the name of the output file.
-        // TODO(alex): Only check if directory exists, do not open the file for
-        // writing until we are done with the process.
-        std::filesystem::path output_file_name = "metapeaks.csv";
-        auto outfile_name = options["-out_dir"] / output_file_name;
-        std::ofstream outfile_stream;
-        outfile_stream.open(outfile_name, std::ios::out | std::ios::binary);
-        if (!outfile_stream) {
-            std::cout << "error: could not open file " << outfile_name
-                      << " for writing" << std::endl;
-            return -1;
-        }
-
-        auto files = MetaMatch::read_file_list(stream);
-        std::vector<MetaMatch::Peak> metapeaks;
-        size_t file_id = 0;
-        std::vector<size_t> classes;
-        for (const auto &[file, class_id] : files) {
+        for (const auto &file : file_names) {
+            // Read the peaks into memory.
             std::filesystem::path input_file = file;
             std::cout << "Reading file: " << input_file << std::endl;
             std::ifstream peaks_stream;
             peaks_stream.open(input_file);
+
             // Check if the file has the appropriate format.
             std::string extension = input_file.extension();
             std::string lowercase_extension = extension;
@@ -404,10 +396,10 @@ int main(int argc, char *argv[]) {
                 ch = std::tolower(ch);
             }
 
+            // Read peaks from this file into the MetaPeaks array.
             std::vector<Centroid::Peak> peaks;
             Grid::Parameters grid_params;
             if (lowercase_extension == ".bpks") {
-                // Read into peak array.
                 std::cout << "Reading peaks from file: " << input_file
                           << std::endl;
                 if (!Centroid::Files::Bpks::read_peaks(peaks_stream,
@@ -417,7 +409,6 @@ int main(int argc, char *argv[]) {
                     return -1;
                 }
             } else if (lowercase_extension == ".csv") {
-                // TODO: read into peak array.
                 if (!Centroid::Files::Csv::read_peaks(peaks_stream, &peaks)) {
                     std::cout << "error: couldn't read peaks from the file list"
                               << std::endl;
@@ -434,27 +425,36 @@ int main(int argc, char *argv[]) {
                     {peak, file_id, class_id, -1, peak.mz, peak.rt});
             }
             ++file_id;
-
-            if (std::find(classes.begin(), classes.end(), class_id) ==
-                classes.end()) {
-                classes.push_back(class_id);
-            }
         }
-
-        // Execute MetaMatch here.
-        // TODO(alex): Error checking!
-        std::cout << "Finding candidates..." << std::endl;
-        MetaMatch::find_candidates(metapeaks, parameters);
-        // TODO(alex): Error checking!
-        auto orphans = MetaMatch::extract_orphans(metapeaks);
-        std::cout << "Extracting orphans..." << std::endl;
-        // TODO(alex): Error checking!
-        std::cout << "Building cluster table..." << std::endl;
-        auto clusters = MetaMatch::reduce_cluster(metapeaks, files.size());
-        // TODO(alex): Error checking!
-        std::cout << "Writing table to disk..." << std::endl;
-        MetaMatch::write_clusters(outfile_stream, clusters, files.size());
+        ++class_id;
     }
+
+    // Execute MetaMatch here.
+    // TODO(alex): Error checking!
+    std::cout << "Finding candidates..." << std::endl;
+    MetaMatch::find_candidates(metapeaks, parameters);
+    // TODO(alex): Error checking!
+    auto orphans = MetaMatch::extract_orphans(metapeaks);
+    std::cout << "Extracting orphans..." << std::endl;
+    // TODO(alex): Error checking!
+    std::cout << "Building cluster table..." << std::endl;
+    auto clusters = MetaMatch::reduce_cluster(metapeaks, files.size());
+    // TODO(alex): Error checking!
+    std::cout << "Writing table to disk..." << std::endl;
+
+    // Prepare the name of the output file.
+    // TODO(alex): Only check if directory exists, do not open the file for
+    // writing until we are done with the process.
+    std::filesystem::path output_file_name = "metapeaks.csv";
+    auto outfile_name = options["-out_dir"] / output_file_name;
+    std::ofstream outfile_stream;
+    outfile_stream.open(outfile_name, std::ios::out | std::ios::binary);
+    if (!outfile_stream) {
+        std::cout << "error: could not open file " << outfile_name
+                  << " for writing" << std::endl;
+        return -1;
+    }
+    MetaMatch::write_clusters(outfile_stream, clusters, files.size());
 
     return 0;
 }

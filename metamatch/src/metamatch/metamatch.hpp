@@ -9,10 +9,18 @@
 namespace MetaMatch {
 
 // TODO(alex): Add docs...
+struct ClassMap {
+    size_t id;
+    size_t n_files;
+    size_t required_hits;
+};
+
+// TODO(alex): Add docs...
 struct Parameters {
     double radius_mz;
     double radius_rt;
     double fraction;
+    std::vector<ClassMap> class_maps;
 };
 
 // TODO(alex): Add docs...
