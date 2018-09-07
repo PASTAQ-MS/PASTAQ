@@ -20,17 +20,12 @@ void print_metamatch_peaks(const std::vector<MetaMatch::Peak>& peaks) {
 
 void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
                                 const MetaMatch::Parameters& parameters) {
-    // DEBUG
-    // std::cout << "BEFORE:" << std::endl;
-    // print_metamatch_peaks(peaks);
     std::cout << "Sorting peaks..." << std::endl;
     auto sort_peaks = [](auto p1, auto p2) -> bool {
         return (p1.mz < p2.mz) || ((p1.mz == p2.mz) && (p1.rt < p2.rt)) ||
                ((p1.rt == p2.rt) && (p1.file_id < p2.file_id));
     };
     std::stable_sort(peaks.begin(), peaks.end(), sort_peaks);
-    // DEBUG
-    // print_metamatch_peaks(peaks);
     // TODO(alex): Do a first pass through the peaks to calculate the number of
     // files, number of classes, number of files per class.
     std::cout << "Calculating class/file proportion..." << std::endl;
@@ -66,25 +61,11 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
             classes.push_back({peak.class_id, {peak.file_id}});
         }
     }
-    // DEBUG
-    // for (const auto& cls : classes) {
-    // std::cout << "class_id: " << cls.id
-    //<< " n_files: " << cls.file_ids.size() << std::endl;
-    //}
 
     std::cout << "Clustering..." << std::endl;
     int cluster_id = 0;
-    double avg_peaks_per_iter = 0;
     for (size_t i = 0; i < peaks.size(); ++i) {
-        // DEBUG
-        // std::cout << "i: " << i << std::endl;
-        // print_metamatch_peaks(peaks);
         auto& peak_a = peaks[i];
-        // DEBUG
-        // if (i % 100000 == 0) {
-        // std::cout << "Progress: peak " << i << " out of " << peaks.size()
-        //<< std::endl;
-        //}
 
         if (peak_a.cluster_id != -1) {
             continue;
@@ -103,37 +84,25 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
                 x_sum += peaks[index].mz * peaks[index].height;
                 y_sum += peaks[index].rt * peaks[index].height;
                 height_sum += peaks[index].height;
+                // x_sum += peaks[index].mz;
+                // y_sum += peaks[index].rt;
+                // height_sum += 1;
             }
             cluster_mz = x_sum / height_sum;
             cluster_rt = y_sum / height_sum;
         };
-        // auto calculate_cluster_pos = [&cluster_mz, &cluster_rt, &peaks,
-        //&metapeak_indexes]() {
-        // double x_sum = 0;
-        // double y_sum = 0;
-        // double height_sum = 0;
-        // for (const auto& index : metapeak_indexes) {
-        // x_sum += peaks[index].mz;
-        // y_sum += peaks[index].rt;
-        // height_sum += 1;
-        //}
-        // cluster_mz = x_sum / height_sum;
-        // cluster_rt = y_sum / height_sum;
-        //};
         calculate_cluster_pos();
 
         peak_a.cluster_id = cluster_id;
 
         // Mark cluster candidates.
-        size_t visited = 1;  // DEBUG
-        for (size_t j = (i + 1); j < peaks.size(); ++j, ++visited) {
+        for (size_t j = (i + 1); j < peaks.size(); ++j) {
             auto& peak_b = peaks[j];
             // Since we know that the peaks are sorted monotonically in mz and
             // then rt, in order to calculate the maximum potential j we only
             // need to find the point where the peak.mz is above the cluster
             // radius.
             if (peak_b.mz > cluster_mz + parameters.radius_mz) {
-                avg_peaks_per_iter += visited;  // DEBUG
                 break;
             }
             if (peak_b.cluster_id == -1 && peak_b.file_id != peak_a.file_id &&
@@ -160,11 +129,6 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
                     metapeak_indexes.push_back(j);
                     calculate_cluster_pos();
                 }
-                // DEBUG
-                // std::cout << "i: " << i
-                //<< " peaks in cluster: " << metapeak_indexes.size()
-                //<< " cluster_mz: " << cluster_mz
-                //<< " cluster_rt: " << cluster_rt << std::endl;
                 // Cull far peaks.
                 for (int k = metapeak_indexes.size() - 1; k >= 0; --k) {
                     auto& index = metapeak_indexes[k];
@@ -180,41 +144,7 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
             }
         }
 
-        // Check if this cluster contains the
-        // necessary number of peaks per class. If the
-        // fraction is not big enough, free the peaks
-        // for future clustering.
-        // std::vector<size_t> class_ids;
-        // std::vector<size_t> class_map;
-        // for (const auto& index : metapeak_indexes) {
-        // auto& peak = peaks[index];
-        // if (peak.cluster_id == cluster_id) {
-        // bool id_present = false;
-        // for (size_t k = 0; k < class_ids.size(); ++k) {
-        // const auto& id = class_ids[k];
-        // if (id == peak.class_id) {
-        // id_present = true;
-        // class_map[k] += 1;
-        // break;
-        //}
-        //}
-        // if (!id_present) {
-        // class_ids.push_back(peak.class_id);
-        // class_map.push_back(1);
-        //}
-        //}
-        //}
-        // bool fraction_achieved = false;
-        // for (const auto& n_hits : class_map) {
-        //// FIXME: Should be n_files_per_class!
-        // if ((double)n_hits / (double)n_files >
-        // parameters.fraction) {
-        // fraction_achieved = true;
-        // break;
-        //}
-        //}
         std::vector<size_t> class_map(classes.size());
-        // ...
         for (const auto& index : metapeak_indexes) {
             const auto& peak = peaks[index];
             for (size_t k = 0; k < classes.size(); ++k) {
@@ -245,14 +175,6 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
             ++cluster_id;
         }
     }
-    // DEBUG
-    // std::cout << "SUM PEAKS VISITED: " << avg_peaks_per_iter << std::endl;
-    // std::cout << "AVG PEAKS VISITED PER ITER: "
-    //<< avg_peaks_per_iter / (double)peaks.size() << std::endl;
-
-    // DEBUG
-    // std::cout << "AFTER" << std::endl;
-    // print_metamatch_peaks(peaks);
     return;
 }
 
@@ -273,11 +195,6 @@ std::vector<MetaMatch::Peak> MetaMatch::extract_orphans(
             break;
         }
     }
-    // DEBUG
-    // std::cout << "ORPHANS:" << std::endl;
-    // print_metamatch_peaks(orphans);
-    // std::cout << "NOT ORPHANS:" << std::endl;
-    // print_metamatch_peaks(peaks);
     return orphans;
 }
 
@@ -294,9 +211,6 @@ std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
     if (peaks.empty()) {
         return clusters;
     }
-    // DEBUG
-    // std::cout << "SORTED METAPEAKS:" << std::endl;
-    // print_metamatch_peaks(peaks);
 
     int cluster_id = peaks[0].cluster_id;
     size_t k = 0;
@@ -321,18 +235,6 @@ std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
         }
     }
 
-    // DEBUG
-    // Print clusters...
-    // for (const auto& cluster : clusters) {
-    // std::cout << "id: " << cluster.id;
-    // std::cout << " mz: " << cluster.mz;
-    // std::cout << " rt: " << cluster.rt;
-    // std::cout << " elements: [";
-    // for (const auto& height : cluster.file_heights)
-    // { std::cout << height << ",";
-    //}
-    // std::cout << "]" << std::endl;
-    //}
     return clusters;
 }
 
