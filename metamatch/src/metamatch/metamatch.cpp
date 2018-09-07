@@ -26,41 +26,6 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
                ((p1.rt == p2.rt) && (p1.file_id < p2.file_id));
     };
     std::stable_sort(peaks.begin(), peaks.end(), sort_peaks);
-    // TODO(alex): Do a first pass through the peaks to calculate the number of
-    // files, number of classes, number of files per class.
-    std::cout << "Calculating class/file proportion..." << std::endl;
-    std::vector<size_t> file_ids;
-    // FIXME(alex): At the end we are only interested in class_id and
-    // file_ids.size(), that is, the number of files per class. This is
-    // a temporary structure, plus we probably don't want to calculate this
-    // here.
-    struct ClassMeta {
-        size_t id;
-        std::vector<size_t> file_ids;
-    };
-    std::vector<ClassMeta> classes;
-    for (const auto& peak : peaks) {
-        bool class_found = false;
-        for (size_t i = 0; i < classes.size(); ++i) {
-            if (peak.class_id == classes[i].id) {
-                class_found = true;
-                bool file_found = false;
-                for (size_t j = 0; j < classes[i].file_ids.size(); ++j) {
-                    if (peak.file_id == classes[i].file_ids[j]) {
-                        file_found = true;
-                        break;
-                    }
-                }
-                if (!file_found) {
-                    classes[i].file_ids.push_back(peak.file_id);
-                }
-                break;
-            }
-        }
-        if (!class_found) {
-            classes.push_back({peak.class_id, {peak.file_id}});
-        }
-    }
 
     std::cout << "Clustering..." << std::endl;
     int cluster_id = 0;
@@ -144,21 +109,21 @@ void MetaMatch::find_candidates(std::vector<MetaMatch::Peak>& peaks,
             }
         }
 
-        std::vector<size_t> class_map(classes.size());
+        std::vector<size_t> class_hits(parameters.class_maps.size());
         for (const auto& index : metapeak_indexes) {
             const auto& peak = peaks[index];
-            for (size_t k = 0; k < classes.size(); ++k) {
-                if (peak.class_id == classes[k].id) {
-                    class_map[k] += 1;
+            for (size_t k = 0; k < class_hits.size(); ++k) {
+                if (peak.class_id == k) {
+                    class_hits[k] += 1;
                     break;
                 }
             }
         }
         bool fraction_achieved = false;
-        for (size_t k = 0; k < class_map.size(); ++k) {
-            const auto& n_hits = class_map[k];
-            const auto& n_files = classes[k].file_ids.size();
-            if ((double)n_hits / (double)n_files > parameters.fraction) {
+        for (size_t k = 0; k < class_hits.size(); ++k) {
+            const auto& n_hits = class_hits[k];
+            if (n_hits >= parameters.class_maps[k].required_hits &&
+                n_hits != 0) {
                 fraction_achieved = true;
                 break;
             }

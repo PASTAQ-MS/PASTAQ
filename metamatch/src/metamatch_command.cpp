@@ -82,6 +82,29 @@ void parse_json(const std::filesystem::path &path, options_map &options,
                 std::exit(-1);
             }
 
+            // TODO(alex): Should we accept the following format?
+            //
+            //   {
+            //       "paths": {
+            //           "class_01": ["filename_01", "filename_02", ...],
+            //           "class_02": ["filename_03", "filename_04", ...]
+            //       },
+            //       ...
+            //   }
+            //
+            //   in addition to
+            //
+            //   {
+            //       "paths": [
+            //           "filename_01:class_01",
+            //           "filename_02:class_01",
+            //           "filename_03:class_02",
+            //           "filename_04:class_02",
+            //           ...
+            //       ],
+            //       ...
+            //   }
+
             auto config_files = content.substr(begin, end - begin);
             for (auto &ch : config_files) {
                 if (ch == ',' || ch == '"') {
@@ -378,7 +401,7 @@ int main(int argc, char *argv[]) {
         size_t n_files = file_names.size();
         size_t required_hits = 0;
         if (parameters.fraction != 0) {
-            required_hits = n_files / parameters.fraction;
+            required_hits = n_files * parameters.fraction;
         }
         parameters.class_maps[class_id] = {class_id, n_files, required_hits};
 
@@ -434,8 +457,8 @@ int main(int argc, char *argv[]) {
     std::cout << "Finding candidates..." << std::endl;
     MetaMatch::find_candidates(metapeaks, parameters);
     // TODO(alex): Error checking!
-    auto orphans = MetaMatch::extract_orphans(metapeaks);
     std::cout << "Extracting orphans..." << std::endl;
+    auto orphans = MetaMatch::extract_orphans(metapeaks);
     // TODO(alex): Error checking!
     std::cout << "Building cluster table..." << std::endl;
     auto clusters = MetaMatch::reduce_cluster(metapeaks, files.size());
