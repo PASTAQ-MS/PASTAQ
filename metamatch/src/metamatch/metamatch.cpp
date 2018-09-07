@@ -257,25 +257,3 @@ bool MetaMatch::write_clusters(std::ostream& stream,
     }
     return stream.good();
 }
-
-std::vector<std::pair<std::string, size_t>> MetaMatch::read_file_list(
-    std::istream& stream) {
-    char cell_delimiter = ' ';
-    char line_delimiter = '\n';
-    std::vector<std::pair<std::string, size_t>> ret;
-    std::string line;
-    // TODO(alex): Add validation (return bool).
-    while (std::getline(stream, line, line_delimiter)) {
-        std::string token;
-        std::stringstream token_stream(line);
-        std::pair<std::string, size_t> file = {};
-        // TODO: validation...
-        std::getline(token_stream, token, cell_delimiter);
-        std::istringstream(token) >> file.first;
-        // TODO: validation...
-        std::getline(token_stream, token, cell_delimiter);
-        std::istringstream(token) >> file.second;
-        ret.push_back(file);
-    }
-    return ret;
-}
