@@ -7,14 +7,14 @@
 #include <vector>
 
 #include "metamatch/metamatch.hpp"
+#include "metamatch/metamatch_files.hpp"
 
 // Type aliases.
 using options_map = std::map<std::string, std::string>;
 
 void print_usage() {
     std::cout << "USAGE: metamatch [-help] [options] "
-                 "<file_01:class_01 "
-                 "file_02:class_01...>"
+                 "<file_01:class_01 file_02:class_01...>"
               << std::endl;
 }
 
@@ -452,32 +452,61 @@ int main(int argc, char *argv[]) {
         ++class_id;
     }
 
-    // Execute MetaMatch here.
-    // TODO(alex): Error checking!
     std::cout << "Finding candidates..." << std::endl;
     MetaMatch::find_clusters(metapeaks, parameters);
-    // TODO(alex): Error checking!
+
     std::cout << "Extracting orphans..." << std::endl;
     auto orphans = MetaMatch::extract_orphans(metapeaks);
-    // TODO(alex): Error checking!
+
     std::cout << "Building cluster table..." << std::endl;
     auto clusters = MetaMatch::reduce_cluster(metapeaks, files.size());
-    // TODO(alex): Error checking!
-    std::cout << "Writing table to disk..." << std::endl;
 
-    // Prepare the name of the output file.
-    // TODO(alex): Only check if directory exists, do not open the file for
-    // writing until we are done with the process.
-    std::filesystem::path output_file_name = "metapeaks.csv";
-    auto outfile_name = options["-out_dir"] / output_file_name;
-    std::ofstream outfile_stream;
-    outfile_stream.open(outfile_name, std::ios::out | std::ios::binary);
-    if (!outfile_stream) {
-        std::cout << "error: could not open file " << outfile_name
-                  << " for writing" << std::endl;
-        return -1;
+    if (!orphans.empty()) {
+        std::cout << "Writing orphans to disk..." << std::endl;
+        {
+            // Prepare the name of the output file.
+            std::filesystem::path output_file_name = "orphans.csv";
+            auto outfile_name = options["-out_dir"] / output_file_name;
+            std::ofstream outfile_stream;
+            outfile_stream.open(outfile_name, std::ios::out | std::ios::binary);
+            if (!outfile_stream) {
+                std::cout << "error: could not open file " << outfile_name
+                          << " for writing" << std::endl;
+                return -1;
+            }
+            if (!MetaMatch::Files::Csv::write_peaks(outfile_stream,
+                                                    metapeaks)) {
+                std::cout << "error: the orphans could not be saved properly"
+                          << std::endl;
+                return -1;
+            }
+        }
     }
-    MetaMatch::write_clusters(outfile_stream, clusters, files.size());
+
+    if (clusters.empty()) {
+        std::cout << "Warning: No clusters found" << std::endl;
+        return 1;
+    }
+
+    std::cout << "Writing clusters to disk..." << std::endl;
+    {
+        // Prepare the name of the output file.
+        std::filesystem::path output_file_name = "metapeaks.csv";
+        auto outfile_name = options["-out_dir"] / output_file_name;
+        std::ofstream outfile_stream;
+        outfile_stream.open(outfile_name, std::ios::out | std::ios::binary);
+        if (!outfile_stream) {
+            std::cout << "error: could not open file " << outfile_name
+                      << " for writing" << std::endl;
+            return -1;
+        }
+        if (!MetaMatch::Files::Csv::write_clusters(outfile_stream, clusters,
+                                                   files.size())) {
+            std::cout << "error: the clusters could not be saved properly"
+                      << std::endl;
+            return -1;
+        }
+    }
 
     return 0;
 }

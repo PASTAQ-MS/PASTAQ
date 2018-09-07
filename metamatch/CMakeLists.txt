@@ -30,7 +30,7 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../centroid" ${CMAKE_CURRENT_BINAR
 if (NOT TARGET metamatchlib)
     add_library(metamatchlib
         "${CMAKE_CURRENT_SOURCE_DIR}/src/metamatch/metamatch.cpp"
-        #"${CMAKE_CURRENT_SOURCE_DIR}/src/metamatch/metamatch_runners.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/metamatch/metamatch_files.cpp"
         )
     target_include_directories(metamatchlib PUBLIC src)
     target_link_libraries(metamatchlib gridlib centroidlib ${CMAKE_THREAD_LIBS_INIT})

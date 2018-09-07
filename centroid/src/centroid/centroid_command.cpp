@@ -447,9 +447,12 @@ int main(int argc, char *argv[]) {
             std::stable_sort(peaks.begin(), peaks.end(), sort_peaks);
 
             std::cout << "Saving peaks to bpks file..." << std::endl;
-            // TODO(alex): Check for errors.
-            Centroid::Files::Bpks::write_peaks(bpks_stream,
-                                               parameters.grid_params, peaks);
+            if (!Centroid::Files::Bpks::write_peaks(
+                    bpks_stream, parameters.grid_params, peaks)) {
+                std::cout << "error: the peaks could not be saved properly"
+                          << std::endl;
+                return -1;
+            }
 
             if (options.find("-csvdump") != options.end() &&
                 (options["-csvdump"] == "true" ||
