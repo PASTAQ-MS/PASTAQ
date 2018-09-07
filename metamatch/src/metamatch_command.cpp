@@ -455,7 +455,7 @@ int main(int argc, char *argv[]) {
     // Execute MetaMatch here.
     // TODO(alex): Error checking!
     std::cout << "Finding candidates..." << std::endl;
-    MetaMatch::find_candidates(metapeaks, parameters);
+    MetaMatch::find_clusters(metapeaks, parameters);
     // TODO(alex): Error checking!
     std::cout << "Extracting orphans..." << std::endl;
     auto orphans = MetaMatch::extract_orphans(metapeaks);

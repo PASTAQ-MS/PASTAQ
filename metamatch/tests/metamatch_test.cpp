@@ -73,8 +73,8 @@ file_03.csv 0
             }
             CHECK(peaks.size() == 22);
             if (peaks.size() == 22) {
-                MetaMatch::Parameters parameters = {0.01, 15, 0.6, {{0,3,2}}};
-                MetaMatch::find_candidates(peaks, parameters);
+                MetaMatch::Parameters parameters = {0.01, 15, 0.6, {{0, 3, 2}}};
+                MetaMatch::find_clusters(peaks, parameters);
                 MetaMatch::extract_orphans(peaks);
                 CHECK(peaks.size() == 17);
                 std::vector<MetaMatch::Cluster> expected_clusters = {
@@ -135,8 +135,9 @@ file_03.csv 1
             }
             CHECK(peaks.size() == 44);
             if (peaks.size() == 44) {
-                MetaMatch::Parameters parameters = {0.01, 15, 0.6, {{0,3,2},{1,3,2}}};
-                MetaMatch::find_candidates(peaks, parameters);
+                MetaMatch::Parameters parameters = {
+                    0.01, 15, 0.6, {{0, 3, 2}, {1, 3, 2}}};
+                MetaMatch::find_clusters(peaks, parameters);
                 MetaMatch::extract_orphans(peaks);
                 CHECK(peaks.size() == 34);
                 std::vector<MetaMatch::Cluster> expected_clusters = {

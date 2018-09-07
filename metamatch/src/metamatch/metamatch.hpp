@@ -41,8 +41,8 @@ struct Cluster {
 };
 
 // TODO(alex): Add docs...
-void find_candidates(std::vector<MetaMatch::Peak>& peaks,
-                     const MetaMatch::Parameters& parameters);
+void find_clusters(std::vector<MetaMatch::Peak>& peaks,
+                   const MetaMatch::Parameters& parameters);
 
 // TODO(alex): Add docs...
 std::vector<MetaMatch::Peak> extract_orphans(
