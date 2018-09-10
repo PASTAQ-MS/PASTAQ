@@ -26,10 +26,11 @@ option(UTILS_ADD_TESTS "run utils tests" ON)
 add_subdirectory(${CMAKE_SOURCE_DIR}/grid)
 add_subdirectory(${CMAKE_SOURCE_DIR}/centroid)
 add_subdirectory(${CMAKE_SOURCE_DIR}/warp2d)
+add_subdirectory(${CMAKE_SOURCE_DIR}/metamatch)
 
 # TODO(alex): Ensure library can be linked against using:
 #     target_link_libraries(my_lib ${TAPP_LIBS})
-set(TAPP_LIBS "gridlib centroidlib")
+set(TAPP_LIBS "gridlib centroidlib warp2dlib metamatchlib")
 
 unset(DOCTEST_LIBRARY_PATH CACHE)
 find_path(

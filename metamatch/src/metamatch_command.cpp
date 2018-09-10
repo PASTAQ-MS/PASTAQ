@@ -6,16 +6,16 @@
 #include <thread>
 #include <vector>
 
-#include "centroid/centroid_files.hpp"
-#include "grid/grid.hpp"
-#include "warp2d/warp2d.hpp"
-#include "warp2d/warp2d_runners.hpp"
+#include "metamatch/metamatch.hpp"
+#include "metamatch/metamatch_files.hpp"
 
 // Type aliases.
 using options_map = std::map<std::string, std::string>;
 
 void print_usage() {
-    std::cout << "USAGE: warp2d [-help] [options] <files>" << std::endl;
+    std::cout << "USAGE: metamatch [-help] [options] "
+                 "<file_01:class_01 file_02:class_01...>"
+              << std::endl;
 }
 
 // Helper functions to check if the given string contains a number.
@@ -52,11 +52,11 @@ void parse_json(const std::filesystem::path &path, options_map &options,
     }
 
     // Find the contents of the configuration.
-    std::regex config_regex(R"("warp2d"[[:space:]]*:[[:space:]]*\{(.*)\})");
+    std::regex config_regex(R"("metamatch"[[:space:]]*:[[:space:]]*\{(.*)\})");
     std::smatch matches;
     std::regex_search(content, matches, config_regex);
     if (matches.size() != 2 || matches[1].str().empty()) {
-        std::cout << "error: could not find \"warp2d\" on the config file"
+        std::cout << "error: could not find \"metamatch\" on the config file"
                   << std::endl;
         std::exit(-1);
     }
@@ -81,6 +81,29 @@ void parse_json(const std::filesystem::path &path, options_map &options,
                 std::cout << "error: malformed config file" << std::endl;
                 std::exit(-1);
             }
+
+            // TODO(alex): Should we accept the following format?
+            //
+            //   {
+            //       "paths": {
+            //           "class_01": ["filename_01", "filename_02", ...],
+            //           "class_02": ["filename_03", "filename_04", ...]
+            //       },
+            //       ...
+            //   }
+            //
+            //   in addition to
+            //
+            //   {
+            //       "paths": [
+            //           "filename_01:class_01",
+            //           "filename_02:class_01",
+            //           "filename_03:class_02",
+            //           "filename_04:class_02",
+            //           ...
+            //       ],
+            //       ...
+            //   }
 
             auto config_files = content.substr(begin, end - begin);
             for (auto &ch : config_files) {
@@ -172,37 +195,19 @@ int main(int argc, char *argv[]) {
     // with the description and if it takes extra parameters or not:
     // <description, takes_parameters>
     const std::map<std::string, std::pair<std::string, bool>> accepted_flags = {
-        // Warp2D parameters.
-        {"-reference_file",
-         {"The path to the file to be used as a reference", true}},
-        {"-slack",
-         {"The maximum number of time points that can be warped", true}},
-        {"-window_size",
-         {"The size of the window that will be used for segmenting the data",
-          true}},
-        {"-peaks_per_window",
-         {"The maximum number of peaks that will be used on any given window",
-          true}},
-        {"-num_points",
-         {"The number of time points in which the retention time range will be "
-          "divided",
-          true}},
-        {"-rt_expand_factor",
-         {"The factor by which the retention time will be expanded in order to "
-          "warp the peaks at the range limit",
+        // MetaMatch parameters.
+        {"-radius_mz",
+         {"The maximum distance in mz that can be used for clustering", true}},
+        {"-radius_rt",
+         {"The maximum distance in rt that can be used for clustering", true}},
+        {"-fraction",
+         {"The percentage of samples that must contain non zero values to "
+          "consider a cluster valid [0.0,1.0]",
           true}},
         // Command parameters.
         {"-out_dir", {"The output directory", true}},
         {"-help", {"Display available options", false}},
         {"-config", {"Specify the configuration file", true}},
-        {"-csvdump",
-         {"Dump the warped peaks as a `csv` file in addition to `.bpks`",
-          false}},
-        {"-parallel", {"Enable parallel processing", false}},
-        {"-n_threads",
-         {"Specify the maximum number of threads that will be used for the "
-          "calculations",
-          true}},
     };
 
     if (argc == 1) {
@@ -301,82 +306,50 @@ int main(int argc, char *argv[]) {
     }
 
     // Parse the options to build the Grid::Parameters struct.
-    Warp2D::Parameters parameters = {};
+    MetaMatch::Parameters parameters = {};
 
-    // Get the Warp2D parameters.
-    if (options.find("-slack") == options.end()) {
-        std::cout << "Slack (slack) not specified" << std::endl;
+    // Get the MetaMatch parameters.
+    if (options.find("-radius_mz") == options.end()) {
+        std::cout << "Radius mz (radius_mz) not specified" << std::endl;
         return -1;
     }
-    auto slack = options["-slack"];
-    if (!is_unsigned_int(slack)) {
-        std::cout << "error: slack has to be a positive integer" << std::endl;
+    auto radius_mz = options["-radius_mz"];
+    if (!is_number(radius_mz)) {
+        std::cout << "error: radius_mz has to be a number" << std::endl;
         print_usage();
         return -1;
     }
-    parameters.slack = std::stoi(slack);
 
-    if (options.find("-window_size") == options.end()) {
-        std::cout << "Window size (window_size) not specified" << std::endl;
+    parameters.radius_mz = std::stod(radius_mz);
+    if (options.find("-radius_rt") == options.end()) {
+        std::cout << "Radius rt (radius_rt) not specified" << std::endl;
         return -1;
     }
-    auto window_size = options["-window_size"];
-    if (!is_unsigned_int(window_size)) {
-        std::cout << "error: window_size has to be a positive integer"
+    auto radius_rt = options["-radius_rt"];
+    if (!is_number(radius_rt)) {
+        std::cout << "error: radius_rt has to be a number" << std::endl;
+        print_usage();
+        return -1;
+    }
+    parameters.radius_rt = std::stod(radius_rt);
+
+    if (options.find("-fraction") == options.end()) {
+        std::cout << "Radius rt (fraction) not specified" << std::endl;
+        return -1;
+    }
+    auto fraction = options["-fraction"];
+    if (!is_number(fraction)) {
+        std::cout << "error: fraction has to be a number" << std::endl;
+        print_usage();
+        return -1;
+    }
+    double required_fraction = std::stod(fraction);
+    if (required_fraction < 0 || required_fraction > 1) {
+        std::cout << "error: fraction has to be a number between 0 and 1"
                   << std::endl;
         print_usage();
         return -1;
     }
-    parameters.window_size = std::stoi(window_size);
-
-    if (options.find("-num_points") == options.end()) {
-        std::cout << "Number of rt points (num_points) not specified"
-                  << std::endl;
-        return -1;
-    }
-    auto num_points = options["-num_points"];
-    if (!is_unsigned_int(num_points)) {
-        std::cout << "error: num_points has to be a positive integer"
-                  << std::endl;
-        print_usage();
-        return -1;
-    }
-    parameters.num_points = std::stoi(num_points);
-
-    if (options.find("-rt_expand_factor") == options.end()) {
-        options["-rt_expand_factor"] = "0.2";  // Default value.
-    }
-    auto rt_expand_factor = options["-rt_expand_factor"];
-    if (!is_number(rt_expand_factor)) {
-        std::cout << "error: "
-                  << "rt_expand_factor"
-                  << " has to be a number" << std::endl;
-        print_usage();
-        return -1;
-    }
-    parameters.rt_expand_factor = std::stoi(rt_expand_factor);
-
-    if (options.find("-peaks_per_window") == options.end()) {
-        std::cout
-            << "Number of peaks per window (peaks_per_window) not specified"
-            << std::endl;
-        return -1;
-    }
-    auto peaks_per_window = options["-peaks_per_window"];
-    if (!is_unsigned_int(peaks_per_window)) {
-        std::cout << "error: peaks_per_window has to be a positive integer"
-                  << std::endl;
-        print_usage();
-        return -1;
-    }
-    parameters.peaks_per_window = std::stoi(peaks_per_window);
-
-    if (options.find("-reference_file") == options.end()) {
-        std::cout << "Reference file (reference_file) not specified"
-                  << std::endl;
-        return -1;
-    }
-    auto reference_file = options["-reference_file"];
 
     // Set up the output directory and check if it exists.
     if (options.find("-out_dir") == options.end()) {
@@ -389,113 +362,136 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    // Set up maximum concurrency.
-    uint64_t max_threads = std::thread::hardware_concurrency();
-    if (!max_threads) {
-        std::cout << "error: this system does not support parallel processing"
-                  << std::endl;
-        return -1;
-    }
-    if ((options.find("-n_threads") != options.end()) &&
-        ((options.find("-parallel") != options.end()) &&
-         (options["-parallel"] == "true" || options["-parallel"].empty()))) {
-        auto n_threads = options["-n_threads"];
-        if (!is_unsigned_int(n_threads)) {
-            std::cout << "error: n_threads has to be a positive integer"
-                      << std::endl;
-            print_usage();
-            return -1;
+    // Extract unique classes from the file list. We expect the file format
+    // of:
+    //
+    //     file_name:class_name
+    //
+    // In case the class name is blank or only the file name is specified,
+    // we treat those files as belonging to the same class.
+    std::vector<std::pair<std::string, std::vector<std::string>>> classes;
+    for (const auto &file : files) {
+        auto pos = file.find(":");
+        std::string file_class = "";
+        if (pos != std::string::npos) {
+            file_class = file.substr(pos + 1);
         }
-        max_threads = std::stoi(n_threads);
+        std::string file_name = file.substr(0, pos);
+        bool found_class = false;
+        for (auto &[cls, file_names] : classes) {
+            if (cls == file_class) {
+                found_class = true;
+                file_names.push_back(file_name);
+                break;
+            }
+        }
+        if (!found_class) {
+            classes.push_back({file_class, {file_name}});
+        }
     }
 
-    // Read the reference file peaks.
-    std::cout << "Reading reference peaks from file: " << reference_file
-              << std::endl;
-    std::vector<Centroid::Peak> reference_peaks;
-    Grid::Parameters reference_grid_params;
+    // Buid a class map with the necessary information for the required
+    // number of files hit per class.
+    parameters.class_maps = std::vector<MetaMatch::ClassMap>(classes.size());
+    std::vector<MetaMatch::Peak> metapeaks;
+    size_t file_id = 0;
+    size_t class_id = 0;
+    for (const auto &[cls, file_names] : classes) {
+        // Prepare the ClassMap for this class.
+        size_t n_files = file_names.size();
+        size_t required_hits = 0;
+        if (required_fraction != 0) {
+            required_hits = n_files * required_fraction;
+        }
+        parameters.class_maps[class_id] = {class_id, n_files, required_hits};
+
+        for (const auto &file : file_names) {
+            // Read the peaks into memory.
+            std::filesystem::path input_file = file;
+            std::cout << "Reading file: " << input_file << std::endl;
+            std::ifstream peaks_stream;
+            peaks_stream.open(input_file);
+
+            // Check if the file has the appropriate format.
+            std::string extension = input_file.extension();
+            std::string lowercase_extension = extension;
+            for (auto &ch : lowercase_extension) {
+                ch = std::tolower(ch);
+            }
+
+            // Read peaks from this file into the MetaPeaks array.
+            std::vector<Centroid::Peak> peaks;
+            Grid::Parameters grid_params;
+            if (lowercase_extension == ".bpks") {
+                std::cout << "Reading peaks from file: " << input_file
+                          << std::endl;
+                if (!Centroid::Files::Bpks::read_peaks(peaks_stream,
+                                                       &grid_params, &peaks)) {
+                    std::cout << "error: couldn't read peaks from the file list"
+                              << std::endl;
+                    return -1;
+                }
+            } else if (lowercase_extension == ".csv") {
+                if (!Centroid::Files::Csv::read_peaks(peaks_stream, &peaks)) {
+                    std::cout << "error: couldn't read peaks from the file list"
+                              << std::endl;
+                    return -1;
+                }
+            } else {
+                std::cout << "error: unknown file format for file "
+                          << input_file << std::endl;
+                print_usage();
+                return -1;
+            }
+            for (const auto &peak : peaks) {
+                metapeaks.push_back(
+                    {peak, file_id, class_id, -1, peak.mz, peak.rt});
+            }
+            ++file_id;
+        }
+        ++class_id;
+    }
+
+    std::cout << "Finding candidates..." << std::endl;
+    MetaMatch::find_clusters(metapeaks, parameters);
+
+    std::cout << "Extracting orphans..." << std::endl;
+    auto orphans = MetaMatch::extract_orphans(metapeaks);
+
+    std::cout << "Building cluster table..." << std::endl;
+    auto clusters = MetaMatch::reduce_cluster(metapeaks, files.size());
+
+    if (!orphans.empty()) {
+        std::cout << "Writing orphans to disk..." << std::endl;
+        {
+            // Prepare the name of the output file.
+            std::filesystem::path output_file_name = "metapeaks.orph";
+            auto outfile_name = options["-out_dir"] / output_file_name;
+            std::ofstream outfile_stream;
+            outfile_stream.open(outfile_name, std::ios::out | std::ios::binary);
+            if (!outfile_stream) {
+                std::cout << "error: could not open file " << outfile_name
+                          << " for writing" << std::endl;
+                return -1;
+            }
+            if (!MetaMatch::Files::Csv::write_peaks(outfile_stream, orphans)) {
+                std::cout << "error: the orphans could not be saved properly"
+                          << std::endl;
+                return -1;
+            }
+        }
+    }
+
+    if (clusters.empty()) {
+        std::cout << "Warning: No clusters found" << std::endl;
+        return 1;
+    }
+
+    std::cout << "Writing clusters to disk..." << std::endl;
     {
-        std::ifstream stream;
-        stream.open(reference_file);
-        if (!stream) {
-            std::cout << "error: could not open reference file "
-                      << reference_file << std::endl;
-            return -1;
-        }
-        std::filesystem::path input_file = reference_file;
-        // Check if the file has the appropriate format.
-        std::string extension = input_file.extension();
-        std::string lowercase_extension = extension;
-        for (auto &ch : lowercase_extension) {
-            ch = std::tolower(ch);
-        }
-
-        if (lowercase_extension == ".bpks") {
-            // Read into peak array.
-            if (!Centroid::Files::Bpks::read_peaks(
-                    stream, &reference_grid_params, &reference_peaks)) {
-                std::cout
-                    << "error: couldn't read peaks from the reference file"
-                    << std::endl;
-                return -1;
-            }
-        } else if (lowercase_extension == ".csv") {
-            // TODO: read into peak array.
-            // Centroid::Files::Csv::read_peaks(stream, &grid_params,
-            // &peaks[0]);
-        } else {
-            std::cout << "error: unknown file format for file " << input_file
-                      << std::endl;
-            print_usage();
-            return -1;
-        }
-    }
-
-    // Execute the program here.
-    for (const auto &file_name : files) {
-        std::filesystem::path input_file = file_name;
-
-        // Open input file.
-        std::ifstream stream;
-        stream.open(input_file);
-        if (!stream) {
-            std::cout << "error: could not open input file " << input_file
-                      << std::endl;
-            return -1;
-        }
-
-        // Check if the file has the appropriate format.
-        std::string extension = input_file.extension();
-        std::string lowercase_extension = extension;
-        for (auto &ch : lowercase_extension) {
-            ch = std::tolower(ch);
-        }
-
-        std::vector<Centroid::Peak> peaks;
-        Grid::Parameters grid_params;
-        if (lowercase_extension == ".bpks") {
-            // Read into peak array.
-            std::cout << "Reading peaks from file: " << input_file << std::endl;
-            if (!Centroid::Files::Bpks::read_peaks(stream, &grid_params,
-                                                   &peaks)) {
-                std::cout
-                    << "error: couldn't read peaks from the reference file"
-                    << std::endl;
-                return -1;
-            }
-        } else if (lowercase_extension == ".csv") {
-            // TODO: read into peak array.
-            // Centroid::Files::Csv::read_peaks(stream, &grid_params,
-            // &peaks[0]);
-        } else {
-            std::cout << "error: unknown file format for file " << input_file
-                      << std::endl;
-            print_usage();
-            return -1;
-        }
-
         // Prepare the name of the output file.
-        auto outfile_name = options["-out_dir"] / input_file.filename();
+        std::filesystem::path output_file_name = "metapeaks.mpks";
+        auto outfile_name = options["-out_dir"] / output_file_name;
         std::ofstream outfile_stream;
         outfile_stream.open(outfile_name, std::ios::out | std::ios::binary);
         if (!outfile_stream) {
@@ -503,51 +499,31 @@ int main(int argc, char *argv[]) {
                       << " for writing" << std::endl;
             return -1;
         }
-        // Perform warping.
-        std::cout << "Performing warping..." << std::endl;
-        std::vector<Centroid::Peak> warped_peaks;
-        if ((options.find("-parallel") != options.end()) &&
-            (options["-parallel"] == "true" || options["-parallel"].empty())) {
-            warped_peaks = Warp2D::Runners::Parallel::run(
-                reference_peaks, peaks, parameters, max_threads);
-        } else {
-            warped_peaks = Warp2D::Runners::Serial::run(reference_peaks, peaks,
-                                                        parameters);
-        }
-
-        std::cout << "Saving peaks to disk in bpks..." << std::endl;
-        if (!Centroid::Files::Bpks::write_peaks(outfile_stream, grid_params,
-                                                warped_peaks)) {
-            std::cout << "error: couldn't write warped peaks into file "
-                      << outfile_name << std::endl;
+        if (!MetaMatch::Files::Csv::write_clusters(outfile_stream, clusters,
+                                                   files.size())) {
+            std::cout << "error: the clusters could not be saved properly"
+                      << std::endl;
             return -1;
         }
+    }
 
-        if (options.find("-csvdump") != options.end() &&
-            (options["-csvdump"] == "true" || options["-csvdump"].empty())) {
-            std::cout << "Saving peaks to disk in csv..." << std::endl;
-            auto csv_outfile_name =
-                options["-out_dir"] /
-                input_file.filename().replace_extension(".csv");
-            std::ofstream csv_outfile_stream;
-            csv_outfile_stream.open(csv_outfile_name,
-                                    std::ios::out | std::ios::binary);
-            std::cout << "Sorting peaks by height (centroid)..." << std::endl;
-            auto sort_peaks = [](const Centroid::Peak &p1,
-                                 const Centroid::Peak &p2) -> bool {
-                return (p1.height_centroid > p2.height_centroid) ||
-                       ((p1.height_centroid == p2.height_centroid) &&
-                        (p1.total_intensity_centroid >
-                         p2.total_intensity_centroid));
-            };
-            std::stable_sort(warped_peaks.begin(), warped_peaks.end(),
-                             sort_peaks);
-            if (!Centroid::Files::Csv::write_peaks(csv_outfile_stream,
-                                                   warped_peaks)) {
-                std::cout << "error: couldn't write warped peaks into file "
-                          << csv_outfile_name << std::endl;
-                return -1;
-            }
+    std::cout << "Writing cluster peaks to disk..." << std::endl;
+    {
+        // Prepare the name of the output file.
+        std::filesystem::path output_file_name = "metapeaks.pid";
+        auto outfile_name = options["-out_dir"] / output_file_name;
+        std::ofstream outfile_stream;
+        outfile_stream.open(outfile_name, std::ios::out | std::ios::binary);
+        if (!outfile_stream) {
+            std::cout << "error: could not open file " << outfile_name
+                      << " for writing" << std::endl;
+            return -1;
+        }
+        if (!MetaMatch::Files::Csv::write_peaks(outfile_stream, metapeaks,
+                                                true)) {
+            std::cout << "error: the metapeaks could not be saved properly"
+                      << std::endl;
+            return -1;
         }
     }
 

@@ -230,6 +230,8 @@ TEST_CASE("Read/Write found peaks to stream") {
             CHECK(peaks[i].j == read_peaks[i].j);
             CHECK(round_double(peaks[i].mz) == round_double(read_peaks[i].mz));
             CHECK(round_double(peaks[i].rt) == round_double(read_peaks[i].rt));
+            CHECK(round_double(peaks[i].height) ==
+                  round_double(read_peaks[i].height));
             CHECK(round_double(peaks[i].total_intensity) ==
                   round_double(read_peaks[i].total_intensity));
             CHECK(round_double(peaks[i].sigma_mz) ==
@@ -265,25 +267,37 @@ TEST_CASE("Read/Write found peaks to stream") {
         }
     }
     SUBCASE("Writing to CSV") {
-        std::vector<std::string> expected_lines = {
-            {"N X Y Height Volume VCentroid XSigma YSigma Count LocalBkgnd "
-             "SNVolume SNHeight SNCentroid"},
-            {"0 20 60 8.76881 175.126 160.357 4.80706 8.85391 50 0.814667 "
-             "214.967 21.9392 196.838"},
-            {"1 50 60 8.51286 132.078 122.656 4.80706 6.82431 40 0.749546 "
-             "176.21 20.6268 163.641"},
-            {"2 80 60 6.90168 88.9893 83.5048 4.80706 5.53369 35 0.542793 "
-             "163.947 22.9877 153.843"},
-            {"3 10 10 2.28256 24.6757 22.0599 4.80706 4.80706 25 0.317821 "
-             "77.6403 12.5857 69.4097"}};
-
+        std::vector<Centroid::Peak> read_peaks;
         std::string line;
         std::stringstream stream;
         CHECK(Centroid::Files::Csv::write_peaks(stream, peaks));
-        size_t i = 0;
-        while (std::getline(stream, line)) {
-            CHECK(line == expected_lines[i]);
-            ++i;
+        CHECK(Centroid::Files::Csv::read_peaks(stream, &read_peaks));
+        CHECK(peaks.size() == read_peaks.size());
+        for (size_t i = 0; i < peaks.size(); ++i) {
+            // NOTE: In the current format there is no Peak.i, Peak.j on the CSV
+            // file. Furthermore, mz and mz_centroid, rt and rt_centroid and
+            // height and height_centroid are treated as the same quantity
+            // respectively.
+            CHECK(round_double(peaks[i].mz) == round_double(read_peaks[i].mz));
+            CHECK(round_double(peaks[i].rt) == round_double(read_peaks[i].rt));
+            CHECK(round_double(peaks[i].height_centroid) ==
+                  round_double(read_peaks[i].height));
+            CHECK(round_double(peaks[i].total_intensity) ==
+                  round_double(read_peaks[i].total_intensity));
+            CHECK(round_double(peaks[i].sigma_mz) ==
+                  round_double(read_peaks[i].sigma_mz));
+            CHECK(round_double(peaks[i].sigma_rt) ==
+                  round_double(read_peaks[i].sigma_rt));
+            CHECK(round_double(peaks[i].mz) ==
+                  round_double(read_peaks[i].mz_centroid));
+            CHECK(round_double(peaks[i].rt) ==
+                  round_double(read_peaks[i].rt_centroid));
+            CHECK(round_double(peaks[i].height_centroid) ==
+                  round_double(read_peaks[i].height_centroid));
+            CHECK(round_double(peaks[i].total_intensity_centroid) ==
+                  round_double(read_peaks[i].total_intensity_centroid));
+            CHECK(round_double(peaks[i].border_background) ==
+                  round_double(read_peaks[i].border_background));
         }
     }
 }
