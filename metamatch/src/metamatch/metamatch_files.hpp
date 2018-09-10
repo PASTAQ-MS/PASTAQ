@@ -12,7 +12,7 @@ bool write_clusters(std::ostream& stream,
 // Write the peaks to the given stream.
 bool write_peaks(std::ostream& stream,
                  const std::vector<MetaMatch::Peak>& peaks,
-                 bool include_mpid=false);
+                 bool include_mpid = false);
 }  // namespace MetaMatch::Files::Csv
 
 #endif /* METAMATCH_METAMATCHFILES_HPP */
