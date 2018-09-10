@@ -465,7 +465,7 @@ int main(int argc, char *argv[]) {
         std::cout << "Writing orphans to disk..." << std::endl;
         {
             // Prepare the name of the output file.
-            std::filesystem::path output_file_name = "orphans.csv";
+            std::filesystem::path output_file_name = "metapeaks.orph";
             auto outfile_name = options["-out_dir"] / output_file_name;
             std::ofstream outfile_stream;
             outfile_stream.open(outfile_name, std::ios::out | std::ios::binary);
@@ -474,8 +474,7 @@ int main(int argc, char *argv[]) {
                           << " for writing" << std::endl;
                 return -1;
             }
-            if (!MetaMatch::Files::Csv::write_peaks(outfile_stream,
-                                                    metapeaks)) {
+            if (!MetaMatch::Files::Csv::write_peaks(outfile_stream, orphans)) {
                 std::cout << "error: the orphans could not be saved properly"
                           << std::endl;
                 return -1;
@@ -491,7 +490,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Writing clusters to disk..." << std::endl;
     {
         // Prepare the name of the output file.
-        std::filesystem::path output_file_name = "metapeaks.csv";
+        std::filesystem::path output_file_name = "metapeaks.mpks";
         auto outfile_name = options["-out_dir"] / output_file_name;
         std::ofstream outfile_stream;
         outfile_stream.open(outfile_name, std::ios::out | std::ios::binary);
@@ -503,6 +502,26 @@ int main(int argc, char *argv[]) {
         if (!MetaMatch::Files::Csv::write_clusters(outfile_stream, clusters,
                                                    files.size())) {
             std::cout << "error: the clusters could not be saved properly"
+                      << std::endl;
+            return -1;
+        }
+    }
+
+    std::cout << "Writing cluster peaks to disk..." << std::endl;
+    {
+        // Prepare the name of the output file.
+        std::filesystem::path output_file_name = "metapeaks.pid";
+        auto outfile_name = options["-out_dir"] / output_file_name;
+        std::ofstream outfile_stream;
+        outfile_stream.open(outfile_name, std::ios::out | std::ios::binary);
+        if (!outfile_stream) {
+            std::cout << "error: could not open file " << outfile_name
+                      << " for writing" << std::endl;
+            return -1;
+        }
+        if (!MetaMatch::Files::Csv::write_peaks(outfile_stream, metapeaks,
+                                                true)) {
+            std::cout << "error: the metapeaks could not be saved properly"
                       << std::endl;
             return -1;
         }

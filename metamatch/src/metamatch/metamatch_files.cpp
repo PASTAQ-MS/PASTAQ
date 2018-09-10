@@ -47,7 +47,8 @@ bool MetaMatch::Files::Csv::write_clusters(
 }
 
 bool MetaMatch::Files::Csv::write_peaks(
-    std::ostream& stream, const std::vector<MetaMatch::Peak>& peaks) {
+    std::ostream& stream, const std::vector<MetaMatch::Peak>& peaks,
+    bool include_mpid) {
     char cell_delimiter = ' ';
     char line_delimiter = '\n';
 
@@ -58,6 +59,9 @@ bool MetaMatch::Files::Csv::write_peaks(
         "N",         "X",        "Y",          "Height",  "Volume",
         "VCentroid", "XSigma",   "YSigma",     "Count",   "LocalBkgnd",
         "SNVolume",  "SNHeight", "SNCentroid", "file_id", "class_id"};
+    if (include_mpid) {
+        header_columns.push_back("mpid");
+    }
     for (size_t i = 0; i < header_columns.size(); ++i) {
         stream << header_columns[i];
         if (i == header_columns.size() - 1) {
@@ -115,6 +119,10 @@ bool MetaMatch::Files::Csv::write_peaks(
                << cell_delimiter
                // class_id
                << peak.class_id;
+        if (include_mpid) {
+            // mpid
+            stream << cell_delimiter << peak.cluster_id;
+        }
         if (i != peaks.size() - 1) {
             stream << line_delimiter;
         }
