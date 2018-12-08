@@ -1,3 +1,6 @@
 [submodule "ext/doctest"]
 	path = ext/doctest
 	url = https://github.com/onqtam/doctest
+[submodule "ext/pybind11"]
+	path = ext/pybind11
+	url = https://github.com/pybind/pybind11
