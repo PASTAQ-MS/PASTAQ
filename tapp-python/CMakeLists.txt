@@ -21,14 +21,14 @@ find_package(Threads REQUIRED)
 #add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../utils" ${CMAKE_CURRENT_BINARY_DIR}/utils)
 
 ## Add grid dependency
-#add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../grid" ${CMAKE_CURRENT_BINARY_DIR}/grid)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../grid" ${CMAKE_CURRENT_BINARY_DIR}/grid)
 
 ## Add centroid dependency
 #add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../centroid" ${CMAKE_CURRENT_BINARY_DIR}/centroid)
 
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ext/pybind11" ${CMAKE_CURRENT_BINARY_DIR}/pybind11)
 pybind11_add_module(example src/example.cpp)
-#target_include_directories(example PUBLIC pybind11/include)
+target_link_libraries(example PRIVATE gridlib)
 
 ## Include library target.
 #if (NOT TARGET metamatchlib)
