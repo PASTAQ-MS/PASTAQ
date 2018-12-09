@@ -52,9 +52,9 @@ RawData raw_data(
     };
 }
 
-PYBIND11_MODULE(example, m) {
+PYBIND11_MODULE(tapp, m) {
     // Documentation.
-    m.doc() = "pybind11 example plugin";
+    m.doc() = "tapp documentation";
 
     // Structs.
     py::class_<Grid::Point>(m, "RawPoint")
