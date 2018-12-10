@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "grid/grid.hpp"
+#include "grid/grid_files.hpp"
 #include "grid/xml_reader.hpp"
 #include "pybind11/numpy.h"
 #include "pybind11/pybind11.h"
@@ -30,7 +31,7 @@ struct RawData {
                               const Grid::Point &p2) -> bool {
             return (p1.rt < p2.rt);
         };
-        std::stable_sort(points.begin(), points.end(), sort_points);
+        std::sort(points.begin(), points.end(), sort_points);
 
         // Find the tic.
         Chromatogram tic = {};
@@ -47,8 +48,55 @@ struct RawData {
         }
         return tic;
     }
+
+    // TODO(alex): Save RawData object to binary format rawdump.
+    void dump(std::string file_name) {
+        // Open file stream.
+        std::filesystem::path output_file = file_name;
+        std::ofstream stream;
+        stream.open(output_file);
+        if (!stream) {
+            std::ostringstream error_stream;
+            error_stream << "error: couldn't open output file" << output_file;
+            throw std::invalid_argument(error_stream.str());
+        }
+
+        if (!Grid::Files::Rawdump::write(stream, data)) {
+            std::ostringstream error_stream;
+            error_stream << "error: couldn't write file succesfully"
+                         << output_file;
+            throw std::invalid_argument(error_stream.str());
+        }
+    }
+    void load(std::string file_name) {
+        // Open file stream.
+        std::filesystem::path input_file = file_name;
+        std::ifstream stream;
+        stream.open(input_file);
+        if (!stream) {
+            std::ostringstream error_stream;
+            error_stream << "error: couldn't open input file" << input_file;
+            throw std::invalid_argument(error_stream.str());
+        }
+
+        // TODO(alex): load object from binary format rawdump
+        if (!Grid::Files::Rawdump::read(stream, data)) {
+            data = {};
+        }
+
+        this->file_name = file_name;
+    }
 };
 
+// IMPORTANT: This is awful design...
+RawData raw_data_load_dump(std::string file_name) {
+    // TODO(alex): Check for proper file extension.
+    RawData raw_data = {};
+    raw_data.load(file_name);
+    return raw_data;
+}
+
+// TODO(alex): Should this be encapsulated in a RawData or raw_data namespace?
 RawData raw_data(std::string file_name, double min_mz, double max_mz,
                  double min_rt, double max_rt) {
     // Setup infinite range if no point was specified.
@@ -71,14 +119,9 @@ RawData raw_data(std::string file_name, double min_mz, double max_mz,
         throw std::invalid_argument(error_stream.str());
     }
 
-    std::filesystem::path input_file = file_name;
+    // TODO(alex): Check for proper file extension.
 
-    // Check if the file exist.
-    if (!std::filesystem::exists(input_file)) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't find the file " << input_file;
-        throw std::invalid_argument(error_stream.str());
-    }
+    std::filesystem::path input_file = file_name;
 
     // Open file stream.
     std::ifstream stream;
@@ -129,6 +172,8 @@ PYBIND11_MODULE(tapp, m) {
     py::class_<RawData>(m, "RawData", py::buffer_protocol())
         .def_readonly("data", &RawData::data)
         .def("tic", &RawData::tic)
+        .def("dump", &RawData::dump)
+        .def("load", &RawData::load)
         .def_buffer([](RawData &m) -> py::buffer_info {
             return py::buffer_info(
                 // Pointer to buffer.
@@ -155,6 +200,8 @@ PYBIND11_MODULE(tapp, m) {
           py::arg("file_name"), py::arg("min_mz") = -1.0,
           py::arg("max_mz") = -1.0, py::arg("min_rt") = -1.0,
           py::arg("max_rt") = -1.0);
+    m.def("raw_data_load_dump", &raw_data_load_dump,
+          "Read raw data from the given rawdump file", py::arg("file_name"));
     m.def("dummy_test",
           []() {
               return RawData{{{1, 1.0, 1}, {1, 1.0, 1}, {1, 2.0, 2}},
