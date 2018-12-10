@@ -7,6 +7,8 @@
 // Read the next mz1 scan from the stream.
 std::optional<std::vector<Grid::Point>> XmlReader::read_next_scan(
     std::istream &stream, const Grid::Parameters &parameters) {
+    // TODO(alex): This function does not need Grid::Parameters, only the
+    // Grid::Bounds.
     while (stream.good()) {
         auto tag = XmlReader::read_tag(stream);
         if (!tag) {

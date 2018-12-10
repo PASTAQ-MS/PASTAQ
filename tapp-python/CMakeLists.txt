@@ -6,6 +6,7 @@ cmake_minimum_required(VERSION 3.1)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Set up compiler options based on platform.
 if (CMAKE_COMPILER_IS_GNUCXX)
@@ -28,7 +29,7 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../grid" ${CMAKE_CURRENT_BINARY_DI
 
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ext/pybind11" ${CMAKE_CURRENT_BINARY_DIR}/pybind11)
 pybind11_add_module(tapp src/tapp-python.cpp)
-target_link_libraries(tapp PRIVATE gridlib)
+target_link_libraries(tapp PRIVATE gridlib stdc++ stdc++fs)
 
 ## Include library target.
 #if (NOT TARGET metamatchlib)
