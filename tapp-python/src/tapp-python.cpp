@@ -155,18 +155,18 @@ struct RawData {
     }
 };
 
-std::vector<double> splat_points(
-    std::vector<Grid::Point> points,
-    double min_mz,
-    double max_mz,
-    double min_rt,
-    double max_mz,
-    double delta_rt,
-    double delta_mz,
-    std::tuple<double, double> sigma_mz,
-    double sigma_rt
-    ) {
-}
+//std::vector<double> splat_points(
+    //std::vector<Grid::Point> points,
+    //double min_mz,
+    //double max_mz,
+    //double min_rt,
+    //double max_mz,
+    //double delta_rt,
+    //double delta_mz,
+    //std::tuple<double, double> sigma_mz,
+    //double sigma_rt
+    //) {
+//}
 
 // IMPORTANT: This is awful design...
 RawData raw_data_load_dump(std::string file_name) {
