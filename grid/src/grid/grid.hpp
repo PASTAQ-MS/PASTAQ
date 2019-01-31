@@ -6,7 +6,7 @@
 
 namespace Instrument {
 
-enum Type : unsigned char { QUAD, TOF, FTICR, ORBITRAP };
+enum Type : unsigned char { QUAD, TOF, FTICR, ORBITRAP, UNKNOWN };
 
 }  // namespace Instrument
 
