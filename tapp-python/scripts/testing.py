@@ -11,9 +11,15 @@ plt.ion()
 plt.show()
 try:
     fig
+    fig_2
+    fig_3
 except NameError:
     fig = plt.figure()
     fig.set_size_inches(18.5, 10.5, forward=True)
+    fig_2 = plt.figure()
+    fig_2.set_size_inches(18.5, 10.5, forward=True)
+    fig_3 = plt.figure()
+    fig_3.set_size_inches(18.5, 10.5, forward=True)
 try:
     ax
 except NameError:
@@ -22,8 +28,15 @@ except NameError:
 # raw_data = tapp.raw_data_load_dump("150210_11_01.rawdump")
 # tic = raw_data.tic()
 
+# print("Loading raw data")
 # # raw_data = tapp.raw_data("/data/Spike-In QEx UKE/HD5YD15ED_DDA_R1.mzXML", 799.036, 809.107, 2768.83, 3171.63)
 # raw_data_big = tapp.raw_data("/data/Spike-In QEx UKE/HD5YD15ED_DDA_R1.mzXML", 0, 2000, 1000, 5000)
+# raw_data_big_df = pd.DataFrame(
+    # {
+        # "mz": raw_data_big.mz(),
+        # "rt": raw_data_big.rt(),
+        # "intensity": raw_data_big.intensity()
+    # })
 # # raw_data_tof_small = tapp.raw_data("/data/180724_TripleTOF_Test_Data/Christoph_Krisp_Marcel_Kwiatkowski/171214_DDA/mzXML/HD+5YD+15ED_DDA.mzXML", 762, 774, 3038, 3210)
 # # raw_data.dump("HD5YD15ED_DDA_R1_small.rawdata")
 # # raw_data_big.dump("HD5YD15ED_DDA_R1_big.rawdata")
@@ -37,12 +50,6 @@ except NameError:
         # "mz": raw_data.mz(),
         # "rt": raw_data.rt(),
         # "intensity": raw_data.intensity()
-    # })
-# raw_data_big_df = pd.DataFrame(
-    # {
-        # "mz": raw_data_big.mz(),
-        # "rt": raw_data_big.rt(),
-        # "intensity": raw_data_big.intensity()
     # })
 # raw_data_tof_small_df = pd.DataFrame(
     # {
@@ -755,6 +762,15 @@ def plot_grid(
         "rt_plot": rt_plot,
     })
 
+# # NOTE: Exploratory region.
+# grid = resample(
+    # raw_data_big_df,
+    # delta_mz=0.002445,
+    # delta_rt=2.9/3,
+    # sigma_mz=(0.0025/4, 200),
+    # sigma_rt=3,
+    # method='tapp_smoothing'
+    # )
 # grid = resample(
     # raw_data_big_df[
         # (raw_data_big_df['mz'] > 801)
@@ -768,7 +784,10 @@ def plot_grid(
     # method='tapp_smoothing'
     # )
 
-# print("Finding peaks.")
+print("Finding peaks.")
+peaks = pd.read_csv("~/Projects/tapp-testbed/feature_finder_exploration/tapp_out_glvista/centroid/HD5YD15ED_DDA_R1.csv", sep=" ")
+peaks = peaks[['X', 'Y', 'Height', 'Volume', 'XSigma', 'YSigma', 'LocalBkgnd']]
+peaks.columns = ['mz', 'rt', 'height', 'total_intensity', 'sigma_mz', 'sigma_rt', 'border_background']
 # peaks = pd.DataFrame(tapp.find_peaks(
     # grid['grid'].shape[1],
     # grid['grid'].shape[0],
@@ -779,15 +798,13 @@ def plot_grid(
     # grid['grid'].flatten()))
 # peaks.columns = ['i', 'j', 'mz', 'rt', 'height', 'total_intensity', 'sigma_mz', 'sigma_rt', 'border_background']
 
-# # Find the sigma
-
-# print("Plotting.")
-grid_plot = plot_grid(
-    fig,
-    grid,
-    peaks,
-    transform='sqrt'
-    )
+# print("Plotting grid.")
+# grid_plot = plot_grid(
+    # fig,
+    # grid,
+    # peaks,
+    # transform='sqrt'
+    # )
 
 # grid_plot['grid_plot'].clear()
 # Plot the raw data for the first detected peak.
@@ -797,13 +814,9 @@ plt.clf()
 plt.figure(fig_3.number)
 plt.clf()
 fitted_peaks = []
-# for i in range(0, 100):
-# for i in [19]:
-# for i in range(0, 5):
-# for i in range(100, 105):
-for i in range(0, peaks.shape[0]):
-# for i in range(57, 58):
-# for i in range(85,86):
+# for i in range(0, peaks.shape[0]):
+for i in range(0, 20):
+    print("peak {0} out of {1}".format(i, peaks.shape[0]))
     selected_peak = peaks.iloc[i]
     theoretical_sigma_mz = sigma_at_mz(selected_peak['mz'], 0.0028/2.335, 200)
     theoretical_sigma_rt = 6
@@ -871,7 +884,7 @@ for i in range(0, peaks.shape[0]):
     if popt_2d[2] == 0 or popt_2d[4] == 0:
         continue
 
-    if popt_2d[2] > 5 * theoretical_sigma_mz or popt_2d[4] > 5 * theoretical_sigma_rt:
+    if popt_2d[2] > 3 * theoretical_sigma_mz or popt_2d[4] > 3 * theoretical_sigma_rt:
         continue
 
     # Save the fitted parameters.
@@ -899,7 +912,9 @@ for i in range(0, peaks.shape[0]):
     fitted_intensity_2d_mz = gaus(selected_range['mz'], popt_2d[0],popt_2d[1],popt_2d[2])
     norm_fitted_intensity_2d_mz = fitted_intensity_2d_mz/fitted_intensity_2d_mz.max()
     plt.figure(fig_2.number)
-    plt.plot(selected_range['mz'], norm_intensity, linestyle='-', color=color, alpha=0.5, label='norm_intensity')
+    markerline, stemlines, baseline = plt.stem(selected_range['mz'], norm_intensity, label='norm_intensity', markerfmt=' ')
+    plt.setp(baseline, color=color, alpha=0.5)
+    plt.setp(stemlines, color=color, alpha=0.5)
     plt.plot(selected_range['mz'], norm_fitted_intensity, linestyle=':', color=color, label='1d_fitting')
     # plt.scatter(selected_peak['mz'] - tolerance_mz, 0, color="blue")
     # plt.scatter(selected_peak['mz'] + tolerance_mz, 0, color="red")
@@ -908,6 +923,8 @@ for i in range(0, peaks.shape[0]):
     # lines = ax.get_lines()
     # legend = plt.legend([lines[i] for i in [0,3]], ["a"], loc=1)
     # axes.add_artist(legend)
+    plt.xlabel('m/z')
+    plt.ylabel('Normalized intensity')
 
     # RT fit plot.
     selected_range = selected_range.sort_values(['rt'])
@@ -917,18 +934,27 @@ for i in range(0, peaks.shape[0]):
     plt.plot(selected_range['rt'], norm_fitted_intensity_2d_rt, color=color, linestyle='--')
     tics = selected_range.groupby('rt').apply(lambda x: x['intensity'].sum())
     plt.plot(tics/tics.max(), label=str(i), linestyle='-', color=color, alpha=0.5)
+    plt.xlabel('retention time (s)')
+    plt.ylabel('Normalized intensity')
 
-    # Contour plot
-    x = grid['bins_mz']
-    y = grid['bins_rt']
-    x, y = np.meshgrid(x, y)
-    Z = gaus2d((x,y), *popt_2d) 
-    x = range(0, len(grid['bins_mz']))
-    y = range(0, len(grid['bins_rt']))
-    x, y = np.meshgrid(x, y)
-    grid_plot['grid_plot'].contour(x, y, Z, levels=[1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10], colors=[color], alpha=0.5)
-    grid_plot['grid_plot'].scatter(selected_peak['i'], selected_peak['j'], color=color, marker='x')
+    # # Contour plot
+    # x = grid['bins_mz']
+    # y = grid['bins_rt']
+    # x, y = np.meshgrid(x, y)
+    # Z = gaus2d((x,y), *popt_2d) 
+    # x = range(0, len(grid['bins_mz']))
+    # y = range(0, len(grid['bins_rt']))
+    # x, y = np.meshgrid(x, y)
+    # grid_plot['grid_plot'].contour(x, y, Z, levels=[1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10], colors=[color], alpha=0.5)
+    # grid_plot['grid_plot'].scatter(selected_peak['i'], selected_peak['j'], color=color, marker='x')
     # grid_plot['grid_plot'].scatter(popt_2d[1]/(np.array(grid['bins_mz']).max() - np.array(grid['bins_mz']).min()), popt_2d[3] - np.array(grid['bins_rt']).min(), color=color, marker='P')
     # print(np.abs(popt_2d[1] - selected_peak['mz']))
 
 fitted_peaks = pd.DataFrame(fitted_peaks)
+plt.figure(fig.number)
+plt.clf()
+# plt.scatter(fitted_peaks['fitted_mz'], fitted_peaks['fitted_sigma_mz'], color='crimson', alpha=0.6, s=4)
+plt.scatter(fitted_peaks['fitted_mz'], fitted_peaks['fitted_sigma_mz'] * 2.335, color='crimson', alpha=0.6, s=4)
+plt.title("HD5YD15ED_1 (Top 10000 peaks)")
+plt.xlabel("m/z")
+plt.ylabel("Fitted FWHM (m/z)")
