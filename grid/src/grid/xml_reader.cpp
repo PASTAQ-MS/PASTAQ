@@ -4,6 +4,45 @@
 #include "utils/base64.hpp"
 #include "xml_reader.hpp"
 
+namespace RawData {
+enum Polarity : unsigned char { POSITIVE, NEGATIVE };
+enum ActivationMethod : unsigned char { CID, HCD };
+
+struct PrecursorInformation {
+    // Index for the scan that caused the MSn event.
+    uint64_t scan_number;
+    // Detected charge for the precursor.
+    uint8_t charge;
+    // Mass to charge of the MSn event.
+    double mz;
+    // Intensity of the precursor event.
+    double intensity;
+    // The activation method for the fragmentation of the MSn event.
+    ActivationMethod activation_method;
+    // The total isolation window selected for fragmentation in m/z units.
+    double window_wideness;
+};
+
+struct Scan {
+    // Index for this scan.
+    uint64_t scan_number;
+    // Type of ms_level of this scan (i.e. MS1/MS2/MSn).
+    uint64_t ms_level;
+    // How many mz-intensity pairs are containd in this scan.
+    uint64_t num_points;
+    // Retention time in seconds of this scan;
+    double retention_time;
+    // mz-intensity vectors should have the same size (num_points).
+    std::vector<double> mz;
+    std::vector<double> intensity;
+    // The polarity of the ionization for this scan.
+    Polarity polarity;
+    // In case this is a MSn scan, the precursor information will be stored
+    // here.
+    std::unique_ptr<PrecursorInformation> precursor_information;
+};
+}  // namespace RawData
+
 // Read the next mz1 scan from the stream.
 std::optional<std::vector<Grid::Point>> XmlReader::read_next_scan(
     std::istream &stream, const Grid::Parameters &parameters) {
