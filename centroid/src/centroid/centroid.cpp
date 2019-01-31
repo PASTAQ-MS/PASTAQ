@@ -13,27 +13,28 @@ std::vector<Centroid::Point> Centroid::find_local_maxima(
         for (size_t i = 1; i < n_mz; ++i) {
             int index = i + j * n_mz;
 
-            // ---------------------------------------------------------
-            // | top_left_value    | top_value    | top_right_value    |
-            // ---------------------------------------------------------
-            // | left_value        | value        | right_value        |
-            // ---------------------------------------------------------
-            // | bottom_left_value | bottom_value | bottom_right_value |
-            // ---------------------------------------------------------
+            // NOTE(alex): The definition of a local maxima in a 2D space might
+            // have different interpretations. i.e. We can select the 8
+            // neighbours and the local maxima will be marked if all points are
+            // below the central value. Alternatively, only a number N of
+            // neighbours can be used, for example only the 4 cardinal
+            // directions from the value under study.
+            //
+            // ----------------------------------------------
+            // |              | top_value    |              |
+            // ----------------------------------------------
+            // | left_value   | value        | right_value  |
+            // ----------------------------------------------
+            // |              | bottom_value |              |
+            // ----------------------------------------------
             double value = data[index];
             double right_value = data[index + 1];
             double left_value = data[index - 1];
             double top_value = data[index - n_mz];
-            double top_right_value = data[index + 1 - n_mz];
-            double top_left_value = data[index - 1 - n_mz];
             double bottom_value = data[index + n_mz];
-            double bottom_right_value = data[index + 1 + n_mz];
-            double bottom_left_value = data[index - 1 + n_mz];
 
             if ((value != 0) && (value > left_value) && (value > right_value) &&
-                (value > top_value) && (value > top_right_value) &&
-                (value > top_left_value) && (value > bottom_value) &&
-                (value > bottom_left_value) && (value > bottom_right_value)) {
+                (value > top_value) && (value > bottom_value)) {
                 Centroid::Point point = {};
                 point.i = i;
                 point.j = j;
