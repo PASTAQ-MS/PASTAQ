@@ -262,4 +262,52 @@ TEST_CASE("Reading scans") {
             }
         }
     }
+
+    SUBCASE("TOPP View sliced mzXML export with full raw_data reader") {
+        auto stream = std::stringstream(mz_xml_data_02);
+        auto raw_data = XmlReader::read_mzxml(
+            stream, 500.0, 500.5, 0.0, 4000.0, Instrument::Type::ORBITRAP,
+            75000, 20000, 200, RawData::Polarity::BOTH);
+        CHECK(raw_data != std::nullopt);
+        if (raw_data) {
+            CHECK(raw_data.value().instrument_type ==
+                  Instrument::Type::ORBITRAP);
+            CHECK(raw_data.value().resolution_ms1 == 75000);
+            CHECK(raw_data.value().resolution_msn == 20000);
+            CHECK(raw_data.value().reference_mz == 200);
+            CHECK(round_double(raw_data.value().min_mz) ==
+                  round_double(500.301));
+            CHECK(round_double(raw_data.value().max_mz) ==
+                  round_double(500.322));
+            CHECK(raw_data.value().scans.size() == 1);
+            CHECK(raw_data.value().scans[0].scan_number == 21460);
+            CHECK(raw_data.value().scans[0].ms_level == 1);
+            CHECK(round_double(raw_data.value().scans[0].retention_time) ==
+                  round_double(3941.78));
+            CHECK(raw_data.value().scans[0].polarity ==
+                  RawData::Polarity::POSITIVE);
+            CHECK(raw_data.value().scans[0].precursor_information == nullptr);
+
+            bool correct_scan_size = raw_data.value().scans[0].num_points == 9;
+            CHECK(correct_scan_size);
+            if (correct_scan_size) {
+                std::vector<double> expected_mz = {
+                    500.301, 500.304, 500.306, 500.309, 500.312,
+                    500.314, 500.317, 500.32,  500.322,
+                };
+                std::vector<double> expected_intensity = {
+                    143243.484, 692585,     1557363.75, 2752631.75, 3999451.25,
+                    4334159.5,  3136448.25, 1772215.5,  520708.593,
+                };
+                for (size_t i = 0; i < raw_data.value().scans[0].num_points;
+                     ++i) {
+                    CHECK(round_double(raw_data.value().scans[0].mz[i]) ==
+                          round_double(expected_mz[i]));
+                    CHECK(
+                        round_double(raw_data.value().scans[0].intensity[i]) ==
+                        round_double(expected_intensity[i]));
+                }
+            }
+        }
+    }
 }

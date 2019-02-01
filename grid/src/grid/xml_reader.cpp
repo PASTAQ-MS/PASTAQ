@@ -4,72 +4,7 @@
 #include "utils/base64.hpp"
 #include "xml_reader.hpp"
 
-namespace RawData {
-enum Polarity : unsigned char { POSITIVE, NEGATIVE, BOTH };
-enum ActivationMethod : unsigned char { CID, HCD };
-
-struct PrecursorInformation {
-    // Index for the scan that caused the MSn event.
-    uint64_t scan_number;
-    // Detected charge for the precursor.
-    uint8_t charge;
-    // Mass to charge of the MSn event.
-    double mz;
-    // Intensity of the precursor event.
-    double intensity;
-    // The activation method for the fragmentation of the MSn event.
-    ActivationMethod activation_method;
-    // The total isolation window selected for fragmentation in m/z units.
-    double window_wideness;
-};
-
-struct Scan {
-    // Index for this scan.
-    uint64_t scan_number;
-    // Type of ms_level of this scan (i.e. MS1/MS2/MSn).
-    uint64_t ms_level;
-    // How many mz-intensity pairs are containd in this scan.
-    uint64_t num_points;
-    // Retention time in seconds of this scan;
-    double retention_time;
-    // mz-intensity vectors should have the same size (num_points).
-    std::vector<double> mz;
-    std::vector<double> intensity;
-    // The polarity of the ionization for this scan.
-    Polarity polarity;
-    // In case this is a MSn scan, the precursor information will be stored
-    // here.
-    PrecursorInformation *precursor_information;
-};
-
-struct RawData {
-    // The instrument type.
-    Instrument::Type instrument_type;
-    // Min/max mass to charge range (m/z).
-    double min_mz;
-    double max_mz;
-    // Min/max retention time range (seconds).
-    double min_rt;
-    double max_rt;
-    // Resolution of MS1/MSn at the reference m/z. In this case the resolution
-    // is defined as:
-    //
-    //     R = reference_mz/fwhm_at_reference_mz
-    //
-    double resolution_ms1;
-    double resolution_msn;
-    double reference_mz;
-
-    // TODO(alex): Add more metadata information here.
-
-    // Extracted scans.
-    std::vector<::RawData::Scan> scans;
-};
-}  // namespace RawData
-
-// TODO: Test this function and ensure the results are the same as
-// using the other reader.
-std::optional<RawData::RawData> read_mzxml(
+std::optional<RawData::RawData> XmlReader::read_mzxml(
     std::istream &stream, double min_mz, double max_mz, double min_rt,
     double max_rt, Instrument::Type instrument_type, double resolution_ms1,
     double resolution_msn, double reference_mz, RawData::Polarity polarity) {
@@ -91,6 +26,8 @@ std::optional<RawData::RawData> read_mzxml(
         }
         if (tag.value().name == "scan" && !tag.value().closed) {
             RawData::Scan scan;
+            scan.precursor_information = nullptr;
+
             auto scan_attributes = tag.value().attributes;
 
             // Find scan number.
@@ -108,7 +45,7 @@ std::optional<RawData::RawData> read_mzxml(
             } else if (scan_attributes["polarity"] == "-") {
                 scan.polarity = RawData::Polarity::NEGATIVE;
             }
-            if (scan.polarity != RawData::Polarity::BOTH &&
+            if (polarity != RawData::Polarity::BOTH &&
                 scan.polarity != polarity) {
                 return std::nullopt;
             }
@@ -237,6 +174,12 @@ std::optional<RawData::RawData> read_mzxml(
                 // the mz bounds or contain no value.
                 if (mz < min_mz || mz > max_mz || intensity == 0) {
                     continue;
+                }
+                if (mz < raw_data.min_mz) {
+                    raw_data.min_mz = mz;
+                }
+                if (mz > raw_data.max_mz) {
+                    raw_data.max_mz = mz;
                 }
 
                 // NOTE(alex): Not the most efficient way. It would be better to
