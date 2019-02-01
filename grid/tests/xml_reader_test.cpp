@@ -279,6 +279,10 @@ TEST_CASE("Reading scans") {
                   round_double(500.301));
             CHECK(round_double(raw_data.value().max_mz) ==
                   round_double(500.322));
+            CHECK(round_double(raw_data.value().min_rt) ==
+                  round_double(3941.78));
+            CHECK(round_double(raw_data.value().max_rt) ==
+                  round_double(3941.78));
             CHECK(raw_data.value().scans.size() == 1);
             CHECK(raw_data.value().scans[0].scan_number == 21460);
             CHECK(raw_data.value().scans[0].ms_level == 1);

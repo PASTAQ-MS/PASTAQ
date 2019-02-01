@@ -103,7 +103,13 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
             // Assuming linearity of the retention time on the mzXML file.
             // We stop searching for the scan, since we are out of bounds.
             if (retention_time > max_rt) {
-                return std::nullopt;
+                break;
+            }
+            if (retention_time < raw_data.min_rt) {
+                raw_data.min_rt = retention_time;
+            }
+            if (retention_time > raw_data.max_rt) {
+                raw_data.max_rt = retention_time;
             }
 
             // TODO(alex): Extract the PrecursorInformation in case it is a MSn
