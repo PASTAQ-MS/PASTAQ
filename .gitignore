@@ -1,2 +1,5 @@
 build
 .dummy.cpp
+__pycache__
+*.so
+*.egg-info*

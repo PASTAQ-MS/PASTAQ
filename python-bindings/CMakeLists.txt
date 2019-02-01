@@ -28,7 +28,7 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../grid" ${CMAKE_CURRENT_BINARY_DI
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../centroid" ${CMAKE_CURRENT_BINARY_DIR}/centroid)
 
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ext/pybind11" ${CMAKE_CURRENT_BINARY_DIR}/pybind11)
-pybind11_add_module(tapp src/tapp-python.cpp)
+pybind11_add_module(tapp src/tapp/bindings.cpp)
 target_link_libraries(tapp PRIVATE gridlib centroidlib stdc++ stdc++fs)
 
 ## Include library target.
