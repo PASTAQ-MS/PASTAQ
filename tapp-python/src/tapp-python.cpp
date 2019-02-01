@@ -26,9 +26,9 @@ RawData::RawData read_mzxml(std::string file_name, double min_mz, double max_mz,
 
     // Parse the instrument type.
     auto instrument_type = Instrument::Type::UNKNOWN;
-    // for (auto &ch : instrument_type_str) {
-    // ch = std::tolower(ch);
-    //}
+    for (auto &ch : instrument_type_str) {
+        ch = std::tolower(ch);
+    }
     if (instrument_type_str == "orbitrap") {
         instrument_type = Instrument::Type::ORBITRAP;
     } else if (instrument_type_str == "tof") {
@@ -44,9 +44,9 @@ RawData::RawData read_mzxml(std::string file_name, double min_mz, double max_mz,
     }
     // Parse the polarity.
     auto polarity = RawData::Polarity::BOTH;
-    // for (auto &ch : polarity_str) {
-    // ch = std::tolower(ch);
-    //}
+    for (auto &ch : polarity_str) {
+        ch = std::tolower(ch);
+    }
     if (polarity_str == "" || polarity_str == "both" || polarity_str == "+-" ||
         polarity_str == "-+") {
         polarity = RawData::Polarity::BOTH;

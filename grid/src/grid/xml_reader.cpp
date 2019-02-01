@@ -47,7 +47,7 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
             }
             if (polarity != RawData::Polarity::BOTH &&
                 scan.polarity != polarity) {
-                return std::nullopt;
+                continue;
             }
 
             // Find MS level.
