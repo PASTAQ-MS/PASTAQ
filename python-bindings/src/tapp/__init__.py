@@ -6,7 +6,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from scipy.optimize import curve_fit
-import time
 
 # TODO(alex): Write documentation.
 def tic(raw_data, min_rt = -math.inf, max_rt = math.inf):
@@ -61,10 +60,6 @@ def load_example_data():
 
 # NOTE: This is not the best design for this function and could be greatly improved.
 def plot_mesh(mesh, transform='none', figure=None):
-    plt.style.use('dark_background')
-    plt.ion()
-    plt.show()
-
     if figure is None:
         figure = plt.figure()
 
@@ -134,35 +129,30 @@ def plot_mesh(mesh, transform='none', figure=None):
         "rt_plot": rt_plot,
     })
 
-def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True):
-    start = time.time()
+def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max_peaks=math.inf):
+    if show_plot_fit or show_mesh_plot:
+        plt.style.use('dark_background')
+        plt.ion()
+        plt.show()
+
     print("Loading data...")
     raw_data = load_example_data()
-    end = time.time()
-    print("> Finished in: {}".format(end - start))
 
     print("Resampling...")
-    start = time.time()
     n, m = calculate_dimensions(raw_data, 9, 10, 10)
     print("Estimated memory consumption of the [{0}x{1}] grid: {2:.2f} (MB)".format(n, m, n * m /1024/1024 * 8))
     mesh = resample(raw_data, 9, 10, 10)
-    end = time.time()
-    print("> Finished in: {}".format(end - start))
 
     print("Saving mesh to disk...")
-    start = time.time()
     mesh.save("mesh.dat")
-    end = time.time()
-    print("> Finished in: {}".format(end - start))
 
     print("Finding local maxima in mesh...")
-    start = time.time()
     local_max = find_local_max(mesh)
     local_max = pd.DataFrame(local_max)
     local_max.columns = ['i', 'j', 'mz', 'rt', 'intensity']
     local_max = local_max.sort_values('intensity', ascending=False)
-    end = time.time()
-    print("> Finished in: {}".format(end - start))
+    if max_peaks != math.inf:
+        local_max = local_max[0:max_peaks]
 
     if show_mesh_plot:
         print("Plotting mesh...")
@@ -173,7 +163,6 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True):
 
     # print("Fitting the top 10 peaks...")
     print("Fitting peaks...")
-    start = time.time()
     def sigma_at_mz(mz, fwhm_ref, mz_ref):
         return fwhm_ref * (mz/mz_ref) ** 1.5  # NOTE: Orbitrap only
 
@@ -186,40 +175,28 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True):
     retention_times = [scan.retention_time for scan in raw_data.scans]
     fitted_peaks = []
     for i in range(0, len(local_max)):
-    # for i in range(0, 10):
         # Show log message each 10%
-        # if i % (len(local_max)/10) == 0 and not silent:
-        # if i % (len(local_max)/10) == 0:
-        print("peak {0} out of {1}".format(i, local_max.shape[0]))
+        if i % (len(local_max)/10) == 0:
+            print("peak {0} out of {1}".format(i, local_max.shape[0]))
+
         selected_peak = local_max.iloc[i]
-        # print(selected_peak)
         theoretical_sigma_mz = fwhm_at(raw_data, selected_peak['mz']) / 2.355 # FIXME: This is a rough approximation.
         theoretical_sigma_rt = 6
         tolerance_mz = 3 * theoretical_sigma_mz
-        # print(theoretical_sigma_mz)
-        # print(tolerance_mz)
-        # print("mz_min: {}".format(selected_peak['mz'] - tolerance_mz))
-        # print("mz_max: {}".format(selected_peak['mz'] + tolerance_mz))
         min_mz = selected_peak['mz'] - tolerance_mz
         max_mz = selected_peak['mz'] + tolerance_mz
 
-        print("> Finding the closest scans:")
-        start_internal = time.time()
         # Find the required scans.
         closest_scan_index = np.abs(retention_times - selected_peak['rt']).argmin()
 
         # The closest N scans are used for fitting.
         scan_indices = [idx for idx in list(range(closest_scan_index - 5, closest_scan_index + 5)) if idx >= 0 and idx < len(raw_data.scans)]
-        end_internal = time.time()
-        print("> Finished in: {}".format(end_internal - start_internal))
 
         if len(scan_indices) < 3:
             continue
 
         # NOTE: Should we store the total number of non zero scans? this is the thing that we should use for filtering.
         # print(scan_indices)
-        print("> Finding the mz points:")
-        start_internal = time.time()
         mzs = []
         rts = []
         intensities = []
@@ -227,43 +204,26 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True):
             xic_x = []
             xic_y_total = []
             xic_y_max = []
+        non_empty_scans = 0
         for idx in scan_indices:
             scan = raw_data.scans[idx]
 
-            if show_plot_fit:
-                total_intensity = 0
-                max_intensity = 0
-            # for i in range(0, scan.num_points):
-                # # Find the mz values within  the desired range.
-                # if scan.mz[i] > max_mz:
-                    # break
-                # if scan.mz[i] < min_mz:
-                    # continue
-
-                # mzs = mzs + [scan.mz[i]]
-                # rts = rts + [scan.retention_time]
-                # intensities = intensities + [scan.intensity[i]]
-                # if show_plot_fit:
-                    # total_intensity = total_intensity + scan.intensity[i]
-                    # if scan.intensity[i] > max_intensity:
-                        # max_intensity = scan.intensity[i]
-
-            # DEBUG: is this more efficient?
             mz_index = np.argwhere(np.array((scan.mz > min_mz) & (scan.mz < max_mz))).flatten()
-            # mzs = np.concatenate([np.array([1,2,3]), np.array([4,5,6]]))
+            if len(mz_index) == 0:
+                continue
+
+            non_empty_scans = non_empty_scans + 1
             mzs = np.concatenate([mzs, np.array(scan.mz)[mz_index]])
             intensities = np.concatenate([intensities, np.array(scan.intensity)[mz_index]])
             rts  = np.concatenate([rts, np.repeat(scan.retention_time, len(mz_index))])
-            # print(mzs)
-            # print(intensities)
-            # print(rts)
 
             if show_plot_fit:
                 xic_x = xic_x + [scan.retention_time]
-                xic_y_total = xic_y_total + [total_intensity]
-                xic_y_max = xic_y_max + [max_intensity]
-        end_internal = time.time()
-        print("> Finished in: {}".format(end_internal - start_internal))
+                xic_y_total = xic_y_total + [np.array(scan.intensity)[mz_index].sum()]
+                xic_y_max = xic_y_max + [np.array(scan.intensity)[mz_index].max()]
+
+        if non_empty_scans < 3:
+            continue
 
         def gaus(x, a, x0, sigma):
                 return a * np.exp(-(x - x0)**2 / (2 * sigma**2))
@@ -273,8 +233,6 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True):
             y = X[1]
             return a * np.exp(-0.5 * ((x - x_0) /sigma_x) ** 2 ) * np.exp(-0.5 * ((y - y_0)/sigma_y) ** 2)
 
-        print("> Fitting the 2D Gaussian:")
-        start_internal = time.time()
         try:
             X = np.array([mzs, rts])
             mean_x = sum(X[0] * intensities) / sum(intensities)
@@ -287,8 +245,6 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True):
             if not silent:
                 print("error when fitting 2D gaussian on peak: {}".format(i))
             continue
-        end_internal = time.time()
-        print("> Finished in: {}".format(end_internal - start_internal))
 
         # # # Discard peaks where the fit is not conforming with the theoretical distributions.
         # if popt_2d[2] == 0 or popt_2d[4] == 0:
@@ -315,6 +271,7 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True):
                 'roi_mz_max': max_mz,
                 'roi_rt_min': rts[0],
                 'roi_rt_max': rts[-1],
+                'num_non_empty_scans': non_empty_scans,
             }]
 
         if show_plot_fit:
@@ -355,14 +312,9 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True):
             # # print(np.abs(popt_2d[1] - selected_peak['mz']))
 
     fitted_peaks = pd.DataFrame(fitted_peaks)
-    end = time.time()
-    print("> Finished in: {}".format(end - start))
 
     print("Saving fitted peaks to disk...")
-    start = time.time()
     pd.DataFrame(fitted_peaks).to_csv('fitted_peaks.csv')
-    end = time.time()
-    print("> Finished in: {}".format(end - start))
 
     return (raw_data, mesh, local_max, fitted_peaks)
 
