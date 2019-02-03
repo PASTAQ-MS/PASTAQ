@@ -22,20 +22,8 @@ def tic(raw_data, min_rt = -math.inf, max_rt = math.inf):
     return (rt, intensity)
 
 def load_example_data():
-     raw_data = read_mzxml(
-            '/data/toydata/toy_data.mzXML',
-            instrument_type = 'orbitrap',
-            resolution_ms1 = 75000,
-            resolution_msn = 30000,
-            reference_mz = 200,
-            polarity = 'pos',
-            min_mz = 801,
-            max_mz = 803,
-            min_rt = 2808,
-            max_rt = 2928,
-        )
      # raw_data = read_mzxml(
-            # '/data/Spike-In QEx UKE/HD5YD15ED_DDA_R1.mzXML',
+            # '/data/toydata/toy_data.mzXML',
             # instrument_type = 'orbitrap',
             # resolution_ms1 = 75000,
             # resolution_msn = 30000,
@@ -46,6 +34,18 @@ def load_example_data():
             # min_rt = 2808,
             # max_rt = 2928,
         # )
+     raw_data = read_mzxml(
+            '/data/ftp_data/150210_11_01.mzXML',
+            instrument_type = 'orbitrap',
+            resolution_ms1 = 75000,
+            resolution_msn = 30000,
+            reference_mz = 200,
+            polarity = 'pos',
+            min_mz = 400,
+            max_mz = 1000,
+            min_rt = 2000,
+            max_rt = 4000,
+        )
      # raw_data = read_mzxml(
             # '/data/qatar/17122018/mzXML/Acute2U_3001.mzXML',
             # instrument_type = 'orbitrap',
@@ -57,11 +57,13 @@ def load_example_data():
      return raw_data
 
 def example_pipeline():
-    print("Loading data")
+    print("Loading data...")
     raw_data = load_example_data()
     n, m = calculate_dimensions(raw_data, 9, 10, 10)
-    print("Estimated memory consumption of the [{0}x{1}] grid: {2:.2f} (MB)".format(n, m, n * m /1024/1024))
+    print("Estimated memory consumption of the [{0}x{1}] grid: {2:.2f} (MB)".format(n, m, n * m /1024/1024 * 8))
     mesh = resample(raw_data, 9, 10, 10)
+    print("Saving mesh to disk...")
+    mesh.save("mesh.dat")
     return (raw_data, mesh)
 
 # NOTE: This is not the best design for this function and could be greatly improved.

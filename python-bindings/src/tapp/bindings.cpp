@@ -189,6 +189,35 @@ struct Mesh {
     std::vector<double> matrix;
     std::vector<double> bins_mz;
     std::vector<double> bins_rt;
+
+    // Dumps the mesh into a binary .dat file.
+    void save(std::string file_name) {
+        // Open file stream.
+        std::filesystem::path output_file = file_name;
+        std::ofstream stream;
+        stream.open(output_file);
+        if (!stream) {
+            std::ostringstream error_stream;
+            error_stream << "error: couldn't open output file" << output_file;
+            throw std::invalid_argument(error_stream.str());
+        }
+
+        // TODO: Error checking, out of bounds, correctness, etc.
+        auto parameters = Grid::Parameters{};
+        parameters.dimensions.n = n;
+        parameters.dimensions.m = m;
+        parameters.bounds.min_rt = bins_rt[0];
+        parameters.bounds.max_rt = bins_rt[m - 1];
+        parameters.bounds.min_mz = bins_mz[0];
+        parameters.bounds.max_mz = bins_mz[n - 1];
+        // FIXME: For now...
+        parameters.instrument_type = Instrument::Type::ORBITRAP;
+        if (!Grid::Files::Dat::write(stream, matrix, parameters)) {
+            std::cout << "error: the grid could not be saved properly"
+                      << std::endl;
+            return;
+        }
+    }
 };
 
 Mesh resample(const RawData::RawData &raw_data, double avg_rt_fwhm,
@@ -216,18 +245,7 @@ Mesh resample(const RawData::RawData &raw_data, double avg_rt_fwhm,
 
     double sigma_rt = avg_rt_fwhm / 2.355;  // FIXME: Approx
 
-    // DEBUG
-    std::cout << "raw_data.min_mz: " << raw_data.min_mz << std::endl;
-    std::cout << "raw_data.max_mz: " << raw_data.max_mz << std::endl;
-    std::cout << "mesh.bins_mz[0]: " << mesh.bins_mz[0] << std::endl;
-    std::cout << "mesh.bins_mz[n-1]: " << mesh.bins_mz[n - 1] << std::endl;
-    std::cout << "raw_data.min_rt: " << raw_data.min_rt << std::endl;
-    std::cout << "raw_data.max_rt: " << raw_data.max_rt << std::endl;
-    std::cout << "mesh.bins_rt[0]: " << mesh.bins_rt[0] << std::endl;
-    std::cout << "mesh.bins_rt[m-1]: " << mesh.bins_rt[m - 1] << std::endl;
-
     for (const auto &scan : raw_data.scans) {
-        // double sigma_rt = avg_rt_fwhm / 2.355;
         // Calculate the min and max indexes for retention time.
 
         // Find the bin for the current retention time.
@@ -244,15 +262,6 @@ Mesh resample(const RawData::RawData &raw_data, double avg_rt_fwhm,
         if (j_max >= m) {
             j_max = m - 1;
         }
-
-        //// DEBUG
-        // std::cout << "current_rt: " << rt << std::endl;
-        // std::cout << "index_rt: " << index_rt << std::endl;
-        // std::cout << "mesh.bins_rt[index_rt]: " << mesh.bins_rt[index_rt]
-        //<< std::endl;
-        // std::cout << "j_min: " << j_min << std::endl;
-        // std::cout << "j_max: " << j_max << std::endl;
-        //
 
         for (size_t k = 0; k < scan.num_points; ++k) {
             double current_intensity = scan.intensity[k];
@@ -275,13 +284,7 @@ Mesh resample(const RawData::RawData &raw_data, double avg_rt_fwhm,
             if (i_max >= n) {
                 i_max = n - 1;
             }
-            //// DEBUG
-            // std::cout << "current_mz: " << current_mz << std::endl;
-            // std::cout << "index_mz: " << index_mz << std::endl;
-            // std::cout << "mesh.bins_mz[index_mz]: " << mesh.bins_mz[index_mz]
-            //<< std::endl;
-            // std::cout << "i_min: " << i_min << std::endl;
-            // std::cout << "i_max: " << i_max << std::endl;
+
             for (size_t j = j_min; j <= j_max; ++j) {
                 for (size_t i = i_min; i <= i_max; ++i) {
                     // FIXME: ORBITRAP
@@ -367,7 +370,8 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("m", &PythonAPI::Mesh::m)
         .def_readonly("matrix", &PythonAPI::Mesh::matrix)
         .def_readonly("bins_mz", &PythonAPI::Mesh::bins_mz)
-        .def_readonly("bins_rt", &PythonAPI::Mesh::bins_rt);
+        .def_readonly("bins_rt", &PythonAPI::Mesh::bins_rt)
+        .def("save", &PythonAPI::Mesh::save, py::arg("file_name"));
 
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,
