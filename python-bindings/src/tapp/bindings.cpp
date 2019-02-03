@@ -214,7 +214,7 @@ Mesh resample(const RawData::RawData &raw_data, double avg_rt_fwhm,
         mesh.bins_rt[j] = raw_data.min_rt + delta_rt * j;
     }
 
-    double sigma_rt = avg_rt_fwhm / 2.355; // FIXME: Approx
+    double sigma_rt = avg_rt_fwhm / 2.355;  // FIXME: Approx
 
     // DEBUG
     std::cout << "raw_data.min_mz: " << raw_data.min_mz << std::endl;
@@ -286,7 +286,10 @@ Mesh resample(const RawData::RawData &raw_data, double avg_rt_fwhm,
                 for (size_t i = i_min; i <= i_max; ++i) {
                     // FIXME: ORBITRAP
                     // NOTE: Should we precalculate this?
-                    double sigma_mz = (fwhm_ref * std::pow(current_mz/raw_data.reference_mz, 1.5)) / 2.355; // FIXME: Approx
+                    double sigma_mz =
+                        (fwhm_ref *
+                         std::pow(current_mz / raw_data.reference_mz, 1.5)) /
+                        2.355;  // FIXME: Approx
 
                     // No need to do boundary check, since we are sure we are
                     // inside the grid.
@@ -294,17 +297,18 @@ Mesh resample(const RawData::RawData &raw_data, double avg_rt_fwhm,
                     double y = mesh.bins_rt[j];
 
                     // Calculate the gaussian weight for this point.
-                    double a = (x - current_mz) / sigma_mz;
-                    double b = (y - current_rt) / sigma_rt;
+                    // NOTE(alex): We could allow the user to set up the amount
+                    // of smoothing in each dimension by setting the multipliers
+                    // (x2 right now).
+                    double a = (x - current_mz) / sigma_mz * 2;
+                    double b = (y - current_rt) / sigma_rt * 2;
                     double weight = std::exp(-0.5 * (a * a + b * b));
 
                     // Set the value, weight and counts.
                     mesh.matrix[i + j * n] += weight * current_intensity;
                 }
-                // break;
             }
         }
-        //break;
     }
     return mesh;
 }
