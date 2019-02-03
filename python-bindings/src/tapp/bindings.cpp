@@ -316,6 +316,58 @@ Mesh resample(const RawData::RawData &raw_data, double avg_rt_fwhm,
     return mesh;
 }
 
+// TODO: For now returns a tuple, we should maybe return a definite struct.
+//
+//     returns: (i,j,mz,rt,intensity)
+//
+std::vector<std::tuple<uint64_t, uint64_t, double, double, double>>
+find_local_max(const Mesh &mesh) {
+    std::vector<std::tuple<uint64_t, uint64_t, double, double, double>> points;
+    for (size_t j = 1; j < mesh.m - 1; ++j) {
+        for (size_t i = 1; i < mesh.n - 1; ++i) {
+            int index = i + j * mesh.n;
+
+            // NOTE(alex): The definition of a local maxima in a 2D space might
+            // have different interpretations. i.e. We can select the 8
+            // neighbours and the local maxima will be marked if all points are
+            // below the central value. Alternatively, only a number N of
+            // neighbours can be used, for example only the 4 cardinal
+            // directions from the value under study.
+            //
+            // ----------------------------------------------
+            // |              | top_value    |              |
+            // ----------------------------------------------
+            // | left_value   | value        | right_value  |
+            // ----------------------------------------------
+            // |              | bottom_value |              |
+            // ----------------------------------------------
+            double value = mesh.matrix[index];
+            double right_value = mesh.matrix[index + 1];
+            double left_value = mesh.matrix[index - 1];
+            double top_value = mesh.matrix[index - mesh.n];
+            double bottom_value = mesh.matrix[index + mesh.n];
+
+            if ((value != 0) && (value > left_value) && (value > right_value) &&
+                (value > top_value) && (value > bottom_value)) {
+                points.push_back(
+                    {i, j, mesh.bins_mz[i], mesh.bins_rt[j], value});
+            }
+        }
+    }
+
+    //// Sort the local maxima by descending intensity.
+    // auto sort_by_value = [](const Centroid::Point &p1,
+    // const Centroid::Point &p2) -> bool {
+    // return (p1.value > p2.value);
+    //};
+    // std::stable_sort(points.begin(), points.end(), sort_by_value);
+
+    // if (parameters.n_peaks != 0 && parameters.n_peaks < points.size()) {
+    // points.resize(parameters.n_peaks);
+    //}
+    return points;
+}
+
 }  // namespace PythonAPI
 
 PYBIND11_MODULE(tapp, m) {
@@ -394,6 +446,7 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("raw_data"), py::arg("mz"))
         .def("resample", &PythonAPI::resample,
              "Resample the raw data into a warped grid", py::arg("raw_data"),
-             py::arg("rt_fwhm"), py::arg("num_mz") = 10,
-             py::arg("num_rt") = 10);
+             py::arg("rt_fwhm"), py::arg("num_mz") = 10, py::arg("num_rt") = 10)
+        .def("find_local_max", &PythonAPI::find_local_max,
+              "Find all local maxima in the given mesh", py::arg("mesh"));
 }
