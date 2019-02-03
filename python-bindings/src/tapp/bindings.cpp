@@ -135,7 +135,7 @@ std::tuple<uint64_t, uint64_t> calculate_dimensions(
         num_samples_per_peak_mz * 2 * std::pow(raw_data.reference_mz, 1.5) /
         fwhm_ref *
         (1 / std::sqrt(raw_data.min_mz) - 1 / std::sqrt(raw_data.max_mz));
-    return std::tuple<uint64_t, uint64_t>(num_points_mz, num_points_rt);
+    return std::tuple<uint64_t, uint64_t>(num_points_mz + 1, num_points_rt + 1);
 }
 
 double mz_at(const RawData::RawData &raw_data, uint64_t num_samples_per_peak_mz,
@@ -181,6 +181,132 @@ std::string to_string(const RawData::Polarity &polarity) {
             return "BOTH";
     };
     return "UNKNOWN";
+}
+
+struct Mesh {
+    uint64_t n;
+    uint64_t m;
+    std::vector<double> matrix;
+    std::vector<double> bins_mz;
+    std::vector<double> bins_rt;
+};
+
+Mesh resample(const RawData::RawData &raw_data, double avg_rt_fwhm,
+              uint64_t num_samples_per_peak_mz,
+              uint64_t num_samples_per_peak_rt) {
+    auto [n, m] =
+        calculate_dimensions(raw_data, avg_rt_fwhm, num_samples_per_peak_mz,
+                             num_samples_per_peak_rt);
+    Mesh mesh;
+    mesh.n = n;
+    mesh.m = m;
+    mesh.matrix = std::vector<double>(n * m);
+    mesh.bins_mz = std::vector<double>(n);
+    mesh.bins_rt = std::vector<double>(m);
+
+    // Generate bins_mz.
+    for (size_t i = 0; i < n; ++i) {
+        mesh.bins_mz[i] = mz_at(raw_data, num_samples_per_peak_mz, i);
+    }
+    // Generate bins_rt.
+    double delta_rt = (raw_data.max_rt - raw_data.min_rt) / (m - 1);
+    for (size_t j = 0; j < m; ++j) {
+        mesh.bins_rt[j] = raw_data.min_rt + delta_rt * j;
+    }
+
+    double sigma_rt = avg_rt_fwhm / 2.355; // FIXME: Approx
+
+    // DEBUG
+    std::cout << "raw_data.min_mz: " << raw_data.min_mz << std::endl;
+    std::cout << "raw_data.max_mz: " << raw_data.max_mz << std::endl;
+    std::cout << "mesh.bins_mz[0]: " << mesh.bins_mz[0] << std::endl;
+    std::cout << "mesh.bins_mz[n-1]: " << mesh.bins_mz[n - 1] << std::endl;
+    std::cout << "raw_data.min_rt: " << raw_data.min_rt << std::endl;
+    std::cout << "raw_data.max_rt: " << raw_data.max_rt << std::endl;
+    std::cout << "mesh.bins_rt[0]: " << mesh.bins_rt[0] << std::endl;
+    std::cout << "mesh.bins_rt[m-1]: " << mesh.bins_rt[m - 1] << std::endl;
+
+    for (const auto &scan : raw_data.scans) {
+        // double sigma_rt = avg_rt_fwhm / 2.355;
+        // Calculate the min and max indexes for retention time.
+
+        // Find the bin for the current retention time.
+        // NOTE: y_index.
+        double current_rt = scan.retention_time;
+        size_t index_rt = (current_rt - raw_data.min_rt) / delta_rt;
+
+        // The smoothing kernel in rt is +-(num_samples_per_peak_rt/2).
+        int64_t j_min = index_rt - num_samples_per_peak_rt / 2;
+        if (j_min < 0) {
+            j_min = 0;
+        }
+        int64_t j_max = index_rt + num_samples_per_peak_rt / 2;
+        if (j_max >= m) {
+            j_max = m - 1;
+        }
+
+        //// DEBUG
+        // std::cout << "current_rt: " << rt << std::endl;
+        // std::cout << "index_rt: " << index_rt << std::endl;
+        // std::cout << "mesh.bins_rt[index_rt]: " << mesh.bins_rt[index_rt]
+        //<< std::endl;
+        // std::cout << "j_min: " << j_min << std::endl;
+        // std::cout << "j_max: " << j_max << std::endl;
+        //
+
+        for (size_t k = 0; k < scan.num_points; ++k) {
+            double current_intensity = scan.intensity[k];
+
+            // Find the bin for the current mz.
+            double current_mz = scan.mz[k];
+
+            // NOTE: x_index
+            // FIXME: This only works for ORBITRAP data for now.
+            double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
+            uint64_t index_mz =
+                num_samples_per_peak_mz * 2 *
+                std::pow(raw_data.reference_mz, 1.5) / fwhm_ref *
+                (1 / std::sqrt(raw_data.min_mz) - 1 / std::sqrt(current_mz));
+            int64_t i_min = index_mz - num_samples_per_peak_mz / 2;
+            if (i_min < 0) {
+                i_min = 0;
+            }
+            int64_t i_max = index_mz + num_samples_per_peak_mz / 2;
+            if (i_max >= n) {
+                i_max = n - 1;
+            }
+            //// DEBUG
+            // std::cout << "current_mz: " << current_mz << std::endl;
+            // std::cout << "index_mz: " << index_mz << std::endl;
+            // std::cout << "mesh.bins_mz[index_mz]: " << mesh.bins_mz[index_mz]
+            //<< std::endl;
+            // std::cout << "i_min: " << i_min << std::endl;
+            // std::cout << "i_max: " << i_max << std::endl;
+            for (size_t j = j_min; j <= j_max; ++j) {
+                for (size_t i = i_min; i <= i_max; ++i) {
+                    // FIXME: ORBITRAP
+                    // NOTE: Should we precalculate this?
+                    double sigma_mz = (fwhm_ref * std::pow(current_mz/raw_data.reference_mz, 1.5)) / 2.355; // FIXME: Approx
+
+                    // No need to do boundary check, since we are sure we are
+                    // inside the grid.
+                    double x = mesh.bins_mz[i];
+                    double y = mesh.bins_rt[j];
+
+                    // Calculate the gaussian weight for this point.
+                    double a = (x - current_mz) / sigma_mz;
+                    double b = (y - current_rt) / sigma_rt;
+                    double weight = std::exp(-0.5 * (a * a + b * b));
+
+                    // Set the value, weight and counts.
+                    mesh.matrix[i + j * n] += weight * current_intensity;
+                }
+                // break;
+            }
+        }
+        //break;
+    }
+    return mesh;
 }
 
 }  // namespace PythonAPI
@@ -232,6 +358,13 @@ PYBIND11_MODULE(tapp, m) {
                    "\n> number of scans: " + std::to_string(rd.scans.size());
         });
 
+    py::class_<PythonAPI::Mesh>(m, "Mesh")
+        .def_readonly("n", &PythonAPI::Mesh::n)
+        .def_readonly("m", &PythonAPI::Mesh::m)
+        .def_readonly("matrix", &PythonAPI::Mesh::matrix)
+        .def_readonly("bins_mz", &PythonAPI::Mesh::bins_mz)
+        .def_readonly("bins_rt", &PythonAPI::Mesh::bins_rt);
+
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,
           "Read raw data from the given mzXML file ", py::arg("file_name"),
@@ -250,5 +383,9 @@ PYBIND11_MODULE(tapp, m) {
         .def("fwhm_at", &PythonAPI::fwhm_at,
              "Calculate the width of the peak at the given m/z for the given "
              "raw file",
-             py::arg("raw_data"), py::arg("mz"));
+             py::arg("raw_data"), py::arg("mz"))
+        .def("resample", &PythonAPI::resample,
+             "Resample the raw data into a warped grid", py::arg("raw_data"),
+             py::arg("rt_fwhm"), py::arg("num_mz") = 10,
+             py::arg("num_rt") = 10);
 }
