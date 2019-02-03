@@ -113,6 +113,48 @@ RawData::RawData read_mzxml(std::string file_name, double min_mz, double max_mz,
     return raw_data.value();
 }
 
+std::tuple<uint64_t, uint64_t> calculate_dimensions(
+    const RawData::RawData &raw_data, double avg_rt_fwhm,
+    uint64_t num_samples_per_peak_mz, uint64_t num_samples_per_peak_rt) {
+    // Calculate the number of sampling points in the rt dimension.
+    //
+    // NOTE(alex): Since the average retention time is given in FWHM and under
+    // the assumption of Gaussian chromatographic peaks, the FWHM ≈ 2.355 *
+    // sigma. We need then 3 sigma left and right of the center of the
+    // chromatographic peak to cover a 99.7 % of the gaussian peak area.
+    double sigma_rt = avg_rt_fwhm / (2 * std::sqrt(2 * std::log(2)));
+    double base_width_rt = sigma_rt * 6;
+    double delta_rt = base_width_rt / num_samples_per_peak_rt;
+    uint64_t num_points_rt =
+        std::ceil((raw_data.max_rt - raw_data.min_rt) / delta_rt);
+
+    double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
+
+    // FIXME: This only works for ORBITRAP data for now.
+    uint64_t num_points_mz =
+        num_samples_per_peak_mz * 2 * std::pow(raw_data.reference_mz, 1.5) /
+        fwhm_ref *
+        (1 / std::sqrt(raw_data.min_mz) - 1 / std::sqrt(raw_data.max_mz));
+    return std::tuple<uint64_t, uint64_t>(num_points_mz, num_points_rt);
+}
+
+double mz_at(const RawData::RawData &raw_data, uint64_t num_samples_per_peak_mz,
+             uint64_t n) {
+    // FIXME: This only works for ORBITRAP data for now.
+    double a = 1 / std::sqrt(raw_data.min_mz);
+    double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
+    double b = fwhm_ref / std::pow(raw_data.reference_mz, 1.5) * n / 2 /
+               num_samples_per_peak_mz;
+    double c = a - b;
+    return 1 / (c * c);
+}
+
+double fwhm_at(const RawData::RawData &raw_data, double mz) {
+    // FIXME: This only works for ORBITRAP data for now.
+    double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
+    return fwhm_ref * std::pow(mz / raw_data.reference_mz, 1.5);
+}
+
 std::string to_string(const Instrument::Type &instrument_type) {
     switch (instrument_type) {
         case Instrument::Type::QUAD:
@@ -197,5 +239,16 @@ PYBIND11_MODULE(tapp, m) {
           py::arg("min_rt") = -1.0, py::arg("max_rt") = -1.0,
           py::arg("instrument_type") = "", py::arg("resolution_ms1"),
           py::arg("resolution_msn"), py::arg("reference_mz"),
-          py::arg("polarity") = "");
+          py::arg("polarity") = "")
+        .def("calculate_dimensions", &PythonAPI::calculate_dimensions,
+             "Calculate the grid parameters for the given raw file",
+             py::arg("raw_data"), py::arg("rt_fwhm"), py::arg("num_mz") = 10,
+             py::arg("num_rt") = 10)
+        .def("mz_at", &PythonAPI::mz_at,
+             "Calculate the mz at the given N for the given raw file",
+             py::arg("raw_data"), py::arg("num_mz") = 10, py::arg("n"))
+        .def("fwhm_at", &PythonAPI::fwhm_at,
+             "Calculate the width of the peak at the given m/z for the given "
+             "raw file",
+             py::arg("raw_data"), py::arg("mz"));
 }
