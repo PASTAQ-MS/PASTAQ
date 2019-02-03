@@ -2,7 +2,7 @@ import math
 
 from .tapp import *
 import numpy as np
-import pandas as pd 
+import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from scipy.optimize import curve_fit
@@ -85,19 +85,19 @@ def plot_mesh(mesh, transform='none', figure=None):
     mz_plot.clear()
     mz_plot.plot(img.sum(axis=0))
     mz_plot.margins(x=0)
-    mz_plot.set_xticks([]) 
+    mz_plot.set_xticks([])
     mz_plot.set_ylabel("Intensity")
 
     rt_plot = plt.subplot(gs[1:, -1])
-    rt_plot.plot(img.sum(axis=1), bins_rt)  
+    rt_plot.plot(img.sum(axis=1), bins_rt)
     rt_plot.margins(y=0)
-    rt_plot.set_yticks([]) 
+    rt_plot.set_yticks([])
     rt_plot.set_xlabel("Intensity")
 
     img_plot = plt.subplot(gs[1:, :-1])
     # img_plot.pcolormesh(mesh.bins_mz, mesh.bins_rt, img)
     img_plot.imshow(img, aspect='auto', origin="lower")
-    
+
     # This only approximates thew ticks assuming we are on a small region, on a
     # warped grid this doesn't work for a large mz range.
     delta_mz = bins_mz[1] - bins_mz[0]
@@ -117,7 +117,7 @@ def plot_mesh(mesh, transform='none', figure=None):
             labels_y = labels_y + [""]
         else:
             labels_y = labels_y + ["{0:.2f}".format(min_rt + delta_rt * loc)]
-    
+
     img_plot.set_xticklabels(labels_x)
     img_plot.set_yticklabels(labels_y)
     img_plot.set_xlabel("m/z")
@@ -240,18 +240,17 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max
             mean_y = sum(X[1] * intensities) / sum(intensities)
             sigma_y = np.sqrt(sum(intensities * (X[1] - mean_y)**2) / sum(intensities))
             popt_2d, pcov_2d = curve_fit(gaus2d, X, intensities, p0=[max(intensities), mean_x, sigma_x, mean_y, sigma_y])
-            # print(popt_2d)
         except:
             if not silent:
                 print("error when fitting 2D gaussian on peak: {}".format(i))
             continue
 
-        # # # Discard peaks where the fit is not conforming with the theoretical distributions.
-        # if popt_2d[2] == 0 or popt_2d[4] == 0:
-            # continue
+        # Discard peaks where the fit is not conforming with the theoretical distributions.
+        if popt_2d[2] <= 0 or popt_2d[4] <= 0:
+            continue
 
-        # if popt_2d[2] > 3 * theoretical_sigma_mz or popt_2d[4] > 3 * theoretical_sigma_rt:
-            # continue
+        if popt_2d[2] > 3 * theoretical_sigma_mz or popt_2d[4] > 3 * theoretical_sigma_rt:
+            continue
 
         # Store the fitted parameters.
         fitted_peaks = fitted_peaks + [{
@@ -302,7 +301,7 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max
             # # x = grid['bins_mz']
             # # y = grid['bins_rt']
             # # x, y = np.meshgrid(x, y)
-            # # Z = gaus2d((x,y), *popt_2d) 
+            # # Z = gaus2d((x,y), *popt_2d)
             # # x = range(0, len(grid['bins_mz']))
             # # y = range(0, len(grid['bins_rt']))
             # # x, y = np.meshgrid(x, y)
