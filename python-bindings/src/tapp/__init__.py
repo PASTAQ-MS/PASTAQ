@@ -129,39 +129,7 @@ def plot_mesh(mesh, transform='none', figure=None):
         "rt_plot": rt_plot,
     })
 
-def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max_peaks=math.inf):
-    if show_plot_fit or show_mesh_plot:
-        plt.style.use('dark_background')
-        plt.ion()
-        plt.show()
-
-    print("Loading data...")
-    raw_data = load_example_data()
-
-    print("Resampling...")
-    n, m = calculate_dimensions(raw_data, 9, 10, 10)
-    print("Estimated memory consumption of the [{0}x{1}] grid: {2:.2f} (MB)".format(n, m, n * m /1024/1024 * 8))
-    mesh = resample(raw_data, 9, 10, 10)
-
-    print("Saving mesh to disk...")
-    mesh.save("mesh.dat")
-
-    print("Finding local maxima in mesh...")
-    local_max = find_local_max(mesh)
-    local_max = pd.DataFrame(local_max)
-    local_max.columns = ['i', 'j', 'mz', 'rt', 'intensity']
-    local_max = local_max.sort_values('intensity', ascending=False)
-    if max_peaks != math.inf:
-        local_max = local_max[0:max_peaks]
-
-    if show_mesh_plot:
-        print("Plotting mesh...")
-        mesh_plot = plot_mesh(mesh)
-
-        print("Plotting local maxima...")
-        mesh_plot['img_plot'].scatter(local_max['i'], local_max['j'], color='aqua', s=5, marker="s", alpha=0.9)
-
-    print("Fitting peaks...")
+def fit_peaks(raw_data, local_max, show_plot_fit=False, silent=True):
     def sigma_at_mz(mz, fwhm_ref, mz_ref):
         return fwhm_ref * (mz/mz_ref) ** 1.5  # NOTE: Orbitrap only
 
@@ -320,6 +288,43 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max
             # # print(np.abs(popt_2d[1] - selected_peak['mz']))
 
     fitted_peaks = pd.DataFrame(fitted_peaks)
+    return fitted_peaks
+
+
+def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max_peaks=math.inf):
+    if show_plot_fit or show_mesh_plot:
+        plt.style.use('dark_background')
+        plt.ion()
+        plt.show()
+
+    print("Loading data...")
+    raw_data = load_example_data()
+
+    print("Resampling...")
+    n, m = calculate_dimensions(raw_data, 9, 10, 10)
+    print("Estimated memory consumption of the [{0}x{1}] grid: {2:.2f} (MB)".format(n, m, n * m /1024/1024 * 8))
+    mesh = resample(raw_data, 9, 10, 10)
+
+    print("Saving mesh to disk...")
+    mesh.save("mesh.dat")
+
+    print("Finding local maxima in mesh...")
+    local_max = find_local_max(mesh)
+    local_max = pd.DataFrame(local_max)
+    local_max.columns = ['i', 'j', 'mz', 'rt', 'intensity']
+    local_max = local_max.sort_values('intensity', ascending=False)
+    if max_peaks != math.inf:
+        local_max = local_max[0:max_peaks]
+
+    if show_mesh_plot:
+        print("Plotting mesh...")
+        mesh_plot = plot_mesh(mesh)
+
+        print("Plotting local maxima...")
+        mesh_plot['img_plot'].scatter(local_max['i'], local_max['j'], color='aqua', s=5, marker="s", alpha=0.9)
+
+    print("Fitting peaks...")
+    fitted_peaks = fit_peaks(raw_data, local_max)
     fitted_peaks_tuple = [tuple(fitted_peaks.iloc[row]) for row in range(0, fitted_peaks.shape[0])]
     print("Saving fitted peaks to disk...")
     tapp.save_fitted_peaks(list(fitted_peaks_tuple), "fitted_peaks.bpks")
