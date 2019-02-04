@@ -129,13 +129,13 @@ def plot_mesh(mesh, transform='none', figure=None):
         "rt_plot": rt_plot,
     })
 
-def fit_peaks(raw_data, local_max, show_plot_fit=False, silent=True):
-    def sigma_at_mz(mz, fwhm_ref, mz_ref):
-        return fwhm_ref * (mz/mz_ref) ** 1.5  # NOTE: Orbitrap only
-
+def fit_peaks(raw_data, local_max, num_scans=10, show_plot_fit=False, silent=True):
     # FIXME: The plotting should be independant of the fitting loop. This it is
     # terrible design.
     if show_plot_fit:
+        plt.style.use('dark_background')
+        plt.ion()
+        plt.show()
         fig_2 = plt.figure()
         fig_3 = plt.figure()
 
@@ -157,7 +157,7 @@ def fit_peaks(raw_data, local_max, show_plot_fit=False, silent=True):
         closest_scan_index = np.abs(retention_times - selected_peak['rt']).argmin()
 
         # The closest N scans are used for fitting.
-        scan_indices = [idx for idx in list(range(closest_scan_index - 5, closest_scan_index + 5)) if idx >= 0 and idx < len(raw_data.scans)]
+        scan_indices = [idx for idx in list(range(closest_scan_index - int(num_scans/2), closest_scan_index + int(num_scans/2))) if idx >= 0 and idx < len(raw_data.scans)]
 
         if len(scan_indices) < 3:
             continue
