@@ -441,8 +441,12 @@ int main(int argc, char *argv[]) {
             }
         } else if (lowercase_extension == ".csv") {
             // TODO: read into peak array.
-            // Centroid::Files::Csv::read_peaks(stream, &grid_params,
-            // &peaks[0]);
+            if (!Centroid::Files::Csv::read_peaks(stream, &reference_peaks)) {
+                std::cout
+                    << "error: couldn't read peaks from the reference file"
+                    << std::endl;
+                return -1;
+            }
         } else {
             std::cout << "error: unknown file format for file " << input_file
                       << std::endl;

@@ -48,14 +48,14 @@ def load_example_data():
             # min_rt = 2000,
             # max_rt = 4000,
         # )
-     raw_data = read_mzxml(
-            '/data/qatar/17122018/mzXML/Acute2U_3001.mzXML',
-            instrument_type = 'orbitrap',
-            resolution_ms1 = 70000,
-            resolution_msn = 30000,
-            reference_mz = 200,
-            polarity = 'pos',
-        )
+     # raw_data = read_mzxml(
+            # '/data/qatar/17122018/mzXML/Acute2U_3001.mzXML',
+            # instrument_type = 'orbitrap',
+            # resolution_ms1 = 70000,
+            # resolution_msn = 30000,
+            # reference_mz = 200,
+            # polarity = 'pos',
+        # )
      return raw_data
 
 # NOTE: This is not the best design for this function and could be greatly improved.
@@ -161,7 +161,6 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max
         print("Plotting local maxima...")
         mesh_plot['img_plot'].scatter(local_max['i'], local_max['j'], color='aqua', s=5, marker="s", alpha=0.9)
 
-    # print("Fitting the top 10 peaks...")
     print("Fitting peaks...")
     def sigma_at_mz(mz, fwhm_ref, mz_ref):
         return fwhm_ref * (mz/mz_ref) ** 1.5  # NOTE: Orbitrap only
@@ -253,24 +252,34 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max
             continue
 
         # Store the fitted parameters.
+        # fitted_peaks = fitted_peaks + [{
+                # 'smoothed_mz': selected_peak['mz'],
+                # 'smoothed_rt': selected_peak['rt'],
+                # 'estimated_mz': mean_x,
+                # 'estimated_rt': mean_y,
+                # 'estimated_sigma_mz': sigma_x,
+                # 'estimated_sigma_rt': sigma_y,
+                # 'fitted_mz': popt_2d[1],
+                # 'fitted_rt': popt_2d[3],
+                # 'fitted_height': popt_2d[0],
+                # 'fitted_sigma_mz': popt_2d[2],
+                # 'fitted_sigma_rt': popt_2d[4],
+                # 'fitted_total_intensity': np.array(intensities).sum(),
+                # 'roi_mz_min': min_mz,
+                # 'roi_mz_max': max_mz,
+                # 'roi_rt_min': rts[0],
+                # 'roi_rt_max': rts[-1],
+                # 'num_non_empty_scans': non_empty_scans,
+            # }]
         fitted_peaks = fitted_peaks + [{
-                'smoothed_mz': selected_peak['mz'],
-                'smoothed_rt': selected_peak['rt'],
-                'estimated_mz': mean_x,
-                'estimated_rt': mean_y,
-                'estimated_sigma_mz': sigma_x,
-                'estimated_sigma_rt': sigma_y,
-                'fitted_mz': popt_2d[1],
-                'fitted_rt': popt_2d[3],
-                'fitted_height': popt_2d[0],
-                'fitted_sigma_mz': popt_2d[2],
-                'fitted_sigma_rt': popt_2d[4],
-                'fitted_total_intensity': np.array(intensities).sum(),
-                'roi_mz_min': min_mz,
-                'roi_mz_max': max_mz,
-                'roi_rt_min': rts[0],
-                'roi_rt_max': rts[-1],
-                'num_non_empty_scans': non_empty_scans,
+                'i': selected_peak['i'],
+                'j': selected_peak['j'],
+                'mz': popt_2d[1],
+                'rt': popt_2d[3],
+                'height': popt_2d[0],
+                'total_intensity': np.array(intensities).sum(),
+                'sigma_mz': popt_2d[2],
+                'sigma_rt': popt_2d[4],
             }]
 
         if show_plot_fit:
@@ -311,9 +320,10 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max
             # # print(np.abs(popt_2d[1] - selected_peak['mz']))
 
     fitted_peaks = pd.DataFrame(fitted_peaks)
-
+    fitted_peaks_tuple = [tuple(fitted_peaks.iloc[row]) for row in range(0, fitted_peaks.shape[0])]
     print("Saving fitted peaks to disk...")
-    pd.DataFrame(fitted_peaks).to_csv('fitted_peaks.csv')
+    tapp.save_fitted_peaks(list(fitted_peaks_tuple), "fitted_peaks.bpks")
+    # pd.DataFrame(fitted_peaks).to_csv('fitted_peaks.csv')
 
     return (raw_data, mesh, local_max, fitted_peaks)
 

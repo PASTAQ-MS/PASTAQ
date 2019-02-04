@@ -1,8 +1,10 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <tuple>
 
 #include "centroid/centroid.hpp"
+#include "centroid/centroid_files.hpp"
 #include "grid/grid.hpp"
 #include "grid/grid_files.hpp"
 #include "grid/xml_reader.hpp"
@@ -368,6 +370,68 @@ find_local_max(const Mesh &mesh) {
     return points;
 }
 
+// FIXME: Terrible!
+// Tuple:
+//
+//     0      ,  1 ,  2 ,  3  ,  4  ,  5        ,  6        ,  7
+//     height ,  i ,  j ,  mz ,  rt ,  sigma_mz ,  sigma_rt ,  total_intensity
+//
+void save_fitted_peaks(
+    const std::vector<std::tuple<double, double, double, double, double, double,
+                                 double, double>> &fitted_peaks,
+    std::string file_name) {
+    std::vector<Centroid::Peak> peaks;
+    for (const auto &fitted_peak : fitted_peaks) {
+        Centroid::Peak peak = {};
+        peak.height = std::get<0>(fitted_peak);
+        peak.i = std::get<1>(fitted_peak);
+        peak.j = std::get<2>(fitted_peak);
+        peak.mz = std::get<3>(fitted_peak);
+        peak.rt = std::get<4>(fitted_peak);
+        peak.sigma_mz = std::get<5>(fitted_peak);
+        peak.sigma_rt = std::get<6>(fitted_peak);
+        peak.total_intensity = std::get<7>(fitted_peak);
+        peak.mz_centroid = std::get<3>(fitted_peak);
+        peak.rt_centroid = std::get<4>(fitted_peak);
+        peak.height_centroid = std::get<0>(fitted_peak);
+        peak.total_intensity_centroid = std::get<7>(fitted_peak);
+        peaks.push_back(peak);
+    }
+
+    std::filesystem::path output_file = file_name;
+    std::ofstream stream;
+    stream.open(output_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open output file" << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+    Grid::Parameters grid_params;
+    if (!Centroid::Files::Bpks::write_peaks(stream, grid_params, peaks)) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't peaks into file " << file_name;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    std::cout << "Saving peaks to disk in csv..." << std::endl;
+    auto csv_outfile_name = output_file.filename().replace_extension(".csv");
+    std::ofstream csv_outfile_stream;
+    csv_outfile_stream.open(csv_outfile_name, std::ios::out | std::ios::binary);
+    std::cout << "Sorting peaks by height (centroid)..." << std::endl;
+    auto sort_peaks = [](const Centroid::Peak &p1,
+                         const Centroid::Peak &p2) -> bool {
+        return (p1.height_centroid > p2.height_centroid) ||
+               ((p1.height_centroid == p2.height_centroid) &&
+                (p1.total_intensity_centroid > p2.total_intensity_centroid));
+    };
+    std::stable_sort(peaks.begin(), peaks.end(), sort_peaks);
+    if (!Centroid::Files::Csv::write_peaks(csv_outfile_stream, peaks)) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't write peaks into file "
+                     << csv_outfile_name;
+        throw std::invalid_argument(error_stream.str());
+    }
+}
 }  // namespace PythonAPI
 
 PYBIND11_MODULE(tapp, m) {
@@ -448,5 +512,8 @@ PYBIND11_MODULE(tapp, m) {
              "Resample the raw data into a warped grid", py::arg("raw_data"),
              py::arg("rt_fwhm"), py::arg("num_mz") = 10, py::arg("num_rt") = 10)
         .def("find_local_max", &PythonAPI::find_local_max,
-              "Find all local maxima in the given mesh", py::arg("mesh"));
+             "Find all local maxima in the given mesh", py::arg("mesh"))
+        .def("save_fitted_peaks", &PythonAPI::save_fitted_peaks,
+             "Save the fitted peaks as a bpks file", py::arg("fitted_peaks"),
+             py::arg("file_name"));
 }
