@@ -148,7 +148,7 @@ def find_roi(raw_data, local_max, avg_rt_fwhm=10):
                 'j': selected_peak['j'],
                 'estimated_mz': selected_peak['mz'],
                 'estimated_rt': selected_peak['rt'],
-                'estimated_height': selected_peak['estimated_height'],
+                'estimated_height': selected_peak['intensity'],
                 'roi_min_mz': min_mz,
                 'roi_max_mz': max_mz,
                 'roi_min_rt': min_rt,
@@ -331,7 +331,7 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max
     print("Resampling...")
     n, m = calculate_dimensions(raw_data, 10, 10)
     print("Estimated memory consumption of the [{0}x{1}] grid: {2:.2f} (MB)".format(n, m, n * m /1024/1024 * 8))
-    mesh = resample(raw_data, 10, 10, 1, 1)
+    mesh = resample(raw_data, 10, 10)
 
     print("Saving mesh to disk...")
     mesh.save("mesh.dat")
@@ -346,7 +346,7 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max
 
     if show_mesh_plot:
         print("Plotting mesh...")
-        mesh_plot = plot_mesh(mesh)
+        mesh_plot = plot_mesh(mesh, transform='sqrt')
 
         print("Plotting local maxima...")
         mesh_plot['img_plot'].scatter(local_max['i'], local_max['j'], color='aqua', s=5, marker="s", alpha=0.9)

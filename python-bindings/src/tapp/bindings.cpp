@@ -226,6 +226,10 @@ double fwhm_to_sigma(double fwhm) {
     return fwhm / (2 * std::sqrt(2 * std::log(2)));
 }
 
+// The given smoothing coefficients will determine how much smoothing we apply
+// on a given mesh. Since the smoothing is calculated as a factor of a Gaussian
+// sigma, the smoothing ratio will be the same regardless of the sampling size.
+// Smoothing ratios of 0.5-1 are recommended as a starting point.
 Mesh resample(const RawData::RawData &raw_data,
               uint64_t num_samples_per_peak_mz,
               uint64_t num_samples_per_peak_rt, double smoothing_coef_mz,
@@ -288,12 +292,12 @@ Mesh resample(const RawData::RawData &raw_data,
             size_t index_mz =
                 x_index(raw_data, current_mz, num_samples_per_peak_mz);
             double sigma_mz = sigma_mz_vect[index_mz];
-            int64_t i_min = x_index(raw_data, index_mz - 3 * sigma_mz,
+            int64_t i_min = x_index(raw_data, current_mz - 3 * sigma_mz,
                                     num_samples_per_peak_mz);
             if (i_min < 0) {
                 i_min = 0;
             }
-            int64_t i_max = x_index(raw_data, index_mz + 3 * sigma_mz,
+            int64_t i_max = x_index(raw_data, current_mz + 3 * sigma_mz,
                                     num_samples_per_peak_mz);
             if (i_max >= n) {
                 i_max = n - 1;
@@ -503,8 +507,8 @@ PYBIND11_MODULE(tapp, m) {
         .def("resample", &PythonAPI::resample,
              "Resample the raw data into a smoothed warped grid",
              py::arg("raw_data"), py::arg("num_mz") = 10,
-             py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 1,
-             py::arg("smoothing_coef_rt") = 1)
+             py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 0.5,
+             py::arg("smoothing_coef_rt") = 0.5)
         .def("find_local_max", &PythonAPI::find_local_max,
              "Find all local maxima in the given mesh", py::arg("mesh"))
         .def("save_fitted_peaks", &PythonAPI::save_fitted_peaks,
