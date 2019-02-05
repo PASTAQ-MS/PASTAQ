@@ -19,7 +19,8 @@ RawData::RawData read_mzxml(std::string file_name, double min_mz, double max_mz,
                             double min_rt, double max_rt,
                             std::string instrument_type_str,
                             double resolution_ms1, double resolution_msn,
-                            double reference_mz, std::string polarity_str) {
+                            double reference_mz, double fwhm_rt,
+                            std::string polarity_str) {
     // Setup infinite range if no point was specified.
     min_rt = min_rt < 0 ? 0 : min_rt;
     max_rt = max_rt < 0 ? std::numeric_limits<double>::infinity() : max_rt;
@@ -112,32 +113,31 @@ RawData::RawData read_mzxml(std::string file_name, double min_mz, double max_mz,
                      << input_file;
         throw std::invalid_argument(error_stream.str());
     }
+    raw_data.value().fwhm_rt = fwhm_rt;
+
     return raw_data.value();
 }
 
-std::tuple<uint64_t, uint64_t> calculate_dimensions(
-    const RawData::RawData &raw_data, double avg_rt_fwhm,
-    uint64_t num_samples_per_peak_mz, uint64_t num_samples_per_peak_rt) {
-    // Calculate the number of sampling points in the rt dimension.
-    //
-    // NOTE(alex): Since the average retention time is given in FWHM and under
-    // the assumption of Gaussian chromatographic peaks, the FWHM ≈ 2.355 *
-    // sigma. We need then 3 sigma left and right of the center of the
-    // chromatographic peak to cover a 99.7 % of the gaussian peak area.
-    double sigma_rt = avg_rt_fwhm / (2 * std::sqrt(2 * std::log(2)));
-    double base_width_rt = sigma_rt * 6;
-    double delta_rt = base_width_rt / num_samples_per_peak_rt;
-    uint64_t num_points_rt =
-        std::ceil((raw_data.max_rt - raw_data.min_rt) / delta_rt);
-
-    double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
-
+uint64_t x_index(const RawData::RawData &raw_data, double mz, uint64_t k) {
     // FIXME: This only works for ORBITRAP data for now.
-    uint64_t num_points_mz =
-        num_samples_per_peak_mz * 2 * std::pow(raw_data.reference_mz, 1.5) /
-        fwhm_ref *
-        (1 / std::sqrt(raw_data.min_mz) - 1 / std::sqrt(raw_data.max_mz));
-    return std::tuple<uint64_t, uint64_t>(num_points_mz + 1, num_points_rt + 1);
+    double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
+    double a = fwhm_ref / std::pow(raw_data.reference_mz, 1.5);
+    double b = (1 / std::sqrt(raw_data.min_mz) - 1 / std::sqrt(mz));
+    return k * 2 / a * b;
+}
+
+uint64_t y_index(const RawData::RawData &raw_data, double rt, uint64_t k) {
+    double delta_rt = raw_data.fwhm_rt / k;
+    return std::ceil((rt - raw_data.min_rt) / delta_rt);
+}
+
+std::tuple<uint64_t, uint64_t> calculate_dimensions(
+    const RawData::RawData &raw_data, uint64_t num_samples_per_peak_mz,
+    uint64_t num_samples_per_peak_rt) {
+    // FIXME: This only works for ORBITRAP data for now.
+    return std::tuple<uint64_t, uint64_t>(
+        x_index(raw_data, raw_data.max_mz, num_samples_per_peak_mz) + 1,
+        y_index(raw_data, raw_data.max_rt, num_samples_per_peak_rt) + 1);
 }
 
 double mz_at(const RawData::RawData &raw_data, uint64_t num_samples_per_peak_mz,
@@ -222,12 +222,16 @@ struct Mesh {
     }
 };
 
-Mesh resample(const RawData::RawData &raw_data, double avg_rt_fwhm,
+double fwhm_to_sigma(double fwhm) {
+    return fwhm / (2 * std::sqrt(2 * std::log(2)));
+}
+
+Mesh resample(const RawData::RawData &raw_data,
               uint64_t num_samples_per_peak_mz,
-              uint64_t num_samples_per_peak_rt) {
-    auto [n, m] =
-        calculate_dimensions(raw_data, avg_rt_fwhm, num_samples_per_peak_mz,
-                             num_samples_per_peak_rt);
+              uint64_t num_samples_per_peak_rt, double smoothing_coef_mz,
+              double smoothing_coef_rt) {
+    auto [n, m] = calculate_dimensions(raw_data, num_samples_per_peak_mz,
+                                       num_samples_per_peak_rt);
     Mesh mesh;
     mesh.n = n;
     mesh.m = m;
@@ -245,22 +249,32 @@ Mesh resample(const RawData::RawData &raw_data, double avg_rt_fwhm,
         mesh.bins_rt[j] = raw_data.min_rt + delta_rt * j;
     }
 
-    double sigma_rt = avg_rt_fwhm / 2.355;  // FIXME: Approx
+    // Pre-calculate the smoothing sigma values for all bins of the grid.
+    double sigma_rt = fwhm_to_sigma(raw_data.fwhm_rt) * smoothing_coef_rt;
+    auto sigma_mz_vect = std::vector<double>(n);
+    for (size_t i = 0; i < n; ++i) {
+        sigma_mz_vect[i] = fwhm_to_sigma(fwhm_at(raw_data, mesh.bins_mz[i])) *
+                           smoothing_coef_mz;
+    }
 
     for (const auto &scan : raw_data.scans) {
         // Calculate the min and max indexes for retention time.
 
         // Find the bin for the current retention time.
-        // NOTE: y_index.
         double current_rt = scan.retention_time;
-        size_t index_rt = (current_rt - raw_data.min_rt) / delta_rt;
+        size_t index_rt =
+            y_index(raw_data, current_rt, num_samples_per_peak_rt);
 
         // The smoothing kernel in rt is +-(num_samples_per_peak_rt/2).
-        int64_t j_min = index_rt - num_samples_per_peak_rt / 2;
+        // int64_t j_min = index_rt - num_samples_per_peak_rt;
+        int64_t j_min = y_index(raw_data, current_rt - 3 * sigma_rt,
+                                num_samples_per_peak_rt);
         if (j_min < 0) {
             j_min = 0;
         }
-        int64_t j_max = index_rt + num_samples_per_peak_rt / 2;
+        // int64_t j_max = index_rt + num_samples_per_peak_rt;
+        int64_t j_max = y_index(raw_data, current_rt + 3 * sigma_rt,
+                                num_samples_per_peak_rt);
         if (j_max >= m) {
             j_max = m - 1;
         }
@@ -271,42 +285,30 @@ Mesh resample(const RawData::RawData &raw_data, double avg_rt_fwhm,
             // Find the bin for the current mz.
             double current_mz = scan.mz[k];
 
-            // NOTE: x_index
-            // FIXME: This only works for ORBITRAP data for now.
-            double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
-            uint64_t index_mz =
-                num_samples_per_peak_mz * 2 *
-                std::pow(raw_data.reference_mz, 1.5) / fwhm_ref *
-                (1 / std::sqrt(raw_data.min_mz) - 1 / std::sqrt(current_mz));
-            int64_t i_min = index_mz - num_samples_per_peak_mz / 2;
+            size_t index_mz =
+                x_index(raw_data, current_mz, num_samples_per_peak_mz);
+            double sigma_mz = sigma_mz_vect[index_mz];
+            int64_t i_min = x_index(raw_data, index_mz - 3 * sigma_mz,
+                                    num_samples_per_peak_mz);
             if (i_min < 0) {
                 i_min = 0;
             }
-            int64_t i_max = index_mz + num_samples_per_peak_mz / 2;
+            int64_t i_max = x_index(raw_data, index_mz + 3 * sigma_mz,
+                                    num_samples_per_peak_mz);
             if (i_max >= n) {
                 i_max = n - 1;
             }
 
             for (size_t j = j_min; j <= j_max; ++j) {
                 for (size_t i = i_min; i <= i_max; ++i) {
-                    // FIXME: ORBITRAP
-                    // NOTE: Should we precalculate this?
-                    double sigma_mz =
-                        (fwhm_ref *
-                         std::pow(current_mz / raw_data.reference_mz, 1.5)) /
-                        2.355;  // FIXME: Approx
-
                     // No need to do boundary check, since we are sure we are
                     // inside the grid.
                     double x = mesh.bins_mz[i];
                     double y = mesh.bins_rt[j];
 
                     // Calculate the gaussian weight for this point.
-                    // NOTE(alex): We could allow the user to set up the amount
-                    // of smoothing in each dimension by setting the multipliers
-                    // (x2 right now).
-                    double a = (x - current_mz) / sigma_mz * 2;
-                    double b = (y - current_rt) / sigma_rt * 2;
+                    double a = (x - current_mz) / sigma_mz;
+                    double b = (y - current_rt) / sigma_rt;
                     double weight = std::exp(-0.5 * (a * a + b * b));
 
                     // Set the value, weight and counts.
@@ -357,16 +359,6 @@ find_local_max(const Mesh &mesh) {
         }
     }
 
-    //// Sort the local maxima by descending intensity.
-    // auto sort_by_value = [](const Centroid::Point &p1,
-    // const Centroid::Point &p2) -> bool {
-    // return (p1.value > p2.value);
-    //};
-    // std::stable_sort(points.begin(), points.end(), sort_by_value);
-
-    // if (parameters.n_peaks != 0 && parameters.n_peaks < points.size()) {
-    // points.resize(parameters.n_peaks);
-    //}
     return points;
 }
 
@@ -496,10 +488,10 @@ PYBIND11_MODULE(tapp, m) {
           py::arg("min_rt") = -1.0, py::arg("max_rt") = -1.0,
           py::arg("instrument_type") = "", py::arg("resolution_ms1"),
           py::arg("resolution_msn"), py::arg("reference_mz"),
-          py::arg("polarity") = "")
+          py::arg("fwhm_rt"), py::arg("polarity") = "")
         .def("calculate_dimensions", &PythonAPI::calculate_dimensions,
              "Calculate the grid parameters for the given raw file",
-             py::arg("raw_data"), py::arg("rt_fwhm"), py::arg("num_mz") = 10,
+             py::arg("raw_data"), py::arg("num_mz") = 10,
              py::arg("num_rt") = 10)
         .def("mz_at", &PythonAPI::mz_at,
              "Calculate the mz at the given N for the given raw file",
@@ -509,8 +501,10 @@ PYBIND11_MODULE(tapp, m) {
              "raw file",
              py::arg("raw_data"), py::arg("mz"))
         .def("resample", &PythonAPI::resample,
-             "Resample the raw data into a warped grid", py::arg("raw_data"),
-             py::arg("rt_fwhm"), py::arg("num_mz") = 10, py::arg("num_rt") = 10)
+             "Resample the raw data into a smoothed warped grid",
+             py::arg("raw_data"), py::arg("num_mz") = 10,
+             py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 1,
+             py::arg("smoothing_coef_rt") = 1)
         .def("find_local_max", &PythonAPI::find_local_max,
              "Find all local maxima in the given mesh", py::arg("mesh"))
         .def("save_fitted_peaks", &PythonAPI::save_fitted_peaks,

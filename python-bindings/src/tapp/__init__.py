@@ -30,6 +30,7 @@ def load_example_data():
             resolution_ms1 = 75000,
             resolution_msn = 30000,
             reference_mz = 200,
+            fwhm_rt = 9,
             polarity = 'pos',
             min_mz = 801,
             max_mz = 803,
@@ -129,6 +130,33 @@ def plot_mesh(mesh, transform='none', figure=None):
         "rt_plot": rt_plot,
     })
 
+def find_roi(raw_data, local_max, avg_rt_fwhm=10):
+    peak_candidates = []
+    for i in range(0, len(local_max)):
+        selected_peak = local_max.iloc[i]
+        theoretical_sigma_mz = fwhm_at(raw_data, selected_peak['mz']) / (2 * math.sqrt(2 * math.log(2)))
+        theoretical_sigma_rt = avg_rt_fwhm / (2 * math.sqrt(2 * math.log(2)))
+        tolerance_mz = 3 * theoretical_sigma_mz
+        tolerance_rt = 3 * theoretical_sigma_rt
+        min_mz = selected_peak['mz'] - tolerance_mz
+        max_mz = selected_peak['mz'] + tolerance_mz
+        min_rt = selected_peak['rt'] - tolerance_rt
+        max_rt = selected_peak['rt'] + tolerance_rt
+
+        peak_candidates = peak_candidates + [{
+                'i': selected_peak['i'],
+                'j': selected_peak['j'],
+                'estimated_mz': selected_peak['mz'],
+                'estimated_rt': selected_peak['rt'],
+                'estimated_height': selected_peak['estimated_height'],
+                'roi_min_mz': min_mz,
+                'roi_max_mz': max_mz,
+                'roi_min_rt': min_rt,
+                'roi_max_rt': max_rt,
+            }]
+
+    return peak_candidates
+
 def fit_peaks(raw_data, local_max, num_scans=10, show_plot_fit=False, silent=True):
     # FIXME: The plotting should be independant of the fitting loop. This it is
     # terrible design.
@@ -143,8 +171,8 @@ def fit_peaks(raw_data, local_max, num_scans=10, show_plot_fit=False, silent=Tru
     fitted_peaks = []
     for i in range(0, len(local_max)):
         # Show log message each 10%
-        if i % (len(local_max)/10) == 0:
-            print("peak {0} out of {1}".format(i, local_max.shape[0]))
+        # if i % (len(local_max)/10) == 0:
+        print("peak {0} out of {1}".format(i, local_max.shape[0]))
 
         selected_peak = local_max.iloc[i]
         theoretical_sigma_mz = fwhm_at(raw_data, selected_peak['mz']) / 2.355 # FIXME: This is a rough approximation.
@@ -291,7 +319,7 @@ def fit_peaks(raw_data, local_max, num_scans=10, show_plot_fit=False, silent=Tru
     return fitted_peaks
 
 
-def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max_peaks=math.inf):
+def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max_peaks=15):
     if show_plot_fit or show_mesh_plot:
         plt.style.use('dark_background')
         plt.ion()
@@ -301,9 +329,9 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max
     raw_data = load_example_data()
 
     print("Resampling...")
-    n, m = calculate_dimensions(raw_data, 9, 10, 10)
+    n, m = calculate_dimensions(raw_data, 10, 10)
     print("Estimated memory consumption of the [{0}x{1}] grid: {2:.2f} (MB)".format(n, m, n * m /1024/1024 * 8))
-    mesh = resample(raw_data, 9, 10, 10)
+    mesh = resample(raw_data, 10, 10, 1, 1)
 
     print("Saving mesh to disk...")
     mesh.save("mesh.dat")
@@ -324,7 +352,7 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max
         mesh_plot['img_plot'].scatter(local_max['i'], local_max['j'], color='aqua', s=5, marker="s", alpha=0.9)
 
     print("Fitting peaks...")
-    fitted_peaks = fit_peaks(raw_data, local_max)
+    fitted_peaks = fit_peaks(raw_data, local_max, show_plot_fit=True)
     fitted_peaks_tuple = [tuple(fitted_peaks.iloc[row]) for row in range(0, fitted_peaks.shape[0])]
     print("Saving fitted peaks to disk...")
     tapp.save_fitted_peaks(list(fitted_peaks_tuple), "fitted_peaks.bpks")

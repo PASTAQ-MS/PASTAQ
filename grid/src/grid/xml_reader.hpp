@@ -63,6 +63,8 @@ struct RawData {
     double resolution_ms1;
     double resolution_msn;
     double reference_mz;
+    // Average full width half maximum of chromatographic peaks.
+    double fwhm_rt;
 
     // Extracted scans.
     std::vector<::RawData::Scan> scans;
