@@ -49,14 +49,15 @@ def load_example_data():
             # min_rt = 2000,
             # max_rt = 4000,
         # )
-     # raw_data = read_mzxml(
-            # '/data/qatar/17122018/mzXML/Acute2U_3001.mzXML',
-            # instrument_type = 'orbitrap',
-            # resolution_ms1 = 70000,
-            # resolution_msn = 30000,
-            # reference_mz = 200,
-            # polarity = 'pos',
-        # )
+     raw_data = read_mzxml(
+            '/data/qatar/17122018/mzXML/Acute2U_3001.mzXML',
+            instrument_type = 'orbitrap',
+            resolution_ms1 = 70000,
+            resolution_msn = 30000,
+            reference_mz = 200,
+            fwhm_rt = 9,
+            polarity = 'pos',
+        )
      return raw_data
 
 # NOTE: This is not the best design for this function and could be greatly improved.
@@ -130,6 +131,54 @@ def plot_mesh(mesh, transform='none', figure=None):
         "rt_plot": rt_plot,
     })
 
+def find_scan_indexes(raw_data, peak_candidate):
+    # Find min/max scans.
+    rts = np.array([scan.retention_time for scan in raw_data.scans])
+    scan_idx = np.where((rts >= peak_candidate['roi_min_rt']) & (rts <= peak_candidate['roi_max_rt']))[0]
+    return scan_idx
+
+def find_mz_indexes(raw_data, peak_candidate, scan_idx):
+    mz_idx = []
+    for j in scan_idx:
+        scan = raw_data.scans[j]
+        mz_i = np.where(np.array(
+            (scan.mz >= peak_candidate['roi_min_mz']) &
+            (scan.mz <= peak_candidate['roi_max_mz'])))[0]
+        mz_idx = mz_idx + [mz_i]
+    return mz_idx
+
+def find_raw_points(raw_data, scan_idx, mz_idx):
+    mzs = []
+    rts = []
+    intensities = []
+    for i in range(0, len(scan_idx)):
+        scan = raw_data.scans[scan_idx[i]]
+        mzs = mzs + [scan.mz[j] for j in mz_idx[i]]
+        intensities = intensities + [scan.intensity[j] for j in mz_idx[i]]
+        rts  = np.concatenate([rts, np.repeat(scan.retention_time, len(mz_idx[i]))])
+    return (np.array(mzs), np.array(intensities), np.array(rts))
+
+def gaus2d(X, a, x_0, sigma_x, y_0, sigma_y):
+    x = X[0]
+    y = X[1]
+    return a * np.exp(-0.5 * ((x - x_0) /sigma_x) ** 2 ) * np.exp(-0.5 * ((y - y_0)/sigma_y) ** 2)
+
+def fit_raw_points(mzs, intensities, rts):
+    X = np.array([mzs, rts])
+    mean_x = sum(X[0] * intensities) / sum(intensities)
+    sigma_x = np.sqrt(sum(intensities * (X[0] - mean_x)**2) / sum(intensities))
+    mean_y = sum(X[1] * intensities) / sum(intensities)
+    sigma_y = np.sqrt(sum(intensities * (X[1] - mean_y)**2) / sum(intensities))
+    fitted_parameters, pcov_2d = curve_fit(gaus2d, X, intensities, p0=[max(intensities), mean_x, sigma_x, mean_y, sigma_y])
+    return fitted_parameters
+
+def fit(raw_data, peak_candidate):
+    scan_idx = find_scan_indexes(raw_data, peak_candidate)
+    mz_idx = find_mz_indexes(raw_data, peak_candidate, scan_idx)
+    data_points = find_raw_points(raw_data, scan_idx, mz_idx)
+    fitted_parameters = fit_raw_points(data_points[0], data_points[1], data_points[2])
+    return fitted_parameters
+
 def find_roi(raw_data, local_max, avg_rt_fwhm=10):
     peak_candidates = []
     for i in range(0, len(local_max)):
@@ -156,6 +205,34 @@ def find_roi(raw_data, local_max, avg_rt_fwhm=10):
             }]
 
     return peak_candidates
+
+def profile_peak_fitting(max_peaks=20):
+    print("Loading data...")
+    raw_data = load_example_data()
+
+    print("Resampling...")
+    mesh = resample(raw_data, 10, 10)
+
+    print("Saving mesh to disk...")
+    mesh.save("mesh.dat")
+
+    print("Finding local maxima in mesh...")
+    local_max = find_local_max(mesh)
+    local_max = pd.DataFrame(local_max)
+    local_max.columns = ['i', 'j', 'mz', 'rt', 'intensity']
+    local_max = local_max.sort_values('intensity', ascending=False)
+    if max_peaks != math.inf:
+        local_max = local_max[0:max_peaks]
+
+    peak_candidates = find_roi(raw_data, local_max)
+    fitted_parameters = []
+    for peak_candidate in peak_candidates:
+        try:
+            fitted_parameters = fitted_parameters + [fit(raw_data, peak_candidate)]
+        except:
+            # print("Couldn't fit peak candidate: {}".format(peak_candidate))
+            pass
+    return fitted_parameters
 
 def fit_peaks(raw_data, local_max, num_scans=10, show_plot_fit=False, silent=True):
     # FIXME: The plotting should be independant of the fitting loop. This it is
@@ -317,7 +394,6 @@ def fit_peaks(raw_data, local_max, num_scans=10, show_plot_fit=False, silent=Tru
 
     fitted_peaks = pd.DataFrame(fitted_peaks)
     return fitted_peaks
-
 
 def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max_peaks=15):
     if show_plot_fit or show_mesh_plot:

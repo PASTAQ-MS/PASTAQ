@@ -118,6 +118,14 @@ RawData::RawData read_mzxml(std::string file_name, double min_mz, double max_mz,
     return raw_data.value();
 }
 
+//std::tuple<size_t, size_t> find_scan_indexes(const RawData::RawData &raw_data,
+                                             //double min_rt, double max_rt) {
+    //size_t min_j = 0;
+    //size_t max_j = raw_data.scans.size();
+
+    //// Find minimum index using binary search.
+//}
+
 uint64_t x_index(const RawData::RawData &raw_data, double mz, uint64_t k) {
     // FIXME: This only works for ORBITRAP data for now.
     double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
@@ -331,6 +339,11 @@ Mesh resample(const RawData::RawData &raw_data,
 std::vector<std::tuple<uint64_t, uint64_t, double, double, double>>
 find_local_max(const Mesh &mesh) {
     std::vector<std::tuple<uint64_t, uint64_t, double, double, double>> points;
+    // FIXME: This is performed in O(n^2), but using the divide and conquer
+    // strategy we might achieve O(n * log(n)) or lower.
+    // FIXME: Also, we should consider the corner case where neighbours are
+    // exactly equal, both should be considered a local maxima and the average
+    // of mz and rt should be reported.
     for (size_t j = 1; j < mesh.m - 1; ++j) {
         for (size_t i = 1; i < mesh.n - 1; ++i) {
             int index = i + j * mesh.n;
