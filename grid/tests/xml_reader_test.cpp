@@ -340,36 +340,7 @@ size_t lower_bound(const std::vector<RawData::Scan>& scans, double needle) {
 
 std::tuple<size_t, size_t> find_roi_indexes_rt(
     const std::vector<RawData::Scan>& scans, double min_rt, double max_rt) {
-    if (scans.size() == 0) {
-        return {0, 0};
-    }
-    // Binary search implementation of a sorted vector of scans. There is no
-    // bound check comparison so trying to search for a value lower than the
-    // lowest retention time scan will result in a segfault.
-    size_t l = 0;
-    size_t r = scans.size() - 1;
-    size_t min_i;
-    while (l <= r) {
-        min_i = (l + r) / 2;
-        if (scans[min_i].retention_time < min_rt) {
-            l = min_i + 1;
-        } else if (scans[min_i].retention_time > min_rt) {
-            r = min_i - 1;
-        } else {
-            break;
-        }
-    }
-    // Once we have found the minimum index for retention time we can perform
-    // a linear search for the upper limit, since the values should be resonably
-    // close.
-    size_t max_i = scans.size() - 1;
-    for (size_t i = min_i + 1; i < scans.size(); ++i) {
-        if (scans[i].retention_time >= max_rt) {
-            max_i = i;
-            break;
-        }
-    }
-    return {min_i, max_i};
+    return {min_j, max_j};
 }
 
 std::tuple<size_t, size_t> find_roi_indexes_mz(const RawData::Scan& scan,

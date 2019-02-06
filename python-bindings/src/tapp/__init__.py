@@ -49,15 +49,15 @@ def load_example_data():
             # min_rt = 2000,
             # max_rt = 4000,
         # )
-     raw_data = read_mzxml(
-            '/data/qatar/17122018/mzXML/Acute2U_3001.mzXML',
-            instrument_type = 'orbitrap',
-            resolution_ms1 = 70000,
-            resolution_msn = 30000,
-            reference_mz = 200,
-            fwhm_rt = 9,
-            polarity = 'pos',
-        )
+     # raw_data = read_mzxml(
+            # '/data/qatar/17122018/mzXML/Acute2U_3001.mzXML',
+            # instrument_type = 'orbitrap',
+            # resolution_ms1 = 70000,
+            # resolution_msn = 30000,
+            # reference_mz = 200,
+            # fwhm_rt = 9,
+            # polarity = 'pos',
+        # )
      return raw_data
 
 # NOTE: This is not the best design for this function and could be greatly improved.
@@ -158,6 +158,9 @@ def find_raw_points_py(raw_data, scan_idx, mz_idx):
         rts  = np.concatenate([rts, np.repeat(scan.retention_time, len(mz_idx[i]))])
     return (np.array(mzs), np.array(intensities), np.array(rts))
 
+def gaus(x, a, x0, sigma):
+        return a * np.exp(-(x - x0)**2 / (2 * sigma**2))
+
 def gaus2d(X, a, x_0, sigma_x, y_0, sigma_y):
     x = X[0]
     y = X[1]
@@ -188,6 +191,70 @@ def fit2(raw_data, peak_candidate):
             peak_candidate['roi_max_rt']
         )
     fitted_parameters = fit_raw_points(data_points.mz, data_points.intensity, data_points.rt)
+    return fitted_parameters
+
+def plot_peak_fit(raw_data, peak, fig_mz, fig_rt):
+    # PLOTTING
+    color = np.random.rand(3,1).flatten()
+
+    data_points = find_raw_points(
+            raw_data,
+            peak['roi_min_mz'],
+            peak['roi_max_mz'],
+            peak['roi_min_rt'],
+            peak['roi_max_rt']
+        )
+
+    rts = data_points.rt
+    mzs = data_points.mz
+    intensities = data_points.intensity
+
+    # MZ fit plot.
+    sort_idx_mz = np.argsort(mzs)
+    fitted_intensity_2d_mz = gaus(
+            np.array(mzs)[sort_idx_mz],
+            peak['fitted_height'],
+            peak['fitted_mz'],
+            peak['fitted_sigma_mz'],
+        )
+    plt.figure(fig_mz.number)
+    markerline, stemlines, baseline = plt.stem(np.array(mzs)[sort_idx_mz], np.array(intensities)[sort_idx_mz], label='intensities', markerfmt=' ')
+    plt.setp(baseline, color=color, alpha=0.5)
+    plt.setp(stemlines, color=color, alpha=0.5)
+    plt.plot(np.array(mzs)[sort_idx_mz], fitted_intensity_2d_mz, linestyle='--', color=color, label='2d_fitting')
+    plt.xlabel('m/z')
+    plt.ylabel('Intensity')
+
+    # RT fit plot.
+    xic_x = np.unique(rts)
+    # xic_y_max = []
+    # for x,y in zip(rts, intensities):
+        # pass
+    sort_idx_rt = np.argsort(xic_x)
+    fitted_intensity_2d_rt = gaus(
+            np.array(xic_x)[sort_idx_rt],
+            peak['fitted_height'],
+            peak['fitted_rt'],
+            peak['fitted_sigma_rt'],
+        )
+    plt.figure(fig_rt.number)
+    plt.plot(np.array(xic_x)[sort_idx_rt], fitted_intensity_2d_rt, color=color, linestyle='--')
+    # plt.plot(xic_x, xic_y_max, label=str(i), linestyle='-', color=color, alpha=0.5)
+    plt.xlabel('retention time (s)')
+    plt.ylabel('Intensity')
+
+    return
+
+def fit_and_plot(raw_data, peak_candidate):
+    data_points = find_raw_points(
+            raw_data,
+            peak_candidate['roi_min_mz'],
+            peak_candidate['roi_max_mz'],
+            peak_candidate['roi_min_rt'],
+            peak_candidate['roi_max_rt']
+        )
+    fitted_parameters = fit_raw_points(data_points.mz, data_points.intensity, data_points.rt)
+    plot_peak_candidate(data_points, fitted_parameters)
     return fitted_parameters
 
 def find_roi(raw_data, local_max, avg_rt_fwhm=10):
@@ -237,189 +304,47 @@ def profile_peak_fitting(max_peaks=20):
 
     peak_candidates = find_roi(raw_data, local_max)
     fitted_parameters = []
+    fitted_peaks = []
     for peak_candidate in peak_candidates:
         try:
-            fitted_parameters = fitted_parameters + [fit(raw_data, peak_candidate)]
-            # fitted_parameters = fitted_parameters + [fit2(raw_data, peak_candidate)]
+            # fitted_parameters = fitted_parameters + [fit(raw_data, peak_candidate)]
+            fitted_parameters = fitted_parameters + [fit2(raw_data, peak_candidate)]
+            peak = peak_candidate
+            peak['fitted_height'] = fitted_parameters[0]
+            peak['fitted_mz'] = fitted_parameters[1]
+            peak['fitted_sigma_mz'] = fitted_parameters[2]
+            peak['fitted_rt'] = fitted_parameters[3]
+            peak['fitted_sigma_rt'] = fitted_parameters[4]
+            fitted_peaks = fitted_peaks + [peak]
         except:
             # print("Couldn't fit peak candidate: {}".format(peak_candidate))
             pass
-    return fitted_parameters
 
-def fit_peaks(raw_data, local_max, num_scans=10, show_plot_fit=False, silent=True):
-    # FIXME: The plotting should be independant of the fitting loop. This it is
-    # terrible design.
-    if show_plot_fit:
-        plt.style.use('dark_background')
-        plt.ion()
-        plt.show()
-        fig_2 = plt.figure()
-        fig_3 = plt.figure()
-
-    retention_times = [scan.retention_time for scan in raw_data.scans]
-    fitted_peaks = []
-    for i in range(0, len(local_max)):
-        # Show log message each 10%
-        # if i % (len(local_max)/10) == 0:
-        print("peak {0} out of {1}".format(i, local_max.shape[0]))
-
-        selected_peak = local_max.iloc[i]
-        theoretical_sigma_mz = fwhm_at(raw_data, selected_peak['mz']) / 2.355 # FIXME: This is a rough approximation.
-        theoretical_sigma_rt = 6
-        tolerance_mz = 3 * theoretical_sigma_mz
-        min_mz = selected_peak['mz'] - tolerance_mz
-        max_mz = selected_peak['mz'] + tolerance_mz
-
-        # Find the required scans.
-        closest_scan_index = np.abs(retention_times - selected_peak['rt']).argmin()
-
-        # The closest N scans are used for fitting.
-        scan_indices = [idx for idx in list(range(closest_scan_index - int(num_scans/2), closest_scan_index + int(num_scans/2))) if idx >= 0 and idx < len(raw_data.scans)]
-
-        if len(scan_indices) < 3:
-            continue
-
-        # NOTE: Should we store the total number of non zero scans? this is the thing that we should use for filtering.
-        # print(scan_indices)
-        mzs = []
-        rts = []
-        intensities = []
-        if show_plot_fit:
-            xic_x = []
-            xic_y_total = []
-            xic_y_max = []
-        non_empty_scans = 0
-        for idx in scan_indices:
-            scan = raw_data.scans[idx]
-
-            mz_index = np.argwhere(np.array((scan.mz > min_mz) & (scan.mz < max_mz))).flatten()
-            if len(mz_index) == 0:
-                continue
-
-            non_empty_scans = non_empty_scans + 1
-            mzs = np.concatenate([mzs, np.array(scan.mz)[mz_index]])
-            intensities = np.concatenate([intensities, np.array(scan.intensity)[mz_index]])
-            rts  = np.concatenate([rts, np.repeat(scan.retention_time, len(mz_index))])
-
-            if show_plot_fit:
-                xic_x = xic_x + [scan.retention_time]
-                xic_y_total = xic_y_total + [np.array(scan.intensity)[mz_index].sum()]
-                xic_y_max = xic_y_max + [np.array(scan.intensity)[mz_index].max()]
-
-        if non_empty_scans < 3:
-            continue
-
-        def gaus(x, a, x0, sigma):
-                return a * np.exp(-(x - x0)**2 / (2 * sigma**2))
-
-        def gaus2d(X, a, x_0, sigma_x, y_0, sigma_y):
-            x = X[0]
-            y = X[1]
-            return a * np.exp(-0.5 * ((x - x_0) /sigma_x) ** 2 ) * np.exp(-0.5 * ((y - y_0)/sigma_y) ** 2)
-
-        try:
-            X = np.array([mzs, rts])
-            mean_x = sum(X[0] * intensities) / sum(intensities)
-            sigma_x = np.sqrt(sum(intensities * (X[0] - mean_x)**2) / sum(intensities))
-            mean_y = sum(X[1] * intensities) / sum(intensities)
-            sigma_y = np.sqrt(sum(intensities * (X[1] - mean_y)**2) / sum(intensities))
-            popt_2d, pcov_2d = curve_fit(gaus2d, X, intensities, p0=[max(intensities), mean_x, sigma_x, mean_y, sigma_y])
-        except:
-            if not silent:
-                print("error when fitting 2D gaussian on peak: {}".format(i))
-            continue
-
-        # Discard peaks where the fit is not conforming with the theoretical distributions.
-        if popt_2d[2] <= 0 or popt_2d[4] <= 0:
-            continue
-
-        if popt_2d[2] > 3 * theoretical_sigma_mz or popt_2d[4] > 3 * theoretical_sigma_rt:
-            continue
-
-        # Store the fitted parameters.
-        # fitted_peaks = fitted_peaks + [{
-                # 'smoothed_mz': selected_peak['mz'],
-                # 'smoothed_rt': selected_peak['rt'],
-                # 'estimated_mz': mean_x,
-                # 'estimated_rt': mean_y,
-                # 'estimated_sigma_mz': sigma_x,
-                # 'estimated_sigma_rt': sigma_y,
-                # 'fitted_mz': popt_2d[1],
-                # 'fitted_rt': popt_2d[3],
-                # 'fitted_height': popt_2d[0],
-                # 'fitted_sigma_mz': popt_2d[2],
-                # 'fitted_sigma_rt': popt_2d[4],
-                # 'fitted_total_intensity': np.array(intensities).sum(),
-                # 'roi_mz_min': min_mz,
-                # 'roi_mz_max': max_mz,
-                # 'roi_rt_min': rts[0],
-                # 'roi_rt_max': rts[-1],
-                # 'num_non_empty_scans': non_empty_scans,
-            # }]
-        fitted_peaks = fitted_peaks + [{
-                'i': selected_peak['i'],
-                'j': selected_peak['j'],
-                'mz': popt_2d[1],
-                'rt': popt_2d[3],
-                'height': popt_2d[0],
-                'total_intensity': np.array(intensities).sum(),
-                'sigma_mz': popt_2d[2],
-                'sigma_rt': popt_2d[4],
-            }]
-
-        if show_plot_fit:
-            # PLOTTING
-            color = np.random.rand(3,1).flatten()
-
-            # MZ fit plot.
-            sort_idx_mz = np.argsort(mzs)
-            fitted_intensity_2d_mz = gaus(np.array(mzs)[sort_idx_mz], popt_2d[0],popt_2d[1],popt_2d[2])
-            plt.figure(fig_2.number)
-            markerline, stemlines, baseline = plt.stem(np.array(mzs)[sort_idx_mz], np.array(intensities)[sort_idx_mz], label='intensities', markerfmt=' ')
-            plt.setp(baseline, color=color, alpha=0.5)
-            plt.setp(stemlines, color=color, alpha=0.5)
-            plt.plot(np.array(mzs)[sort_idx_mz], fitted_intensity_2d_mz, linestyle='--', color=color, label='2d_fitting')
-            plt.xlabel('m/z')
-            plt.ylabel('Intensity')
-
-            # RT fit plot.
-            sort_idx_rt = np.argsort(xic_x)
-            fitted_intensity_2d_rt = gaus(np.array(xic_x)[sort_idx_rt], popt_2d[0],popt_2d[3],popt_2d[4])
-            plt.figure(fig_3.number)
-            plt.plot(np.array(xic_x)[sort_idx_rt], fitted_intensity_2d_rt, color=color, linestyle='--')
-            plt.plot(xic_x, xic_y_max, label=str(i), linestyle='-', color=color, alpha=0.5)
-            plt.xlabel('retention time (s)')
-            plt.ylabel('Intensity')
-
-            # # # Contour plot
-            # # x = grid['bins_mz']
-            # # y = grid['bins_rt']
-            # # x, y = np.meshgrid(x, y)
-            # # Z = gaus2d((x,y), *popt_2d)
-            # # x = range(0, len(grid['bins_mz']))
-            # # y = range(0, len(grid['bins_rt']))
-            # # x, y = np.meshgrid(x, y)
-            # # grid_plot['grid_plot'].contour(x, y, Z, levels=[1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10], colors=[color], alpha=0.5)
-            # # grid_plot['grid_plot'].scatter(selected_peak['i'], selected_peak['j'], color=color, marker='x')
-            # # grid_plot['grid_plot'].scatter(popt_2d[1]/(np.array(grid['bins_mz']).max() - np.array(grid['bins_mz']).min()), popt_2d[3] - np.array(grid['bins_rt']).min(), color=color, marker='P')
-            # # print(np.abs(popt_2d[1] - selected_peak['mz']))
-
-    fitted_peaks = pd.DataFrame(fitted_peaks)
     return fitted_peaks
 
-def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max_peaks=15):
+def example_pipeline(show_mesh_plot=False, show_plot_fit=True, silent=True, max_peaks=15):
     if show_plot_fit or show_mesh_plot:
         plt.style.use('dark_background')
         plt.ion()
         plt.show()
 
     print("Loading data...")
-    raw_data = load_example_data()
+    raw_data = read_mzxml(
+        '/data/toydata/toy_data.mzXML',
+        instrument_type = 'orbitrap',
+        resolution_ms1 = 75000,
+        resolution_msn = 30000,
+        reference_mz = 200,
+        fwhm_rt = 9,
+        polarity = 'pos',
+        min_mz = 801,
+        max_mz = 803,
+        min_rt = 2808,
+        max_rt = 2928,
+    )
 
     print("Resampling...")
-    n, m = calculate_dimensions(raw_data, 10, 10)
-    print("Estimated memory consumption of the [{0}x{1}] grid: {2:.2f} (MB)".format(n, m, n * m /1024/1024 * 8))
-    mesh = resample(raw_data, 10, 10, 0.33, 0.33)
+    mesh = resample(raw_data, 10, 10, 0.5, 0.5)
 
     print("Saving mesh to disk...")
     mesh.save("mesh.dat")
@@ -440,10 +365,32 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max
         mesh_plot['img_plot'].scatter(local_max['i'], local_max['j'], color='aqua', s=5, marker="s", alpha=0.9)
 
     print("Fitting peaks...")
-    fitted_peaks = fit_peaks(raw_data, local_max, show_plot_fit=show_plot_fit)
-    fitted_peaks_tuple = [tuple(fitted_peaks.iloc[row]) for row in range(0, fitted_peaks.shape[0])]
-    print("Saving fitted peaks to disk...")
-    tapp.save_fitted_peaks(list(fitted_peaks_tuple), "fitted_peaks.bpks")
+    peak_candidates = find_roi(raw_data, local_max)
+    fitted_peaks = []
+    if show_plot_fit:
+        fig_mz = plt.figure()
+        fig_rt = plt.figure()
+    for peak_candidate in peak_candidates:
+        try:
+            # fitted_parameters = fitted_parameters + [fit(raw_data, peak_candidate)]
+            fitted_parameters = fit2(raw_data, peak_candidate)
+            peak = peak_candidate
+            peak['fitted_height'] = fitted_parameters[0]
+            peak['fitted_mz'] = fitted_parameters[1]
+            peak['fitted_sigma_mz'] = fitted_parameters[2]
+            peak['fitted_rt'] = fitted_parameters[3]
+            peak['fitted_sigma_rt'] = fitted_parameters[4]
+            fitted_peaks = fitted_peaks + [peak]
+            if show_plot_fit:
+                plot_peak_fit(raw_data, peak, fig_mz, fig_rt)
+        except Exception as e:
+            print(e)
+            pass
+
+    # fitted_peaks = fit_peaks(raw_data, local_max, show_plot_fit=show_plot_fit)
+    # fitted_peaks_tuple = [tuple(fitted_peaks.iloc[row]) for row in range(0, fitted_peaks.shape[0])]
+    # print("Saving fitted peaks to disk...")
+    # tapp.save_fitted_peaks(list(fitted_peaks_tuple), "fitted_peaks.bpks")
     # pd.DataFrame(fitted_peaks).to_csv('fitted_peaks.csv')
 
     return (raw_data, mesh, local_max, fitted_peaks)

@@ -157,27 +157,32 @@ RoiIndices find_roi_indexes(const RawData::RawData &raw_data, const Roi &roi) {
             max_rt = raw_data.max_rt;
         }
         // Binary search for lower bound.
-        size_t l = 0;
-        size_t r = scans.size() - 1;
-        roi_indices.min_j;
+        size_t min_j = 0;
+        size_t max_j = raw_data.scans.size() - 1;
+        size_t l = min_j;
+        size_t r = max_j;
         while (l <= r) {
-            roi_indices.min_j = (l + r) / 2;
-            if (scans[roi_indices.min_j].retention_time < min_rt) {
-                l = roi_indices.min_j + 1;
-            } else if (scans[roi_indices.min_j].retention_time > min_rt) {
-                r = roi_indices.min_j - 1;
+            min_j = (l + r) / 2;
+            if (scans[min_j].retention_time < min_rt) {
+                l = min_j + 1;
+            } else if (scans[min_j].retention_time > min_rt) {
+                r = min_j - 1;
             } else {
                 break;
             }
         }
         // Linear search for upper bound.
-        roi_indices.max_j = scans.size() - 1;
-        for (size_t i = roi_indices.min_j + 1; i < scans.size(); ++i) {
+        if (min_j != max_j) {
+            min_j = min_j + 1;
+        }
+        for (size_t i = min_j; i < scans.size(); ++i) {
             if (scans[i].retention_time >= max_rt) {
-                roi_indices.max_j = i;
+                max_j = i;
                 break;
             }
         }
+        roi_indices.min_j = min_j;
+        roi_indices.max_j = max_j;
     }
 
     // Find m/z indices per scan.
@@ -186,16 +191,13 @@ RoiIndices find_roi_indexes(const RawData::RawData &raw_data, const Roi &roi) {
     roi_indices.max_i =
         std::vector<size_t>(roi_indices.max_j - roi_indices.min_j + 1);
     size_t k = 0;
-    for (size_t j = roi_indices.min_j; j <= roi_indices.max_j; ++j, ++k) {
+    for (size_t j = roi_indices.min_j; j < roi_indices.max_j; ++j, ++k) {
         const auto &scan = scans[j];
         if (scan.num_points == 0) {
             // return {0, 0};
             // TODO: Throw exception for python code to catch?
             continue;
         }
-        size_t min_i = 0;
-        size_t max_i = scan.num_points - 1;
-        // TODO: Preinitialize min_i/max_i vectors.
         {
             double min_mz = roi.min_mz;
             double max_mz = roi.max_mz;
@@ -206,6 +208,8 @@ RoiIndices find_roi_indexes(const RawData::RawData &raw_data, const Roi &roi) {
                 max_mz = scan.mz[scan.num_points - 1];
             }
             // Binary search for lower bound.
+            size_t min_i = 0;
+            size_t max_i = scan.num_points - 1;
             size_t l = min_i;
             size_t r = max_i;
             while (l <= r) {
@@ -219,15 +223,18 @@ RoiIndices find_roi_indexes(const RawData::RawData &raw_data, const Roi &roi) {
                 }
             }
             // Linear search for upper bound.
-            for (size_t i = min_i + 1; i < scan.mz.size(); ++i) {
+            if (min_i != max_i) {
+                min_i = min_i + 1;
+            }
+            for (size_t i = min_i; i < scan.mz.size(); ++i) {
                 if (scan.mz[i] >= max_mz) {
                     max_i = i;
                     break;
                 }
             }
+            roi_indices.min_i[k] = min_i;
+            roi_indices.max_i[k] = max_i;
         }
-        roi_indices.min_i[k] = min_i;
-        roi_indices.max_i[k] = max_i;
     }
 
     return roi_indices;
@@ -251,9 +258,9 @@ RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
     // TODO: Prealloc the thing...
     RawPoints raw_points;
     size_t k = 0;
-    for (size_t j = indices.min_j; j <= indices.max_j; ++j, ++k) {
+    for (size_t j = indices.min_j; j < indices.max_j; ++j, ++k) {
         const auto &scan = raw_data.scans[j];
-        for (size_t i = indices.min_i[k]; i <= indices.max_i[k]; ++i) {
+        for (size_t i = indices.min_i[k]; i < indices.max_i[k]; ++i) {
             raw_points.rt.push_back(scan.retention_time);
             raw_points.mz.push_back(scan.mz[i]);
             raw_points.intensity.push_back(scan.intensity[i]);
