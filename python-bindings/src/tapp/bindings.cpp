@@ -118,13 +118,149 @@ RawData::RawData read_mzxml(std::string file_name, double min_mz, double max_mz,
     return raw_data.value();
 }
 
-//std::tuple<size_t, size_t> find_scan_indexes(const RawData::RawData &raw_data,
-                                             //double min_rt, double max_rt) {
-    //size_t min_j = 0;
-    //size_t max_j = raw_data.scans.size();
+struct Roi {
+    double min_mz;
+    double max_mz;
+    double min_rt;
+    double max_rt;
+};
 
-    //// Find minimum index using binary search.
-//}
+struct RoiIndices {
+    size_t min_j;
+    size_t max_j;
+
+    std::vector<size_t> min_i;
+    std::vector<size_t> max_i;
+};
+
+// TODO: This should be tested.
+RoiIndices find_roi_indexes(const RawData::RawData &raw_data, const Roi &roi) {
+    // The search procedure for the indices for both retention time and m/z is
+    // the same: Fist a binary search is performed to find the lower bound,
+    // followed by a linear search from the minimum index to find the upper
+    // bound.
+    //
+    const auto &scans = raw_data.scans;
+    if (scans.size() == 0) {
+        // return {0, 0};
+        // TODO: Throw exception for python code to catch?
+    }
+    RoiIndices roi_indices;
+    // Find scan indices.
+    {
+        double min_rt = roi.min_rt;
+        double max_rt = roi.max_rt;
+        if (min_rt < raw_data.min_rt) {
+            min_rt = raw_data.min_rt;
+        }
+        if (max_rt > raw_data.max_rt) {
+            max_rt = raw_data.max_rt;
+        }
+        // Binary search for lower bound.
+        size_t l = 0;
+        size_t r = scans.size() - 1;
+        roi_indices.min_j;
+        while (l <= r) {
+            roi_indices.min_j = (l + r) / 2;
+            if (scans[roi_indices.min_j].retention_time < min_rt) {
+                l = roi_indices.min_j + 1;
+            } else if (scans[roi_indices.min_j].retention_time > min_rt) {
+                r = roi_indices.min_j - 1;
+            } else {
+                break;
+            }
+        }
+        // Linear search for upper bound.
+        roi_indices.max_j = scans.size() - 1;
+        for (size_t i = roi_indices.min_j + 1; i < scans.size(); ++i) {
+            if (scans[i].retention_time >= max_rt) {
+                roi_indices.max_j = i;
+                break;
+            }
+        }
+    }
+
+    // Find m/z indices per scan.
+    roi_indices.min_i =
+        std::vector<size_t>(roi_indices.max_j - roi_indices.min_j + 1);
+    roi_indices.max_i =
+        std::vector<size_t>(roi_indices.max_j - roi_indices.min_j + 1);
+    size_t k = 0;
+    for (size_t j = roi_indices.min_j; j <= roi_indices.max_j; ++j, ++k) {
+        const auto &scan = scans[j];
+        if (scan.num_points == 0) {
+            // return {0, 0};
+            // TODO: Throw exception for python code to catch?
+            continue;
+        }
+        size_t min_i = 0;
+        size_t max_i = scan.num_points - 1;
+        // TODO: Preinitialize min_i/max_i vectors.
+        {
+            double min_mz = roi.min_mz;
+            double max_mz = roi.max_mz;
+            if (min_mz < scan.mz[0]) {
+                min_mz = scan.mz[0];
+            }
+            if (max_mz > scan.mz[scan.num_points - 1]) {
+                max_mz = scan.mz[scan.num_points - 1];
+            }
+            // Binary search for lower bound.
+            size_t l = min_i;
+            size_t r = max_i;
+            while (l <= r) {
+                min_i = (l + r) / 2;
+                if (scan.mz[min_i] < min_mz) {
+                    l = min_i + 1;
+                } else if (scan.mz[min_i] > min_mz) {
+                    r = min_i - 1;
+                } else {
+                    break;
+                }
+            }
+            // Linear search for upper bound.
+            for (size_t i = min_i + 1; i < scan.mz.size(); ++i) {
+                if (scan.mz[i] >= max_mz) {
+                    max_i = i;
+                    break;
+                }
+            }
+        }
+        roi_indices.min_i[k] = min_i;
+        roi_indices.max_i[k] = max_i;
+    }
+
+    return roi_indices;
+}
+
+struct RawPoint {
+    double rt;
+    double mz;
+    double intensity;
+};
+
+struct RawPoints {
+    std::vector<double> rt;
+    std::vector<double> mz;
+    std::vector<double> intensity;
+};
+
+RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
+                          double max_mz, double min_rt, double max_rt) {
+    auto indices = find_roi_indexes(raw_data, {min_mz, max_mz, min_rt, max_rt});
+    // TODO: Prealloc the thing...
+    RawPoints raw_points;
+    size_t k = 0;
+    for (size_t j = indices.min_j; j <= indices.max_j; ++j, ++k) {
+        const auto &scan = raw_data.scans[j];
+        for (size_t i = indices.min_i[k]; i <= indices.max_i[k]; ++i) {
+            raw_points.rt.push_back(scan.retention_time);
+            raw_points.mz.push_back(scan.mz[i]);
+            raw_points.intensity.push_back(scan.intensity[i]);
+        }
+    }
+    return raw_points;
+}
 
 uint64_t x_index(const RawData::RawData &raw_data, double mz, uint64_t k) {
     // FIXME: This only works for ORBITRAP data for now.
@@ -498,6 +634,11 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("bins_rt", &PythonAPI::Mesh::bins_rt)
         .def("save", &PythonAPI::Mesh::save, py::arg("file_name"));
 
+    py::class_<PythonAPI::RawPoints>(m, "RawPoints")
+        .def_readonly("rt", &PythonAPI::RawPoints::rt)
+        .def_readonly("mz", &PythonAPI::RawPoints::mz)
+        .def_readonly("intensity", &PythonAPI::RawPoints::intensity);
+
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,
           "Read raw data from the given mzXML file ", py::arg("file_name"),
@@ -526,5 +667,9 @@ PYBIND11_MODULE(tapp, m) {
              "Find all local maxima in the given mesh", py::arg("mesh"))
         .def("save_fitted_peaks", &PythonAPI::save_fitted_peaks,
              "Save the fitted peaks as a bpks file", py::arg("fitted_peaks"),
-             py::arg("file_name"));
+             py::arg("file_name"))
+        .def("find_raw_points", &PythonAPI::find_raw_points,
+             "Save the fitted peaks as a bpks file", py::arg("raw_data"),
+             py::arg("min_mz"), py::arg("max_mz"), py::arg("min_rt"),
+             py::arg("max_rt"));
 }

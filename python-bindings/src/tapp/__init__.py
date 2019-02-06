@@ -147,7 +147,7 @@ def find_mz_indexes(raw_data, peak_candidate, scan_idx):
         mz_idx = mz_idx + [mz_i]
     return mz_idx
 
-def find_raw_points(raw_data, scan_idx, mz_idx):
+def find_raw_points_py(raw_data, scan_idx, mz_idx):
     mzs = []
     rts = []
     intensities = []
@@ -175,8 +175,19 @@ def fit_raw_points(mzs, intensities, rts):
 def fit(raw_data, peak_candidate):
     scan_idx = find_scan_indexes(raw_data, peak_candidate)
     mz_idx = find_mz_indexes(raw_data, peak_candidate, scan_idx)
-    data_points = find_raw_points(raw_data, scan_idx, mz_idx)
+    data_points = find_raw_points_py(raw_data, scan_idx, mz_idx)
     fitted_parameters = fit_raw_points(data_points[0], data_points[1], data_points[2])
+    return fitted_parameters
+
+def fit2(raw_data, peak_candidate):
+    data_points = find_raw_points(
+            raw_data,
+            peak_candidate['roi_min_mz'],
+            peak_candidate['roi_max_mz'],
+            peak_candidate['roi_min_rt'],
+            peak_candidate['roi_max_rt']
+        )
+    fitted_parameters = fit_raw_points(data_points.mz, data_points.intensity, data_points.rt)
     return fitted_parameters
 
 def find_roi(raw_data, local_max, avg_rt_fwhm=10):
@@ -211,7 +222,7 @@ def profile_peak_fitting(max_peaks=20):
     raw_data = load_example_data()
 
     print("Resampling...")
-    mesh = resample(raw_data, 10, 10)
+    mesh = resample(raw_data, 5, 5, 0.5, 0.5)
 
     print("Saving mesh to disk...")
     mesh.save("mesh.dat")
@@ -229,6 +240,7 @@ def profile_peak_fitting(max_peaks=20):
     for peak_candidate in peak_candidates:
         try:
             fitted_parameters = fitted_parameters + [fit(raw_data, peak_candidate)]
+            # fitted_parameters = fitted_parameters + [fit2(raw_data, peak_candidate)]
         except:
             # print("Couldn't fit peak candidate: {}".format(peak_candidate))
             pass
@@ -407,7 +419,7 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max
     print("Resampling...")
     n, m = calculate_dimensions(raw_data, 10, 10)
     print("Estimated memory consumption of the [{0}x{1}] grid: {2:.2f} (MB)".format(n, m, n * m /1024/1024 * 8))
-    mesh = resample(raw_data, 10, 10)
+    mesh = resample(raw_data, 10, 10, 0.33, 0.33)
 
     print("Saving mesh to disk...")
     mesh.save("mesh.dat")
@@ -428,7 +440,7 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=False, silent=True, max
         mesh_plot['img_plot'].scatter(local_max['i'], local_max['j'], color='aqua', s=5, marker="s", alpha=0.9)
 
     print("Fitting peaks...")
-    fitted_peaks = fit_peaks(raw_data, local_max, show_plot_fit=True)
+    fitted_peaks = fit_peaks(raw_data, local_max, show_plot_fit=show_plot_fit)
     fitted_peaks_tuple = [tuple(fitted_peaks.iloc[row]) for row in range(0, fitted_peaks.shape[0])]
     print("Saving fitted peaks to disk...")
     tapp.save_fitted_peaks(list(fitted_peaks_tuple), "fitted_peaks.bpks")
