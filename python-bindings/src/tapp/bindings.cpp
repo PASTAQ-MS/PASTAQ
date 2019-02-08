@@ -255,11 +255,18 @@ struct RawPoints {
 RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
                           double max_mz, double min_rt, double max_rt) {
     auto indices = find_roi_indexes(raw_data, {min_mz, max_mz, min_rt, max_rt});
-    // TODO: Prealloc the thing...
     RawPoints raw_points;
     size_t k = 0;
+    if (((int64_t)indices.max_j - (int64_t)indices.min_j) <= 3) {
+        std::ostringstream error_stream;
+        error_stream << "not enough scans to perform fitting...";
+        throw std::invalid_argument(error_stream.str());
+    }
     for (size_t j = indices.min_j; j < indices.max_j; ++j, ++k) {
         const auto &scan = raw_data.scans[j];
+        if (((int64_t)indices.max_i[k] - (int64_t)indices.min_i[k]) <= 3) {
+            continue;
+        }
         for (size_t i = indices.min_i[k]; i < indices.max_i[k]; ++i) {
             raw_points.rt.push_back(scan.retention_time);
             raw_points.mz.push_back(scan.mz[i]);
