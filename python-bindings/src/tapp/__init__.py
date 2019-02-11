@@ -245,6 +245,141 @@ def fit_guos(x, y):
     # print(np.allclose(np.dot(X, A), Y))
     return np.array([height, mean, sigma])
 
+def fit_guos_2d_prime(x, y, z):
+    x_mean = x.mean()
+    x = x - x_mean
+    y_mean = y.mean()
+    y = y - y_mean
+
+    z_2 = np.power(z, 2)
+    x_2 = np.power(x, 2)
+    x_3 = np.power(x, 3)
+    x_4 = np.power(x, 4)
+    y_2 = np.power(y, 2)
+    y_3 = np.power(y, 3)
+    y_4 = np.power(y, 4)
+
+    X = np.array(
+            [
+                [
+                    z_2.sum(),
+                    (x * z_2).sum(),
+                    (x_2 * z_2).sum(),
+                    (y * z_2).sum(),
+                    (y_2 * z_2).sum(),
+                ],
+                [
+                    (x * z_2).sum(),
+                    (x_2 * z_2).sum(),
+                    (x_3 * z_2).sum(),
+                    (x * y * z_2).sum(),
+                    (x * y_2 * z_2).sum(),
+                ],
+                [
+                    (x_2 * z_2).sum(),
+                    (x_3 * z_2).sum(),
+                    (x_4 * z_2).sum(),
+                    (x_2 * y * z_2).sum(),
+                    (x_2 * y_2 * z_2).sum(),
+                ],
+                [
+                    (y * z_2).sum(),
+                    (x * y * z_2).sum(),
+                    (x_2 * y * z_2).sum(),
+                    (y_2 * z_2).sum(),
+                    (y_3 * z_2).sum(),
+                ],
+                [
+                    (y_2 * z_2).sum(),
+                    (x * y_2 * z_2).sum(),
+                    (x_2 * y_2 * z_2).sum(),
+                    (y_3 * z_2).sum(),
+                    (y_4 * z_2).sum(),
+                ],
+            ],
+        )
+    Y = np.array([
+            (z_2 * np.log(z)).sum(),
+            (z_2 * x * np.log(z)).sum(),
+            (z_2 * x_2 * np.log(z)).sum(),
+            (z_2 * y * np.log(z)).sum(),
+            (z_2 * y_2 * np.log(z)).sum(),
+        ])
+    return X, Y
+
+def fit_guos_2d(x, y, z):
+    x_mean = x.mean()
+    x = x - x_mean
+    y_mean = y.mean()
+    y = y - y_mean
+
+    z_2 = np.power(z, 2)
+    x_2 = np.power(x, 2)
+    x_3 = np.power(x, 3)
+    x_4 = np.power(x, 4)
+    y_2 = np.power(y, 2)
+    y_3 = np.power(y, 3)
+    y_4 = np.power(y, 4)
+
+    X = np.array(
+            [
+                [
+                    z_2.sum(),
+                    (x * z_2).sum(),
+                    (x_2 * z_2).sum(),
+                    (y * z_2).sum(),
+                    (y_2 * z_2).sum(),
+                ],
+                [
+                    (x * z_2).sum(),
+                    (x_2 * z_2).sum(),
+                    (x_3 * z_2).sum(),
+                    (x * y * z_2).sum(),
+                    (x * y_2 * z_2).sum(),
+                ],
+                [
+                    (x_2 * z_2).sum(),
+                    (x_3 * z_2).sum(),
+                    (x_4 * z_2).sum(),
+                    (x_2 * y * z_2).sum(),
+                    (x_2 * y_2 * z_2).sum(),
+                ],
+                [
+                    (y * z_2).sum(),
+                    (x * y * z_2).sum(),
+                    (x_2 * y * z_2).sum(),
+                    (y_2 * z_2).sum(),
+                    (y_3 * z_2).sum(),
+                ],
+                [
+                    (y_2 * z_2).sum(),
+                    (x * y_2 * z_2).sum(),
+                    (x_2 * y_2 * z_2).sum(),
+                    (y_3 * z_2).sum(),
+                    (y_4 * z_2).sum(),
+                ],
+            ],
+        )
+    Y = np.array([
+            (z_2 * np.log(z)).sum(),
+            (z_2 * x * np.log(z)).sum(),
+            (z_2 * x_2 * np.log(z)).sum(),
+            (z_2 * y * np.log(z)).sum(),
+            (z_2 * y_2 * np.log(z)).sum(),
+        ])
+    # a, b, c, d, e = np.linalg.solve(X, Y)
+    beta = np.linalg.lstsq(X,Y)
+    a, b, c, d, e = beta[0]
+
+    sigma_mz = np.sqrt(1/(-2 * c))
+    mz = b / (-2 * c) + x_mean
+    sigma_rt = np.sqrt(1/(-2 * e))
+    rt = d / (-2 * e) + y_mean
+    height = np.exp(a - ((b ** 2) / (4 * c)) - ((d ** 2) / (4 * e)))
+
+    # print(np.allclose(np.dot(X, A), Y))
+    return np.array([height, mz, sigma_mz, rt, sigma_rt])
+
 def test_gaus_fit():
     x, y = generate_gaussian()
     parameters_inle = fit_inle(x, y)
@@ -305,10 +440,13 @@ def fit3(raw_data, peak_candidate):
             peak_candidate['roi_min_rt'],
             peak_candidate['roi_max_rt']
         )
+    return fit_guos_2d(np.array(data_points.mz), np.array(data_points.rt), np.array(data_points.intensity))
     # parameters_caruana = fit_caruana(np.array(data_points.mz), np.array(data_points.intensity))
     # return np.concatenate([parameters_caruana, [0,0]])
-    parameters_guos = fit_guos(np.array(data_points.mz), np.array(data_points.intensity))
-    return np.concatenate([parameters_guos, [0,0]])
+    # parameters_guos = fit_guos(np.array(data_points.mz), np.array(data_points.intensity))
+    # return np.concatenate([parameters_guos, [0,0]])
+    # parameters_inle = fit_inle(np.array(data_points.mz), np.array(data_points.intensity))
+    # return np.concatenate([parameters_inle, [0,0]])
     # X = np.column_stack(
         # (
             # np.repeat(1, len(data_points.mz)),
@@ -451,7 +589,15 @@ def find_roi(raw_data, local_max, avg_rt_fwhm=10):
 
 def profile_peak_fitting(max_peaks=20):
     print("Loading data...")
-    raw_data = load_example_data()
+    raw_data = read_mzxml(
+        '/data/qatar/17122018/mzXML/Acute2U_3001.mzXML',
+        instrument_type = 'orbitrap',
+        resolution_ms1 = 70000,
+        resolution_msn = 30000,
+        reference_mz = 200,
+        fwhm_rt = 9,
+        polarity = 'pos',
+    )
 
     print("Resampling...")
     mesh = resample(raw_data, 5, 5, 0.5, 0.5)
@@ -473,7 +619,8 @@ def profile_peak_fitting(max_peaks=20):
     for peak_candidate in peak_candidates:
         try:
             # fitted_parameters = fitted_parameters + [fit(raw_data, peak_candidate)]
-            fitted_parameters = fitted_parameters + [fit2(raw_data, peak_candidate)]
+            # fitted_parameters = fitted_parameters + [fit2(raw_data, peak_candidate)]
+            fitted_parameters = fitted_parameters + [fit3(raw_data, peak_candidate)]
             peak = peak_candidate
             peak['fitted_height'] = fitted_parameters[0]
             peak['fitted_mz'] = fitted_parameters[1]
