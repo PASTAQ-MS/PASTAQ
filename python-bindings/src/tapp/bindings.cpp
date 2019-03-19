@@ -134,6 +134,8 @@ struct RoiIndices {
 };
 
 // TODO: This should be tested.
+// FIXME: This has a pretty important problem. It's not possible to tell if we
+// are returning a single scan or if we couldn't find any indices on the ROI.
 RoiIndices find_roi_indexes(const RawData::RawData &raw_data, const Roi &roi) {
     // The search procedure for the indices for both retention time and m/z is
     // the same: Fist a binary search is performed to find the lower bound,
@@ -519,32 +521,65 @@ Mesh resample_2(const RawData::RawData &raw_data,
                            smoothing_coef_mz;
     }
 
-    for (size_t row = 0; row < m - 1; ++row) {
+    size_t previous_min_j = 0;
+    for (size_t row = 0; row < m; ++row) {
         // Find scans that belong to this bin in rt.
         double min_rt = mesh.bins_rt[row] - 3 * sigma_rt;
         double max_rt = mesh.bins_rt[row] + 3 * sigma_rt;
         double current_rt = mesh.bins_rt[row];
 
-        auto smoothed_row = std::vector<double>(n);
+        // Find index range on the smoothed raw spectra for rt smoothing.
+        // NOTE: min_j is inclusive and max_j is exclusive.
+        int64_t min_j = 0;
+        int64_t max_j = raw_data.scans.size();
+        for (size_t j = previous_min_j; j < raw_data.scans.size(); ++j) {
+            if (raw_data.scans[j].retention_time > min_rt && j != 0) {
+                min_j = j - 1;
+                break;
+            }
+        }
+        previous_min_j = min_j;
+
         for (size_t col = 0; col < n; ++col) {
             double min_mz = mesh.bins_mz[col] - 3 * sigma_mz_vect[col];
             double max_mz = mesh.bins_mz[col] + 3 * sigma_mz_vect[col];
             double current_mz = mesh.bins_mz[col];
             double sigma_mz = sigma_mz_vect[col];
 
-            auto indices =
-                find_roi_indexes(raw_data, {min_mz, max_mz, min_rt, max_rt});
-
             size_t k = 0;
             double sum_weights = 0;
             double sum_weights_values = 0;
-            for (size_t j = indices.min_j; j < indices.max_j; ++j, ++k) {
+            for (size_t j = min_j; j < max_j; ++j, ++k) {
                 const auto &scan = raw_data.scans[j];
-                if (((int64_t)indices.max_i[k] - (int64_t)indices.min_i[k]) ==
-                    0) {
-                    continue;
+                if (scan.retention_time > max_rt) {
+                    break;
                 }
-                for (size_t i = indices.min_i[k]; i < indices.max_i[k]; ++i) {
+
+                // Find mz indexes.
+                // NOTE: min_i is inclusive and max_i is exclusive.
+                // Binary search for lower bound.
+                size_t min_i = 0;
+                size_t max_i = scan.num_points;
+                size_t l = min_i;
+                size_t r = max_i - 1;
+                while (l <= r) {
+                    min_i = (l + r) / 2;
+                    if (scan.mz[min_i] < min_mz) {
+                        l = min_i + 1;
+                    } else if (scan.mz[min_i] > min_mz) {
+                        r = min_i - 1;
+                    } else {
+                        break;
+                    }
+                    if (min_i == 0) {
+                        break;
+                    }
+                }
+
+                for (size_t i = min_i; i < scan.num_points; ++i) {
+                    if (scan.mz[i] > max_mz) {
+                        break;
+                    }
                     double a = (scan.mz[i] - current_mz) / sigma_mz;
                     double b = (scan.retention_time - current_rt) / sigma_rt;
                     double weight = std::exp(-0.5 * (a * a + b * b));
@@ -553,12 +588,10 @@ Mesh resample_2(const RawData::RawData &raw_data,
                 }
             }
 
-            // smoothed_row[col] = sum_weights_values / (sum_weights + 1);
             if (sum_weights == 0) {
                 sum_weights = 1;
             }
-            smoothed_row[col] = sum_weights_values / (sum_weights);
-            mesh.matrix[col + row * n] = smoothed_row[col];
+            mesh.matrix[col + row * n] = sum_weights_values / sum_weights;
         }
     }
 

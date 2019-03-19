@@ -566,7 +566,7 @@ def profile_resample():
 
     mesh = resample(raw_data, 5, 5, 0.5, 0.5)
     mesh = resample_2(raw_data, 5, 5, 0.5, 0.5)
-    mesh = resample_3(raw_data, 5, 5, 0.5, 0.5)
+    # mesh = resample_3(raw_data, 5, 5, 0.5, 0.5)
 
 def profile_peak_fitting(max_peaks=20):
     print("Loading data...")
@@ -650,7 +650,7 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=True, silent=True, max_
     # )
     raw_data = read_mzxml(
         '/data/toydata/toy_data_tof.mzXML',
-        instrument_type = 'orbitrap',
+        instrument_type = 'orbitrap', # FIXME: This is not correct, should be TOF, but not currently available.
         resolution_ms1 = 30000,
         resolution_msn = 30000,
         reference_mz = 200,
@@ -664,8 +664,8 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=True, silent=True, max_
 
     print("Resampling...")
     # mesh = resample(raw_data, 10, 10, 0.5, 0.5)
-    # mesh = resample_2(raw_data, 10, 10, 0.5, 0.5)
-    mesh = resample_3(raw_data, 10, 10, 0.5, 0.5)
+    mesh = resample_2(raw_data, 10, 10, 0.5, 0.5)
+    # mesh = resample_3(raw_data, 10, 10, 0.5, 0.5)
 
     print("Saving mesh to disk...")
     mesh.save("mesh.dat")
@@ -680,7 +680,7 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=True, silent=True, max_
 
     if show_mesh_plot:
         print("Plotting mesh...")
-        mesh_plot = plot_mesh(mesh, transform='none')
+        mesh_plot = plot_mesh(mesh, transform='sqrt')
 
         # print("Plotting local maxima...")
         # mesh_plot['img_plot'].scatter(local_max['i'], local_max['j'], color='aqua', s=5, marker="s", alpha=0.9)
