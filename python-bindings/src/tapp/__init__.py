@@ -566,6 +566,7 @@ def profile_resample():
 
     mesh = resample(raw_data, 5, 5, 0.5, 0.5)
     mesh = resample_2(raw_data, 5, 5, 0.5, 0.5)
+    mesh = resample_3(raw_data, 5, 5, 0.5, 0.5)
 
 def profile_peak_fitting(max_peaks=20):
     print("Loading data...")
@@ -634,23 +635,37 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=True, silent=True, max_
         plt.show()
 
     print("Loading data...")
+    # raw_data = read_mzxml(
+        # '/data/toydata/toy_data.mzXML',
+        # instrument_type = 'orbitrap',
+        # resolution_ms1 = 75000,
+        # resolution_msn = 30000,
+        # reference_mz = 200,
+        # fwhm_rt = 9,
+        # polarity = 'pos',
+        # min_mz = 801,
+        # max_mz = 803,
+        # min_rt = 2808,
+        # max_rt = 2928,
+    # )
     raw_data = read_mzxml(
-        '/data/toydata/toy_data.mzXML',
+        '/data/toydata/toy_data_tof.mzXML',
         instrument_type = 'orbitrap',
-        resolution_ms1 = 75000,
+        resolution_ms1 = 30000,
         resolution_msn = 30000,
         reference_mz = 200,
         fwhm_rt = 9,
         polarity = 'pos',
-        min_mz = 801,
-        max_mz = 803,
-        min_rt = 2808,
-        max_rt = 2928,
+        min_mz = 510,
+        max_mz = 531,
+        min_rt = 2390,
+        max_rt = 2510,
     )
 
     print("Resampling...")
     # mesh = resample(raw_data, 10, 10, 0.5, 0.5)
-    mesh = resample_2(raw_data, 10, 10, 0.5, 0.5)
+    # mesh = resample_2(raw_data, 10, 10, 0.5, 0.5)
+    mesh = resample_3(raw_data, 10, 10, 0.5, 0.5)
 
     print("Saving mesh to disk...")
     mesh.save("mesh.dat")
