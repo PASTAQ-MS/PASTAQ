@@ -416,22 +416,6 @@ def fit2(raw_data, peak_candidate):
     fitted_parameters = fit_raw_points(data_points.mz, data_points.intensity, data_points.rt)
     return fitted_parameters
 
-def alg_1(x, y):
-    X = np.array(
-            [
-                [len(x), np.array(x).sum(), np.power(x, 2).sum()],
-                [np.array(x).sum(), np.power(x, 2).sum(), np.power(x, 3).sum()],
-                [np.power(x, 2).sum(), np.power(x, 3).sum(), np.power(x, 4).sum()]
-            ],
-        )
-    Y = np.array([
-            np.log(y).sum(),
-            np.dot(x, np.log(y)).sum(),
-            np.dot(np.power(x, 2), np.log(y)).sum()
-        ])
-    beta = np.linalg.solve(X,Y)
-    return beta
-
 def fit3(raw_data, peak_candidate):
     data_points = find_raw_points(
             raw_data,
@@ -441,60 +425,25 @@ def fit3(raw_data, peak_candidate):
             peak_candidate['roi_max_rt']
         )
     return fit_guos_2d(np.array(data_points.mz), np.array(data_points.rt), np.array(data_points.intensity))
-    # parameters_caruana = fit_caruana(np.array(data_points.mz), np.array(data_points.intensity))
-    # return np.concatenate([parameters_caruana, [0,0]])
-    # parameters_guos = fit_guos(np.array(data_points.mz), np.array(data_points.intensity))
-    # return np.concatenate([parameters_guos, [0,0]])
-    # parameters_inle = fit_inle(np.array(data_points.mz), np.array(data_points.intensity))
-    # return np.concatenate([parameters_inle, [0,0]])
-    # X = np.column_stack(
-        # (
-            # np.repeat(1, len(data_points.mz)),
-            # data_points.mz,
-            # np.power(data_points.mz, 2),
-            # data_points.rt,
-            # np.power(data_points.rt, 2)
-        # ))
-    # Y = np.array(np.log(data_points.intensity))
-    # beta = np.dot(np.dot(np.linalg.inv(np.dot(X.transpose(), X)), X.transpose()), Y)
-    # fitted_sigma_mz = -1/(2 * beta[2])
-    # fitted_mz = beta[1] * fitted_sigma_mz
-    # fitted_sigma_rt = -1/(2 * beta[4])
-    # fitted_rt = beta[3] *  fitted_sigma_rt
-    # fitted_height = np.exp(beta[0] + 1/2 * (fitted_mz ** 2) / fitted_sigma_mz + 1/2 * (fitted_rt ** 2) / fitted_sigma_rt)
-    # X = np.column_stack(
-        # (
-            # np.repeat(1, len(data_points.mz)),
-            # data_points.mz,
-            # np.power(data_points.mz, 2),
-        # ))
-    # Y = np.array(np.log(data_points.intensity))
-    # beta = np.dot(np.dot(np.linalg.inv(np.dot(X.transpose(), X)), X.transpose()), Y)
-    # fitted_sigma_mz = -1/(2 * beta[2])
-    # fitted_mz = beta[1] * fitted_sigma_mz
-    # fitted_sigma_rt = 0
-    # fitted_rt = 0
-    # fitted_height = np.exp(beta[0] + 1/2 * (fitted_mz ** 2) / fitted_sigma_mz)
 
-    # X = np.array(
-            # [
-                # [len(data_points.mz), np.array(data_points.mz).sum(), np.power(data_points.mz, 2).sum()],
-                # [np.array(data_points.mz).sum(), np.power(data_points.mz, 2).sum(), np.power(data_points.mz, 3).sum()],
-                # [np.power(data_points.mz, 2).sum(), np.power(data_points.mz, 3).sum(), np.power(data_points.mz, 4).sum()]
-            # ],
-        # )
-    # Y = np.array([
-            # np.log(data_points.intensity).sum(),
-            # np.dot(data_points.mz, np.log(data_points.intensity)).sum(),
-            # np.dot(np.power(data_points.mz, 2), np.log(data_points.intensity)).sum()
-        # ])
-    # beta = np.linalg.solve(X,Y)
-    # fitted_sigma_mz = np.sqrt(-1/(2 * beta[2]))
-    # fitted_mz = -beta[1]/ (2 * beta[2])
-    # fitted_sigma_rt = 0
-    # fitted_rt = 0
-    # fitted_height = np.exp(beta[0] - beta[1] ** 2 / (4 * beta[2]))
-    # return np.array([fitted_height, fitted_mz, fitted_sigma_mz, fitted_rt, fitted_sigma_rt])
+def fit_raw_weighted_estimate(raw_data, peak_candidate):
+    data_points = find_raw_points(
+            raw_data,
+            peak_candidate['roi_min_mz'],
+            peak_candidate['roi_max_mz'],
+            peak_candidate['roi_min_rt'],
+            peak_candidate['roi_max_rt']
+        )
+    mzs = np.array(data_points.mz)
+    rts = np.array(data_points.rt)
+    intensities = np.array(data_points.intensity)
+
+    mean_x = sum(mzs * intensities) / sum(intensities)
+    sigma_x = np.sqrt(sum(intensities * (mzs - mean_x)**2) / sum(intensities))
+    mean_y = sum(rts * intensities) / sum(intensities)
+    sigma_y = np.sqrt(sum(intensities * (rts - mean_y)**2) / sum(intensities))
+
+    return np.array([intensities.max(), mean_x, sigma_x, mean_y, sigma_y])
 
 def plot_peak_fit(raw_data, peak, fig_mz, fig_rt):
     # PLOTTING
@@ -587,16 +536,60 @@ def find_roi(raw_data, local_max, avg_rt_fwhm=10):
 
     return peak_candidates
 
-def profile_peak_fitting(max_peaks=20):
-    print("Loading data...")
+def profile_resample():
+    # raw_data = read_mzxml(
+        # '/data/toydata/toy_data.mzXML',
+        # instrument_type = 'orbitrap',
+        # resolution_ms1 = 75000,
+        # resolution_msn = 30000,
+        # reference_mz = 200,
+        # fwhm_rt = 9,
+        # polarity = 'pos',
+        # min_mz = 801,
+        # max_mz = 803,
+        # min_rt = 2808,
+        # max_rt = 2928,
+    # )
     raw_data = read_mzxml(
         '/data/qatar/17122018/mzXML/Acute2U_3001.mzXML',
         instrument_type = 'orbitrap',
-        resolution_ms1 = 70000,
+        resolution_ms1 = 75000,
         resolution_msn = 30000,
         reference_mz = 200,
         fwhm_rt = 9,
         polarity = 'pos',
+        # min_mz = 200,
+        # max_mz = 800,
+        # min_rt = 0,
+        # max_rt = 1000,
+    )
+
+    mesh = resample(raw_data, 5, 5, 0.5, 0.5)
+    mesh = resample_2(raw_data, 5, 5, 0.5, 0.5)
+
+def profile_peak_fitting(max_peaks=20):
+    print("Loading data...")
+    # raw_data = read_mzxml(
+        # '/data/qatar/17122018/mzXML/Acute2U_3001.mzXML',
+        # instrument_type = 'orbitrap',
+        # resolution_ms1 = 70000,
+        # resolution_msn = 30000,
+        # reference_mz = 200,
+        # fwhm_rt = 9,
+        # polarity = 'pos',
+    # )
+    raw_data = read_mzxml(
+        '/data/toydata/toy_data.mzXML',
+        instrument_type = 'orbitrap',
+        resolution_ms1 = 75000,
+        resolution_msn = 30000,
+        reference_mz = 200,
+        fwhm_rt = 9,
+        polarity = 'pos',
+        min_mz = 801,
+        max_mz = 803,
+        min_rt = 2808,
+        max_rt = 2928,
     )
 
     print("Resampling...")
@@ -656,49 +649,50 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=True, silent=True, max_
     )
 
     print("Resampling...")
-    mesh = resample(raw_data, 10, 10, 0.5, 0.5)
+    # mesh = resample(raw_data, 10, 10, 0.5, 0.5)
+    mesh = resample_2(raw_data, 10, 10, 0.5, 0.5)
 
     print("Saving mesh to disk...")
     mesh.save("mesh.dat")
 
-    print("Finding local maxima in mesh...")
+    # print("Finding local maxima in mesh...")
     local_max = find_local_max(mesh)
-    local_max = pd.DataFrame(local_max)
-    local_max.columns = ['i', 'j', 'mz', 'rt', 'intensity']
-    local_max = local_max.sort_values('intensity', ascending=False)
-    if max_peaks != math.inf:
-        local_max = local_max[0:max_peaks]
+    # local_max = pd.DataFrame(local_max)
+    # local_max.columns = ['i', 'j', 'mz', 'rt', 'intensity']
+    # local_max = local_max.sort_values('intensity', ascending=False)
+    # if max_peaks != math.inf:
+        # local_max = local_max[0:max_peaks]
 
     if show_mesh_plot:
         print("Plotting mesh...")
-        mesh_plot = plot_mesh(mesh, transform='sqrt')
+        mesh_plot = plot_mesh(mesh, transform='none')
 
-        print("Plotting local maxima...")
-        mesh_plot['img_plot'].scatter(local_max['i'], local_max['j'], color='aqua', s=5, marker="s", alpha=0.9)
+        # print("Plotting local maxima...")
+        # mesh_plot['img_plot'].scatter(local_max['i'], local_max['j'], color='aqua', s=5, marker="s", alpha=0.9)
 
-    print("Fitting peaks...")
-    peak_candidates = find_roi(raw_data, local_max)
+    # print("Fitting peaks...")
+    # peak_candidates = find_roi(raw_data, local_max)
     fitted_peaks = []
-    if show_plot_fit:
-        fig_mz = plt.figure()
-        fig_rt = plt.figure()
-    for peak_candidate in peak_candidates:
-        try:
-            # fitted_parameters = fitted_parameters + [fit(raw_data, peak_candidate)]
-            # fitted_parameters = fit2(raw_data, peak_candidate)
-            fitted_parameters = fit3(raw_data, peak_candidate)
-            peak = peak_candidate
-            peak['fitted_height'] = fitted_parameters[0]
-            peak['fitted_mz'] = fitted_parameters[1]
-            peak['fitted_sigma_mz'] = fitted_parameters[2]
-            peak['fitted_rt'] = fitted_parameters[3]
-            peak['fitted_sigma_rt'] = fitted_parameters[4]
-            fitted_peaks = fitted_peaks + [peak]
-            if show_plot_fit:
-                plot_peak_fit(raw_data, peak, fig_mz, fig_rt)
-        except Exception as e:
-            print(e)
-            pass
+    # if show_plot_fit:
+        # fig_mz = plt.figure()
+        # fig_rt = plt.figure()
+    # for peak_candidate in peak_candidates:
+        # try:
+            # # fitted_parameters = fitted_parameters + [fit(raw_data, peak_candidate)]
+            # # fitted_parameters = fit2(raw_data, peak_candidate)
+            # fitted_parameters = fit3(raw_data, peak_candidate)
+            # peak = peak_candidate
+            # peak['fitted_height'] = fitted_parameters[0]
+            # peak['fitted_mz'] = fitted_parameters[1]
+            # peak['fitted_sigma_mz'] = fitted_parameters[2]
+            # peak['fitted_rt'] = fitted_parameters[3]
+            # peak['fitted_sigma_rt'] = fitted_parameters[4]
+            # fitted_peaks = fitted_peaks + [peak]
+            # if show_plot_fit:
+                # plot_peak_fit(raw_data, peak, fig_mz, fig_rt)
+        # except Exception as e:
+            # print(e)
+            # pass
 
     # fitted_peaks = fit_peaks(raw_data, local_max, show_plot_fit=show_plot_fit)
     # fitted_peaks_tuple = [tuple(fitted_peaks.iloc[row]) for row in range(0, fitted_peaks.shape[0])]

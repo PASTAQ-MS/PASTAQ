@@ -482,6 +482,89 @@ Mesh resample(const RawData::RawData &raw_data,
     return mesh;
 }
 
+// The given smoothing coefficients will determine how much smoothing we apply
+// on a given mesh. Since the smoothing is calculated as a factor of a Gaussian
+// sigma, the smoothing ratio will be the same regardless of the sampling size.
+// Smoothing ratios of 0.5-1 are recommended as a starting point.
+//
+// NOTE: Here we are trying an updated gaussian smoothing algorithm.
+Mesh resample_2(const RawData::RawData &raw_data,
+                uint64_t num_samples_per_peak_mz,
+                uint64_t num_samples_per_peak_rt, double smoothing_coef_mz,
+                double smoothing_coef_rt) {
+    auto [n, m] = calculate_dimensions(raw_data, num_samples_per_peak_mz,
+                                       num_samples_per_peak_rt);
+    Mesh mesh;
+    mesh.n = n;
+    mesh.m = m;
+    mesh.matrix = std::vector<double>(n * m);
+    mesh.bins_mz = std::vector<double>(n);
+    mesh.bins_rt = std::vector<double>(m);
+
+    // Generate bins_mz.
+    for (size_t i = 0; i < n; ++i) {
+        mesh.bins_mz[i] = mz_at(raw_data, num_samples_per_peak_mz, i);
+    }
+    // Generate bins_rt.
+    double delta_rt = (raw_data.max_rt - raw_data.min_rt) / (m - 1);
+    for (size_t j = 0; j < m; ++j) {
+        mesh.bins_rt[j] = raw_data.min_rt + delta_rt * j;
+    }
+
+    // Pre-calculate the smoothing sigma values for all bins of the grid.
+    double sigma_rt = fwhm_to_sigma(raw_data.fwhm_rt) * smoothing_coef_rt;
+    auto sigma_mz_vect = std::vector<double>(n);
+    for (size_t i = 0; i < n; ++i) {
+        sigma_mz_vect[i] = fwhm_to_sigma(fwhm_at(raw_data, mesh.bins_mz[i])) *
+                           smoothing_coef_mz;
+    }
+
+    for (size_t row = 0; row < m - 1; ++row) {
+        // Find scans that belong to this bin in rt.
+        double min_rt = mesh.bins_rt[row] - 3 * sigma_rt;
+        double max_rt = mesh.bins_rt[row] + 3 * sigma_rt;
+        double current_rt = mesh.bins_rt[row];
+
+        auto smoothed_row = std::vector<double>(n);
+        for (size_t col = 0; col < n; ++col) {
+            double min_mz = mesh.bins_mz[col] - 3 * sigma_mz_vect[col];
+            double max_mz = mesh.bins_mz[col] + 3 * sigma_mz_vect[col];
+            double current_mz = mesh.bins_mz[col];
+            double sigma_mz = sigma_mz_vect[col];
+
+            auto indices =
+                find_roi_indexes(raw_data, {min_mz, max_mz, min_rt, max_rt});
+
+            size_t k = 0;
+            double sum_weights = 0;
+            double sum_weights_values = 0;
+            for (size_t j = indices.min_j; j < indices.max_j; ++j, ++k) {
+                const auto &scan = raw_data.scans[j];
+                if (((int64_t)indices.max_i[k] - (int64_t)indices.min_i[k]) ==
+                    0) {
+                    continue;
+                }
+                for (size_t i = indices.min_i[k]; i < indices.max_i[k]; ++i) {
+                    double a = (scan.mz[i] - current_mz) / sigma_mz;
+                    double b = (scan.retention_time - current_rt) / sigma_rt;
+                    double weight = std::exp(-0.5 * (a * a + b * b));
+                    sum_weights += weight;
+                    sum_weights_values += weight * scan.intensity[i];
+                }
+            }
+
+            // smoothed_row[col] = sum_weights_values / (sum_weights + 1);
+            if (sum_weights == 0) {
+                sum_weights = 1;
+            }
+            smoothed_row[col] = sum_weights_values / (sum_weights);
+            mesh.matrix[col + row * n] = smoothed_row[col];
+        }
+    }
+
+    return mesh;
+}
+
 // TODO: For now returns a tuple, we should maybe return a definite struct.
 //
 //     returns: (i,j,mz,rt,intensity)
@@ -673,6 +756,11 @@ PYBIND11_MODULE(tapp, m) {
              "raw file",
              py::arg("raw_data"), py::arg("mz"))
         .def("resample", &PythonAPI::resample,
+             "Resample the raw data into a smoothed warped grid",
+             py::arg("raw_data"), py::arg("num_mz") = 10,
+             py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 0.5,
+             py::arg("smoothing_coef_rt") = 0.5)
+        .def("resample_2", &PythonAPI::resample_2,
              "Resample the raw data into a smoothed warped grid",
              py::arg("raw_data"), py::arg("num_mz") = 10,
              py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 0.5,
