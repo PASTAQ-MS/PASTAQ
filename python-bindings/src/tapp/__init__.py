@@ -566,7 +566,6 @@ def profile_resample():
 
     mesh = resample(raw_data, 5, 5, 0.5, 0.5)
     mesh = resample_2(raw_data, 5, 5, 0.5, 0.5)
-    # mesh = resample_3(raw_data, 5, 5, 0.5, 0.5)
 
 def profile_peak_fitting(max_peaks=20):
     print("Loading data...")
@@ -665,49 +664,48 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=True, silent=True, max_
     print("Resampling...")
     # mesh = resample(raw_data, 10, 10, 0.5, 0.5)
     mesh = resample_2(raw_data, 10, 10, 0.5, 0.5)
-    # mesh = resample_3(raw_data, 10, 10, 0.5, 0.5)
 
     print("Saving mesh to disk...")
     mesh.save("mesh.dat")
 
     # print("Finding local maxima in mesh...")
     local_max = find_local_max(mesh)
-    # local_max = pd.DataFrame(local_max)
-    # local_max.columns = ['i', 'j', 'mz', 'rt', 'intensity']
-    # local_max = local_max.sort_values('intensity', ascending=False)
-    # if max_peaks != math.inf:
-        # local_max = local_max[0:max_peaks]
+    local_max = pd.DataFrame(local_max)
+    local_max.columns = ['i', 'j', 'mz', 'rt', 'intensity']
+    local_max = local_max.sort_values('intensity', ascending=False)
+    if max_peaks != math.inf:
+        local_max = local_max[0:max_peaks]
 
     if show_mesh_plot:
         print("Plotting mesh...")
         mesh_plot = plot_mesh(mesh, transform='sqrt')
 
-        # print("Plotting local maxima...")
-        # mesh_plot['img_plot'].scatter(local_max['i'], local_max['j'], color='aqua', s=5, marker="s", alpha=0.9)
+        print("Plotting local maxima...")
+        mesh_plot['img_plot'].scatter(local_max['i'], local_max['j'], color='aqua', s=5, marker="s", alpha=0.9)
 
-    # print("Fitting peaks...")
-    # peak_candidates = find_roi(raw_data, local_max)
+    print("Fitting peaks...")
+    peak_candidates = find_roi(raw_data, local_max)
     fitted_peaks = []
-    # if show_plot_fit:
-        # fig_mz = plt.figure()
-        # fig_rt = plt.figure()
-    # for peak_candidate in peak_candidates:
-        # try:
-            # # fitted_parameters = fitted_parameters + [fit(raw_data, peak_candidate)]
-            # # fitted_parameters = fit2(raw_data, peak_candidate)
-            # fitted_parameters = fit3(raw_data, peak_candidate)
-            # peak = peak_candidate
-            # peak['fitted_height'] = fitted_parameters[0]
-            # peak['fitted_mz'] = fitted_parameters[1]
-            # peak['fitted_sigma_mz'] = fitted_parameters[2]
-            # peak['fitted_rt'] = fitted_parameters[3]
-            # peak['fitted_sigma_rt'] = fitted_parameters[4]
-            # fitted_peaks = fitted_peaks + [peak]
-            # if show_plot_fit:
-                # plot_peak_fit(raw_data, peak, fig_mz, fig_rt)
-        # except Exception as e:
-            # print(e)
-            # pass
+    if show_plot_fit:
+        fig_mz = plt.figure()
+        fig_rt = plt.figure()
+    for peak_candidate in peak_candidates:
+        try:
+            # fitted_parameters = fitted_parameters + [fit(raw_data, peak_candidate)]
+            # fitted_parameters = fit2(raw_data, peak_candidate)
+            fitted_parameters = fit3(raw_data, peak_candidate)
+            peak = peak_candidate
+            peak['fitted_height'] = fitted_parameters[0]
+            peak['fitted_mz'] = fitted_parameters[1]
+            peak['fitted_sigma_mz'] = fitted_parameters[2]
+            peak['fitted_rt'] = fitted_parameters[3]
+            peak['fitted_sigma_rt'] = fitted_parameters[4]
+            fitted_peaks = fitted_peaks + [peak]
+            if show_plot_fit:
+                plot_peak_fit(raw_data, peak, fig_mz, fig_rt)
+        except Exception as e:
+            print(e)
+            pass
 
     # fitted_peaks = fit_peaks(raw_data, local_max, show_plot_fit=show_plot_fit)
     # fitted_peaks_tuple = [tuple(fitted_peaks.iloc[row]) for row in range(0, fitted_peaks.shape[0])]
