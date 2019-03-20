@@ -16,6 +16,7 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
                               resolution_ms1,
                               resolution_msn,
                               reference_mz,
+                              0,
                               {}};
     // TODO(alex): Can we automatically detect the instrument type and set
     // resolution from the header?

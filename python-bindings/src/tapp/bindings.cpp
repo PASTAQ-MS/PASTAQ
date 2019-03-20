@@ -1,3 +1,4 @@
+#include <cassert>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -301,10 +302,10 @@ uint64_t x_index(const RawData::RawData &raw_data, double mz, uint64_t k) {
             return static_cast<uint64_t>(k * (mz - raw_data.min_mz) / fwhm_ref);
         } break;
         case Instrument::UNKNOWN: {
-            // Can't handle unknown instruments.
+            assert(false);  // Can't handle unknown instruments.
         } break;
     }
-    // FIXME: ASSERT?
+    assert(false);  // Can't handle unknown instruments.
     return 0;
 }
 
@@ -314,11 +315,10 @@ uint64_t y_index(const RawData::RawData &raw_data, double rt, uint64_t k) {
 }
 
 std::tuple<uint64_t, uint64_t> calculate_dimensions(
-    const RawData::RawData &raw_data, uint64_t num_samples_per_peak_mz,
-    uint64_t num_samples_per_peak_rt) {
+    const RawData::RawData &raw_data, uint64_t k, uint64_t t) {
     return std::tuple<uint64_t, uint64_t>(
-        x_index(raw_data, raw_data.max_mz, num_samples_per_peak_mz) + 1,
-        y_index(raw_data, raw_data.max_rt, num_samples_per_peak_rt) + 1);
+        x_index(raw_data, raw_data.max_mz, k) + 1,
+        y_index(raw_data, raw_data.max_rt, t) + 1);
 }
 
 double fwhm_at(const RawData::RawData &raw_data, double mz) {
@@ -337,7 +337,7 @@ double fwhm_at(const RawData::RawData &raw_data, double mz) {
             e = 0;
         } break;
         case Instrument::UNKNOWN: {
-            // FIXME: ASSERT?
+            assert(false);  // Can't handle unknown instruments.
         } break;
     }
     double mz_ref = raw_data.reference_mz;
@@ -418,12 +418,14 @@ double fwhm_to_sigma(double fwhm) {
 // on a given mesh. Since the smoothing is calculated as a factor of a Gaussian
 // sigma, the smoothing ratio will be the same regardless of the sampling size.
 // Smoothing ratios of 0.5-1 are recommended as a starting point.
-Mesh resample(const RawData::RawData &raw_data,
-              uint64_t num_samples_per_peak_mz,
-              uint64_t num_samples_per_peak_rt, double smoothing_coef_mz,
-              double smoothing_coef_rt) {
-    auto [n, m] = calculate_dimensions(raw_data, num_samples_per_peak_mz,
-                                       num_samples_per_peak_rt);
+//
+//     k: Number of desired sampling points per FWHM in mz.
+//     t: Number of desired sampling points per FWHM in mz.
+//
+Mesh resample(const RawData::RawData &raw_data, uint64_t k, uint64_t t,
+              double smoothing_coef_mz, double smoothing_coef_rt) {
+    // Initialize the Mesh object.
+    auto [n, m] = calculate_dimensions(raw_data, k, t);
     Mesh mesh;
     mesh.n = n;
     mesh.m = m;
@@ -438,31 +440,26 @@ Mesh resample(const RawData::RawData &raw_data,
         switch (raw_data.instrument_type) {
             case Instrument::ORBITRAP: {
                 double a = 1 / std::sqrt(raw_data.min_mz);
-                double b = fwhm_ref / std::pow(mz_ref, 1.5) * i / 2 /
-                           num_samples_per_peak_mz;
+                double b = fwhm_ref / std::pow(mz_ref, 1.5) * i / 2 / k;
                 double c = a - b;
                 mesh.bins_mz[i] = 1 / (c * c);
             } break;
             case Instrument::FTICR: {
                 double a = fwhm_ref * raw_data.min_mz;
                 double b = mz_ref * mz_ref;
-                mesh.bins_mz[i] = raw_data.min_mz /
-                                  (1 - (a / b) * i / num_samples_per_peak_mz);
+                mesh.bins_mz[i] = raw_data.min_mz / (1 - (a / b) * i / k);
             } break;
             case Instrument::TOF: {
                 mesh.bins_mz[i] =
-                    raw_data.min_mz *
-                    std::exp(fwhm_ref / mz_ref * i / num_samples_per_peak_mz);
+                    raw_data.min_mz * std::exp(fwhm_ref / mz_ref * i / k);
             } break;
             case Instrument::QUAD: {
-                // Same as regular grid.
                 double delta_mz = (raw_data.max_mz - raw_data.min_mz) /
                                   static_cast<double>(mesh.n - 1);
-                mesh.bins_mz[i] =
-                    raw_data.min_mz + delta_mz * i / num_samples_per_peak_mz;
+                mesh.bins_mz[i] = raw_data.min_mz + delta_mz * i / k;
             } break;
             case Instrument::UNKNOWN: {
-                // FIXME: ASSERT?
+                assert(false);  // Can't handle unknown instruments.
             } break;
         }
     }
@@ -481,15 +478,15 @@ Mesh resample(const RawData::RawData &raw_data,
                            smoothing_coef_mz;
     }
 
+    // Perform 2D kernel smoothing.
     size_t previous_min_j = 0;
     for (size_t row = 0; row < m; ++row) {
-        // Find scans that belong to this bin in rt.
+        // Find rt scans that will be used for smoothing on this row.
         double min_rt = mesh.bins_rt[row] - 3 * sigma_rt;
         double max_rt = mesh.bins_rt[row] + 3 * sigma_rt;
         double current_rt = mesh.bins_rt[row];
 
-        // Find index range on the smoothed raw spectra for rt smoothing.
-        // NOTE: min_j is inclusive and max_j is exclusive.
+        // Find index range of rt values for min_rt/max_rt.
         size_t min_j = 0;
         size_t max_j = raw_data.scans.size();
         for (size_t j = previous_min_j; j < raw_data.scans.size(); ++j) {
@@ -501,23 +498,22 @@ Mesh resample(const RawData::RawData &raw_data,
         previous_min_j = min_j;
 
         for (size_t col = 0; col < n; ++col) {
+            // Find mz/intensity points that will be used for smoothing on this
+            // column..
             double min_mz = mesh.bins_mz[col] - 3 * sigma_mz_vect[col];
             double max_mz = mesh.bins_mz[col] + 3 * sigma_mz_vect[col];
             double current_mz = mesh.bins_mz[col];
             double sigma_mz = sigma_mz_vect[col];
 
-            size_t k = 0;
             double sum_weights = 0;
             double sum_weights_values = 0;
-            for (size_t j = min_j; j < max_j; ++j, ++k) {
+            for (size_t j = min_j; j < max_j; ++j) {
                 const auto &scan = raw_data.scans[j];
                 if (scan.retention_time > max_rt) {
                     break;
                 }
 
-                // Find mz indexes.
-                // NOTE: min_i is inclusive and max_i is exclusive.
-                // Binary search for lower bound.
+                // Find index range of mz values for min_mz/max_mz.
                 size_t min_i = 0;
                 size_t max_i = scan.num_points;
                 size_t l = min_i;
