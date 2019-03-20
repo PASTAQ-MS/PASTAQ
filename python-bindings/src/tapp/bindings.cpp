@@ -279,11 +279,33 @@ RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
 }
 
 uint64_t x_index(const RawData::RawData &raw_data, double mz, uint64_t k) {
-    // FIXME: This only works for ORBITRAP data for now.
     double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
-    double a = fwhm_ref / std::pow(raw_data.reference_mz, 1.5);
-    double b = (1 / std::sqrt(raw_data.min_mz) - 1 / std::sqrt(mz));
-    return k * 2 / a * b;
+    switch (raw_data.instrument_type) {
+        case Instrument::ORBITRAP: {
+            double a = fwhm_ref / std::pow(raw_data.reference_mz, 1.5);
+            double b = (1 / std::sqrt(raw_data.min_mz) - 1 / std::sqrt(mz));
+            return static_cast<uint64_t>(k * 2 / a * b);
+        } break;
+        case Instrument::FTICR: {
+            double a = 1 - raw_data.min_mz / mz;
+            double b = raw_data.reference_mz * raw_data.reference_mz;
+            double c = fwhm_ref * raw_data.min_mz;
+            return static_cast<uint64_t>(k * a * b / c);
+        } break;
+        case Instrument::TOF: {
+            return static_cast<uint64_t>(k * raw_data.reference_mz / fwhm_ref *
+                                         std::log(mz / raw_data.min_mz));
+        } break;
+        case Instrument::QUAD: {
+            // Same as the regular grid.
+            return static_cast<uint64_t>(k * (mz - raw_data.min_mz) / fwhm_ref);
+        } break;
+        case Instrument::UNKNOWN: {
+            // Can't handle unknown instruments.
+        } break;
+    }
+    // FIXME: ASSERT?
+    return 0;
 }
 
 uint64_t y_index(const RawData::RawData &raw_data, double rt, uint64_t k) {
@@ -294,27 +316,33 @@ uint64_t y_index(const RawData::RawData &raw_data, double rt, uint64_t k) {
 std::tuple<uint64_t, uint64_t> calculate_dimensions(
     const RawData::RawData &raw_data, uint64_t num_samples_per_peak_mz,
     uint64_t num_samples_per_peak_rt) {
-    // FIXME: This only works for ORBITRAP data for now.
     return std::tuple<uint64_t, uint64_t>(
         x_index(raw_data, raw_data.max_mz, num_samples_per_peak_mz) + 1,
         y_index(raw_data, raw_data.max_rt, num_samples_per_peak_rt) + 1);
 }
 
-double mz_at(const RawData::RawData &raw_data, uint64_t num_samples_per_peak_mz,
-             uint64_t n) {
-    // FIXME: This only works for ORBITRAP data for now.
-    double a = 1 / std::sqrt(raw_data.min_mz);
-    double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
-    double b = fwhm_ref / std::pow(raw_data.reference_mz, 1.5) * n / 2 /
-               num_samples_per_peak_mz;
-    double c = a - b;
-    return 1 / (c * c);
-}
-
 double fwhm_at(const RawData::RawData &raw_data, double mz) {
-    // FIXME: This only works for ORBITRAP data for now.
-    double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
-    return fwhm_ref * std::pow(mz / raw_data.reference_mz, 1.5);
+    double e = 0;
+    switch (raw_data.instrument_type) {
+        case Instrument::ORBITRAP: {
+            e = 1.5;
+        } break;
+        case Instrument::FTICR: {
+            e = 2;
+        } break;
+        case Instrument::TOF: {
+            e = 1;
+        } break;
+        case Instrument::QUAD: {
+            e = 0;
+        } break;
+        case Instrument::UNKNOWN: {
+            // FIXME: ASSERT?
+        } break;
+    }
+    double mz_ref = raw_data.reference_mz;
+    double fwhm_ref = mz_ref / raw_data.resolution_ms1;
+    return fwhm_ref * std::pow(mz / mz_ref, e);
 }
 
 std::string to_string(const Instrument::Type &instrument_type) {
@@ -372,7 +400,7 @@ struct Mesh {
         parameters.bounds.max_rt = bins_rt[m - 1];
         parameters.bounds.min_mz = bins_mz[0];
         parameters.bounds.max_mz = bins_mz[n - 1];
-        // FIXME: For now...
+        // FIXME: For now... Should we store instrument_type in Mesh?
         parameters.instrument_type = Instrument::Type::ORBITRAP;
         if (!Grid::Files::Dat::write(stream, matrix, parameters)) {
             std::cout << "error: the grid could not be saved properly"
@@ -404,9 +432,41 @@ Mesh resample(const RawData::RawData &raw_data,
     mesh.bins_rt = std::vector<double>(m);
 
     // Generate bins_mz.
+    double mz_ref = raw_data.reference_mz;
+    double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
     for (size_t i = 0; i < n; ++i) {
-        mesh.bins_mz[i] = mz_at(raw_data, num_samples_per_peak_mz, i);
+        switch (raw_data.instrument_type) {
+            case Instrument::ORBITRAP: {
+                double a = 1 / std::sqrt(raw_data.min_mz);
+                double b = fwhm_ref / std::pow(mz_ref, 1.5) * i / 2 /
+                           num_samples_per_peak_mz;
+                double c = a - b;
+                mesh.bins_mz[i] = 1 / (c * c);
+            } break;
+            case Instrument::FTICR: {
+                double a = fwhm_ref * raw_data.min_mz;
+                double b = mz_ref * mz_ref;
+                mesh.bins_mz[i] = raw_data.min_mz /
+                                  (1 - (a / b) * i / num_samples_per_peak_mz);
+            } break;
+            case Instrument::TOF: {
+                mesh.bins_mz[i] =
+                    raw_data.min_mz *
+                    std::exp(fwhm_ref / mz_ref * i / num_samples_per_peak_mz);
+            } break;
+            case Instrument::QUAD: {
+                // Same as regular grid.
+                double delta_mz = (raw_data.max_mz - raw_data.min_mz) /
+                                  static_cast<double>(mesh.n - 1);
+                mesh.bins_mz[i] =
+                    raw_data.min_mz + delta_mz * i / num_samples_per_peak_mz;
+            } break;
+            case Instrument::UNKNOWN: {
+                // FIXME: ASSERT?
+            } break;
+        }
     }
+
     // Generate bins_rt.
     double delta_rt = (raw_data.max_rt - raw_data.min_rt) / (m - 1);
     for (size_t j = 0; j < m; ++j) {
@@ -430,8 +490,8 @@ Mesh resample(const RawData::RawData &raw_data,
 
         // Find index range on the smoothed raw spectra for rt smoothing.
         // NOTE: min_j is inclusive and max_j is exclusive.
-        int64_t min_j = 0;
-        int64_t max_j = raw_data.scans.size();
+        size_t min_j = 0;
+        size_t max_j = raw_data.scans.size();
         for (size_t j = previous_min_j; j < raw_data.scans.size(); ++j) {
             if (raw_data.scans[j].retention_time > min_rt && j != 0) {
                 min_j = j - 1;
@@ -681,9 +741,6 @@ PYBIND11_MODULE(tapp, m) {
              "Calculate the grid parameters for the given raw file",
              py::arg("raw_data"), py::arg("num_mz") = 10,
              py::arg("num_rt") = 10)
-        .def("mz_at", &PythonAPI::mz_at,
-             "Calculate the mz at the given N for the given raw file",
-             py::arg("raw_data"), py::arg("num_mz") = 10, py::arg("n"))
         .def("fwhm_at", &PythonAPI::fwhm_at,
              "Calculate the width of the peak at the given m/z for the given "
              "raw file",

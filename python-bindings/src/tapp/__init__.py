@@ -648,7 +648,7 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=True, silent=True, max_
     # )
     raw_data = read_mzxml(
         '/data/toydata/toy_data_tof.mzXML',
-        instrument_type = 'orbitrap', # FIXME: This is not correct, should be TOF, but not currently available.
+        instrument_type = 'tof', # FIXME: This is not correct, should be TOF, but not currently available.
         resolution_ms1 = 30000,
         resolution_msn = 30000,
         reference_mz = 200,
