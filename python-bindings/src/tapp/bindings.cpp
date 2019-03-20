@@ -421,106 +421,6 @@ Mesh resample(const RawData::RawData &raw_data,
                            smoothing_coef_mz;
     }
 
-    for (const auto &scan : raw_data.scans) {
-        // Calculate the min and max indexes for retention time.
-
-        // Find the bin for the current retention time.
-        double current_rt = scan.retention_time;
-        size_t index_rt =
-            y_index(raw_data, current_rt, num_samples_per_peak_rt);
-
-        // The smoothing kernel in rt is +-(num_samples_per_peak_rt/2).
-        // int64_t j_min = index_rt - num_samples_per_peak_rt;
-        int64_t j_min = y_index(raw_data, current_rt - 3 * sigma_rt,
-                                num_samples_per_peak_rt);
-        if (j_min < 0) {
-            j_min = 0;
-        }
-        // int64_t j_max = index_rt + num_samples_per_peak_rt;
-        int64_t j_max = y_index(raw_data, current_rt + 3 * sigma_rt,
-                                num_samples_per_peak_rt);
-        if (j_max >= m) {
-            j_max = m - 1;
-        }
-
-        for (size_t k = 0; k < scan.num_points; ++k) {
-            double current_intensity = scan.intensity[k];
-
-            // Find the bin for the current mz.
-            double current_mz = scan.mz[k];
-
-            size_t index_mz =
-                x_index(raw_data, current_mz, num_samples_per_peak_mz);
-            double sigma_mz = sigma_mz_vect[index_mz];
-            int64_t i_min = x_index(raw_data, current_mz - 3 * sigma_mz,
-                                    num_samples_per_peak_mz);
-            if (i_min < 0) {
-                i_min = 0;
-            }
-            int64_t i_max = x_index(raw_data, current_mz + 3 * sigma_mz,
-                                    num_samples_per_peak_mz);
-            if (i_max >= n) {
-                i_max = n - 1;
-            }
-
-            for (size_t j = j_min; j <= j_max; ++j) {
-                for (size_t i = i_min; i <= i_max; ++i) {
-                    // No need to do boundary check, since we are sure we are
-                    // inside the grid.
-                    double x = mesh.bins_mz[i];
-                    double y = mesh.bins_rt[j];
-
-                    // Calculate the gaussian weight for this point.
-                    double a = (x - current_mz) / sigma_mz;
-                    double b = (y - current_rt) / sigma_rt;
-                    double weight = std::exp(-0.5 * (a * a + b * b));
-
-                    // Set the value, weight and counts.
-                    mesh.matrix[i + j * n] += weight * current_intensity;
-                }
-            }
-        }
-    }
-    return mesh;
-}
-
-// The given smoothing coefficients will determine how much smoothing we apply
-// on a given mesh. Since the smoothing is calculated as a factor of a Gaussian
-// sigma, the smoothing ratio will be the same regardless of the sampling size.
-// Smoothing ratios of 0.5-1 are recommended as a starting point.
-//
-// NOTE: Here we are trying an updated gaussian smoothing algorithm.
-Mesh resample_2(const RawData::RawData &raw_data,
-                uint64_t num_samples_per_peak_mz,
-                uint64_t num_samples_per_peak_rt, double smoothing_coef_mz,
-                double smoothing_coef_rt) {
-    auto [n, m] = calculate_dimensions(raw_data, num_samples_per_peak_mz,
-                                       num_samples_per_peak_rt);
-    Mesh mesh;
-    mesh.n = n;
-    mesh.m = m;
-    mesh.matrix = std::vector<double>(n * m);
-    mesh.bins_mz = std::vector<double>(n);
-    mesh.bins_rt = std::vector<double>(m);
-
-    // Generate bins_mz.
-    for (size_t i = 0; i < n; ++i) {
-        mesh.bins_mz[i] = mz_at(raw_data, num_samples_per_peak_mz, i);
-    }
-    // Generate bins_rt.
-    double delta_rt = (raw_data.max_rt - raw_data.min_rt) / (m - 1);
-    for (size_t j = 0; j < m; ++j) {
-        mesh.bins_rt[j] = raw_data.min_rt + delta_rt * j;
-    }
-
-    // Pre-calculate the smoothing sigma values for all bins of the grid.
-    double sigma_rt = fwhm_to_sigma(raw_data.fwhm_rt) * smoothing_coef_rt;
-    auto sigma_mz_vect = std::vector<double>(n);
-    for (size_t i = 0; i < n; ++i) {
-        sigma_mz_vect[i] = fwhm_to_sigma(fwhm_at(raw_data, mesh.bins_mz[i])) *
-                           smoothing_coef_mz;
-    }
-
     size_t previous_min_j = 0;
     for (size_t row = 0; row < m; ++row) {
         // Find scans that belong to this bin in rt.
@@ -789,11 +689,6 @@ PYBIND11_MODULE(tapp, m) {
              "raw file",
              py::arg("raw_data"), py::arg("mz"))
         .def("resample", &PythonAPI::resample,
-             "Resample the raw data into a smoothed warped grid",
-             py::arg("raw_data"), py::arg("num_mz") = 10,
-             py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 0.5,
-             py::arg("smoothing_coef_rt") = 0.5)
-        .def("resample_2", &PythonAPI::resample_2,
              "Resample the raw data into a smoothed warped grid",
              py::arg("raw_data"), py::arg("num_mz") = 10,
              py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 0.5,

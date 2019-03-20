@@ -565,7 +565,6 @@ def profile_resample():
     )
 
     mesh = resample(raw_data, 5, 5, 0.5, 0.5)
-    mesh = resample_2(raw_data, 5, 5, 0.5, 0.5)
 
 def profile_peak_fitting(max_peaks=20):
     print("Loading data...")
@@ -662,8 +661,7 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=True, silent=True, max_
     )
 
     print("Resampling...")
-    # mesh = resample(raw_data, 10, 10, 0.5, 0.5)
-    mesh = resample_2(raw_data, 10, 10, 0.5, 0.5)
+    mesh = resample(raw_data, 10, 10, 0.5, 0.5)
 
     print("Saving mesh to disk...")
     mesh.save("mesh.dat")
