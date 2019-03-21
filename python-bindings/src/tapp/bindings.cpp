@@ -554,6 +554,227 @@ Mesh resample(const RawData::RawData &raw_data, uint64_t k, uint64_t t,
     return mesh;
 }
 
+// Applies a 2D kernel smoothing. The smoothing is performed in two passes.
+// First the raw data points are mapped into a 2D matrix by splatting them into
+// a matrix. Sparse areas might result in artifacts when the data is noisy, for
+// this reason, the data is smoothed again.
+//
+// Since multiple passes of a Gaussian smoothing is equivalent to a single
+// pass with `sigma = sqrt(2) * sigma_pass`, we adjust the sigmas for each pass
+// accordingly.
+Mesh old_resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
+                  uint64_t num_samples_rt, double smoothing_coef_mz,
+                  double smoothing_coef_rt) {
+    // Initialize the Mesh object.
+    auto [n, m] =
+        calculate_dimensions(raw_data, num_samples_mz, num_samples_rt);
+    Mesh mesh;
+    mesh.n = n;
+    mesh.m = m;
+    mesh.matrix = std::vector<double>(n * m);
+    auto weights = std::vector<double>(n * m);
+    mesh.bins_mz = std::vector<double>(n);
+    mesh.bins_rt = std::vector<double>(m);
+
+    // Generate bins_mz.
+    double mz_ref = raw_data.reference_mz;
+    double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
+    for (size_t i = 0; i < n; ++i) {
+        switch (raw_data.instrument_type) {
+            case Instrument::ORBITRAP: {
+                double a = 1 / std::sqrt(raw_data.min_mz);
+                double b =
+                    fwhm_ref / std::pow(mz_ref, 1.5) * i / 2 / num_samples_mz;
+                double c = a - b;
+                mesh.bins_mz[i] = 1 / (c * c);
+            } break;
+            case Instrument::FTICR: {
+                double a = fwhm_ref * raw_data.min_mz;
+                double b = mz_ref * mz_ref;
+                mesh.bins_mz[i] =
+                    raw_data.min_mz / (1 - (a / b) * i / num_samples_mz);
+            } break;
+            case Instrument::TOF: {
+                mesh.bins_mz[i] =
+                    raw_data.min_mz *
+                    std::exp(fwhm_ref / mz_ref * i / num_samples_mz);
+            } break;
+            case Instrument::QUAD: {
+                double delta_mz = (raw_data.max_mz - raw_data.min_mz) /
+                                  static_cast<double>(mesh.n - 1);
+                mesh.bins_mz[i] =
+                    raw_data.min_mz + delta_mz * i / num_samples_mz;
+            } break;
+            case Instrument::UNKNOWN: {
+                assert(false);  // Can't handle unknown instruments.
+            } break;
+        }
+    }
+
+    // Generate bins_rt.
+    double delta_rt = (raw_data.max_rt - raw_data.min_rt) / (m - 1);
+    for (size_t j = 0; j < m; ++j) {
+        mesh.bins_rt[j] = raw_data.min_rt + delta_rt * j;
+    }
+
+    // Pre-calculate the smoothing sigma values for all bins of the grid.
+    double sigma_rt =
+        fwhm_to_sigma(raw_data.fwhm_rt) * smoothing_coef_rt / std::sqrt(2);
+    auto sigma_mz_vec = std::vector<double>(n);
+    for (size_t i = 0; i < n; ++i) {
+        sigma_mz_vec[i] = fwhm_to_sigma(fwhm_at(raw_data, mesh.bins_mz[i])) *
+                          smoothing_coef_mz / std::sqrt(2);
+    }
+
+    // Pre-calculate the kernel half widths for rt and all mzs.
+    //
+    // Since sigma_rt is constant, the size of the kernel will be the same
+    // for the entire rt range.
+    uint64_t rt_kernel_hw = 3 * sigma_rt / delta_rt;
+    auto mz_kernel_hw = std::vector<uint64_t>(n);
+    for (size_t i = 0; i < n; ++i) {
+        double sigma_mz = sigma_mz_vec[i];
+        double delta_mz = 0;
+        if (i == 0) {
+            delta_mz = mesh.bins_mz[i + 1] - mesh.bins_mz[i];
+        } else {
+            delta_mz = mesh.bins_mz[i] - mesh.bins_mz[i - 1];
+        }
+        mz_kernel_hw[i] = 3 * sigma_mz / delta_mz;
+    }
+
+    // Gaussian splatting.
+    for (size_t i = 0; i < raw_data.scans.size(); ++i) {
+        const auto &scan = raw_data.scans[i];
+        double current_rt = scan.retention_time;
+
+        // Find the bin for the current retention time.
+        size_t index_rt = y_index(raw_data, current_rt, num_samples_rt);
+
+        // Find the min/max indexes for the rt kernel.
+        size_t j_min = 0;
+        if (index_rt >= rt_kernel_hw) {
+            j_min = index_rt - rt_kernel_hw;
+        }
+        size_t j_max = mesh.m - 1;
+        if ((index_rt + rt_kernel_hw) < mesh.m) {
+            j_max = index_rt + rt_kernel_hw;
+        }
+
+        for (size_t k = 0; k < scan.num_points; ++k) {
+            double current_intensity = scan.intensity[k];
+            double current_mz = scan.mz[k];
+
+            // Find the bin for the current mz.
+            size_t index_mz = x_index(raw_data, current_mz, num_samples_mz);
+
+            double sigma_mz = sigma_mz_vec[index_mz];
+
+            // Find the min/max indexes for the mz kernel.
+            size_t i_min = 0;
+            if (index_mz >= mz_kernel_hw[index_mz]) {
+                i_min = index_mz - mz_kernel_hw[index_mz];
+            }
+            size_t i_max = mesh.n - 1;
+            if ((index_mz + mz_kernel_hw[index_mz]) < mesh.n) {
+                i_max = index_mz + mz_kernel_hw[index_mz];
+            }
+
+            for (size_t j = j_min; j <= j_max; ++j) {
+                for (size_t i = i_min; i <= i_max; ++i) {
+                    double x = mesh.bins_mz[i];
+                    double y = mesh.bins_rt[j];
+
+                    // Calculate the Gaussian weight for this point.
+                    double a = (x - current_mz) / sigma_mz;
+                    double b = (y - current_rt) / sigma_rt;
+                    double weight = std::exp(-0.5 * (a * a + b * b));
+
+                    mesh.matrix[i + j * n] += weight * current_intensity;
+                    weights[i + j * n] += weight;
+                }
+            }
+        }
+    }
+    for (size_t i = 0; i < (n * m); ++i) {
+        double weight = weights[i];
+        if (weight == 0) {
+            weight = 1;
+        }
+        mesh.matrix[i] = mesh.matrix[i] / weight;
+    }
+
+    // Gaussian smoothing.
+    //
+    // The Gaussian 2D filter is separable. We obtain the same result with
+    // faster performance by applying two 1D kernel convolutions instead. This
+    // is specially noticeable on the full image.
+    {
+        auto smoothed_matrix = std::vector<double>(mesh.n * mesh.m);
+
+        // Retention time smoothing.
+        for (size_t j = 0; j < mesh.m; ++j) {
+            double current_rt = mesh.bins_rt[j];
+            size_t min_k = 0;
+            if (j >= rt_kernel_hw) {
+                min_k = j - rt_kernel_hw;
+            }
+            size_t max_k = mesh.m - 1;
+            if ((j + rt_kernel_hw) < mesh.m) {
+                max_k = j + rt_kernel_hw;
+            }
+            for (size_t i = 0; i < mesh.n; ++i) {
+                double sum_weights = 0;
+                double sum_weighted_values = 0;
+                for (size_t k = min_k; k <= max_k; ++k) {
+                    double a = (current_rt - mesh.bins_rt[k]) / sigma_rt;
+                    double weight = std::exp(-0.5 * (a * a));
+                    sum_weights += weight;
+                    sum_weighted_values += weight * mesh.matrix[i + k * mesh.n];
+                }
+                smoothed_matrix[i + j * mesh.n] =
+                    sum_weighted_values / sum_weights;
+            }
+        }
+        mesh.matrix = smoothed_matrix;
+    }
+    {
+        auto smoothed_matrix = std::vector<double>(mesh.n * mesh.m);
+
+        // mz smoothing.
+        //
+        // Since sigma_mz is not constant, we need to calculate the kernel half
+        // width for each potential mz value.
+        for (size_t i = 0; i < mesh.n; ++i) {
+            double sigma_mz = sigma_mz_vec[i];
+            double current_mz = mesh.bins_mz[i];
+
+            size_t min_k = 0;
+            if (i >= mz_kernel_hw[i]) {
+                min_k = i - mz_kernel_hw[i];
+            }
+            size_t max_k = mesh.n - 1;
+            if ((i + mz_kernel_hw[i]) < mesh.n) {
+                max_k = i + mz_kernel_hw[i];
+            }
+            for (size_t j = 0; j < mesh.m; ++j) {
+                double sum_weights = 0;
+                double sum_weighted_values = 0;
+                for (size_t k = min_k; k <= max_k; ++k) {
+                    double a = (current_mz - mesh.bins_mz[k]) / sigma_mz;
+                    double weight = std::exp(-0.5 * (a * a));
+                    sum_weights += weight;
+                    sum_weighted_values += weight * mesh.matrix[k + j * mesh.n];
+                }
+                smoothed_matrix[i + j * mesh.n] =
+                    sum_weighted_values / sum_weights;
+            }
+        }
+        mesh.matrix = smoothed_matrix;
+    }
+    return mesh;
+}
+
 // TODO: For now returns a tuple, we should maybe return a definite struct.
 //
 //     returns: (i,j,mz,rt,intensity)
@@ -741,7 +962,7 @@ PYBIND11_MODULE(tapp, m) {
              "Calculate the width of the peak at the given m/z for the given "
              "raw file",
              py::arg("raw_data"), py::arg("mz"))
-        .def("resample", &PythonAPI::resample,
+        .def("resample", &PythonAPI::old_resample,
              "Resample the raw data into a smoothed warped grid",
              py::arg("raw_data"), py::arg("num_mz") = 10,
              py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 0.5,
