@@ -197,7 +197,9 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
             }
             // TODO(alex): ASSERT scan.mz.size() == scan.intensity.size()
             scan.num_points = scan.mz.size();
-            raw_data.scans.push_back(scan);
+            if (scan.num_points != 0) {
+                raw_data.scans.push_back(scan);
+            }
         }
     }
     return raw_data;
