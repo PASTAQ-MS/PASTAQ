@@ -8,12 +8,14 @@ import matplotlib.gridspec as gridspec
 from scipy.optimize import curve_fit
 
 # TODO(alex): Write documentation.
-def tic(raw_data, min_rt = -math.inf, max_rt = math.inf):
+
+
+def tic(raw_data, min_rt=-math.inf, max_rt=math.inf):
     rt = []
     intensity = []
     for i in range(0, len(raw_data.scans)):
         if (raw_data.scans[i].retention_time < min_rt or
-            raw_data.scans[i].retention_time > max_rt):
+                raw_data.scans[i].retention_time > max_rt):
             continue
         sum = 0
         for j in range(0, raw_data.scans[i].num_points):
@@ -23,44 +25,47 @@ def tic(raw_data, min_rt = -math.inf, max_rt = math.inf):
 
     return (rt, intensity)
 
+
 def load_example_data():
-     raw_data = read_mzxml(
-            '/data/toydata/toy_data.mzXML',
-            instrument_type = 'orbitrap',
-            resolution_ms1 = 75000,
-            resolution_msn = 30000,
-            reference_mz = 200,
-            fwhm_rt = 9,
-            polarity = 'pos',
-            min_mz = 801,
-            max_mz = 803,
-            min_rt = 2808,
-            max_rt = 2928,
-        )
-     # raw_data = read_mzxml(
-            # '/data/ftp_data/150210_11_01.mzXML',
-            # instrument_type = 'orbitrap',
-            # resolution_ms1 = 75000,
-            # resolution_msn = 30000,
-            # reference_mz = 200,
-            # polarity = 'pos',
-            # min_mz = 400,
-            # max_mz = 1000,
-            # min_rt = 2000,
-            # max_rt = 4000,
-        # )
-     # raw_data = read_mzxml(
-            # '/data/qatar/17122018/mzXML/Acute2U_3001.mzXML',
-            # instrument_type = 'orbitrap',
-            # resolution_ms1 = 70000,
-            # resolution_msn = 30000,
-            # reference_mz = 200,
-            # fwhm_rt = 9,
-            # polarity = 'pos',
-        # )
-     return raw_data
+    raw_data = read_mzxml(
+        '/data/toydata/toy_data.mzXML',
+        instrument_type='orbitrap',
+        resolution_ms1=75000,
+        resolution_msn=30000,
+        reference_mz=200,
+        fwhm_rt=9,
+        polarity='pos',
+        min_mz=801,
+        max_mz=803,
+        min_rt=2808,
+        max_rt=2928,
+    )
+    # raw_data = read_mzxml(
+    # '/data/ftp_data/150210_11_01.mzXML',
+    # instrument_type = 'orbitrap',
+    # resolution_ms1 = 75000,
+    # resolution_msn = 30000,
+    # reference_mz = 200,
+    # polarity = 'pos',
+    # min_mz = 400,
+    # max_mz = 1000,
+    # min_rt = 2000,
+    # max_rt = 4000,
+    # )
+    # raw_data = read_mzxml(
+    # '/data/qatar/17122018/mzXML/Acute2U_3001.mzXML',
+    # instrument_type = 'orbitrap',
+    # resolution_ms1 = 70000,
+    # resolution_msn = 30000,
+    # reference_mz = 200,
+    # fwhm_rt = 9,
+    # polarity = 'pos',
+    # )
+    return raw_data
 
 # NOTE: This is not the best design for this function and could be greatly improved.
+
+
 def plot_mesh(mesh, transform='none', figure=None):
     if figure is None:
         figure = plt.figure()
@@ -82,7 +87,7 @@ def plot_mesh(mesh, transform='none', figure=None):
 
     plt.figure(figure.number)
     plt.clf()
-    gs = gridspec.GridSpec(5,5)
+    gs = gridspec.GridSpec(5, 5)
     mz_plot = plt.subplot(gs[0, :-1])
     mz_plot.clear()
     mz_plot.plot(img.sum(axis=0))
@@ -131,11 +136,14 @@ def plot_mesh(mesh, transform='none', figure=None):
         "rt_plot": rt_plot,
     })
 
+
 def find_scan_indexes(raw_data, peak_candidate):
     # Find min/max scans.
     rts = np.array([scan.retention_time for scan in raw_data.scans])
-    scan_idx = np.where((rts >= peak_candidate['roi_min_rt']) & (rts <= peak_candidate['roi_max_rt']))[0]
+    scan_idx = np.where((rts >= peak_candidate['roi_min_rt']) & (
+        rts <= peak_candidate['roi_max_rt']))[0]
     return scan_idx
+
 
 def find_mz_indexes(raw_data, peak_candidate, scan_idx):
     mz_idx = []
@@ -147,6 +155,7 @@ def find_mz_indexes(raw_data, peak_candidate, scan_idx):
         mz_idx = mz_idx + [mz_i]
     return mz_idx
 
+
 def find_raw_points_py(raw_data, scan_idx, mz_idx):
     mzs = []
     rts = []
@@ -155,27 +164,34 @@ def find_raw_points_py(raw_data, scan_idx, mz_idx):
         scan = raw_data.scans[scan_idx[i]]
         mzs = mzs + [scan.mz[j] for j in mz_idx[i]]
         intensities = intensities + [scan.intensity[j] for j in mz_idx[i]]
-        rts  = np.concatenate([rts, np.repeat(scan.retention_time, len(mz_idx[i]))])
+        rts = np.concatenate(
+            [rts, np.repeat(scan.retention_time, len(mz_idx[i]))])
     return (np.array(mzs), np.array(intensities), np.array(rts))
 
+
 def gaus(x, a, x0, sigma):
-        return a * np.exp(-(x - x0)**2 / (2 * sigma**2))
+    return a * np.exp(-(x - x0)**2 / (2 * sigma**2))
+
 
 def gaus2d(X, a, x_0, sigma_x, y_0, sigma_y):
     x = X[0]
     y = X[1]
-    return a * np.exp(-0.5 * ((x - x_0) /sigma_x) ** 2 ) * np.exp(-0.5 * ((y - y_0)/sigma_y) ** 2)
+    return a * np.exp(-0.5 * ((x - x_0) / sigma_x) ** 2) * np.exp(-0.5 * ((y - y_0)/sigma_y) ** 2)
 
-def fit_raw_points(mzs, intensities, rts):
+
+def fit_curvefit(mzs, intensities, rts):
     X = np.array([mzs, rts])
     mean_x = sum(X[0] * intensities) / sum(intensities)
     sigma_x = np.sqrt(sum(intensities * (X[0] - mean_x)**2) / sum(intensities))
     mean_y = sum(X[1] * intensities) / sum(intensities)
     sigma_y = np.sqrt(sum(intensities * (X[1] - mean_y)**2) / sum(intensities))
-    fitted_parameters, pcov_2d = curve_fit(gaus2d, X, intensities, p0=[max(intensities), mean_x, sigma_x, mean_y, sigma_y])
+    fitted_parameters, pcov_2d = curve_fit(gaus2d, X, intensities, p0=[
+                                           max(intensities), mean_x, sigma_x, mean_y, sigma_y])
     return fitted_parameters
 
 # NOTE: Testing different fitting methods
+
+
 def generate_gaussian():
     x = np.linspace(801.38, 801.42, 100)
     y = gaus(x, 1, 801.40, 0.0025)
@@ -183,27 +199,30 @@ def generate_gaussian():
     return (x, y)
 
 # NOTE: Testing different fitting methods
+
+
 def fit_inle(x, y):
     mean_x = np.sum(x * y) / np.sum(y)
     sigma_x = np.sqrt(sum(y * (x - mean_x)**2) / sum(y))
     fitted_parameters, cov = curve_fit(gaus, x, y, p0=[max(y), mean_x, sigma_x])
     return fitted_parameters
 
+
 def fit_caruana(x, y):
     x_mean = x.mean()
     x = x - x_mean
     X = np.array(
-            [
-                [len(x), np.array(x).sum(), np.power(x, 2).sum()],
-                [np.array(x).sum(), np.power(x, 2).sum(), np.power(x, 3).sum()],
-                [np.power(x, 2).sum(), np.power(x, 3).sum(), np.power(x, 4).sum()]
-            ],
-        )
+        [
+            [len(x), np.array(x).sum(), np.power(x, 2).sum()],
+            [np.array(x).sum(), np.power(x, 2).sum(), np.power(x, 3).sum()],
+            [np.power(x, 2).sum(), np.power(x, 3).sum(), np.power(x, 4).sum()]
+        ],
+    )
     Y = np.array([
-            np.log(y).sum(),
-            (x * np.log(y)).sum(),
-            (np.power(x, 2) * np.log(y)).sum()
-        ])
+        np.log(y).sum(),
+        (x * np.log(y)).sum(),
+        (np.power(x, 2) * np.log(y)).sum()
+    ])
     a, b, c = np.linalg.solve(X, Y)
     mean = -b / (2 * c) + x_mean
     sigma = np.sqrt(-1 / (2 * c))
@@ -211,39 +230,41 @@ def fit_caruana(x, y):
     # print(np.allclose(np.dot(X, A), Y))
     return np.array([height, mean, sigma])
 
+
 def fit_guos(x, y):
     x_mean = x.mean()
     x = x - x_mean
     X = np.array(
+        [
             [
-                [
-                    np.power(y, 2).sum(),
-                    (x * np.power(y, 2)).sum(),
-                    (np.power(x, 2) * np.power(y, 2)).sum(),
-                ],
-                [
-                    (x * np.power(y, 2)).sum(),
-                    (np.power(x, 2) * np.power(y, 2)).sum(),
-                    (np.power(x, 3) * np.power(y, 2)).sum(),
-                ],
-                [
-                    (np.power(x, 2) * np.power(y, 2)).sum(),
-                    (np.power(x, 3) * np.power(y, 2)).sum(),
-                    (np.power(x, 4) * np.power(y, 2)).sum(),
-                ],
+                np.power(y, 2).sum(),
+                (x * np.power(y, 2)).sum(),
+                (np.power(x, 2) * np.power(y, 2)).sum(),
             ],
-        )
+            [
+                (x * np.power(y, 2)).sum(),
+                (np.power(x, 2) * np.power(y, 2)).sum(),
+                (np.power(x, 3) * np.power(y, 2)).sum(),
+            ],
+            [
+                (np.power(x, 2) * np.power(y, 2)).sum(),
+                (np.power(x, 3) * np.power(y, 2)).sum(),
+                (np.power(x, 4) * np.power(y, 2)).sum(),
+            ],
+        ],
+    )
     Y = np.array([
-            (np.power(y, 2) * np.log(y)).sum(),
-            (np.power(y, 2) * x * np.log(y)).sum(),
-            (np.power(y, 2) * np.power(x, 2) * np.log(y)).sum()
-        ])
+        (np.power(y, 2) * np.log(y)).sum(),
+        (np.power(y, 2) * x * np.log(y)).sum(),
+        (np.power(y, 2) * np.power(x, 2) * np.log(y)).sum()
+    ])
     a, b, c = np.linalg.solve(X, Y)
     mean = -b / (2 * c) + x_mean
     sigma = np.sqrt(-1 / (2 * c))
     height = np.exp(a - (b ** 2) / (4 * c))
     # print(np.allclose(np.dot(X, A), Y))
     return np.array([height, mean, sigma])
+
 
 def fit_guos_2d_prime(x, y, z):
     x_mean = x.mean()
@@ -260,52 +281,53 @@ def fit_guos_2d_prime(x, y, z):
     y_4 = np.power(y, 4)
 
     X = np.array(
+        [
             [
-                [
-                    z_2.sum(),
-                    (x * z_2).sum(),
-                    (x_2 * z_2).sum(),
-                    (y * z_2).sum(),
-                    (y_2 * z_2).sum(),
-                ],
-                [
-                    (x * z_2).sum(),
-                    (x_2 * z_2).sum(),
-                    (x_3 * z_2).sum(),
-                    (x * y * z_2).sum(),
-                    (x * y_2 * z_2).sum(),
-                ],
-                [
-                    (x_2 * z_2).sum(),
-                    (x_3 * z_2).sum(),
-                    (x_4 * z_2).sum(),
-                    (x_2 * y * z_2).sum(),
-                    (x_2 * y_2 * z_2).sum(),
-                ],
-                [
-                    (y * z_2).sum(),
-                    (x * y * z_2).sum(),
-                    (x_2 * y * z_2).sum(),
-                    (y_2 * z_2).sum(),
-                    (y_3 * z_2).sum(),
-                ],
-                [
-                    (y_2 * z_2).sum(),
-                    (x * y_2 * z_2).sum(),
-                    (x_2 * y_2 * z_2).sum(),
-                    (y_3 * z_2).sum(),
-                    (y_4 * z_2).sum(),
-                ],
+                z_2.sum(),
+                (x * z_2).sum(),
+                (x_2 * z_2).sum(),
+                (y * z_2).sum(),
+                (y_2 * z_2).sum(),
             ],
-        )
+            [
+                (x * z_2).sum(),
+                (x_2 * z_2).sum(),
+                (x_3 * z_2).sum(),
+                (x * y * z_2).sum(),
+                (x * y_2 * z_2).sum(),
+            ],
+            [
+                (x_2 * z_2).sum(),
+                (x_3 * z_2).sum(),
+                (x_4 * z_2).sum(),
+                (x_2 * y * z_2).sum(),
+                (x_2 * y_2 * z_2).sum(),
+            ],
+            [
+                (y * z_2).sum(),
+                (x * y * z_2).sum(),
+                (x_2 * y * z_2).sum(),
+                (y_2 * z_2).sum(),
+                (y_3 * z_2).sum(),
+            ],
+            [
+                (y_2 * z_2).sum(),
+                (x * y_2 * z_2).sum(),
+                (x_2 * y_2 * z_2).sum(),
+                (y_3 * z_2).sum(),
+                (y_4 * z_2).sum(),
+            ],
+        ],
+    )
     Y = np.array([
-            (z_2 * np.log(z)).sum(),
-            (z_2 * x * np.log(z)).sum(),
-            (z_2 * x_2 * np.log(z)).sum(),
-            (z_2 * y * np.log(z)).sum(),
-            (z_2 * y_2 * np.log(z)).sum(),
-        ])
+        (z_2 * np.log(z)).sum(),
+        (z_2 * x * np.log(z)).sum(),
+        (z_2 * x_2 * np.log(z)).sum(),
+        (z_2 * y * np.log(z)).sum(),
+        (z_2 * y_2 * np.log(z)).sum(),
+    ])
     return X, Y
+
 
 def fit_guos_2d(x, y, z):
     x_mean = x.mean()
@@ -322,53 +344,53 @@ def fit_guos_2d(x, y, z):
     y_4 = np.power(y, 4)
 
     X = np.array(
+        [
             [
-                [
-                    z_2.sum(),
-                    (x * z_2).sum(),
-                    (x_2 * z_2).sum(),
-                    (y * z_2).sum(),
-                    (y_2 * z_2).sum(),
-                ],
-                [
-                    (x * z_2).sum(),
-                    (x_2 * z_2).sum(),
-                    (x_3 * z_2).sum(),
-                    (x * y * z_2).sum(),
-                    (x * y_2 * z_2).sum(),
-                ],
-                [
-                    (x_2 * z_2).sum(),
-                    (x_3 * z_2).sum(),
-                    (x_4 * z_2).sum(),
-                    (x_2 * y * z_2).sum(),
-                    (x_2 * y_2 * z_2).sum(),
-                ],
-                [
-                    (y * z_2).sum(),
-                    (x * y * z_2).sum(),
-                    (x_2 * y * z_2).sum(),
-                    (y_2 * z_2).sum(),
-                    (y_3 * z_2).sum(),
-                ],
-                [
-                    (y_2 * z_2).sum(),
-                    (x * y_2 * z_2).sum(),
-                    (x_2 * y_2 * z_2).sum(),
-                    (y_3 * z_2).sum(),
-                    (y_4 * z_2).sum(),
-                ],
+                z_2.sum(),
+                (x * z_2).sum(),
+                (x_2 * z_2).sum(),
+                (y * z_2).sum(),
+                (y_2 * z_2).sum(),
             ],
-        )
+            [
+                (x * z_2).sum(),
+                (x_2 * z_2).sum(),
+                (x_3 * z_2).sum(),
+                (x * y * z_2).sum(),
+                (x * y_2 * z_2).sum(),
+            ],
+            [
+                (x_2 * z_2).sum(),
+                (x_3 * z_2).sum(),
+                (x_4 * z_2).sum(),
+                (x_2 * y * z_2).sum(),
+                (x_2 * y_2 * z_2).sum(),
+            ],
+            [
+                (y * z_2).sum(),
+                (x * y * z_2).sum(),
+                (x_2 * y * z_2).sum(),
+                (y_2 * z_2).sum(),
+                (y_3 * z_2).sum(),
+            ],
+            [
+                (y_2 * z_2).sum(),
+                (x * y_2 * z_2).sum(),
+                (x_2 * y_2 * z_2).sum(),
+                (y_3 * z_2).sum(),
+                (y_4 * z_2).sum(),
+            ],
+        ],
+    )
     Y = np.array([
-            (z_2 * np.log(z)).sum(),
-            (z_2 * x * np.log(z)).sum(),
-            (z_2 * x_2 * np.log(z)).sum(),
-            (z_2 * y * np.log(z)).sum(),
-            (z_2 * y_2 * np.log(z)).sum(),
-        ])
+        (z_2 * np.log(z)).sum(),
+        (z_2 * x * np.log(z)).sum(),
+        (z_2 * x_2 * np.log(z)).sum(),
+        (z_2 * y * np.log(z)).sum(),
+        (z_2 * y_2 * np.log(z)).sum(),
+    ])
     # a, b, c, d, e = np.linalg.solve(X, Y)
-    beta = np.linalg.lstsq(X,Y)
+    beta = np.linalg.lstsq(X, Y)
     a, b, c, d, e = beta[0]
 
     sigma_mz = np.sqrt(1/(-2 * c))
@@ -379,6 +401,7 @@ def fit_guos_2d(x, y, z):
 
     # print(np.allclose(np.dot(X, A), Y))
     return np.array([height, mz, sigma_mz, rt, sigma_rt])
+
 
 def test_gaus_fit():
     x, y = generate_gaussian()
@@ -393,47 +416,58 @@ def test_gaus_fit():
     plt.show()
     fig = plt.figure()
     plt.scatter(x, y, label='Raw data')
-    plt.plot(x, gaus(x, *parameters_inle), label='curve_fit', linestyle='--', color='crimson')
+    plt.plot(x, gaus(x, *parameters_inle), label='curve_fit',
+             linestyle='--', color='crimson')
     plt.plot(x, gaus(x, *parameters_guos), label='guos')
-    plt.plot(x, gaus(x, *parameters_caruana), label='caruana', linestyle=':', color='aqua')
+    plt.plot(x, gaus(x, *parameters_caruana),
+             label='caruana', linestyle=':', color='aqua')
     plt.legend(loc='upper left')
+
 
 def fit(raw_data, peak_candidate):
     scan_idx = find_scan_indexes(raw_data, peak_candidate)
     mz_idx = find_mz_indexes(raw_data, peak_candidate, scan_idx)
     data_points = find_raw_points_py(raw_data, scan_idx, mz_idx)
-    fitted_parameters = fit_raw_points(data_points[0], data_points[1], data_points[2])
+    fitted_parameters = fit_curvefit(
+        data_points[0], data_points[1], data_points[2])
     return fitted_parameters
+
 
 def fit2(raw_data, peak_candidate):
     data_points = find_raw_points(
-            raw_data,
-            peak_candidate['roi_min_mz'],
-            peak_candidate['roi_max_mz'],
-            peak_candidate['roi_min_rt'],
-            peak_candidate['roi_max_rt']
-        )
-    fitted_parameters = fit_raw_points(data_points.mz, data_points.intensity, data_points.rt)
+        raw_data,
+        peak_candidate['roi_min_mz'],
+        peak_candidate['roi_max_mz'],
+        peak_candidate['roi_min_rt'],
+        peak_candidate['roi_max_rt']
+    )
+    fitted_parameters = fit_curvefit(
+        data_points.mz, data_points.intensity, data_points.rt)
     return fitted_parameters
+
 
 def fit3(raw_data, peak_candidate):
     data_points = find_raw_points(
-            raw_data,
-            peak_candidate['roi_min_mz'],
-            peak_candidate['roi_max_mz'],
-            peak_candidate['roi_min_rt'],
-            peak_candidate['roi_max_rt']
-        )
-    return fit_guos_2d(np.array(data_points.mz), np.array(data_points.rt), np.array(data_points.intensity))
+        raw_data,
+        peak_candidate['roi_min_mz'],
+        peak_candidate['roi_max_mz'],
+        peak_candidate['roi_min_rt'],
+        peak_candidate['roi_max_rt']
+    )
+    return fit_guos_2d(
+        np.array(data_points.mz),
+        np.array(data_points.rt),
+        np.array(data_points.intensity))
+
 
 def fit_raw_weighted_estimate(raw_data, peak_candidate):
     data_points = find_raw_points(
-            raw_data,
-            peak_candidate['roi_min_mz'],
-            peak_candidate['roi_max_mz'],
-            peak_candidate['roi_min_rt'],
-            peak_candidate['roi_max_rt']
-        )
+        raw_data,
+        peak_candidate['roi_min_mz'],
+        peak_candidate['roi_max_mz'],
+        peak_candidate['roi_min_rt'],
+        peak_candidate['roi_max_rt']
+    )
     mzs = np.array(data_points.mz)
     rts = np.array(data_points.rt)
     intensities = np.array(data_points.intensity)
@@ -445,17 +479,18 @@ def fit_raw_weighted_estimate(raw_data, peak_candidate):
 
     return np.array([intensities.max(), mean_x, sigma_x, mean_y, sigma_y])
 
+
 def plot_peak_fit(raw_data, peak, fig_mz, fig_rt):
     # PLOTTING
-    color = np.random.rand(3,1).flatten()
+    color = np.random.rand(3, 1).flatten()
 
     data_points = find_raw_points(
-            raw_data,
-            peak['roi_min_mz'],
-            peak['roi_max_mz'],
-            peak['roi_min_rt'],
-            peak['roi_max_rt']
-        )
+        raw_data,
+        peak['roi_min_mz'],
+        peak['roi_max_mz'],
+        peak['roi_min_rt'],
+        peak['roi_max_rt']
+    )
 
     rts = data_points.rt
     mzs = data_points.mz
@@ -464,16 +499,18 @@ def plot_peak_fit(raw_data, peak, fig_mz, fig_rt):
     # MZ fit plot.
     sort_idx_mz = np.argsort(mzs)
     fitted_intensity_2d_mz = gaus(
-            np.array(mzs)[sort_idx_mz],
-            peak['fitted_height'],
-            peak['fitted_mz'],
-            peak['fitted_sigma_mz'],
-        )
+        np.array(mzs)[sort_idx_mz],
+        peak['fitted_height'],
+        peak['fitted_mz'],
+        peak['fitted_sigma_mz'],
+    )
     plt.figure(fig_mz.number)
-    markerline, stemlines, baseline = plt.stem(np.array(mzs)[sort_idx_mz], np.array(intensities)[sort_idx_mz], label='intensities', markerfmt=' ')
+    markerline, stemlines, baseline = plt.stem(np.array(mzs)[sort_idx_mz], np.array(
+        intensities)[sort_idx_mz], label='intensities', markerfmt=' ')
     plt.setp(baseline, color=color, alpha=0.5)
     plt.setp(stemlines, color=color, alpha=0.5)
-    plt.plot(np.array(mzs)[sort_idx_mz], fitted_intensity_2d_mz, linestyle='--', color=color, label='2d_fitting')
+    plt.plot(np.array(mzs)[sort_idx_mz], fitted_intensity_2d_mz,
+             linestyle='--', color=color, label='2d_fitting')
     plt.xlabel('m/z')
     plt.ylabel('Intensity')
 
@@ -481,60 +518,66 @@ def plot_peak_fit(raw_data, peak, fig_mz, fig_rt):
     xic_x = np.unique(rts)
     # xic_y_max = []
     # for x,y in zip(rts, intensities):
-        # pass
+    # pass
     sort_idx_rt = np.argsort(xic_x)
     fitted_intensity_2d_rt = gaus(
-            np.array(xic_x)[sort_idx_rt],
-            peak['fitted_height'],
-            peak['fitted_rt'],
-            peak['fitted_sigma_rt'],
-        )
+        np.array(xic_x)[sort_idx_rt],
+        peak['fitted_height'],
+        peak['fitted_rt'],
+        peak['fitted_sigma_rt'],
+    )
     plt.figure(fig_rt.number)
-    plt.plot(np.array(xic_x)[sort_idx_rt], fitted_intensity_2d_rt, color=color, linestyle='--')
+    plt.plot(np.array(xic_x)[sort_idx_rt],
+             fitted_intensity_2d_rt, color=color, linestyle='--')
     # plt.plot(xic_x, xic_y_max, label=str(i), linestyle='-', color=color, alpha=0.5)
     plt.xlabel('retention time (s)')
     plt.ylabel('Intensity')
 
     return
 
+
 def fit_and_plot(raw_data, peak_candidate):
     data_points = find_raw_points(
-            raw_data,
-            peak_candidate['roi_min_mz'],
-            peak_candidate['roi_max_mz'],
-            peak_candidate['roi_min_rt'],
-            peak_candidate['roi_max_rt']
-        )
-    fitted_parameters = fit_raw_points(data_points.mz, data_points.intensity, data_points.rt)
+        raw_data,
+        peak_candidate['roi_min_mz'],
+        peak_candidate['roi_max_mz'],
+        peak_candidate['roi_min_rt'],
+        peak_candidate['roi_max_rt']
+    )
+    fitted_parameters = fit_curvefit(
+        data_points.mz, data_points.intensity, data_points.rt)
     plot_peak_candidate(data_points, fitted_parameters)
     return fitted_parameters
+
 
 def find_roi(raw_data, local_max, avg_rt_fwhm=10):
     peak_candidates = []
     for i in range(0, len(local_max)):
         selected_peak = local_max.iloc[i]
-        theoretical_sigma_mz = fwhm_at(raw_data, selected_peak['mz']) / (2 * math.sqrt(2 * math.log(2)))
+        theoretical_sigma_mz = fwhm_at(
+            raw_data, selected_peak['mz']) / (2 * math.sqrt(2 * math.log(2)))
         theoretical_sigma_rt = avg_rt_fwhm / (2 * math.sqrt(2 * math.log(2)))
-        tolerance_mz = 3 * theoretical_sigma_mz
-        tolerance_rt = 3 * theoretical_sigma_rt
+        tolerance_mz = 2.5 * theoretical_sigma_mz
+        tolerance_rt = 2.5 * theoretical_sigma_rt
         min_mz = selected_peak['mz'] - tolerance_mz
         max_mz = selected_peak['mz'] + tolerance_mz
         min_rt = selected_peak['rt'] - tolerance_rt
         max_rt = selected_peak['rt'] + tolerance_rt
 
         peak_candidates = peak_candidates + [{
-                'i': selected_peak['i'],
-                'j': selected_peak['j'],
-                'estimated_mz': selected_peak['mz'],
-                'estimated_rt': selected_peak['rt'],
-                'estimated_height': selected_peak['intensity'],
-                'roi_min_mz': min_mz,
-                'roi_max_mz': max_mz,
-                'roi_min_rt': min_rt,
-                'roi_max_rt': max_rt,
-            }]
+            'i': selected_peak['i'],
+            'j': selected_peak['j'],
+            'estimated_mz': selected_peak['mz'],
+            'estimated_rt': selected_peak['rt'],
+            'estimated_height': selected_peak['intensity'],
+            'roi_min_mz': min_mz,
+            'roi_max_mz': max_mz,
+            'roi_min_rt': min_rt,
+            'roi_max_rt': max_rt,
+        }]
 
     return peak_candidates
+
 
 def profile_resample():
     # raw_data = read_mzxml(
@@ -552,12 +595,12 @@ def profile_resample():
     # )
     raw_data = read_mzxml(
         '/data/qatar/17122018/mzXML/Acute2U_3001.mzXML',
-        instrument_type = 'orbitrap',
-        resolution_ms1 = 75000,
-        resolution_msn = 30000,
-        reference_mz = 200,
-        fwhm_rt = 9,
-        polarity = 'pos',
+        instrument_type='orbitrap',
+        resolution_ms1=75000,
+        resolution_msn=30000,
+        reference_mz=200,
+        fwhm_rt=9,
+        polarity='pos',
         # min_mz = 200,
         # max_mz = 800,
         # min_rt = 0,
@@ -566,29 +609,30 @@ def profile_resample():
 
     mesh = resample(raw_data, 5, 5, 0.5, 0.5)
 
+
 def profile_peak_fitting(max_peaks=20):
     print("Loading data...")
     # raw_data = read_mzxml(
-        # '/data/qatar/17122018/mzXML/Acute2U_3001.mzXML',
-        # instrument_type = 'orbitrap',
-        # resolution_ms1 = 70000,
-        # resolution_msn = 30000,
-        # reference_mz = 200,
-        # fwhm_rt = 9,
-        # polarity = 'pos',
+    # '/data/qatar/17122018/mzXML/Acute2U_3001.mzXML',
+    # instrument_type = 'orbitrap',
+    # resolution_ms1 = 70000,
+    # resolution_msn = 30000,
+    # reference_mz = 200,
+    # fwhm_rt = 9,
+    # polarity = 'pos',
     # )
     raw_data = read_mzxml(
         '/data/toydata/toy_data.mzXML',
-        instrument_type = 'orbitrap',
-        resolution_ms1 = 75000,
-        resolution_msn = 30000,
-        reference_mz = 200,
-        fwhm_rt = 9,
-        polarity = 'pos',
-        min_mz = 801,
-        max_mz = 803,
-        min_rt = 2808,
-        max_rt = 2928,
+        instrument_type='orbitrap',
+        resolution_ms1=75000,
+        resolution_msn=30000,
+        reference_mz=200,
+        fwhm_rt=9,
+        polarity='pos',
+        min_mz=801,
+        max_mz=803,
+        min_rt=2808,
+        max_rt=2928,
     )
 
     print("Resampling...")
@@ -605,14 +649,15 @@ def profile_peak_fitting(max_peaks=20):
     if max_peaks != math.inf:
         local_max = local_max[0:max_peaks]
 
-    peak_candidates = find_roi(raw_data, local_max)
+    peak_candidates = find_roi(raw_data, local_max, 9)
     fitted_parameters = []
     fitted_peaks = []
     for peak_candidate in peak_candidates:
         try:
             # fitted_parameters = fitted_parameters + [fit(raw_data, peak_candidate)]
             # fitted_parameters = fitted_parameters + [fit2(raw_data, peak_candidate)]
-            fitted_parameters = fitted_parameters + [fit3(raw_data, peak_candidate)]
+            fitted_parameters = fitted_parameters + \
+                [fit3(raw_data, peak_candidate)]
             peak = peak_candidate
             peak['fitted_height'] = fitted_parameters[0]
             peak['fitted_mz'] = fitted_parameters[1]
@@ -626,6 +671,7 @@ def profile_peak_fitting(max_peaks=20):
 
     return fitted_peaks
 
+
 def example_pipeline(show_mesh_plot=False, show_plot_fit=True, silent=True, max_peaks=15):
     if show_plot_fit or show_mesh_plot:
         plt.style.use('dark_background')
@@ -634,30 +680,31 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=True, silent=True, max_
 
     print("Loading data...")
     # raw_data = read_mzxml(
-        # '/data/toydata/toy_data.mzXML',
-        # instrument_type = 'orbitrap',
-        # resolution_ms1 = 75000,
-        # resolution_msn = 30000,
-        # reference_mz = 200,
-        # fwhm_rt = 9,
-        # polarity = 'pos',
-        # min_mz = 801,
-        # max_mz = 803,
-        # min_rt = 2808,
-        # max_rt = 2928,
+    # '/data/toydata/toy_data.mzXML',
+    # instrument_type = 'orbitrap',
+    # resolution_ms1 = 75000,
+    # resolution_msn = 30000,
+    # reference_mz = 200,
+    # fwhm_rt = 9,
+    # polarity = 'pos',
+    # min_mz = 801,
+    # max_mz = 803,
+    # min_rt = 2808,
+    # max_rt = 2928,
     # )
     raw_data = read_mzxml(
         '/data/toydata/toy_data_tof.mzXML',
-        instrument_type = 'tof', # FIXME: This is not correct, should be TOF, but not currently available.
-        resolution_ms1 = 30000,
-        resolution_msn = 30000,
-        reference_mz = 200,
-        fwhm_rt = 9,
-        polarity = 'pos',
-        min_mz = 510,
-        max_mz = 531,
-        min_rt = 2390,
-        max_rt = 2510,
+        # FIXME: This is not correct, should be TOF, but not currently available.
+        instrument_type='tof',
+        resolution_ms1=30000,
+        resolution_msn=30000,
+        reference_mz=200,
+        fwhm_rt=9,
+        polarity='pos',
+        min_mz=510,
+        max_mz=531,
+        min_rt=2390,
+        max_rt=2510,
     )
 
     print("Resampling...")
@@ -679,7 +726,8 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=True, silent=True, max_
         mesh_plot = plot_mesh(mesh, transform='sqrt')
 
         print("Plotting local maxima...")
-        mesh_plot['img_plot'].scatter(local_max['i'], local_max['j'], color='aqua', s=5, marker="s", alpha=0.9)
+        mesh_plot['img_plot'].scatter(
+            local_max['i'], local_max['j'], color='aqua', s=5, marker="s", alpha=0.9)
 
     print("Fitting peaks...")
     peak_candidates = find_roi(raw_data, local_max)
