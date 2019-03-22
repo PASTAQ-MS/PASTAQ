@@ -134,115 +134,6 @@ struct RoiIndices {
     std::vector<size_t> max_i;
 };
 
-// TODO: This should be tested.
-// FIXME: This has a pretty important problem. It's not possible to tell if we
-// are returning a single scan or if we couldn't find any indices on the ROI.
-RoiIndices find_roi_indexes(const RawData::RawData &raw_data, const Roi &roi) {
-    // The search procedure for the indices for both retention time and m/z is
-    // the same: Fist a binary search is performed to find the lower bound,
-    // followed by a linear search from the minimum index to find the upper
-    // bound.
-    //
-    const auto &scans = raw_data.scans;
-    if (scans.size() == 0) {
-        // return {0, 0};
-        // TODO: Throw exception for python code to catch?
-    }
-    RoiIndices roi_indices;
-    // Find scan indices.
-    {
-        double min_rt = roi.min_rt;
-        double max_rt = roi.max_rt;
-        if (min_rt < raw_data.min_rt) {
-            min_rt = raw_data.min_rt;
-        }
-        if (max_rt > raw_data.max_rt) {
-            max_rt = raw_data.max_rt;
-        }
-        // Binary search for lower bound.
-        size_t min_j = 0;
-        size_t max_j = raw_data.scans.size() - 1;
-        size_t l = min_j;
-        size_t r = max_j;
-        while (l <= r) {
-            min_j = (l + r) / 2;
-            if (scans[min_j].retention_time < min_rt) {
-                l = min_j + 1;
-            } else if (scans[min_j].retention_time > min_rt) {
-                r = min_j - 1;
-            } else {
-                break;
-            }
-        }
-        // Linear search for upper bound.
-        if (min_j != max_j) {
-            min_j = min_j + 1;
-        }
-        for (size_t i = min_j; i < scans.size(); ++i) {
-            if (scans[i].retention_time >= max_rt) {
-                max_j = i;
-                break;
-            }
-        }
-        roi_indices.min_j = min_j;
-        roi_indices.max_j = max_j;
-    }
-
-    // Find m/z indices per scan.
-    roi_indices.min_i =
-        std::vector<size_t>(roi_indices.max_j - roi_indices.min_j + 1);
-    roi_indices.max_i =
-        std::vector<size_t>(roi_indices.max_j - roi_indices.min_j + 1);
-    size_t k = 0;
-    for (size_t j = roi_indices.min_j; j < roi_indices.max_j; ++j, ++k) {
-        const auto &scan = scans[j];
-        if (scan.num_points == 0) {
-            // return {0, 0};
-            // TODO: Throw exception for python code to catch?
-            continue;
-        }
-        {
-            double min_mz = roi.min_mz;
-            double max_mz = roi.max_mz;
-            if (min_mz < scan.mz[0]) {
-                min_mz = scan.mz[0];
-            }
-            if (max_mz > scan.mz[scan.num_points - 1]) {
-                max_mz = scan.mz[scan.num_points - 1];
-            }
-            // Binary search for lower bound.
-            size_t min_i = 0;
-            size_t max_i = scan.num_points - 1;
-            size_t l = min_i;
-            size_t r = max_i;
-            while (l <= r) {
-                min_i = (l + r) / 2;
-                if (scan.mz[min_i] < min_mz) {
-                    l = min_i + 1;
-                } else if (scan.mz[min_i] > min_mz) {
-                    r = min_i - 1;
-                } else {
-                    break;
-                }
-            }
-            // Linear search for upper bound.
-            if (min_i != max_i) {
-                min_i = min_i + 1;
-            }
-            for (size_t i = min_i; i < scan.mz.size(); ++i) {
-                if (scan.mz[i] >= max_mz) {
-                    max_i = i;
-                    break;
-                }
-            }
-            roi_indices.min_i[k] = min_i;
-            roi_indices.max_i[k] = max_i;
-        }
-    }
-
-    return roi_indices;
-}
-
 struct RawPoint {
     double rt;
     double mz;
@@ -253,29 +144,98 @@ struct RawPoints {
     std::vector<double> rt;
     std::vector<double> mz;
     std::vector<double> intensity;
+    size_t num_points;
 };
 
 RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
                           double max_mz, double min_rt, double max_rt) {
-    auto indices = find_roi_indexes(raw_data, {min_mz, max_mz, min_rt, max_rt});
     RawPoints raw_points;
-    size_t k = 0;
-    if (((int64_t)indices.max_j - (int64_t)indices.min_j) <= 3) {
+    const auto &scans = raw_data.scans;
+    if (scans.size() == 0) {
         std::ostringstream error_stream;
-        error_stream << "not enough scans to perform fitting...";
+        error_stream << "the given raw_data is empty";
         throw std::invalid_argument(error_stream.str());
     }
-    for (size_t j = indices.min_j; j < indices.max_j; ++j, ++k) {
-        const auto &scan = raw_data.scans[j];
-        if (((int64_t)indices.max_i[k] - (int64_t)indices.min_i[k]) <= 3) {
+
+    // Find scan indices.
+    if (min_rt < raw_data.min_rt) {
+        min_rt = raw_data.min_rt;
+    }
+    if (max_rt > raw_data.max_rt) {
+        max_rt = raw_data.max_rt;
+    }
+
+    // Binary search for lower rt bound.
+    size_t min_j = 0;
+    size_t max_j = scans.size();
+    size_t l = min_j;
+    size_t r = max_j - 1;
+    while (l <= r) {
+        min_j = (l + r) / 2;
+        if (scans[min_j].retention_time < min_rt) {
+            l = min_j + 1;
+        } else if (scans[min_j].retention_time > min_rt) {
+            r = min_j - 1;
+        } else {
+            break;
+        }
+        if (min_j == 0) {
+            break;
+        }
+    }
+    for (size_t j = min_j; j < max_j; ++j) {
+        const auto &scan = scans[j];
+        if (scan.num_points == 0) {
             continue;
         }
-        for (size_t i = indices.min_i[k]; i < indices.max_i[k]; ++i) {
+        if (scan.retention_time > max_rt) {
+            break;
+        }
+        // Binary search for lower mz bound.
+        double internal_min_mz = min_mz;
+        double internal_max_mz = max_mz;
+        if (internal_min_mz < scan.mz[0]) {
+            internal_min_mz = scan.mz[0];
+        }
+        if (internal_max_mz > scan.mz[scan.num_points - 1]) {
+            internal_max_mz = scan.mz[scan.num_points - 1];
+        }
+        // Binary search for lower bound.
+        size_t min_i = 0;
+        size_t max_i = scan.num_points;
+        size_t l = min_i;
+        size_t r = max_i - 1;
+        while (l <= r) {
+            min_i = (l + r) / 2;
+            if (scan.mz[min_i] < internal_min_mz) {
+                l = min_i + 1;
+            } else if (scan.mz[min_i] > internal_min_mz) {
+                r = min_i - 1;
+            } else {
+                break;
+            }
+            if (min_i == 0) {
+                break;
+            }
+        }
+        for (size_t i = min_i; i < max_i; ++i) {
+            if (scan.mz[i] > internal_max_mz) {
+                break;
+            }
+
             raw_points.rt.push_back(scan.retention_time);
             raw_points.mz.push_back(scan.mz[i]);
             raw_points.intensity.push_back(scan.intensity[i]);
+            ++raw_points.num_points;
         }
     }
+
+    if (raw_points.num_points == 0) {
+        std::ostringstream error_stream;
+        error_stream << "couldn't find raw_data points on the given ROI";
+        throw std::invalid_argument(error_stream.str());
+    }
+
     return raw_points;
 }
 
