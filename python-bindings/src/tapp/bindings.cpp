@@ -334,8 +334,10 @@ std::string to_string(const RawData::Polarity &polarity) {
 }
 
 struct Mesh {
-    uint64_t n;
-    uint64_t m;
+    uint64_t n;  // Number of mz sampling points.
+    uint64_t m;  // Number of rt sampling points.
+    uint64_t k;  // Number of sampling points per FWHM in mz.
+    uint64_t t;  // Number of sampling points per FWHM in rt.
     std::vector<double> matrix;
     std::vector<double> bins_mz;
     std::vector<double> bins_rt;
@@ -391,6 +393,8 @@ Mesh resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
     Mesh mesh;
     mesh.n = n;
     mesh.m = m;
+    mesh.k = num_samples_mz;
+    mesh.t = num_samples_rt;
     mesh.matrix = std::vector<double>(n * m);
     auto weights = std::vector<double>(n * m);
     mesh.bins_mz = std::vector<double>(n);
@@ -403,27 +407,23 @@ Mesh resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
         switch (raw_data.instrument_type) {
             case Instrument::ORBITRAP: {
                 double a = 1 / std::sqrt(raw_data.min_mz);
-                double b =
-                    fwhm_ref / std::pow(mz_ref, 1.5) * i / 2 / num_samples_mz;
+                double b = fwhm_ref / std::pow(mz_ref, 1.5) * i / 2 / mesh.k;
                 double c = a - b;
                 mesh.bins_mz[i] = 1 / (c * c);
             } break;
             case Instrument::FTICR: {
                 double a = fwhm_ref * raw_data.min_mz;
                 double b = mz_ref * mz_ref;
-                mesh.bins_mz[i] =
-                    raw_data.min_mz / (1 - (a / b) * i / num_samples_mz);
+                mesh.bins_mz[i] = raw_data.min_mz / (1 - (a / b) * i / mesh.k);
             } break;
             case Instrument::TOF: {
                 mesh.bins_mz[i] =
-                    raw_data.min_mz *
-                    std::exp(fwhm_ref / mz_ref * i / num_samples_mz);
+                    raw_data.min_mz * std::exp(fwhm_ref / mz_ref * i / mesh.k);
             } break;
             case Instrument::QUAD: {
                 double delta_mz = (raw_data.max_mz - raw_data.min_mz) /
                                   static_cast<double>(mesh.n - 1);
-                mesh.bins_mz[i] =
-                    raw_data.min_mz + delta_mz * i / num_samples_mz;
+                mesh.bins_mz[i] = raw_data.min_mz + delta_mz * i / mesh.k;
             } break;
             case Instrument::UNKNOWN: {
                 assert(false);  // Can't handle unknown instruments.
@@ -469,7 +469,7 @@ Mesh resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
         double current_rt = scan.retention_time;
 
         // Find the bin for the current retention time.
-        size_t index_rt = y_index(raw_data, current_rt, num_samples_rt);
+        size_t index_rt = y_index(raw_data, current_rt, mesh.t);
 
         // Find the min/max indexes for the rt kernel.
         size_t j_min = 0;
@@ -486,7 +486,7 @@ Mesh resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
             double current_mz = scan.mz[k];
 
             // Find the bin for the current mz.
-            size_t index_mz = x_index(raw_data, current_mz, num_samples_mz);
+            size_t index_mz = x_index(raw_data, current_mz, mesh.k);
 
             double sigma_mz = sigma_mz_vec[index_mz];
 
@@ -642,6 +642,537 @@ find_local_max(const Mesh &mesh) {
     return points;
 }
 
+struct Peak {
+    // ID of this peak. Should be kept for futher processing.
+    size_t id;
+    // Center of the peak in index space (Coordinates of local maxima).
+    uint64_t local_max_i;
+    uint64_t local_max_j;
+    // Real mz/rt values for the center of this peak (From the local maxima
+    // coordinates).
+    double local_max_mz;
+    double local_max_rt;
+    // Height of the peak (Height of local maxima).
+    double local_max_height;
+
+    // Simple estimation of the peak metrics on the mesh values based on the
+    // slope descent.
+    //
+    // Sumation of all intensities within the peak boundary. (Ignores holes,
+    // i.e. does not interpolate values in case of non closed set).
+    double mesh_boundary_total_intensity;
+    // Estimated values for the position of the 2D peak based on the slope
+    // descent points.
+    double mesh_boundary_mz;
+    double mesh_boundary_rt;
+    // Estimated mz/rt values for the standard deviation of the peak in both
+    // axes. (Ignores holes).
+    double mesh_boundary_sigma_mz;
+    double mesh_boundary_sigma_rt;
+    // Average intensity on the boundary of the peak.
+    double mesh_boundary_border_background;
+    // NOTE: number of points within the boundary found via slope descent?
+
+    // Region of interest for this peak.
+    double roi_min_mz;
+    double roi_max_mz;
+    double roi_min_rt;
+    double roi_max_rt;
+    // Simple estimation of the peak metrics on the mesh values.
+    double mesh_roi_mz;
+    double mesh_roi_rt;
+    double mesh_roi_sigma_mz;
+    double mesh_roi_sigma_rt;
+    double mesh_roi_total_intensity;
+    // Simple estimation of the peak metrics on the raw data.
+    double raw_roi_mz;
+    double raw_roi_rt;
+    double raw_roi_sigma_mz;
+    double raw_roi_sigma_rt;
+    double raw_roi_max_height;
+    double raw_roi_total_intensity;
+    uint64_t raw_roi_num_points;
+    uint64_t raw_roi_num_scans;
+
+    // Matrix A for 2D gaussian fitting using least squares.
+    double A[5][5];
+    // Vector C for 2D gaussian fitting using least squares.
+    double C[5];
+};
+
+struct MeshIndex {
+    size_t i;
+    size_t j;
+};
+
+// FIXME: Probably this should be the default.
+std::vector<MeshIndex> find_local_max_idx(const Mesh &mesh) {
+    std::vector<MeshIndex> points;
+    // FIXME: This is performed in O(n^2), but using the divide and conquer
+    // strategy we might achieve O(n * log(n)) or lower.
+    // FIXME: Also, we should consider the corner case where neighbours are
+    // exactly equal, both should be considered a local maxima and the average
+    // of mz and rt should be reported.
+    for (size_t j = 1; j < mesh.m - 1; ++j) {
+        for (size_t i = 1; i < mesh.n - 1; ++i) {
+            int index = i + j * mesh.n;
+
+            // NOTE(alex): The definition of a local maxima in a 2D space might
+            // have different interpretations. i.e. We can select the 8
+            // neighbours and the local maxima will be marked if all points are
+            // below the central value. Alternatively, only a number N of
+            // neighbours can be used, for example only the 4 cardinal
+            // directions from the value under study.
+            //
+            // ----------------------------------------------
+            // |              | top_value    |              |
+            // ----------------------------------------------
+            // | left_value   | value        | right_value  |
+            // ----------------------------------------------
+            // |              | bottom_value |              |
+            // ----------------------------------------------
+            double value = mesh.matrix[index];
+            double right_value = mesh.matrix[index + 1];
+            double left_value = mesh.matrix[index - 1];
+            double top_value = mesh.matrix[index - mesh.n];
+            double bottom_value = mesh.matrix[index + mesh.n];
+
+            if ((value != 0) && (value > left_value) && (value > right_value) &&
+                (value > top_value) && (value > bottom_value)) {
+                points.push_back({i, j});
+            }
+        }
+    }
+
+    return points;
+}
+
+void explore_peak_slope(uint64_t i, uint64_t j, double previous_value,
+                        const Mesh &mesh, std::vector<MeshIndex> &points) {
+    // Check that the point has not being already included.
+    for (const auto &point : points) {
+        if (point.i == i && point.j == j) {
+            return;
+        }
+    }
+
+    double value = mesh.matrix[i + j * mesh.n];
+    if (previous_value >= 0 && previous_value < value) {
+        return;
+    }
+
+    points.push_back({i, j});
+
+    // Return if we are at the edge of the grid.
+    if (i < 1 || i >= mesh.n - 1 || j < 1 || j >= mesh.m - 1) {
+        return;
+    }
+
+    explore_peak_slope(i - 1, j, value, mesh, points);
+    explore_peak_slope(i + 1, j, value, mesh, points);
+    explore_peak_slope(i, j + 1, value, mesh, points);
+    explore_peak_slope(i, j - 1, value, mesh, points);
+    explore_peak_slope(i - 1, j - 1, value, mesh, points);
+    explore_peak_slope(i + 1, j + 1, value, mesh, points);
+    explore_peak_slope(i - 1, j + 1, value, mesh, points);
+    explore_peak_slope(i + 1, j - 1, value, mesh, points);
+}
+
+std::vector<MeshIndex> find_boundary(std::vector<MeshIndex> &points) {
+    // Under the constraints of the grid coordinates, we need at least 5 points
+    // in order to have a boundary that does not contain all the points in the
+    // initial set.
+    if (points.size() < 5) {
+        return points;
+    }
+
+    // Check if this point is a boundary by trying to find all 8 neighbours, if
+    // the point does not have all of them, then it is a boundary point.
+    auto point_exists = [&points](const MeshIndex &p) {
+        for (const auto &point : points) {
+            if (p.i == point.i && p.j == point.j) {
+                return true;
+            }
+        }
+        return false;
+    };
+    std::vector<MeshIndex> boundary;
+    for (const auto &point : points) {
+        if (!point_exists({point.i - 1, point.j - 1}) ||
+            !point_exists({point.i, point.j - 1}) ||
+            !point_exists({point.i + 1, point.j - 1}) ||
+            !point_exists({point.i - 1, point.j}) ||
+            !point_exists({point.i + 1, point.j}) ||
+            !point_exists({point.i - 1, point.j + 1}) ||
+            !point_exists({point.i, point.j + 1}) ||
+            !point_exists({point.i + 1, point.j + 1})) {
+            boundary.push_back(point);
+        }
+    }
+    return boundary;
+}
+
+Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
+                const MeshIndex &local_max) {
+    Peak peak = {};
+    peak.id = 0;
+    peak.local_max_i = local_max.i;
+    peak.local_max_j = local_max.j;
+    peak.local_max_mz = mesh.bins_mz[local_max.i];
+    peak.local_max_rt = mesh.bins_rt[local_max.j];
+    peak.local_max_height = mesh.matrix[local_max.i + local_max.j * mesh.n];
+
+    // Find the points within the boundary by slope descent on the mesh from the
+    // local max.
+    std::vector<MeshIndex> peak_points;
+    explore_peak_slope(local_max.i, local_max.j, -1, mesh, peak_points);
+    // FIXME: Should this just set NaN to boundary related peaks?
+    if (peak_points.size() <= 1) {
+        std::ostringstream error_stream;
+        error_stream
+            << "couldn't find any points on the mesh for this local max";
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    {
+        // TODO(alex): error handling. What happens if the number of points is
+        // very small? We should probably ignore peaks with less than 5 points
+        // so that it has dimensionality in both mz and rt:
+        //
+        //   | |+| |
+        //   |+|c|+|
+        //   | |+| |
+        std::vector<MeshIndex> peak_boundary;
+        peak_boundary = find_boundary(peak_points);
+        // FIXME: Should this just set NaN to boundary related peaks?
+        if (peak_boundary.empty()) {
+            std::ostringstream error_stream;
+            error_stream << "couldn't find any points inside the boundary";
+            throw std::invalid_argument(error_stream.str());
+        }
+
+        // Calculate the average background intensity from the boundary.
+        double boundary_sum = 0;
+        for (const auto &point : peak_boundary) {
+            boundary_sum += mesh.matrix[point.i + point.j * mesh.n];
+        }
+        peak.mesh_boundary_border_background =
+            boundary_sum / peak_boundary.size();
+    }
+
+    // Calculate the total ion intensity on the peak for the values on the grid
+    // and the sigma in mz and rt. The sigma is calculated by using the
+    // algebraic formula for the variance of the random variable X:
+    //
+    //     Var(X) = E[X^2] - E[X]
+    //
+    // Where E[X] is the estimated value for X.
+    //
+    // In order to generalize this formula for the 2D blob, all values at the
+    // same index will be aggregated together.
+    //
+    // TODO(alex): Note that this can cause catastrophic cancellation or
+    // loss of significance. Probably the best option is to use a variant of
+    // the Welford's method for computing the variance in a single pass. See:
+    //
+    //     http://jonisalonen.com/2013/deriving-welfords-method-for-computing-variance/
+    //     https://ipfs.io/ipfs/QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco/wiki/Algorithms_for_calculating_variance.html
+    //
+    {
+        double height_sum = 0;
+        double x_sum = 0;
+        double y_sum = 0;
+        double x_sig = 0;
+        double y_sig = 0;
+        for (const auto &point : peak_points) {
+            double mz = mesh.bins_mz[point.i];
+            double rt = mesh.bins_rt[point.j];
+            double value = mesh.matrix[point.i + point.j * mesh.n];
+
+            height_sum += value;
+            x_sum += value * mz;
+            y_sum += value * rt;
+            x_sig += value * mz * mz;
+            y_sig += value * rt * rt;
+        }
+        peak.mesh_boundary_mz = x_sum / height_sum;
+        peak.mesh_boundary_rt = y_sum / height_sum;
+        peak.mesh_boundary_sigma_mz =
+            std::sqrt((x_sig / height_sum) - std::pow(x_sum / height_sum, 2));
+        peak.mesh_boundary_sigma_rt =
+            std::sqrt((y_sig / height_sum) - std::pow(y_sum / height_sum, 2));
+        peak.mesh_boundary_total_intensity = height_sum;
+    }
+
+    // Calculate the ROI for a given local max.
+    {
+        double mz = peak.local_max_mz;
+        double rt = peak.local_max_rt;
+
+        double theoretical_sigma_mz =
+            fwhm_to_sigma(fwhm_at(raw_data, mesh.bins_mz[local_max.i]));
+        double theoretical_sigma_rt = fwhm_to_sigma(raw_data.fwhm_rt);
+
+        peak.roi_min_mz = mz - 3 * theoretical_sigma_mz;
+        peak.roi_max_mz = mz + 3 * theoretical_sigma_mz;
+        peak.roi_min_rt = rt - 3 * theoretical_sigma_rt;
+        peak.roi_max_rt = rt + 3 * theoretical_sigma_rt;
+    }
+
+    // Calculate the estimation of values for the mesh points in the ROI.
+    {
+        // Find min_i via binary search.
+        size_t min_i = 0;
+        {
+            size_t l = 0;
+            size_t r = mesh.n - 1;
+            while (l <= r) {
+                min_i = (l + r) / 2;
+                if (mesh.bins_mz[min_i] < peak.roi_min_mz) {
+                    l = min_i + 1;
+                } else if (mesh.bins_mz[min_i] > peak.roi_min_mz) {
+                    r = min_i - 1;
+                } else {
+                    break;
+                }
+                if (min_i == 0) {
+                    break;
+                }
+            }
+        }
+        // Find min_j via binary search.
+        size_t min_j = 0;
+        {
+            size_t l = 0;
+            size_t r = mesh.m - 1;
+            while (l <= r) {
+                min_j = (l + r) / 2;
+                if (mesh.bins_rt[min_j] < peak.roi_min_rt) {
+                    l = min_j + 1;
+                } else if (mesh.bins_rt[min_j] > peak.roi_min_rt) {
+                    r = min_j - 1;
+                } else {
+                    break;
+                }
+                if (min_j == 0) {
+                    break;
+                }
+            }
+        }
+        double height_sum = 0;
+        double x_sum = 0;
+        double y_sum = 0;
+        double x_sig = 0;
+        double y_sig = 0;
+        for (size_t j = min_j; j < mesh.m; ++j) {
+            if (mesh.bins_rt[j] > peak.roi_max_rt) {
+                break;
+            }
+            for (size_t i = min_i; i < mesh.n; ++i) {
+                if (mesh.bins_mz[i] > peak.roi_max_mz) {
+                    break;
+                }
+                double mz = mesh.bins_mz[i];
+                double rt = mesh.bins_rt[j];
+                double value = mesh.matrix[i + j * mesh.n];
+                height_sum += value;
+                x_sum += value * mz;
+                y_sum += value * rt;
+                x_sig += value * mz * mz;
+                y_sig += value * rt * rt;
+            }
+        }
+        peak.mesh_roi_mz = x_sum / height_sum;
+        peak.mesh_roi_rt = y_sum / height_sum;
+        peak.mesh_roi_sigma_mz =
+            std::sqrt((x_sig / height_sum) - std::pow(x_sum / height_sum, 2));
+        peak.mesh_roi_sigma_rt =
+            std::sqrt((y_sig / height_sum) - std::pow(y_sum / height_sum, 2));
+        peak.mesh_roi_total_intensity = height_sum;
+    }
+
+    {
+        const auto &scans = raw_data.scans;
+        // FIXME: Make nan instead?
+        if (scans.size() == 0) {
+            std::ostringstream error_stream;
+            error_stream << "the given raw_data is empty";
+            throw std::invalid_argument(error_stream.str());
+        }
+
+        // Find scan indices.
+        double internal_min_rt = peak.roi_min_rt;
+        double internal_max_rt = peak.roi_max_rt;
+        if (internal_min_rt < raw_data.min_rt) {
+            internal_min_rt = raw_data.min_rt;
+        }
+        if (internal_max_rt > raw_data.max_rt) {
+            internal_max_rt = raw_data.max_rt;
+        }
+
+        // Binary search for lower rt bound.
+        size_t min_j = 0;
+        size_t max_j = scans.size();
+        size_t l = min_j;
+        size_t r = max_j - 1;
+        while (l <= r) {
+            min_j = (l + r) / 2;
+            if (scans[min_j].retention_time < internal_min_rt) {
+                l = min_j + 1;
+            } else if (scans[min_j].retention_time > internal_min_rt) {
+                r = min_j - 1;
+            } else {
+                break;
+            }
+            if (min_j == 0) {
+                break;
+            }
+        }
+        double height_sum = 0;
+        double x_sum = 0;
+        double y_sum = 0;
+        double x_sig = 0;
+        double y_sig = 0;
+        for (size_t j = min_j; j < max_j; ++j) {
+            const auto &scan = scans[j];
+            if (scan.num_points == 0) {
+                continue;
+            }
+            if (scan.retention_time > internal_max_rt) {
+                break;
+            }
+            ++peak.raw_roi_num_scans;
+            // Binary search for lower mz bound.
+            double internal_min_mz = peak.roi_min_mz;
+            double internal_max_mz = peak.roi_max_mz;
+            if (internal_min_mz < scan.mz[0]) {
+                internal_min_mz = scan.mz[0];
+            }
+            if (internal_max_mz > scan.mz[scan.num_points - 1]) {
+                internal_max_mz = scan.mz[scan.num_points - 1];
+            }
+            // Binary search for lower bound.
+            size_t min_i = 0;
+            size_t max_i = scan.num_points;
+            size_t l = min_i;
+            size_t r = max_i - 1;
+            while (l <= r) {
+                min_i = (l + r) / 2;
+                if (scan.mz[min_i] < internal_min_mz) {
+                    l = min_i + 1;
+                } else if (scan.mz[min_i] > internal_min_mz) {
+                    r = min_i - 1;
+                } else {
+                    break;
+                }
+                if (min_i == 0) {
+                    break;
+                }
+            }
+            for (size_t i = min_i; i < max_i; ++i) {
+                if (scan.mz[i] > internal_max_mz) {
+                    break;
+                }
+                double mz = scan.mz[i];
+                double rt = scan.retention_time;
+                double value = scan.intensity[i];
+                if (value > peak.raw_roi_max_height) {
+                    peak.raw_roi_max_height = value;
+                }
+                ++peak.raw_roi_num_points;
+                height_sum += value;
+                x_sum += value * mz;
+                y_sum += value * rt;
+                x_sig += value * mz * mz;
+                y_sig += value * rt * rt;
+
+                // Calculate the values for the A matrix and C vector necessary
+                // for the 2D Gaussian fitting using least squares.
+                {
+                    // FIXME: We might need to center the mz/rt values.
+                    double x = mz;
+                    double y = rt;
+                    double z = value;
+                    double log_z = std::log(z);
+                    double z_2 = std::pow(z, 2);
+                    double x_2 = std::pow(x, 2);
+                    double x_3 = std::pow(x, 3);
+                    double x_4 = std::pow(x, 4);
+                    double y_2 = std::pow(y, 2);
+                    double y_3 = std::pow(y, 3);
+                    double y_4 = std::pow(y, 4);
+                    // Matrix A.
+                    // Row 0
+                    peak.A[0][0] += z_2;
+                    peak.A[0][1] += z_2 * x;
+                    peak.A[0][2] += z_2 * x_2;
+                    peak.A[0][3] += z_2 * y;
+                    peak.A[0][4] += z_2 * y_2;
+                    // Row 1
+                    peak.A[1][0] += z_2 * x;
+                    peak.A[1][1] += z_2 * x_2;
+                    peak.A[1][2] += z_2 * x_3;
+                    peak.A[1][3] += z_2 * x * y;
+                    peak.A[1][4] += z_2 * x * y_2;
+                    // Row 2
+                    peak.A[2][0] += z_2 * x_2;
+                    peak.A[2][1] += z_2 * x_3;
+                    peak.A[2][2] += z_2 * x_4;
+                    peak.A[2][3] += z_2 * x_2 * y;
+                    peak.A[2][4] += z_2 * x_2 * y_2;
+                    // Row 3
+                    peak.A[3][0] += z_2 * y;
+                    peak.A[3][1] += z_2 * x * y;
+                    peak.A[3][2] += z_2 * x_2 * y;
+                    peak.A[3][3] += z_2 * y_2;
+                    peak.A[3][4] += z_2 * y_3;
+                    // Row 4
+                    peak.A[4][0] += z_2 * y_2;
+                    peak.A[4][1] += z_2 * x * y_2;
+                    peak.A[4][2] += z_2 * x_2 * y_2;
+                    peak.A[4][3] += z_2 * y_3;
+                    peak.A[4][4] += z_2 * y_4;
+                    // Vector C.
+                    peak.C[0] += z_2 * log_z;
+                    peak.C[1] += z_2 * x * log_z;
+                    peak.C[2] += z_2 * x_2 * log_z;
+                    peak.C[3] += z_2 * y * log_z;
+                    peak.C[4] += z_2 * y_2 * log_z;
+                }
+            }
+        }
+        // FIXME: Not controlling for div/0.
+        peak.raw_roi_mz = x_sum / height_sum;
+        peak.raw_roi_rt = y_sum / height_sum;
+        peak.raw_roi_sigma_mz =
+            std::sqrt((x_sig / height_sum) - std::pow(x_sum / height_sum, 2));
+        peak.raw_roi_sigma_rt =
+            std::sqrt((y_sig / height_sum) - std::pow(y_sum / height_sum, 2));
+        peak.raw_roi_total_intensity = height_sum;
+
+        // FIXME: Make nan instead?
+        // if (raw_points.num_points == 0) {
+        // std::ostringstream error_stream;
+        // error_stream << "couldn't find raw_data points on the given ROI";
+        // throw std::invalid_argument(error_stream.str());
+        //}
+    }
+
+    return peak;
+}
+
+std::vector<Peak> find_peaks(const RawData::RawData &raw_data,
+                             const Mesh &mesh) {
+    auto local_max = find_local_max_idx(mesh);
+    std::vector<Peak> peaks;
+    for (const auto &lm : local_max) {
+        peaks.push_back(build_peak(raw_data, mesh, lm));
+    }
+    // TODO: Sort peaks
+    // TODO: Fill peak ids.
+    return peaks;
+}
+
 // FIXME: Terrible!
 // Tuple:
 //
@@ -766,6 +1297,47 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("mz", &PythonAPI::RawPoints::mz)
         .def_readonly("intensity", &PythonAPI::RawPoints::intensity);
 
+    py::class_<PythonAPI::Peak>(m, "Peak")
+        .def_readonly("id", &PythonAPI::Peak::id)
+        .def_readonly("local_max_i", &PythonAPI::Peak::local_max_i)
+        .def_readonly("local_max_j", &PythonAPI::Peak::local_max_j)
+        .def_readonly("local_max_mz", &PythonAPI::Peak::local_max_mz)
+        .def_readonly("local_max_rt", &PythonAPI::Peak::local_max_rt)
+        .def_readonly("local_max_height", &PythonAPI::Peak::local_max_height)
+        .def_readonly("mesh_boundary_mz", &PythonAPI::Peak::mesh_boundary_mz)
+        .def_readonly("mesh_boundary_rt", &PythonAPI::Peak::mesh_boundary_rt)
+        .def_readonly("mesh_boundary_sigma_mz",
+                      &PythonAPI::Peak::mesh_boundary_sigma_mz)
+        .def_readonly("mesh_boundary_sigma_rt",
+                      &PythonAPI::Peak::mesh_boundary_sigma_rt)
+        .def_readonly("mesh_boundary_total_intensity",
+                      &PythonAPI::Peak::mesh_boundary_total_intensity)
+        .def_readonly("mesh_boundary_border_background",
+                      &PythonAPI::Peak::mesh_boundary_border_background)
+        .def_readonly("roi_min_mz", &PythonAPI::Peak::roi_min_mz)
+        .def_readonly("roi_max_mz", &PythonAPI::Peak::roi_max_mz)
+        .def_readonly("roi_min_rt", &PythonAPI::Peak::roi_min_rt)
+        .def_readonly("roi_max_rt", &PythonAPI::Peak::roi_max_rt)
+        .def_readonly("mesh_roi_mz", &PythonAPI::Peak::mesh_roi_mz)
+        .def_readonly("mesh_roi_rt", &PythonAPI::Peak::mesh_roi_rt)
+        .def_readonly("mesh_roi_sigma_mz", &PythonAPI::Peak::mesh_roi_sigma_mz)
+        .def_readonly("mesh_roi_sigma_rt", &PythonAPI::Peak::mesh_roi_sigma_rt)
+        .def_readonly("mesh_roi_total_intensity",
+                      &PythonAPI::Peak::mesh_roi_total_intensity)
+        .def_readonly("raw_roi_mz", &PythonAPI::Peak::raw_roi_mz)
+        .def_readonly("raw_roi_rt", &PythonAPI::Peak::raw_roi_rt)
+        .def_readonly("raw_roi_sigma_mz", &PythonAPI::Peak::raw_roi_sigma_mz)
+        .def_readonly("raw_roi_sigma_rt", &PythonAPI::Peak::raw_roi_sigma_rt)
+        .def_readonly("raw_roi_total_intensity",
+                      &PythonAPI::Peak::raw_roi_total_intensity)
+        .def_readonly("raw_roi_max_height",
+                      &PythonAPI::Peak::raw_roi_max_height)
+        .def_readonly("raw_roi_num_points",
+                      &PythonAPI::Peak::raw_roi_num_points)
+        .def_readonly("raw_roi_num_scans", &PythonAPI::Peak::raw_roi_num_scans);
+        //.def_readonly("A", &PythonAPI::Peak::A)
+        //.def_readonly("C", &PythonAPI::Peak::C);
+
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,
           "Read raw data from the given mzXML file ", py::arg("file_name"),
@@ -795,5 +1367,8 @@ PYBIND11_MODULE(tapp, m) {
         .def("find_raw_points", &PythonAPI::find_raw_points,
              "Save the fitted peaks as a bpks file", py::arg("raw_data"),
              py::arg("min_mz"), py::arg("max_mz"), py::arg("min_rt"),
-             py::arg("max_rt"));
+             py::arg("max_rt"))
+        .def("find_peaks", &PythonAPI::find_peaks,
+             "Find all peaks in the given mesh", py::arg("raw_data"),
+             py::arg("mesh"));
 }
