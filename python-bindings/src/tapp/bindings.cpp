@@ -698,6 +698,38 @@ struct Peak {
     double A[5][5];
     // Vector C for 2D gaussian fitting using least squares.
     double C[5];
+
+    // FIXME: OMG WHAT IS HAPPENINGGGGGGGG
+    double a_0_0() { return A[0][0]; }
+    double a_0_1() { return A[0][1]; }
+    double a_0_2() { return A[0][2]; }
+    double a_0_3() { return A[0][3]; }
+    double a_0_4() { return A[0][4]; }
+    double a_1_0() { return A[1][0]; }
+    double a_1_1() { return A[1][1]; }
+    double a_1_2() { return A[1][2]; }
+    double a_1_3() { return A[1][3]; }
+    double a_1_4() { return A[1][4]; }
+    double a_2_0() { return A[2][0]; }
+    double a_2_1() { return A[2][1]; }
+    double a_2_2() { return A[2][2]; }
+    double a_2_3() { return A[2][3]; }
+    double a_2_4() { return A[2][4]; }
+    double a_3_0() { return A[3][0]; }
+    double a_3_1() { return A[3][1]; }
+    double a_3_2() { return A[3][2]; }
+    double a_3_3() { return A[3][3]; }
+    double a_3_4() { return A[3][4]; }
+    double a_4_0() { return A[4][0]; }
+    double a_4_1() { return A[4][1]; }
+    double a_4_2() { return A[4][2]; }
+    double a_4_3() { return A[4][3]; }
+    double a_4_4() { return A[4][4]; }
+    double c_0() { return C[0]; }
+    double c_1() { return C[1]; }
+    double c_2() { return C[2]; }
+    double c_3() { return C[3]; }
+    double c_4() { return C[4]; }
 };
 
 struct MeshIndex {
@@ -743,6 +775,13 @@ std::vector<MeshIndex> find_local_max_idx(const Mesh &mesh) {
             }
         }
     }
+
+    auto sort_by_value = [&mesh](const MeshIndex &p1,
+                                 const MeshIndex &p2) -> bool {
+        return (mesh.matrix[p1.i + p1.j * mesh.n] >
+                mesh.matrix[p2.i + p2.j * mesh.n]);
+    };
+    std::stable_sort(points.begin(), points.end(), sort_by_value);
 
     return points;
 }
@@ -992,6 +1031,45 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
     }
 
     {
+        // Initializing A and C
+        // Matrix A.
+        // Row 0
+        peak.A[0][0] = 0;
+        peak.A[0][1] = 0;
+        peak.A[0][2] = 0;
+        peak.A[0][3] = 0;
+        peak.A[0][4] = 0;
+        // Row 1
+        peak.A[1][0] = 0;
+        peak.A[1][1] = 0;
+        peak.A[1][2] = 0;
+        peak.A[1][3] = 0;
+        peak.A[1][4] = 0;
+        // Row 2
+        peak.A[2][0] = 0;
+        peak.A[2][1] = 0;
+        peak.A[2][2] = 0;
+        peak.A[2][3] = 0;
+        peak.A[2][4] = 0;
+        // Row 3
+        peak.A[3][0] = 0;
+        peak.A[3][1] = 0;
+        peak.A[3][2] = 0;
+        peak.A[3][3] = 0;
+        peak.A[3][4] = 0;
+        // Row 4
+        peak.A[4][0] = 0;
+        peak.A[4][1] = 0;
+        peak.A[4][2] = 0;
+        peak.A[4][3] = 0;
+        peak.A[4][4] = 0;
+        // Vector C.
+        peak.C[0] = 0;
+        peak.C[1] = 0;
+        peak.C[2] = 0;
+        peak.C[3] = 0;
+        peak.C[4] = 0;
+
         const auto &scans = raw_data.scans;
         // FIXME: Make nan instead?
         if (scans.size() == 0) {
@@ -1085,13 +1163,66 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
                 y_sum += value * rt;
                 x_sig += value * mz * mz;
                 y_sig += value * rt * rt;
+            }
+        }
+        // FIXME: Not controlling for div/0.
+        peak.raw_roi_mz = x_sum / height_sum;
+        peak.raw_roi_rt = y_sum / height_sum;
+        peak.raw_roi_sigma_mz =
+            std::sqrt((x_sig / height_sum) - std::pow(x_sum / height_sum, 2));
+        peak.raw_roi_sigma_rt =
+            std::sqrt((y_sig / height_sum) - std::pow(y_sum / height_sum, 2));
+        peak.raw_roi_total_intensity = height_sum;
+
+        for (size_t j = min_j; j < max_j; ++j) {
+            const auto &scan = scans[j];
+            if (scan.num_points == 0) {
+                continue;
+            }
+            if (scan.retention_time > internal_max_rt) {
+                break;
+            }
+            // Binary search for lower mz bound.
+            double internal_min_mz = peak.roi_min_mz;
+            double internal_max_mz = peak.roi_max_mz;
+            if (internal_min_mz < scan.mz[0]) {
+                internal_min_mz = scan.mz[0];
+            }
+            if (internal_max_mz > scan.mz[scan.num_points - 1]) {
+                internal_max_mz = scan.mz[scan.num_points - 1];
+            }
+            // Binary search for lower bound.
+            size_t min_i = 0;
+            size_t max_i = scan.num_points;
+            size_t l = min_i;
+            size_t r = max_i - 1;
+            while (l <= r) {
+                min_i = (l + r) / 2;
+                if (scan.mz[min_i] < internal_min_mz) {
+                    l = min_i + 1;
+                } else if (scan.mz[min_i] > internal_min_mz) {
+                    r = min_i - 1;
+                } else {
+                    break;
+                }
+                if (min_i == 0) {
+                    break;
+                }
+            }
+            for (size_t i = min_i; i < max_i; ++i) {
+                if (scan.mz[i] > internal_max_mz) {
+                    break;
+                }
+                double mz = scan.mz[i];
+                double rt = scan.retention_time;
+                double value = scan.intensity[i];
 
                 // Calculate the values for the A matrix and C vector necessary
                 // for the 2D Gaussian fitting using least squares.
                 {
                     // FIXME: We might need to center the mz/rt values.
-                    double x = mz;
-                    double y = rt;
+                    double x = mz - peak.raw_roi_mz;
+                    double y = rt - peak.raw_roi_rt;
                     double z = value;
                     double log_z = std::log(z);
                     double z_2 = std::pow(z, 2);
@@ -1141,14 +1272,6 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
                 }
             }
         }
-        // FIXME: Not controlling for div/0.
-        peak.raw_roi_mz = x_sum / height_sum;
-        peak.raw_roi_rt = y_sum / height_sum;
-        peak.raw_roi_sigma_mz =
-            std::sqrt((x_sig / height_sum) - std::pow(x_sum / height_sum, 2));
-        peak.raw_roi_sigma_rt =
-            std::sqrt((y_sig / height_sum) - std::pow(y_sum / height_sum, 2));
-        peak.raw_roi_total_intensity = height_sum;
 
         // FIXME: Make nan instead?
         // if (raw_points.num_points == 0) {
@@ -1334,9 +1457,37 @@ PYBIND11_MODULE(tapp, m) {
                       &PythonAPI::Peak::raw_roi_max_height)
         .def_readonly("raw_roi_num_points",
                       &PythonAPI::Peak::raw_roi_num_points)
-        .def_readonly("raw_roi_num_scans", &PythonAPI::Peak::raw_roi_num_scans);
-        //.def_readonly("A", &PythonAPI::Peak::A)
-        //.def_readonly("C", &PythonAPI::Peak::C);
+        .def_readonly("raw_roi_num_scans", &PythonAPI::Peak::raw_roi_num_scans)
+        .def("a_0_0", &PythonAPI::Peak::a_0_0)
+        .def("a_0_1", &PythonAPI::Peak::a_0_1)
+        .def("a_0_2", &PythonAPI::Peak::a_0_2)
+        .def("a_0_3", &PythonAPI::Peak::a_0_3)
+        .def("a_0_4", &PythonAPI::Peak::a_0_4)
+        .def("a_1_0", &PythonAPI::Peak::a_1_0)
+        .def("a_1_1", &PythonAPI::Peak::a_1_1)
+        .def("a_1_2", &PythonAPI::Peak::a_1_2)
+        .def("a_1_3", &PythonAPI::Peak::a_1_3)
+        .def("a_1_4", &PythonAPI::Peak::a_1_4)
+        .def("a_2_0", &PythonAPI::Peak::a_2_0)
+        .def("a_2_1", &PythonAPI::Peak::a_2_1)
+        .def("a_2_2", &PythonAPI::Peak::a_2_2)
+        .def("a_2_3", &PythonAPI::Peak::a_2_3)
+        .def("a_2_4", &PythonAPI::Peak::a_2_4)
+        .def("a_3_0", &PythonAPI::Peak::a_3_0)
+        .def("a_3_1", &PythonAPI::Peak::a_3_1)
+        .def("a_3_2", &PythonAPI::Peak::a_3_2)
+        .def("a_3_3", &PythonAPI::Peak::a_3_3)
+        .def("a_3_4", &PythonAPI::Peak::a_3_4)
+        .def("a_4_0", &PythonAPI::Peak::a_4_0)
+        .def("a_4_1", &PythonAPI::Peak::a_4_1)
+        .def("a_4_2", &PythonAPI::Peak::a_4_2)
+        .def("a_4_3", &PythonAPI::Peak::a_4_3)
+        .def("a_4_4", &PythonAPI::Peak::a_4_4)
+        .def("c_0", &PythonAPI::Peak::c_0)
+        .def("c_1", &PythonAPI::Peak::c_1)
+        .def("c_2", &PythonAPI::Peak::c_2)
+        .def("c_3", &PythonAPI::Peak::c_3)
+        .def("c_4", &PythonAPI::Peak::c_4);
 
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,
