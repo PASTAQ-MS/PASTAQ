@@ -343,6 +343,12 @@ def fit_guos_2d(x, y, z):
 def fit_guos_2d_from_peak(peak):
     x_mean = peak.raw_roi_mz
     y_mean = peak.raw_roi_rt
+    x_sigma = peak.raw_roi_sigma_mz
+    y_sigma = peak.raw_roi_sigma_rt
+    z_mean = peak.raw_roi_mean_height
+    z_sigma = peak.raw_roi_sigma_height
+    if x_sigma == 0 or y_sigma == 0 or z_sigma == 0:
+        return [np.nan, np.nan, np.nan, np.nan, np.nan, ]
     X = np.array(
         [
             [
@@ -390,7 +396,9 @@ def fit_guos_2d_from_peak(peak):
         peak.c_4(),
     ])
     # a, b, c, d, e = np.linalg.solve(X, Y)
+    # print(X, Y)
     beta = np.linalg.lstsq(X, Y, rcond=None)
+    # print(beta)
     a, b, c, d, e = beta[0]
 
     # if c < 0:
@@ -412,10 +420,10 @@ def fit_guos_2d_from_peak(peak):
         # height = np.nan
 
     sigma_mz = np.sqrt(1/(-2 * c))
-    mz = b / (-2 * c) + x_mean
+    mz = (b / (-2 * c)) + x_mean
     sigma_rt = np.sqrt(1/(-2 * e))
-    rt = d / (-2 * e) + y_mean
-    height = np.exp(a - ((b ** 2) / (4 * c)) - ((d ** 2) / (4 * e)))
+    rt = (d / (-2 * e)) + y_mean
+    height = (np.exp(a - ((b ** 2) / (4 * c)) - ((d ** 2) / (4 * e))))
 
     # print(np.allclose(np.dot(X, A), Y))
     return np.array([height, mz, sigma_mz, rt, sigma_rt])
@@ -804,8 +812,10 @@ def debugging_qatar():
         fwhm_rt=tapp_parameters['avg_fwhm_rt'],
         # min_mz=313.06909,
         # max_mz=313.07223,
-        min_mz=313.05,
-        max_mz=313.08,
+        # min_mz=313.05,
+        # max_mz=313.08,
+        # min_mz=200,
+        # max_mz=400,
         min_rt=6.5 * 60,
         max_rt=14 * 60,
         # min_rt=417,
@@ -813,7 +823,7 @@ def debugging_qatar():
         polarity='pos',
     )
     print("Resampling")
-    mesh = resample(raw_data, 10, 10, 0.5, 0.5)
+    mesh = resample(raw_data, 5, 5, 0.5, 0.5)
     plt.style.use('dark_background')
     plt.ion()
     plt.show()
@@ -822,30 +832,7 @@ def debugging_qatar():
     # Testing internal peak finding routine.
     print("Finding peaks")
     peaks = find_peaks(raw_data, mesh)
-    print("Fitting peaks via least_squares")
-    fitted_peaks = []
-    for peak_candidate in peaks:
-        fitted_peak = fit_guos_2d_from_peak(peak_candidate)
-        fitted_peaks = fitted_peaks + [fitted_peak]
-
-    fitted_peaks = pd.DataFrame(fitted_peaks)
-    fitted_peaks.columns = ['fitted_height', 'fitted_mz',
-                            'fitted_sigma_mz', 'fitted_rt', 'fitted_sigma_rt']
-
-    # peak = peaks[0]
-    # print(fit_guos_2d_from_peak(peak))
-    # data_points = find_raw_points(
-    # raw_data,
-    # peak.roi_min_mz,
-    # peak.roi_max_mz,
-    # peak.roi_min_rt,
-    # peak.roi_max_rt
-    # )
-    # print(fit_guos_2d(
-    # np.array(data_points.mz),
-    # np.array(data_points.rt),
-    # np.array(data_points.intensity)))
-    peaks = pd.DataFrame(
+    peaks_df = pd.DataFrame(
         {
             'local_max_mz': np.array([peak.local_max_mz for peak in peaks]),
             'local_max_rt': np.array([peak.local_max_rt for peak in peaks]),
@@ -870,73 +857,78 @@ def debugging_qatar():
             'raw_roi_num_points': np.array([peak.raw_roi_num_points for peak in peaks]),
             'raw_roi_num_scans': np.array([peak.raw_roi_num_scans for peak in peaks]),
         })
-    peaks = pd.concat([peaks, fitted_peaks], axis=1)
 
-    # local_max = find_local_max(mesh)
-    # local_max = pd.DataFrame(local_max)
-    # local_max.columns = ['i', 'j', 'mz', 'rt', 'intensity']
-    # local_max = local_max.sort_values('intensity', ascending=False)
-    # # if max_peaks != math.inf:
-    # # local_max = local_max[0:max_peaks]
-
-    # if True:
-    # print("Plotting mesh...")
-    # mesh_plot = plot_mesh(mesh, transform='sqrt')
-
-    # print("Plotting local maxima...")
-    # mesh_plot['img_plot'].scatter(
-    # local_max['i'], local_max['j'], color='aqua', s=5, marker="s", alpha=0.9)
-
-    # print("Preparing peak candidates")
-    # peak_candidates = find_roi(raw_data, local_max)
-    # print("Fitting peaks...")
+    # print("Fitting peaks via least_squares")
     # fitted_peaks = []
-    # if True:
-    # fig_mz = plt.figure()
-    # fig_rt = plt.figure()
-    # for peak_candidate in peak_candidates[0:10]:
-    # # for peak_candidate in peak_candidates:
-    # try:
-    # # fitted_parameters = fitted_parameters + [fit(raw_data, peak_candidate)]
-    # # fitted_parameters = fit2(raw_data, peak_candidate)
-    # # fitted_parameters = fit3(raw_data, peak_candidate)
-    # fitted_parameters = fit_raw_weighted_estimate(
-    # raw_data, peak_candidate)
-    # peak = peak_candidate
-    # peak['fitted_height'] = fitted_parameters[0]
-    # peak['fitted_mz'] = fitted_parameters[1]
-    # peak['fitted_sigma_mz'] = fitted_parameters[2]
-    # peak['fitted_rt'] = fitted_parameters[3]
-    # peak['fitted_sigma_rt'] = fitted_parameters[4]
-    # if (
-    # peak['fitted_sigma_mz'] <= 0 or
-    # peak['fitted_sigma_rt'] <= 0 or
-    # peak['fitted_height'] <= 0 or
-    # peak['fitted_mz'] > raw_data.max_mz or
-    # peak['fitted_mz'] < raw_data.min_mz or
-    # peak['fitted_rt'] > raw_data.max_rt or
-    # peak['fitted_rt'] < raw_data.min_rt or
-    # np.isnan(peak['fitted_sigma_mz']).any() or
-    # np.isnan(peak['fitted_sigma_rt']).any() or
-    # np.isnan(peak['fitted_height']).any() or
-    # np.isnan(peak['fitted_mz']).any() or
-    # np.isnan(peak['fitted_rt']).any() or
-    # np.isinf(peak['fitted_sigma_mz']).any() or
-    # np.isinf(peak['fitted_sigma_rt']).any() or
-    # np.isinf(peak['fitted_height']).any() or
-    # np.isinf(peak['fitted_mz']).any() or
-    # np.isinf(peak['fitted_rt']).any()
-    # ):
-    # continue
-    # fitted_peaks = fitted_peaks + [peak]
-    # if True:
-    # plot_peak_fit(raw_data, peak, fig_mz, fig_rt)
-    # except Exception as e:
-    # print(e)
-    # pass
+    # for peak_candidate in peaks:
+        # fitted_peak = fit_guos_2d_from_peak(peak_candidate)
+        # fitted_peaks = fitted_peaks + [fitted_peak]
 
-    # return raw_data, mesh, local_max, fitted_peaks
-    return raw_data, mesh, peaks
+    # fitted_peaks = pd.DataFrame(fitted_peaks)
+    # fitted_peaks.columns = ['fitted_height', 'fitted_mz',
+                            # 'fitted_sigma_mz', 'fitted_rt', 'fitted_sigma_rt']
+    # peaks_df = pd.concat([peaks_df, fitted_peaks], axis=1)
+
+    print("Plotting ")
+    # fig = plt.figure()
+    # plt.subplot(3, 1, 1)
+    # plt.title('slope_descent')
+    # plt.scatter(
+        # peaks_df['slope_descent_mz'],
+        # peaks_df['slope_descent_sigma_mz'],
+        # color='crimson', alpha=0.7, s=3)
+    # plt.ylim(bottom=0)
+    # # plt.ylim(top=0.08)
+    # plt.ylim(top=0.01)
+    # plt.subplot(3, 1, 2)
+    # plt.title('mesh_roi')
+    # plt.scatter(
+        # peaks_df['mesh_roi_mz'],
+        # peaks_df['mesh_roi_sigma_mz'],
+        # color='crimson', alpha=0.7, s=3)
+    # plt.ylim(bottom=0)
+    # # plt.ylim(top=0.08)
+    # plt.ylim(top=0.01)
+    # plt.ylabel('sigma_mz')
+    # plt.subplot(3, 1, 3)
+    # plt.title('raw_roi')
+    # plt.scatter(
+        # peaks_df['raw_roi_mz'],
+        # peaks_df['raw_roi_sigma_mz'],
+        # color='crimson', alpha=0.7, s=3)
+    # plt.ylim(bottom=0)
+    # # plt.ylim(top=0.08)
+    # plt.ylim(top=0.01)
+    # plt.xlabel('m/z')
+    fig = plt.figure()
+    plt.subplot(3, 1, 1)
+    plt.title('slope_descent')
+    plt.scatter(
+        peaks_df['slope_descent_rt'],
+        peaks_df['slope_descent_sigma_rt'],
+        color='crimson', alpha=0.7, s=3)
+    plt.ylim(bottom=0)
+    # plt.ylim(top=10)
+    plt.subplot(3, 1, 2)
+    plt.title('mesh_roi')
+    plt.scatter(
+        peaks_df['mesh_roi_rt'],
+        peaks_df['mesh_roi_sigma_rt'],
+        color='crimson', alpha=0.7, s=3)
+    plt.ylim(bottom=0)
+    # plt.ylim(top=10)
+    plt.ylabel('sigma_rt')
+    plt.subplot(3, 1, 3)
+    plt.title('raw_roi')
+    plt.scatter(
+        peaks_df['raw_roi_rt'],
+        peaks_df['raw_roi_sigma_rt'],
+        color='crimson', alpha=0.7, s=3)
+    plt.ylim(bottom=0)
+    # plt.ylim(top=10)
+    plt.xlabel('rt (s)')
+
+    return raw_data, mesh, peaks_df, peaks
 
 
 RawData.tic = tic

@@ -691,6 +691,8 @@ struct Peak {
     double raw_roi_sigma_rt;
     double raw_roi_max_height;
     double raw_roi_total_intensity;
+    double raw_roi_mean_height;
+    double raw_roi_sigma_height;
     uint64_t raw_roi_num_points;
     uint64_t raw_roi_num_scans;
 
@@ -796,7 +798,7 @@ void explore_peak_slope(uint64_t i, uint64_t j, double previous_value,
     }
 
     double value = mesh.matrix[i + j * mesh.n];
-    if (previous_value >= 0 && previous_value < value) {
+    if (previous_value >= 0 && (previous_value < value || value <= 0.00001)) {
         return;
     }
 
@@ -864,6 +866,7 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
     // Find the points within the boundary by slope descent on the mesh from the
     // local max.
     std::vector<MeshIndex> peak_points;
+    // std::cout << peak.id << std::endl;
     explore_peak_slope(local_max.i, local_max.j, -1, mesh, peak_points);
     // FIXME: Should this just set NaN to boundary related peaks?
     if (peak_points.size() <= 1) {
@@ -1107,6 +1110,7 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
             }
         }
         double height_sum = 0;
+        double sq_height_sum = 0;
         double x_sum = 0;
         double y_sum = 0;
         double x_sig = 0;
@@ -1159,6 +1163,7 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
                 }
                 ++peak.raw_roi_num_points;
                 height_sum += value;
+                sq_height_sum += value * value;
                 x_sum += value * mz;
                 y_sum += value * rt;
                 x_sig += value * mz * mz;
@@ -1173,6 +1178,10 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
         peak.raw_roi_sigma_rt =
             std::sqrt((y_sig / height_sum) - std::pow(y_sum / height_sum, 2));
         peak.raw_roi_total_intensity = height_sum;
+        peak.raw_roi_mean_height = height_sum / peak.raw_roi_num_points;
+        peak.raw_roi_sigma_height =
+            std::sqrt(sq_height_sum / peak.raw_roi_num_points -
+                      peak.raw_roi_mean_height * peak.raw_roi_mean_height);
 
         for (size_t j = min_j; j < max_j; ++j) {
             const auto &scan = scans[j];
@@ -1221,8 +1230,8 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
                 // for the 2D Gaussian fitting using least squares.
                 {
                     // FIXME: We might need to center the mz/rt values.
-                    double x = mz - peak.raw_roi_mz;
-                    double y = rt - peak.raw_roi_rt;
+                    double x = (mz - peak.raw_roi_mz);
+                    double y = (rt - peak.raw_roi_rt);
                     double z = value;
                     double log_z = std::log(z);
                     double z_2 = std::pow(z, 2);
@@ -1455,6 +1464,10 @@ PYBIND11_MODULE(tapp, m) {
                       &PythonAPI::Peak::raw_roi_total_intensity)
         .def_readonly("raw_roi_max_height",
                       &PythonAPI::Peak::raw_roi_max_height)
+        .def_readonly("raw_roi_mean_height",
+                      &PythonAPI::Peak::raw_roi_mean_height)
+        .def_readonly("raw_roi_sigma_height",
+                      &PythonAPI::Peak::raw_roi_sigma_height)
         .def_readonly("raw_roi_num_points",
                       &PythonAPI::Peak::raw_roi_num_points)
         .def_readonly("raw_roi_num_scans", &PythonAPI::Peak::raw_roi_num_scans)
