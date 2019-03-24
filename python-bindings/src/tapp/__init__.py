@@ -930,5 +930,59 @@ def debugging_qatar():
 
     return raw_data, mesh, peaks_df, peaks
 
+def peak_extraction(file_name, tapp_parameters, polarity):
+    print("Reading raw data")
+    raw_data = tapp.read_mzxml(
+        file_name,
+        instrument_type=tapp_parameters['instrument_type'],
+        resolution_ms1=tapp_parameters['resolution_ms1'],
+        resolution_msn=tapp_parameters['resolution_msn'],
+        reference_mz=tapp_parameters['reference_mz'],
+        fwhm_rt=tapp_parameters['avg_fwhm_rt'],
+        polarity=polarity,
+    )
+    print("Resampling")
+    mesh = resample(raw_data, 5, 5, 0.5, 0.5)
+
+    print("Finding peaks")
+    peaks = find_peaks(raw_data, mesh)
+    peaks_df = pd.DataFrame(
+        {
+            'local_max_mz': np.array([peak.local_max_mz for peak in peaks]),
+            'local_max_rt': np.array([peak.local_max_rt for peak in peaks]),
+            'local_max_height': np.array([peak.local_max_height for peak in peaks]),
+            'slope_descent_mz': np.array([peak.mesh_boundary_mz for peak in peaks]),
+            'slope_descent_rt': np.array([peak.mesh_boundary_rt for peak in peaks]),
+            'slope_descent_sigma_mz': np.array([peak.mesh_boundary_sigma_mz for peak in peaks]),
+            'slope_descent_sigma_rt': np.array([peak.mesh_boundary_sigma_rt for peak in peaks]),
+            'slope_descent_total_intensity': np.array([peak.mesh_boundary_total_intensity for peak in peaks]),
+            'slope_descent_border_background': np.array([peak.mesh_boundary_border_background for peak in peaks]),
+            'mesh_roi_mz': np.array([peak.mesh_roi_mz for peak in peaks]),
+            'mesh_roi_rt': np.array([peak.mesh_roi_rt for peak in peaks]),
+            'mesh_roi_sigma_mz': np.array([peak.mesh_roi_sigma_mz for peak in peaks]),
+            'mesh_roi_sigma_rt': np.array([peak.mesh_roi_sigma_rt for peak in peaks]),
+            'mesh_roi_total_intensity': np.array([peak.mesh_roi_total_intensity for peak in peaks]),
+            'raw_roi_mz': np.array([peak.raw_roi_mz for peak in peaks]),
+            'raw_roi_rt': np.array([peak.raw_roi_rt for peak in peaks]),
+            'raw_roi_sigma_mz': np.array([peak.raw_roi_sigma_mz for peak in peaks]),
+            'raw_roi_sigma_rt': np.array([peak.raw_roi_sigma_rt for peak in peaks]),
+            'raw_roi_total_intensity': np.array([peak.raw_roi_total_intensity for peak in peaks]),
+            'raw_roi_max_height': np.array([peak.raw_roi_max_height for peak in peaks]),
+            'raw_roi_num_points': np.array([peak.raw_roi_num_points for peak in peaks]),
+            'raw_roi_num_scans': np.array([peak.raw_roi_num_scans for peak in peaks]),
+        })
+
+    # print("Fitting peaks via least_squares")
+    # fitted_peaks = []
+    # for peak_candidate in peaks:
+        # fitted_peak = fit_guos_2d_from_peak(peak_candidate)
+        # fitted_peaks = fitted_peaks + [fitted_peak]
+
+    # fitted_peaks = pd.DataFrame(fitted_peaks)
+    # fitted_peaks.columns = ['fitted_height', 'fitted_mz',
+                            # 'fitted_sigma_mz', 'fitted_rt', 'fitted_sigma_rt']
+    # peaks_df = pd.concat([peaks_df, fitted_peaks], axis=1)
+
+    return raw_data, mesh, peaks_df, peaks
 
 RawData.tic = tic
