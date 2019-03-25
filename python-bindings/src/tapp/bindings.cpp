@@ -396,7 +396,6 @@ Mesh resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
     mesh.k = num_samples_mz;
     mesh.t = num_samples_rt;
     mesh.matrix = std::vector<double>(n * m);
-    auto weights = std::vector<double>(n * m);
     mesh.bins_mz = std::vector<double>(n);
     mesh.bins_rt = std::vector<double>(m);
 
@@ -464,64 +463,67 @@ Mesh resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
     }
 
     // Gaussian splatting.
-    for (size_t i = 0; i < raw_data.scans.size(); ++i) {
-        const auto &scan = raw_data.scans[i];
-        double current_rt = scan.retention_time;
+    {
+        auto weights = std::vector<double>(n * m);
+        for (size_t i = 0; i < raw_data.scans.size(); ++i) {
+            const auto &scan = raw_data.scans[i];
+            double current_rt = scan.retention_time;
 
-        // Find the bin for the current retention time.
-        size_t index_rt = y_index(raw_data, current_rt, mesh.t);
+            // Find the bin for the current retention time.
+            size_t index_rt = y_index(raw_data, current_rt, mesh.t);
 
-        // Find the min/max indexes for the rt kernel.
-        size_t j_min = 0;
-        if (index_rt >= rt_kernel_hw) {
-            j_min = index_rt - rt_kernel_hw;
-        }
-        size_t j_max = mesh.m - 1;
-        if ((index_rt + rt_kernel_hw) < mesh.m) {
-            j_max = index_rt + rt_kernel_hw;
-        }
-
-        for (size_t k = 0; k < scan.num_points; ++k) {
-            double current_intensity = scan.intensity[k];
-            double current_mz = scan.mz[k];
-
-            // Find the bin for the current mz.
-            size_t index_mz = x_index(raw_data, current_mz, mesh.k);
-
-            double sigma_mz = sigma_mz_vec[index_mz];
-
-            // Find the min/max indexes for the mz kernel.
-            size_t i_min = 0;
-            if (index_mz >= mz_kernel_hw[index_mz]) {
-                i_min = index_mz - mz_kernel_hw[index_mz];
+            // Find the min/max indexes for the rt kernel.
+            size_t j_min = 0;
+            if (index_rt >= rt_kernel_hw) {
+                j_min = index_rt - rt_kernel_hw;
             }
-            size_t i_max = mesh.n - 1;
-            if ((index_mz + mz_kernel_hw[index_mz]) < mesh.n) {
-                i_max = index_mz + mz_kernel_hw[index_mz];
+            size_t j_max = mesh.m - 1;
+            if ((index_rt + rt_kernel_hw) < mesh.m) {
+                j_max = index_rt + rt_kernel_hw;
             }
 
-            for (size_t j = j_min; j <= j_max; ++j) {
-                for (size_t i = i_min; i <= i_max; ++i) {
-                    double x = mesh.bins_mz[i];
-                    double y = mesh.bins_rt[j];
+            for (size_t k = 0; k < scan.num_points; ++k) {
+                double current_intensity = scan.intensity[k];
+                double current_mz = scan.mz[k];
 
-                    // Calculate the Gaussian weight for this point.
-                    double a = (x - current_mz) / sigma_mz;
-                    double b = (y - current_rt) / sigma_rt;
-                    double weight = std::exp(-0.5 * (a * a + b * b));
+                // Find the bin for the current mz.
+                size_t index_mz = x_index(raw_data, current_mz, mesh.k);
 
-                    mesh.matrix[i + j * n] += weight * current_intensity;
-                    weights[i + j * n] += weight;
+                double sigma_mz = sigma_mz_vec[index_mz];
+
+                // Find the min/max indexes for the mz kernel.
+                size_t i_min = 0;
+                if (index_mz >= mz_kernel_hw[index_mz]) {
+                    i_min = index_mz - mz_kernel_hw[index_mz];
+                }
+                size_t i_max = mesh.n - 1;
+                if ((index_mz + mz_kernel_hw[index_mz]) < mesh.n) {
+                    i_max = index_mz + mz_kernel_hw[index_mz];
+                }
+
+                for (size_t j = j_min; j <= j_max; ++j) {
+                    for (size_t i = i_min; i <= i_max; ++i) {
+                        double x = mesh.bins_mz[i];
+                        double y = mesh.bins_rt[j];
+
+                        // Calculate the Gaussian weight for this point.
+                        double a = (x - current_mz) / sigma_mz;
+                        double b = (y - current_rt) / sigma_rt;
+                        double weight = std::exp(-0.5 * (a * a + b * b));
+
+                        mesh.matrix[i + j * n] += weight * current_intensity;
+                        weights[i + j * n] += weight;
+                    }
                 }
             }
         }
-    }
-    for (size_t i = 0; i < (n * m); ++i) {
-        double weight = weights[i];
-        if (weight == 0) {
-            weight = 1;
+        for (size_t i = 0; i < (n * m); ++i) {
+            double weight = weights[i];
+            if (weight == 0) {
+                weight = 1;
+            }
+            mesh.matrix[i] = mesh.matrix[i] / weight;
         }
-        mesh.matrix[i] = mesh.matrix[i] / weight;
     }
 
     // Gaussian smoothing.
