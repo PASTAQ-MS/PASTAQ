@@ -12,6 +12,8 @@
 #include "pybind11/numpy.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
+#include "warp2d/warp2d.hpp"
+#include "warp2d/warp2d_runners.hpp"
 
 namespace py = pybind11;
 
@@ -1369,6 +1371,49 @@ void save_fitted_peaks(
         throw std::invalid_argument(error_stream.str());
     }
 }
+
+std::vector<std::vector<Peak>> warp_peaks(
+    std::vector<std::vector<Peak>> all_peaks, size_t reference_index,
+    int64_t slack, int64_t window_size, int64_t num_points,
+    double rt_expand_factor, int64_t peaks_per_window) {
+    // TODO(alex): Validate the parameters and throw an error if appropriate.
+    Warp2D::Parameters parameters = {slack, window_size, num_points,
+                                     peaks_per_window, rt_expand_factor};
+    std::vector<std::vector<Peak>> all_warped_peaks;
+    const auto &reference_peaks_original = all_warped_peaks[reference_index];
+    auto translate_peak_format = [](const std::vector<Peak> &before_peaks)
+        -> std::vector<Centroid::Peak> {
+        auto after_peaks = std::vector<Centroid::Peak>(before_peaks.size());
+        for (size_t i = 0; i < before_peaks.size(); ++i) {
+            after_peaks[i].i = before_peaks[i].local_max_i;
+            after_peaks[i].j = before_peaks[i].local_max_j;
+            after_peaks[i].mz = before_peaks[i].local_max_mz;
+            after_peaks[i].rt = before_peaks[i].local_max_rt;
+            after_peaks[i].height = before_peaks[i].local_max_height;
+
+            // NOTE: Currently using slope_descent quantification.
+            after_peaks[i].total_intensity =
+                before_peaks[i].slope_descent_total_intensity;
+            after_peaks[i].sigma_mz = before_peaks[i].slope_descent_sigma_mz;
+            after_peaks[i].sigma_rt = before_peaks[i].slope_descent_sigma_rt;
+            after_peaks[i].border_background =
+                before_peaks[i].slope_descent_border_background;
+        }
+        return after_peaks;
+    };
+    auto reference_peaks = translate_peak_format(reference_peaks_original);
+
+    for (size_t i = 0; i < all_peaks.size(); ++i) {
+        if (i == reference_index) {
+            continue;
+        }
+        auto peaks = translate_peak_format(all_peaks[i]);
+        std::vector<Centroid::Peak> warped_peaks;
+        warped_peaks =
+            Warp2D::Runners::Serial::run(reference_peaks, peaks, parameters);
+    }
+    return all_warped_peaks;
+}
 }  // namespace PythonAPI
 
 PYBIND11_MODULE(tapp, m) {
@@ -1438,16 +1483,16 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("local_max_mz", &PythonAPI::Peak::local_max_mz)
         .def_readonly("local_max_rt", &PythonAPI::Peak::local_max_rt)
         .def_readonly("local_max_height", &PythonAPI::Peak::local_max_height)
-        .def_readonly("mesh_boundary_mz", &PythonAPI::Peak::mesh_boundary_mz)
-        .def_readonly("mesh_boundary_rt", &PythonAPI::Peak::mesh_boundary_rt)
-        .def_readonly("mesh_boundary_sigma_mz",
-                      &PythonAPI::Peak::mesh_boundary_sigma_mz)
-        .def_readonly("mesh_boundary_sigma_rt",
-                      &PythonAPI::Peak::mesh_boundary_sigma_rt)
-        .def_readonly("mesh_boundary_total_intensity",
-                      &PythonAPI::Peak::mesh_boundary_total_intensity)
-        .def_readonly("mesh_boundary_border_background",
-                      &PythonAPI::Peak::mesh_boundary_border_background)
+        .def_readonly("slope_descent_mz", &PythonAPI::Peak::slope_descent_mz)
+        .def_readonly("slope_descent_rt", &PythonAPI::Peak::slope_descent_rt)
+        .def_readonly("slope_descent_sigma_mz",
+                      &PythonAPI::Peak::slope_descent_sigma_mz)
+        .def_readonly("slope_descent_sigma_rt",
+                      &PythonAPI::Peak::slope_descent_sigma_rt)
+        .def_readonly("slope_descent_total_intensity",
+                      &PythonAPI::Peak::slope_descent_total_intensity)
+        .def_readonly("slope_descent_border_background",
+                      &PythonAPI::Peak::slope_descent_border_background)
         .def_readonly("roi_min_mz", &PythonAPI::Peak::roi_min_mz)
         .def_readonly("roi_max_mz", &PythonAPI::Peak::roi_max_mz)
         .def_readonly("roi_min_rt", &PythonAPI::Peak::roi_min_rt)
@@ -1536,5 +1581,11 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("max_rt"))
         .def("find_peaks", &PythonAPI::find_peaks,
              "Find all peaks in the given mesh", py::arg("raw_data"),
-             py::arg("mesh"));
+             py::arg("mesh"))
+        .def("warp_peaks", &PythonAPI::warp_peaks,
+             "Warp peak lists to maximize the similarity with the given "
+             "reference",
+             py::arg("all_peaks"), py::arg("reference_index"), py::arg("slack"),
+             py::arg("window_size"), py::arg("num_points"),
+             py::arg("rt_expand_factor"), py::arg("peaks_per_window"));
 }

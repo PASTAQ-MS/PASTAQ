@@ -354,7 +354,7 @@ int main(int argc, char *argv[]) {
         print_usage();
         return -1;
     }
-    parameters.rt_expand_factor = std::stoi(rt_expand_factor);
+    parameters.rt_expand_factor = std::stod(rt_expand_factor);
 
     if (options.find("-peaks_per_window") == options.end()) {
         std::cout

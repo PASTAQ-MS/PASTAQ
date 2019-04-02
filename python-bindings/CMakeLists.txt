@@ -27,9 +27,12 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../grid" ${CMAKE_CURRENT_BINARY_DI
 # Add centroid dependency
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../centroid" ${CMAKE_CURRENT_BINARY_DIR}/centroid)
 
+# Add warp2d dependency
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../warp2d" ${CMAKE_CURRENT_BINARY_DIR}/warp2d)
+
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ext/pybind11" ${CMAKE_CURRENT_BINARY_DIR}/pybind11)
 pybind11_add_module(tapp src/tapp/bindings.cpp)
-target_link_libraries(tapp PRIVATE gridlib centroidlib stdc++ stdc++fs)
+target_link_libraries(tapp PRIVATE gridlib centroidlib warp2dlib stdc++ stdc++fs)
 
 ## Include library target.
 #if (NOT TARGET metamatchlib)
