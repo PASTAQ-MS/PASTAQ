@@ -837,12 +837,12 @@ def debugging_qatar():
             'local_max_mz': np.array([peak.local_max_mz for peak in peaks]),
             'local_max_rt': np.array([peak.local_max_rt for peak in peaks]),
             'local_max_height': np.array([peak.local_max_height for peak in peaks]),
-            'slope_descent_mz': np.array([peak.mesh_boundary_mz for peak in peaks]),
-            'slope_descent_rt': np.array([peak.mesh_boundary_rt for peak in peaks]),
-            'slope_descent_sigma_mz': np.array([peak.mesh_boundary_sigma_mz for peak in peaks]),
-            'slope_descent_sigma_rt': np.array([peak.mesh_boundary_sigma_rt for peak in peaks]),
-            'slope_descent_total_intensity': np.array([peak.mesh_boundary_total_intensity for peak in peaks]),
-            'slope_descent_border_background': np.array([peak.mesh_boundary_border_background for peak in peaks]),
+            'slope_descent_mz': np.array([peak.slope_descent_mz for peak in peaks]),
+            'slope_descent_rt': np.array([peak.slope_descent_rt for peak in peaks]),
+            'slope_descent_sigma_mz': np.array([peak.slope_descent_sigma_mz for peak in peaks]),
+            'slope_descent_sigma_rt': np.array([peak.slope_descent_sigma_rt for peak in peaks]),
+            'slope_descent_total_intensity': np.array([peak.slope_descent_total_intensity for peak in peaks]),
+            'slope_descent_border_background': np.array([peak.slope_descent_border_background for peak in peaks]),
             'mesh_roi_mz': np.array([peak.mesh_roi_mz for peak in peaks]),
             'mesh_roi_rt': np.array([peak.mesh_roi_rt for peak in peaks]),
             'mesh_roi_sigma_mz': np.array([peak.mesh_roi_sigma_mz for peak in peaks]),
@@ -870,63 +870,66 @@ def debugging_qatar():
     # peaks_df = pd.concat([peaks_df, fitted_peaks], axis=1)
 
     print("Plotting ")
-    # fig = plt.figure()
-    # plt.subplot(3, 1, 1)
-    # plt.title('slope_descent')
-    # plt.scatter(
-        # peaks_df['slope_descent_mz'],
-        # peaks_df['slope_descent_sigma_mz'],
-        # color='crimson', alpha=0.7, s=3)
-    # plt.ylim(bottom=0)
-    # # plt.ylim(top=0.08)
-    # plt.ylim(top=0.01)
-    # plt.subplot(3, 1, 2)
-    # plt.title('mesh_roi')
-    # plt.scatter(
-        # peaks_df['mesh_roi_mz'],
-        # peaks_df['mesh_roi_sigma_mz'],
-        # color='crimson', alpha=0.7, s=3)
-    # plt.ylim(bottom=0)
-    # # plt.ylim(top=0.08)
-    # plt.ylim(top=0.01)
-    # plt.ylabel('sigma_mz')
-    # plt.subplot(3, 1, 3)
-    # plt.title('raw_roi')
-    # plt.scatter(
-        # peaks_df['raw_roi_mz'],
-        # peaks_df['raw_roi_sigma_mz'],
-        # color='crimson', alpha=0.7, s=3)
-    # plt.ylim(bottom=0)
-    # # plt.ylim(top=0.08)
-    # plt.ylim(top=0.01)
-    # plt.xlabel('m/z')
     fig = plt.figure()
     plt.subplot(3, 1, 1)
     plt.title('slope_descent')
     plt.scatter(
-        peaks_df['slope_descent_rt'],
-        peaks_df['slope_descent_sigma_rt'],
+        # peaks_df['slope_descent_mz'],
+        peaks_df['local_max_mz'],
+        peaks_df['slope_descent_sigma_mz'],
         color='crimson', alpha=0.7, s=3)
     plt.ylim(bottom=0)
-    # plt.ylim(top=10)
+    # plt.ylim(top=0.08)
+    # plt.ylim(top=0.01)
     plt.subplot(3, 1, 2)
     plt.title('mesh_roi')
     plt.scatter(
-        peaks_df['mesh_roi_rt'],
-        peaks_df['mesh_roi_sigma_rt'],
+        peaks_df['local_max_mz'],
+        # peaks_df['mesh_roi_mz'],
+        peaks_df['mesh_roi_sigma_mz'],
         color='crimson', alpha=0.7, s=3)
     plt.ylim(bottom=0)
-    # plt.ylim(top=10)
-    plt.ylabel('sigma_rt')
+    # plt.ylim(top=0.08)
+    # plt.ylim(top=0.01)
+    plt.ylabel('sigma_mz')
     plt.subplot(3, 1, 3)
     plt.title('raw_roi')
     plt.scatter(
-        peaks_df['raw_roi_rt'],
-        peaks_df['raw_roi_sigma_rt'],
+        # peaks_df['raw_roi_mz'],
+        peaks_df['local_max_mz'],
+        peaks_df['raw_roi_sigma_mz'],
         color='crimson', alpha=0.7, s=3)
     plt.ylim(bottom=0)
-    # plt.ylim(top=10)
-    plt.xlabel('rt (s)')
+    # plt.ylim(top=0.08)
+    # plt.ylim(top=0.01)
+    plt.xlabel('m/z')
+    # fig = plt.figure()
+    # plt.subplot(3, 1, 1)
+    # plt.title('slope_descent')
+    # plt.scatter(
+        # peaks_df['slope_descent_rt'],
+        # peaks_df['slope_descent_sigma_rt'],
+        # color='crimson', alpha=0.7, s=3)
+    # plt.ylim(bottom=0)
+    # # plt.ylim(top=10)
+    # plt.subplot(3, 1, 2)
+    # plt.title('mesh_roi')
+    # plt.scatter(
+        # peaks_df['mesh_roi_rt'],
+        # peaks_df['mesh_roi_sigma_rt'],
+        # color='crimson', alpha=0.7, s=3)
+    # plt.ylim(bottom=0)
+    # # plt.ylim(top=10)
+    # plt.ylabel('sigma_rt')
+    # plt.subplot(3, 1, 3)
+    # plt.title('raw_roi')
+    # plt.scatter(
+        # peaks_df['raw_roi_rt'],
+        # peaks_df['raw_roi_sigma_rt'],
+        # color='crimson', alpha=0.7, s=3)
+    # plt.ylim(bottom=0)
+    # # plt.ylim(top=10)
+    # plt.xlabel('rt (s)')
 
     return raw_data, mesh, peaks_df, peaks
 
@@ -951,12 +954,12 @@ def peak_extraction(file_name, tapp_parameters, polarity):
             'local_max_mz': np.array([peak.local_max_mz for peak in peaks]),
             'local_max_rt': np.array([peak.local_max_rt for peak in peaks]),
             'local_max_height': np.array([peak.local_max_height for peak in peaks]),
-            'slope_descent_mz': np.array([peak.mesh_boundary_mz for peak in peaks]),
-            'slope_descent_rt': np.array([peak.mesh_boundary_rt for peak in peaks]),
-            'slope_descent_sigma_mz': np.array([peak.mesh_boundary_sigma_mz for peak in peaks]),
-            'slope_descent_sigma_rt': np.array([peak.mesh_boundary_sigma_rt for peak in peaks]),
-            'slope_descent_total_intensity': np.array([peak.mesh_boundary_total_intensity for peak in peaks]),
-            'slope_descent_border_background': np.array([peak.mesh_boundary_border_background for peak in peaks]),
+            'slope_descent_mz': np.array([peak.slope_descent_mz for peak in peaks]),
+            'slope_descent_rt': np.array([peak.slope_descent_rt for peak in peaks]),
+            'slope_descent_sigma_mz': np.array([peak.slope_descent_sigma_mz for peak in peaks]),
+            'slope_descent_sigma_rt': np.array([peak.slope_descent_sigma_rt for peak in peaks]),
+            'slope_descent_total_intensity': np.array([peak.slope_descent_total_intensity for peak in peaks]),
+            'slope_descent_border_background': np.array([peak.slope_descent_border_background for peak in peaks]),
             'mesh_roi_mz': np.array([peak.mesh_roi_mz for peak in peaks]),
             'mesh_roi_rt': np.array([peak.mesh_roi_rt for peak in peaks]),
             'mesh_roi_sigma_mz': np.array([peak.mesh_roi_sigma_mz for peak in peaks]),

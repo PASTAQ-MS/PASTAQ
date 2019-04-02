@@ -662,17 +662,17 @@ struct Peak {
     //
     // Sumation of all intensities within the peak boundary. (Ignores holes,
     // i.e. does not interpolate values in case of non closed set).
-    double mesh_boundary_total_intensity;
+    double slope_descent_total_intensity;
     // Estimated values for the position of the 2D peak based on the slope
     // descent points.
-    double mesh_boundary_mz;
-    double mesh_boundary_rt;
+    double slope_descent_mz;
+    double slope_descent_rt;
     // Estimated mz/rt values for the standard deviation of the peak in both
     // axes. (Ignores holes).
-    double mesh_boundary_sigma_mz;
-    double mesh_boundary_sigma_rt;
+    double slope_descent_sigma_mz;
+    double slope_descent_sigma_rt;
     // Average intensity on the boundary of the peak.
-    double mesh_boundary_border_background;
+    double slope_descent_border_background;
     // NOTE: number of points within the boundary found via slope descent?
 
     // Region of interest for this peak.
@@ -900,7 +900,7 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
         for (const auto &point : peak_boundary) {
             boundary_sum += mesh.matrix[point.i + point.j * mesh.n];
         }
-        peak.mesh_boundary_border_background =
+        peak.slope_descent_border_background =
             boundary_sum / peak_boundary.size();
     }
 
@@ -939,13 +939,13 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
             x_sig += value * mz * mz;
             y_sig += value * rt * rt;
         }
-        peak.mesh_boundary_mz = x_sum / height_sum;
-        peak.mesh_boundary_rt = y_sum / height_sum;
-        peak.mesh_boundary_sigma_mz =
+        peak.slope_descent_mz = x_sum / height_sum;
+        peak.slope_descent_rt = y_sum / height_sum;
+        peak.slope_descent_sigma_mz =
             std::sqrt((x_sig / height_sum) - std::pow(x_sum / height_sum, 2));
-        peak.mesh_boundary_sigma_rt =
+        peak.slope_descent_sigma_rt =
             std::sqrt((y_sig / height_sum) - std::pow(y_sum / height_sum, 2));
-        peak.mesh_boundary_total_intensity = height_sum;
+        peak.slope_descent_total_intensity = height_sum;
     }
 
     // Calculate the ROI for a given local max.
