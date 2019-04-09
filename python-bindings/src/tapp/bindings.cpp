@@ -1307,11 +1307,14 @@ std::vector<Peak> find_peaks(const RawData::RawData &raw_data,
                              const Mesh &mesh) {
     auto local_max = find_local_max_idx(mesh);
     std::vector<Peak> peaks;
+    size_t i = 0;
     for (const auto &lm : local_max) {
-        peaks.push_back(build_peak(raw_data, mesh, lm));
+        auto peak = build_peak(raw_data, mesh, lm);
+        peak.id = i;
+        peaks.push_back(peak);
+        ++i;
     }
     // TODO: Sort peaks
-    // TODO: Fill peak ids.
     return peaks;
 }
 
