@@ -185,6 +185,9 @@ RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
             break;
         }
     }
+    if (scans[min_j].retention_time < min_rt) {
+        ++min_j;
+    }
     for (size_t j = min_j; j < max_j; ++j) {
         const auto &scan = scans[j];
         if (scan.num_points == 0) {
@@ -219,6 +222,9 @@ RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
             if (min_i == 0) {
                 break;
             }
+        }
+        if (scan.mz[min_i] < internal_min_mz) {
+            ++min_i;
         }
         for (size_t i = min_i; i < max_i; ++i) {
             if (scan.mz[i] > internal_max_mz) {
