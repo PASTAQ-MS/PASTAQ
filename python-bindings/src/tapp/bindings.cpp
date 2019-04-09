@@ -1331,8 +1331,8 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
                 // for the 2D Gaussian fitting using least squares.
                 {
                     // FIXME: We might need to center the mz/rt values.
-                    double x = (mz - peak.raw_roi_mz);
-                    double y = (rt - peak.raw_roi_rt);
+                    double x = (mz - peak.local_max_mz);
+                    double y = (rt - peak.local_max_rt);
                     double z = value;
                     double log_z = std::log(z);
                     double z_2 = std::pow(z, 2);

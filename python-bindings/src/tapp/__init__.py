@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from scipy.optimize import curve_fit
+import matplotlib.colors as colors
 
 # TODO(alex): Write documentation.
 
@@ -343,14 +344,6 @@ def fit_guos_2d(x, y, z):
 
 
 def fit_guos_2d_from_peak(peak):
-    x_mean = peak.raw_roi_mz
-    y_mean = peak.raw_roi_rt
-    x_sigma = peak.raw_roi_sigma_mz
-    y_sigma = peak.raw_roi_sigma_rt
-    z_mean = peak.raw_roi_mean_height
-    z_sigma = peak.raw_roi_sigma_height
-    if x_sigma == 0 or y_sigma == 0 or z_sigma == 0:
-        return [np.nan, np.nan, np.nan, np.nan, np.nan, ]
     X = np.array(
         [
             [
@@ -401,31 +394,13 @@ def fit_guos_2d_from_peak(peak):
     # print(X, Y)
     beta = np.linalg.lstsq(X, Y, rcond=None)
     # print(beta)
-    a, b, c, d, e = beta[0]
+    beta_0, beta_1, beta_2, beta_3, beta_4 = beta[0]
 
-    # if c < 0:
-        # sigma_mz = np.sqrt(1/(-2 * c))
-        # mz = b / (-2 * c) + x_mean
-    # else:
-        # sigma_mz = np.nan
-        # mz = np.nan
-    # if e < 0:
-        # sigma_rt = np.sqrt(1/(-2 * e))
-        # rt = d / (-2 * e) + y_mean
-    # else:
-        # sigma_rt = np.nan
-        # rt = np.nan
-
-    # if c != 0 and e != 0:
-        # height = np.exp(a - ((b ** 2) / (4 * c)) - ((d ** 2) / (4 * e)))
-    # else:
-        # height = np.nan
-
-    sigma_mz = np.sqrt(1/(-2 * c))
-    mz = (b / (-2 * c)) + x_mean
-    sigma_rt = np.sqrt(1/(-2 * e))
-    rt = (d / (-2 * e)) + y_mean
-    height = (np.exp(a - ((b ** 2) / (4 * c)) - ((d ** 2) / (4 * e))))
+    sigma_mz = np.sqrt(1/(-2 * beta_2))
+    mz = (beta_1 / (-2 * beta_2)) + peak.local_max_mz
+    sigma_rt = np.sqrt(1/(-2 * beta_4))
+    rt = (beta_3 / (-2 * beta_4)) + peak.local_max_rt
+    height = np.exp(beta_0)
 
     # print(np.allclose(np.dot(X, A), Y))
     return np.array([height, mz, sigma_mz, rt, sigma_rt])
@@ -561,7 +536,7 @@ def plot_peak_fit(raw_data, peak, fig_mz, fig_rt):
     plt.xlabel('retention time (s)')
     plt.ylabel('Intensity')
 
-    return
+    return fig_mz, fig_rt
 
 
 def fit_and_plot(raw_data, peak_candidate):
@@ -939,6 +914,10 @@ def peak_extraction(file_name, tapp_parameters, polarity):
     print("Reading raw data")
     raw_data = tapp.read_mzxml(
         file_name,
+        min_mz=tapp_parameters['min_mz'],
+        max_mz=tapp_parameters['max_mz'],
+        min_rt=tapp_parameters['min_rt'],
+        max_rt=tapp_parameters['max_rt'],
         instrument_type=tapp_parameters['instrument_type'],
         resolution_ms1=tapp_parameters['resolution_ms1'],
         resolution_msn=tapp_parameters['resolution_msn'],
@@ -990,4 +969,427 @@ def peak_extraction(file_name, tapp_parameters, polarity):
 
     return raw_data, mesh, peaks_df, peaks
 
+def testing_warping():
+    # TODO: Load and peak detect two files
+    file_name_a = "/data/qatar/17122018/mzXML/AcutePreU_3001.mzXML"
+    file_name_b = "/data/qatar/17122018/mzXML/Acute2U_3002.mzXML"
+    tapp_parameters = {
+        'instrument_type': 'orbitrap',
+        'resolution_ms1': 70000,
+        'resolution_msn': 30000,
+        'reference_mz': 200,
+        'avg_fwhm_rt': 9,
+        'num_samples_mz': 5,
+        'num_samples_rt': 5,
+        'max_peaks': 100,
+        'min_mz': 200,
+        'max_mz': 400,
+        'min_rt': 100,
+        'max_rt': 300,
+        # 'min_mz': 0,
+        # 'max_mz': 2000,
+        # 'min_rt': 0,
+        # 'max_rt': 2000,
+        # 'max_peaks': 20,
+    }
+    raw_data_a, mesh_a, peaks_df_a, peaks_a = peak_extraction(file_name_a, tapp_parameters, 'pos')
+    raw_data_b, mesh_b, peaks_df_b, peaks_b = peak_extraction(file_name_b, tapp_parameters, 'pos')
+    unwarped_peaks = [peaks_a, peaks_b]
+    print("Warping...")
+    warped_peaks = warp_peaks(unwarped_peaks, 0, 50, 50, 2000, 0.2, 100)
+    print("Finding similarity...")
+    print(tapp.find_similarity(unwarped_peaks[0], unwarped_peaks[1], 10000))
+    print(tapp.find_similarity(warped_peaks[0], warped_peaks[1], 10000))
+    return unwarped_peaks, warped_peaks
+
+
+    # FIXME: Debug
+    # plt.style.use('dark_background')
+    # plt.ion()
+    # plt.show()
+    # mesh_plot_a = plot_mesh(mesh_a, transform='sqrt')
+    # mesh_plot_b = plot_mesh(mesh_b, transform='sqrt')
+
+    # TODO: Warp file_b with file_a as reference
+    # TODO: Compare total similarity before and after warping.
+
+def plot_xic(peak, raw_data, figure=None):
+    x, y = peak.xic(raw_data)
+    plt.style.use('dark_background')
+    if not figure:
+        figure = plt.figure()
+
+    plt.ion()
+    plt.show()
+    plt.plot(x, y, label='peak_id = {}'.format(peak.id))
+    plt.xlabel('Retention time (s)')
+    plt.ylabel('Intensity')
+    plt.legend()
+
+    return figure
+
+def testing_xic_plotting(N=20):
+    file_name = '/data/toydata/toy_data_tof.mzXML'
+    tapp_parameters = {
+        'instrument_type': 'tof',
+        'resolution_ms1': 30000,
+        'resolution_msn': 30000,
+        'reference_mz': 200,
+        'avg_fwhm_rt': 15,
+        'min_mz': 510,
+        'max_mz': 531,
+        'min_rt': 2390,
+        'max_rt': 2510,
+    }
+    print("Reading raw data")
+    raw_data = tapp.read_mzxml(
+        file_name,
+        instrument_type=tapp_parameters['instrument_type'],
+        resolution_ms1=tapp_parameters['resolution_ms1'],
+        resolution_msn=tapp_parameters['resolution_msn'],
+        reference_mz=tapp_parameters['reference_mz'],
+        # NOTE: For testing purposes
+        fwhm_rt=tapp_parameters['avg_fwhm_rt'],
+        min_mz=tapp_parameters['min_mz'],
+        max_mz=tapp_parameters['max_mz'],
+        min_rt=tapp_parameters['min_rt'],
+        max_rt=tapp_parameters['max_rt'],
+    )
+    print("Resampling")
+    mesh = resample(raw_data, 5, 5, 0.5, 0.5)
+    plt.style.use('dark_background')
+    plt.ion()
+    plt.show()
+    plot_mesh(mesh)
+
+    # Testing internal peak finding routine.
+    print("Finding peaks")
+    peaks = find_peaks(raw_data, mesh)
+    # peaks_df = pd.DataFrame(
+        # {
+            # 'id': np.array([peak.id for peak in peaks]),
+            # 'local_max_mz': np.array([peak.local_max_mz for peak in peaks]),
+            # 'local_max_rt': np.array([peak.local_max_rt for peak in peaks]),
+            # 'local_max_height': np.array([peak.local_max_height for peak in peaks]),
+            # 'slope_descent_mz': np.array([peak.slope_descent_mz for peak in peaks]),
+            # 'slope_descent_rt': np.array([peak.slope_descent_rt for peak in peaks]),
+            # 'slope_descent_sigma_mz': np.array([peak.slope_descent_sigma_mz for peak in peaks]),
+            # 'slope_descent_sigma_rt': np.array([peak.slope_descent_sigma_rt for peak in peaks]),
+            # 'slope_descent_total_intensity': np.array([peak.slope_descent_total_intensity for peak in peaks]),
+            # 'slope_descent_border_background': np.array([peak.slope_descent_border_background for peak in peaks]),
+            # 'mesh_roi_mz': np.array([peak.mesh_roi_mz for peak in peaks]),
+            # 'mesh_roi_rt': np.array([peak.mesh_roi_rt for peak in peaks]),
+            # 'mesh_roi_sigma_mz': np.array([peak.mesh_roi_sigma_mz for peak in peaks]),
+            # 'mesh_roi_sigma_rt': np.array([peak.mesh_roi_sigma_rt for peak in peaks]),
+            # 'mesh_roi_total_intensity': np.array([peak.mesh_roi_total_intensity for peak in peaks]),
+            # 'raw_roi_mz': np.array([peak.raw_roi_mz for peak in peaks]),
+            # 'raw_roi_rt': np.array([peak.raw_roi_rt for peak in peaks]),
+            # 'raw_roi_sigma_mz': np.array([peak.raw_roi_sigma_mz for peak in peaks]),
+            # 'raw_roi_sigma_rt': np.array([peak.raw_roi_sigma_rt for peak in peaks]),
+            # 'raw_roi_total_intensity': np.array([peak.raw_roi_total_intensity for peak in peaks]),
+            # 'raw_roi_max_height': np.array([peak.raw_roi_max_height for peak in peaks]),
+            # 'raw_roi_num_points': np.array([peak.raw_roi_num_points for peak in peaks]),
+            # 'raw_roi_num_scans': np.array([peak.raw_roi_num_scans for peak in peaks]),
+        # })
+
+    # print("Fitting peaks via least_squares")
+    # fitted_peaks = []
+    # for peak_candidate in peaks:
+        # fitted_peak = fit_guos_2d_from_peak(peak_candidate)
+        # fitted_peaks = fitted_peaks + [fitted_peak]
+
+    # fitted_peaks = pd.DataFrame(fitted_peaks)
+    # fitted_peaks.columns = ['fitted_height', 'fitted_mz',
+                            # 'fitted_sigma_mz', 'fitted_rt', 'fitted_sigma_rt']
+    # peaks_df = pd.concat([peaks_df, fitted_peaks], axis=1)
+
+    print("Plotting xic")
+    fig = plt.figure()
+    for i in range(0, N):
+        fig = peaks[i].plot_xic(raw_data, fig)
+
+    return raw_data, mesh, peaks
+
+def fit_sigmas(peak):
+    X = np.array(
+        [
+            [
+                peak.a_2_2(),
+                peak.a_2_4(),
+            ],
+            [
+                peak.a_4_2(),
+                peak.a_4_4(),
+            ],
+        ],
+    )
+    Y = np.array([
+        peak.c_2(),
+        peak.c_4(),
+    ])
+
+    print(X, Y)
+    beta = np.linalg.lstsq(X, Y, rcond=None)
+    beta_2, beta_4 = beta[0]
+    var_x = 1/(2 * beta_2)
+    var_y = 1/(2 * beta_4)
+
+    print(var_x, var_y)
+    if var_x <= 0 or var_y <= 0:
+        return np.nan, np.nan
+
+    sigma_mz = np.sqrt(var_x)
+    sigma_rt = np.sqrt(var_y)
+
+    return sigma_mz, sigma_rt
+
+def fit_height_and_sigmas(peak):
+    X = np.array(
+        [
+            [
+                peak.a_0_0(),
+                peak.a_0_2(),
+                peak.a_0_4(),
+            ],
+            [
+                peak.a_2_0(),
+                peak.a_2_2(),
+                peak.a_2_4(),
+            ],
+            [
+                peak.a_4_0(),
+                peak.a_4_2(),
+                peak.a_4_4(),
+            ],
+        ],
+    )
+    Y = np.array([
+        peak.c_0(),
+        peak.c_2(),
+        peak.c_4(),
+    ])
+
+    print(X, Y)
+    beta = np.linalg.lstsq(X, Y, rcond=None)
+    beta_0, beta_2, beta_4 = beta[0]
+    var_x = -1/(2 * beta_2)
+    var_y = -1/(2 * beta_4)
+
+    print(var_x, var_y)
+    # if var_x <= 0 or var_y <= 0:
+        # return np.nan, np.nan
+
+    sigma_mz = np.sqrt(var_x)
+    sigma_rt = np.sqrt(var_y)
+    height = np.exp(beta_0)
+
+    return height, sigma_mz, sigma_rt
+
+def load_toy_data():
+    file_name = '/data/toydata/toy_data_tof.mzXML'
+    tapp_parameters = {
+        'instrument_type': 'tof',
+        'resolution_ms1': 30000,
+        'resolution_msn': 30000,
+        'reference_mz': 200,
+        'avg_fwhm_rt': 15,
+        'min_mz': 510,
+        'max_mz': 531,
+        'min_rt': 2390,
+        'max_rt': 2510,
+    }
+    print("Reading raw data")
+    raw_data = tapp.read_mzxml(
+        file_name,
+        instrument_type=tapp_parameters['instrument_type'],
+        resolution_ms1=tapp_parameters['resolution_ms1'],
+        resolution_msn=tapp_parameters['resolution_msn'],
+        reference_mz=tapp_parameters['reference_mz'],
+        # NOTE: For testing purposes
+        fwhm_rt=tapp_parameters['avg_fwhm_rt'],
+        min_mz=tapp_parameters['min_mz'],
+        max_mz=tapp_parameters['max_mz'],
+        min_rt=tapp_parameters['min_rt'],
+        max_rt=tapp_parameters['max_rt'],
+    )
+    print("Resampling")
+    mesh = resample(raw_data, 5, 5, 0.5, 0.5)
+    print("Finding peaks")
+    peaks = find_peaks(raw_data, mesh)
+    return raw_data, mesh, peaks
+
+def load_hye_data_example():
+    file_name = '/data/toydata/toy_data_hye.mzXML'
+    # file_name = '/data/toydata/toy_data_hye_2.mzXML'
+    # file_name = '/data/toydata/toy_data_hye_3.mzXML'
+    # file_name = '/data/toydata/toy_data_hye_4.mzXML'
+    # file_name = '/data/toydata/toy_data_hye_5.mzXML'
+    # file_name = '/data/toydata/toy_data_hye_6.mzXML'
+    tapp_parameters = {
+        'instrument_type': 'orbitrap',
+        'resolution_ms1': 75000,
+        'resolution_msn': 30000,
+        'reference_mz': 200,
+        'avg_fwhm_rt': 30,
+        'min_mz': 0,
+        'max_mz': 1000,
+        'min_rt': 0,
+        'max_rt': 10000,
+    }
+    print("Reading raw data")
+    raw_data = tapp.read_mzxml(
+        file_name,
+        instrument_type=tapp_parameters['instrument_type'],
+        resolution_ms1=tapp_parameters['resolution_ms1'],
+        resolution_msn=tapp_parameters['resolution_msn'],
+        reference_mz=tapp_parameters['reference_mz'],
+        # NOTE: For testing purposes
+        fwhm_rt=tapp_parameters['avg_fwhm_rt'],
+        min_mz=tapp_parameters['min_mz'],
+        max_mz=tapp_parameters['max_mz'],
+        min_rt=tapp_parameters['min_rt'],
+        max_rt=tapp_parameters['max_rt'],
+    )
+    print("Resampling")
+    mesh = resample(raw_data, 10, 10, 0.4, 0.4)
+    print("Finding peaks")
+    peaks = find_peaks(raw_data, mesh)
+    return raw_data, mesh, peaks
+
+def debugging_peak_fitting(fig = None):
+    # Load data
+    raw_data, mesh, peaks = load_toy_data()
+    peak = peaks[0]
+
+    # Setup plotting figures and parameters
+    plt.style.use('dark_background')
+    plt.ion()
+    plt.show()
+
+    if not fig:
+        fig = plt.figure()
+
+    data_points = find_raw_points(
+        raw_data,
+        peak.roi_min_mz,
+        peak.roi_max_mz,
+        peak.roi_min_rt,
+        peak.roi_max_rt,
+    )
+    rts = data_points.rt
+    mzs = data_points.mz
+    intensities = data_points.intensity
+
+    np.random.seed(0)
+
+    # Generate random color
+    color = np.random.rand(3, 1).flatten()
+
+    plt.figure(fig.number)
+
+    # MZ plot.
+    plt.subplot(2, 1, 1)
+    sort_idx_mz = np.argsort(mzs)
+    markerline, stemlines, baseline = plt.stem(np.array(mzs)[sort_idx_mz], np.array(
+        intensities)[sort_idx_mz], label='intensities', markerfmt=' ')
+    plt.setp(baseline, color=color, alpha=0.5)
+    plt.setp(stemlines, color=color, alpha=0.5)
+    # plt.plot(np.array(mzs)[sort_idx_mz], fitted_intensity_2d_mz,
+             # linestyle='--', color=color, label='2d_fitting')
+    plt.xlabel('m/z')
+    plt.ylabel('Intensity')
+    plt.xlim(peak.roi_min_mz, peak.roi_max_mz)
+
+    # Raw data plot.
+    plt.subplot(2, 1, 2)
+    plt.scatter(mzs, rts, c=intensities, label='raw values')
+    plt.scatter(
+        peak.local_max_mz, peak.local_max_rt,
+        color='red',
+        alpha=0.8,
+        label='smoothed local max',
+        )
+    plt.xlabel('m/z')
+    plt.ylabel('Retention time (s)')
+    plt.xlim(peak.roi_min_mz, peak.roi_max_mz)
+    plt.legend()
+
+    # height = peak.local_max_height
+    # mz = peak.local_max_mz
+    # rt = peak.local_max_rt
+    # print(data_points.mz)
+    # print(data_points.rt)
+    # print(data_points.intensity)
+
+def plot_raw_points(peak, raw_data, img_plot=None, rt_plot=None, mz_plot=None):
+    data_points = find_raw_points(
+        raw_data,
+        peak.roi_min_mz,
+        peak.roi_max_mz,
+        peak.roi_min_rt,
+        peak.roi_max_rt,
+    )
+    rts = data_points.rt
+    mzs = data_points.mz
+    intensities = data_points.intensity
+
+    if not img_plot and not rt_plot and not mz_plot:
+        plt.style.use('dark_background')
+        plt.ion()
+        plt.show()
+        fig = plt.figure()
+        plt.clf()
+        gs = gridspec.GridSpec(5, 5)
+        mz_plot = plt.subplot(gs[0, :-1])
+        mz_plot.margins(x=0)
+        mz_plot.set_xticks([])
+        mz_plot.set_ylabel("Intensity")
+        mz_plot.set_xlim([np.array(mzs).min(), np.array(mzs).max()])
+        rt_plot = plt.subplot(gs[1:, -1])
+        rt_plot.margins(y=0)
+        rt_plot.set_yticks([])
+        rt_plot.set_xlabel("Intensity")
+        rt_plot.set_ylim([np.array(rts).min(), np.array(rts).max()])
+        img_plot = plt.subplot(gs[1:, :-1])
+        img_plot.set_xlim([np.array(mzs).min(), np.array(mzs).max()])
+        img_plot.set_ylim([np.array(rts).min(), np.array(rts).max()])
+
+
+    # NOTE: Adding 200 for a more pleasant color map on the first peaks, found this
+    # number by trial and error, dont @ me.
+    np.random.seed(peak.id + 200)
+    color = np.append(np.random.rand(3,1).flatten(), 0.5)
+    np.random.seed(None)
+
+    if img_plot:
+        # Raw data plot.
+        img_plot.scatter(mzs, rts, c=np.sqrt(intensities), label='raw values for peak_id = {}'.format(peak.id), edgecolor=color)
+        img_plot.scatter(
+            peak.local_max_mz, peak.local_max_rt,
+            color='red',
+            alpha=0.5,
+            label='smoothed local max for peak_id = {}'.format(peak.id),
+            )
+    if rt_plot:
+        x, y = peak.xic(raw_data)
+        rt_plot.plot(y, x, color=color)
+    if mz_plot:
+        sort_idx_mz = np.argsort(mzs)
+        markerline, stemlines, baseline = mz_plot.stem(
+            np.array(mzs)[sort_idx_mz], np.array(intensities)[sort_idx_mz], markerfmt=' ')
+        plt.setp(baseline, color=color, alpha=0.5)
+        plt.setp(stemlines, color=color, alpha=0.5)
+
+    return({
+        "img_plot": img_plot,
+        "mz_plot": mz_plot,
+        "rt_plot": rt_plot,
+    })
+
 RawData.tic = tic
+
+Peak.plot_xic = plot_xic
+Peak.plot_raw_points = plot_raw_points
+Peak.fit_mz_rt_height_and_sigmas = fit_guos_2d_from_peak
+Peak.fit_height_and_sigmas = fit_height_and_sigmas
+Peak.fit_sigmas = fit_sigmas
