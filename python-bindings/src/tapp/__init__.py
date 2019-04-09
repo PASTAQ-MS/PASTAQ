@@ -66,7 +66,11 @@ def load_example_data():
 # NOTE: This is not the best design for this function and could be greatly improved.
 
 
-def plot_mesh(mesh, transform='none', figure=None):
+def plot_mesh(mesh, transform='sqrt', figure=None):
+    plt.style.use('dark_background')
+    plt.ion()
+    plt.show()
+
     if figure is None:
         figure = plt.figure()
 
@@ -80,17 +84,13 @@ def plot_mesh(mesh, transform='none', figure=None):
     max_mz = np.array(bins_mz).max()
     min_rt = np.array(bins_rt).min()
     max_rt = np.array(bins_rt).max()
-    if transform == 'sqrt':
-        img = np.sqrt(img)
-    elif transform == 'log':
-        img = np.log(img + 0.00001)
 
     plt.figure(figure.number)
     plt.clf()
     gs = gridspec.GridSpec(5, 5)
     mz_plot = plt.subplot(gs[0, :-1])
     mz_plot.clear()
-    mz_plot.plot(img.sum(axis=0))
+    mz_plot.plot(bins_mz, img.sum(axis=0))
     mz_plot.margins(x=0)
     mz_plot.set_xticks([])
     mz_plot.set_ylabel("Intensity")
@@ -102,31 +102,33 @@ def plot_mesh(mesh, transform='none', figure=None):
     rt_plot.set_xlabel("Intensity")
 
     img_plot = plt.subplot(gs[1:, :-1])
-    # img_plot.pcolormesh(mesh.bins_mz, mesh.bins_rt, img)
-    img_plot.imshow(img, aspect='auto', origin="lower")
+    offset_rt = (np.array(mesh.bins_rt).max() - np.array(mesh.bins_rt).min())/mesh.m / 2
+    offset_mz = (np.array(mesh.bins_mz).max() - np.array(mesh.bins_mz).min())/mesh.n / 2
+    if transform == 'sqrt':
+        img_plot.pcolormesh(
+                np.array(mesh.bins_mz) - offset_mz,
+                np.array(mesh.bins_rt) - offset_rt,
+                img,
+                snap=True,
+                norm=colors.PowerNorm(gamma=1./2.))
+    elif transform == 'cubic':
+        img_plot.pcolormesh(
+                np.array(mesh.bins_mz) - offset_mz,
+                np.array(mesh.bins_rt) - offset_rt,
+                img,
+                norm=colors.PowerNorm(gamma=1./3.))
+    elif transform == 'log':
+        img_plot.pcolormesh(
+                np.array(mesh.bins_mz) - offset_mz,
+                np.array(mesh.bins_rt) - offset_rt,
+                img,
+                norm=colors.LogNorm(vmin=img.min()+1e-8, vmax=img.max()))
+    else:
+        img_plot.pcolormesh(mesh.bins_mz, mesh.bins_rt, img)
+    
+    img_plot.set_xlim([np.array(mesh.bins_mz).min() - offset_mz, np.array(mesh.bins_mz).max() - offset_mz])
+    img_plot.set_ylim([np.array(mesh.bins_rt).min() - offset_rt, np.array(mesh.bins_rt).max() - offset_rt])
 
-    # This only approximates thew ticks assuming we are on a small region, on a
-    # warped grid this doesn't work for a large mz range.
-    delta_mz = bins_mz[1] - bins_mz[0]
-    delta_rt = bins_rt[1] - bins_rt[0]
-    locs_x = img_plot.get_xticks()
-    labels_x = []
-    for loc in locs_x:
-        if loc < 0 or loc >= num_bins_mz:
-            labels_x = labels_x + [""]
-        else:
-            labels_x = labels_x + ["{0:.2f}".format(min_mz + delta_mz * loc)]
-
-    locs_y = img_plot.get_yticks()
-    labels_y = []
-    for loc in locs_y:
-        if loc < 0 or loc >= num_bins_rt:
-            labels_y = labels_y + [""]
-        else:
-            labels_y = labels_y + ["{0:.2f}".format(min_rt + delta_rt * loc)]
-
-    img_plot.set_xticklabels(labels_x)
-    img_plot.set_yticklabels(labels_y)
     img_plot.set_xlabel("m/z")
     img_plot.set_ylabel("retention time (s)")
 
