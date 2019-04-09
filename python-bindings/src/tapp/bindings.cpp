@@ -742,6 +742,97 @@ struct Peak {
     double c_2() { return C[2]; }
     double c_3() { return C[3]; }
     double c_4() { return C[4]; }
+
+    // (Rt, Intensity)
+    std::tuple<std::vector<double>, std::vector<double>> xic(
+        const RawData::RawData &raw_data) {
+        std::vector<double> rt;
+        std::vector<double> intensity;
+        {
+            const auto &scans = raw_data.scans;
+            if (scans.size() == 0) {
+                return {rt, intensity};
+            }
+
+            // Find scan indices.
+            double internal_min_rt = this->roi_min_rt;
+            double internal_max_rt = this->roi_max_rt;
+            if (internal_min_rt < raw_data.min_rt) {
+                internal_min_rt = raw_data.min_rt;
+            }
+            if (internal_max_rt > raw_data.max_rt) {
+                internal_max_rt = raw_data.max_rt;
+            }
+
+            // Binary search for lower rt bound.
+            size_t min_j = 0;
+            size_t max_j = scans.size();
+            size_t l = min_j;
+            size_t r = max_j - 1;
+            while (l <= r) {
+                min_j = (l + r) / 2;
+                if (scans[min_j].retention_time < internal_min_rt) {
+                    l = min_j + 1;
+                } else if (scans[min_j].retention_time > internal_min_rt) {
+                    r = min_j - 1;
+                } else {
+                    break;
+                }
+                if (min_j == 0) {
+                    break;
+                }
+            }
+            for (size_t j = min_j; j < max_j; ++j) {
+                const auto &scan = scans[j];
+                if (scan.num_points == 0) {
+                    continue;
+                }
+                if (scan.retention_time > internal_max_rt) {
+                    break;
+                }
+
+                // Binary search for lower mz bound.
+                double internal_min_mz = this->roi_min_mz;
+                double internal_max_mz = this->roi_max_mz;
+                if (internal_min_mz < scan.mz[0]) {
+                    internal_min_mz = scan.mz[0];
+                }
+                if (internal_max_mz > scan.mz[scan.num_points - 1]) {
+                    internal_max_mz = scan.mz[scan.num_points - 1];
+                }
+                // Binary search for lower bound.
+                size_t min_i = 0;
+                size_t max_i = scan.num_points;
+                size_t l = min_i;
+                size_t r = max_i - 1;
+                while (l <= r) {
+                    min_i = (l + r) / 2;
+                    if (scan.mz[min_i] < internal_min_mz) {
+                        l = min_i + 1;
+                    } else if (scan.mz[min_i] > internal_min_mz) {
+                        r = min_i - 1;
+                    } else {
+                        break;
+                    }
+                    if (min_i == 0) {
+                        break;
+                    }
+                }
+
+                // Sum all points in the scan.
+                double intensity_sum = 0;
+                for (size_t i = min_i; i < max_i; ++i) {
+                    if (scan.mz[i] > internal_max_mz) {
+                        break;
+                    }
+                    intensity_sum += scan.intensity[i];
+                }
+                rt.push_back(scan.retention_time);
+                intensity.push_back(intensity_sum);
+            }
+        }
+        return {rt, intensity};
+    }
 };
 
 struct MeshIndex {
@@ -1382,15 +1473,15 @@ void save_fitted_peaks(
 }
 
 std::vector<std::vector<Peak>> warp_peaks(
-    std::vector<std::vector<Peak>> all_peaks, size_t reference_index,
+    const std::vector<std::vector<Peak>> &all_peaks, size_t reference_index,
     int64_t slack, int64_t window_size, int64_t num_points,
     double rt_expand_factor, int64_t peaks_per_window) {
     // TODO(alex): Validate the parameters and throw an error if appropriate.
     Warp2D::Parameters parameters = {slack, window_size, num_points,
                                      peaks_per_window, rt_expand_factor};
-    std::vector<std::vector<Peak>> all_warped_peaks;
-    const auto &reference_peaks_original = all_warped_peaks[reference_index];
-    auto translate_peak_format = [](const std::vector<Peak> &before_peaks)
+    auto reference_peaks_original = all_peaks[reference_index];
+    auto translate_peak_format_to_centroid =
+        [](const std::vector<Peak> &before_peaks)
         -> std::vector<Centroid::Peak> {
         auto after_peaks = std::vector<Centroid::Peak>(before_peaks.size());
         for (size_t i = 0; i < before_peaks.size(); ++i) {
@@ -1410,19 +1501,133 @@ std::vector<std::vector<Peak>> warp_peaks(
         }
         return after_peaks;
     };
-    auto reference_peaks = translate_peak_format(reference_peaks_original);
+    auto translate_peak_format_from_centroid =
+        [](const std::vector<Centroid::Peak> &before_peaks)
+        -> std::vector<Peak> {
+        auto after_peaks = std::vector<Peak>(before_peaks.size());
+        for (size_t i = 0; i < before_peaks.size(); ++i) {
+            after_peaks[i].local_max_i = before_peaks[i].i;
+            after_peaks[i].local_max_j = before_peaks[i].j;
+            after_peaks[i].local_max_mz = before_peaks[i].mz;
+            after_peaks[i].local_max_rt = before_peaks[i].rt;
+            after_peaks[i].local_max_height = before_peaks[i].height;
 
+            // NOTE: Currently using slope_descent quantification.
+            after_peaks[i].slope_descent_total_intensity =
+                before_peaks[i].total_intensity;
+            after_peaks[i].slope_descent_sigma_mz = before_peaks[i].sigma_mz;
+            after_peaks[i].slope_descent_sigma_rt = before_peaks[i].sigma_rt;
+            after_peaks[i].slope_descent_border_background =
+                before_peaks[i].border_background;
+        }
+        return after_peaks;
+    };
+    auto reference_peaks =
+        translate_peak_format_to_centroid(reference_peaks_original);
+
+    std::vector<std::vector<Peak>> all_warped_peaks;
     for (size_t i = 0; i < all_peaks.size(); ++i) {
         if (i == reference_index) {
+            all_warped_peaks.push_back(all_peaks[i]);
             continue;
         }
-        auto peaks = translate_peak_format(all_peaks[i]);
+        auto peaks = translate_peak_format_to_centroid(all_peaks[i]);
         std::vector<Centroid::Peak> warped_peaks;
         warped_peaks =
             Warp2D::Runners::Serial::run(reference_peaks, peaks, parameters);
+        all_warped_peaks.push_back(
+            translate_peak_format_from_centroid(warped_peaks));
     }
     return all_warped_peaks;
 }
+
+struct SimilarityResults {
+    double self_a;
+    double self_b;
+    double overlap;
+    double geometric_ratio;
+    double mean_ratio;
+};
+SimilarityResults find_similarity(const std::vector<Peak> &peak_list_a,
+                                  const std::vector<Peak> &peak_list_b,
+                                  size_t n_peaks) {
+    auto translate_peak_format_to_centroid =
+        [](const std::vector<Peak> &before_peaks)
+        -> std::vector<Centroid::Peak> {
+        auto after_peaks = std::vector<Centroid::Peak>(before_peaks.size());
+        for (size_t i = 0; i < before_peaks.size(); ++i) {
+            after_peaks[i].i = before_peaks[i].local_max_i;
+            after_peaks[i].j = before_peaks[i].local_max_j;
+            after_peaks[i].mz = before_peaks[i].local_max_mz;
+            after_peaks[i].rt = before_peaks[i].local_max_rt;
+            after_peaks[i].height = before_peaks[i].local_max_height;
+
+            // NOTE: Currently using slope_descent quantification.
+            after_peaks[i].total_intensity =
+                before_peaks[i].slope_descent_total_intensity;
+            after_peaks[i].sigma_mz = before_peaks[i].slope_descent_sigma_mz;
+            after_peaks[i].sigma_rt = before_peaks[i].slope_descent_sigma_rt;
+            after_peaks[i].border_background =
+                before_peaks[i].slope_descent_border_background;
+        }
+        return after_peaks;
+    };
+    auto sort_peaks = [](const Centroid::Peak &p1,
+                         const Centroid::Peak &p2) -> bool {
+        return (p1.height > p2.height) || (p1.height == p2.height);
+    };
+    auto peak_list_a_centroid = translate_peak_format_to_centroid(peak_list_a);
+    auto peak_list_b_centroid = translate_peak_format_to_centroid(peak_list_b);
+    std::stable_sort(peak_list_a_centroid.begin(), peak_list_a_centroid.end(),
+                     sort_peaks);
+    std::stable_sort(peak_list_b_centroid.begin(), peak_list_b_centroid.end(),
+                     sort_peaks);
+    peak_list_a_centroid.resize(n_peaks);
+    peak_list_b_centroid.resize(n_peaks);
+    SimilarityResults results = {};
+    results.self_a =
+        Warp2D::similarity_2D(peak_list_a_centroid, peak_list_a_centroid);
+    results.self_b =
+        Warp2D::similarity_2D(peak_list_b_centroid, peak_list_b_centroid);
+    results.overlap =
+        Warp2D::similarity_2D(peak_list_a_centroid, peak_list_b_centroid);
+    // Overlap / (GeometricMean(self_a, self_b))
+    results.geometric_ratio =
+        results.overlap / std::sqrt(results.self_a * results.self_b);
+    // Harmonic mean of the ratios between self_similarity/overlap_similarity
+    results.mean_ratio =
+        2 * results.overlap / (results.self_a + results.self_b);
+    return results;
+}
+
+struct PeakList {
+    std::vector<Peak> peaks;
+    std::string file_name;   // NOTE: Should this be on the raw_data instead?
+    std::string class_name;  // NOTE: Should this be on the raw_data instead?
+    std::shared_ptr<RawData::RawData> raw_data;
+};
+
+struct WarpingTimeMap {
+    std::vector<double> rt_start;
+    std::vector<double> rt_end;
+    std::vector<double> warped_rt_start;
+    std::vector<double> warped_rt_end;
+    size_t n_warping_segments;
+};
+
+struct PeakLists {
+    std::vector<PeakList> peak_lists;
+    std::shared_ptr<WarpingTimeMap> warping_time_map;
+};
+
+struct MetaPeak {
+    // TODO: ...
+};
+
+struct MetaPeaks {
+    // TODO: ...
+};
+
 }  // namespace PythonAPI
 
 PYBIND11_MODULE(tapp, m) {
@@ -1556,7 +1761,23 @@ PYBIND11_MODULE(tapp, m) {
         .def("c_1", &PythonAPI::Peak::c_1)
         .def("c_2", &PythonAPI::Peak::c_2)
         .def("c_3", &PythonAPI::Peak::c_3)
-        .def("c_4", &PythonAPI::Peak::c_4);
+        .def("c_4", &PythonAPI::Peak::c_4)
+        .def("xic", &PythonAPI::Peak::xic, py::arg("raw_data"));
+
+    py::class_<PythonAPI::SimilarityResults>(m, "Similarity")
+        .def_readonly("self_a", &PythonAPI::SimilarityResults::self_a)
+        .def_readonly("self_b", &PythonAPI::SimilarityResults::self_b)
+        .def_readonly("overlap", &PythonAPI::SimilarityResults::overlap)
+        .def_readonly("geometric_ratio",
+                      &PythonAPI::SimilarityResults::geometric_ratio)
+        .def_readonly("mean_ratio", &PythonAPI::SimilarityResults::mean_ratio)
+        .def("__repr__", [](const PythonAPI::SimilarityResults &s) {
+            return "Similarity: self_a: " + std::to_string(s.self_a) +
+                   ", self_b: " + std::to_string(s.self_b) +
+                   ", overlap: " + std::to_string(s.overlap) +
+                   ", geometric_ratio: " + std::to_string(s.geometric_ratio) +
+                   ", mean_ratio: " + std::to_string(s.mean_ratio);
+        });
 
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,
@@ -1596,5 +1817,9 @@ PYBIND11_MODULE(tapp, m) {
              "reference",
              py::arg("all_peaks"), py::arg("reference_index"), py::arg("slack"),
              py::arg("window_size"), py::arg("num_points"),
-             py::arg("rt_expand_factor"), py::arg("peaks_per_window"));
+             py::arg("rt_expand_factor"), py::arg("peaks_per_window"))
+        .def("find_similarity", &PythonAPI::find_similarity,
+             "Find the similarity between two peak lists",
+             py::arg("peak_list_a"), py::arg("peak_list_b"),
+             py::arg("n_peaks"));
 }
