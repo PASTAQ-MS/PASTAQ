@@ -149,29 +149,12 @@ struct RawPoints {
     size_t num_points;
 };
 
-RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
-                          double max_mz, double min_rt, double max_rt) {
-    RawPoints raw_points;
+size_t find_min_rt_index(const RawData::RawData &raw_data, double min_rt) {
     const auto &scans = raw_data.scans;
-    if (scans.size() == 0) {
-        std::ostringstream error_stream;
-        error_stream << "the given raw_data is empty";
-        throw std::invalid_argument(error_stream.str());
-    }
 
-    // Find scan indices.
-    if (min_rt < raw_data.min_rt) {
-        min_rt = raw_data.min_rt;
-    }
-    if (max_rt > raw_data.max_rt) {
-        max_rt = raw_data.max_rt;
-    }
-
-    // Binary search for lower rt bound.
     size_t min_j = 0;
-    size_t max_j = scans.size();
     size_t l = min_j;
-    size_t r = max_j - 1;
+    size_t r = scans.size() - 1;
     while (l <= r) {
         min_j = (l + r) / 2;
         if (scans[min_j].retention_time < min_rt) {
@@ -185,9 +168,51 @@ RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
             break;
         }
     }
+    return min_j;
+}
+
+size_t lower_bound(const std::vector<double> &haystack, double needle) {
+    size_t index = 0;
+    size_t l = 0;
+    size_t r = haystack.size() - 1;
+    while (l <= r) {
+        index = (l + r) / 2;
+        if (haystack[index] < needle) {
+            l = index + 1;
+        } else if (haystack[index] > needle) {
+            r = index - 1;
+        } else {
+            break;
+        }
+        if (index == 0) {
+            break;
+        }
+    }
+    return index;
+}
+
+RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
+                          double max_mz, double min_rt, double max_rt) {
+    RawPoints raw_points;
+    const auto &scans = raw_data.scans;
+    if (scans.size() == 0) {
+        std::ostringstream error_stream;
+        error_stream << "the given raw_data is empty";
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    if (min_rt < raw_data.min_rt) {
+        min_rt = raw_data.min_rt;
+    }
+    if (max_rt > raw_data.max_rt) {
+        max_rt = raw_data.max_rt;
+    }
+    size_t min_j = find_min_rt_index(raw_data, min_rt);
+    size_t max_j = scans.size();
     if (scans[min_j].retention_time < min_rt) {
         ++min_j;
     }
+
     for (size_t j = min_j; j < max_j; ++j) {
         const auto &scan = scans[j];
         if (scan.num_points == 0) {
@@ -196,7 +221,7 @@ RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
         if (scan.retention_time > max_rt) {
             break;
         }
-        // Binary search for lower mz bound.
+
         double internal_min_mz = min_mz;
         double internal_max_mz = max_mz;
         if (internal_min_mz < scan.mz[0]) {
@@ -205,24 +230,8 @@ RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
         if (internal_max_mz > scan.mz[scan.num_points - 1]) {
             internal_max_mz = scan.mz[scan.num_points - 1];
         }
-        // Binary search for lower bound.
-        size_t min_i = 0;
+        size_t min_i = lower_bound(scan.mz, internal_min_mz);
         size_t max_i = scan.num_points;
-        size_t l = min_i;
-        size_t r = max_i - 1;
-        while (l <= r) {
-            min_i = (l + r) / 2;
-            if (scan.mz[min_i] < internal_min_mz) {
-                l = min_i + 1;
-            } else if (scan.mz[min_i] > internal_min_mz) {
-                r = min_i - 1;
-            } else {
-                break;
-            }
-            if (min_i == 0) {
-                break;
-            }
-        }
         if (scan.mz[min_i] < internal_min_mz) {
             ++min_i;
         }
@@ -764,23 +773,10 @@ struct Peak {
                 internal_max_rt = raw_data.max_rt;
             }
 
-            // Binary search for lower rt bound.
-            size_t min_j = 0;
+            size_t min_j = find_min_rt_index(raw_data, internal_min_rt);
             size_t max_j = scans.size();
-            size_t l = min_j;
-            size_t r = max_j - 1;
-            while (l <= r) {
-                min_j = (l + r) / 2;
-                if (scans[min_j].retention_time < internal_min_rt) {
-                    l = min_j + 1;
-                } else if (scans[min_j].retention_time > internal_min_rt) {
-                    r = min_j - 1;
-                } else {
-                    break;
-                }
-                if (min_j == 0) {
-                    break;
-                }
+            if (scans[min_j].retention_time < internal_min_rt) {
+                ++min_j;
             }
             for (size_t j = min_j; j < max_j; ++j) {
                 const auto &scan = scans[j];
@@ -791,7 +787,6 @@ struct Peak {
                     break;
                 }
 
-                // Binary search for lower mz bound.
                 double internal_min_mz = this->roi_min_mz;
                 double internal_max_mz = this->roi_max_mz;
                 if (internal_min_mz < scan.mz[0]) {
@@ -800,23 +795,10 @@ struct Peak {
                 if (internal_max_mz > scan.mz[scan.num_points - 1]) {
                     internal_max_mz = scan.mz[scan.num_points - 1];
                 }
-                // Binary search for lower bound.
-                size_t min_i = 0;
+                size_t min_i = lower_bound(scan.mz, internal_min_mz);
                 size_t max_i = scan.num_points;
-                size_t l = min_i;
-                size_t r = max_i - 1;
-                while (l <= r) {
-                    min_i = (l + r) / 2;
-                    if (scan.mz[min_i] < internal_min_mz) {
-                        l = min_i + 1;
-                    } else if (scan.mz[min_i] > internal_min_mz) {
-                        r = min_i - 1;
-                    } else {
-                        break;
-                    }
-                    if (min_i == 0) {
-                        break;
-                    }
+                if (scan.mz[min_i] < internal_min_mz) {
+                    ++min_i;
                 }
 
                 // Sum all points in the scan.
@@ -1064,44 +1046,16 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
 
     // Calculate the estimation of values for the mesh points in the ROI.
     {
-        // Find min_i via binary search.
-        size_t min_i = 0;
-        {
-            size_t l = 0;
-            size_t r = mesh.n - 1;
-            while (l <= r) {
-                min_i = (l + r) / 2;
-                if (mesh.bins_mz[min_i] < peak.roi_min_mz) {
-                    l = min_i + 1;
-                } else if (mesh.bins_mz[min_i] > peak.roi_min_mz) {
-                    r = min_i - 1;
-                } else {
-                    break;
-                }
-                if (min_i == 0) {
-                    break;
-                }
-            }
+        // Find minimum indexes via binary search.
+        size_t min_i = lower_bound(mesh.bins_mz, peak.roi_min_mz);
+        size_t min_j = lower_bound(mesh.bins_rt, peak.roi_min_rt);
+        if (mesh.bins_mz[min_i] < peak.roi_min_mz) {
+            ++min_i;
         }
-        // Find min_j via binary search.
-        size_t min_j = 0;
-        {
-            size_t l = 0;
-            size_t r = mesh.m - 1;
-            while (l <= r) {
-                min_j = (l + r) / 2;
-                if (mesh.bins_rt[min_j] < peak.roi_min_rt) {
-                    l = min_j + 1;
-                } else if (mesh.bins_rt[min_j] > peak.roi_min_rt) {
-                    r = min_j - 1;
-                } else {
-                    break;
-                }
-                if (min_j == 0) {
-                    break;
-                }
-            }
+        if (mesh.bins_rt[min_j] < peak.roi_min_rt) {
+            ++min_j;
         }
+
         double height_sum = 0;
         double x_sum = 0;
         double y_sum = 0;
@@ -1192,24 +1146,12 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
             internal_max_rt = raw_data.max_rt;
         }
 
-        // Binary search for lower rt bound.
-        size_t min_j = 0;
+        size_t min_j = find_min_rt_index(raw_data, internal_min_rt);
         size_t max_j = scans.size();
-        size_t l = min_j;
-        size_t r = max_j - 1;
-        while (l <= r) {
-            min_j = (l + r) / 2;
-            if (scans[min_j].retention_time < internal_min_rt) {
-                l = min_j + 1;
-            } else if (scans[min_j].retention_time > internal_min_rt) {
-                r = min_j - 1;
-            } else {
-                break;
-            }
-            if (min_j == 0) {
-                break;
-            }
+        if (scans[min_j].retention_time < internal_min_rt) {
+            ++min_j;
         }
+
         double height_sum = 0;
         double sq_height_sum = 0;
         double x_sum = 0;
@@ -1224,8 +1166,7 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
             if (scan.retention_time > internal_max_rt) {
                 break;
             }
-            ++peak.raw_roi_num_scans;
-            // Binary search for lower mz bound.
+
             double internal_min_mz = peak.roi_min_mz;
             double internal_max_mz = peak.roi_max_mz;
             if (internal_min_mz < scan.mz[0]) {
@@ -1234,24 +1175,13 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
             if (internal_max_mz > scan.mz[scan.num_points - 1]) {
                 internal_max_mz = scan.mz[scan.num_points - 1];
             }
-            // Binary search for lower bound.
-            size_t min_i = 0;
+
+            size_t min_i = lower_bound(scan.mz, internal_min_mz);
             size_t max_i = scan.num_points;
-            size_t l = min_i;
-            size_t r = max_i - 1;
-            while (l <= r) {
-                min_i = (l + r) / 2;
-                if (scan.mz[min_i] < internal_min_mz) {
-                    l = min_i + 1;
-                } else if (scan.mz[min_i] > internal_min_mz) {
-                    r = min_i - 1;
-                } else {
-                    break;
-                }
-                if (min_i == 0) {
-                    break;
-                }
+            if (scan.mz[min_i] < internal_min_mz) {
+                ++min_i;
             }
+            bool scan_not_empty = false;
             for (size_t i = min_i; i < max_i; ++i) {
                 if (scan.mz[i] > internal_max_mz) {
                     break;
@@ -1262,6 +1192,7 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
                 if (value > peak.raw_roi_max_height) {
                     peak.raw_roi_max_height = value;
                 }
+                scan_not_empty = true;
                 ++peak.raw_roi_num_points;
                 height_sum += value;
                 sq_height_sum += value * value;
@@ -1269,68 +1200,10 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
                 y_sum += value * rt;
                 x_sig += value * mz * mz;
                 y_sig += value * rt * rt;
-            }
-        }
-        // FIXME: Not controlling for div/0.
-        peak.raw_roi_mz = x_sum / height_sum;
-        peak.raw_roi_rt = y_sum / height_sum;
-        peak.raw_roi_sigma_mz =
-            std::sqrt((x_sig / height_sum) - std::pow(x_sum / height_sum, 2));
-        peak.raw_roi_sigma_rt =
-            std::sqrt((y_sig / height_sum) - std::pow(y_sum / height_sum, 2));
-        peak.raw_roi_total_intensity = height_sum;
-        peak.raw_roi_mean_height = height_sum / peak.raw_roi_num_points;
-        peak.raw_roi_sigma_height =
-            std::sqrt(sq_height_sum / peak.raw_roi_num_points -
-                      peak.raw_roi_mean_height * peak.raw_roi_mean_height);
-
-        for (size_t j = min_j; j < max_j; ++j) {
-            const auto &scan = scans[j];
-            if (scan.num_points == 0) {
-                continue;
-            }
-            if (scan.retention_time > internal_max_rt) {
-                break;
-            }
-            // Binary search for lower mz bound.
-            double internal_min_mz = peak.roi_min_mz;
-            double internal_max_mz = peak.roi_max_mz;
-            if (internal_min_mz < scan.mz[0]) {
-                internal_min_mz = scan.mz[0];
-            }
-            if (internal_max_mz > scan.mz[scan.num_points - 1]) {
-                internal_max_mz = scan.mz[scan.num_points - 1];
-            }
-            // Binary search for lower bound.
-            size_t min_i = 0;
-            size_t max_i = scan.num_points;
-            size_t l = min_i;
-            size_t r = max_i - 1;
-            while (l <= r) {
-                min_i = (l + r) / 2;
-                if (scan.mz[min_i] < internal_min_mz) {
-                    l = min_i + 1;
-                } else if (scan.mz[min_i] > internal_min_mz) {
-                    r = min_i - 1;
-                } else {
-                    break;
-                }
-                if (min_i == 0) {
-                    break;
-                }
-            }
-            for (size_t i = min_i; i < max_i; ++i) {
-                if (scan.mz[i] > internal_max_mz) {
-                    break;
-                }
-                double mz = scan.mz[i];
-                double rt = scan.retention_time;
-                double value = scan.intensity[i];
 
                 // Calculate the values for the A matrix and C vector necessary
                 // for the 2D Gaussian fitting using least squares.
                 {
-                    // FIXME: We might need to center the mz/rt values.
                     double x = (mz - peak.local_max_mz);
                     double y = (rt - peak.local_max_rt);
                     double z = value;
@@ -1381,7 +1254,22 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
                     peak.C[4] += z_2 * y_2 * log_z;
                 }
             }
+            if (scan_not_empty) {
+                ++peak.raw_roi_num_scans;
+            }
         }
+        // FIXME: Not controlling for div/0.
+        peak.raw_roi_mz = y_sig;
+        peak.raw_roi_rt = y_sum;
+        peak.raw_roi_sigma_mz =
+            std::sqrt((x_sig / height_sum) - std::pow(x_sum / height_sum, 2));
+        peak.raw_roi_sigma_rt =
+            std::sqrt((y_sig / height_sum) - std::pow(y_sum / height_sum, 2));
+        peak.raw_roi_total_intensity = height_sum;
+        peak.raw_roi_mean_height = height_sum / peak.raw_roi_num_points;
+        peak.raw_roi_sigma_height =
+            std::sqrt(sq_height_sum / peak.raw_roi_num_points -
+                      peak.raw_roi_mean_height * peak.raw_roi_mean_height);
 
         // FIXME: Make nan instead?
         // if (raw_points.num_points == 0) {
@@ -1405,7 +1293,6 @@ std::vector<Peak> find_peaks(const RawData::RawData &raw_data,
         peaks.push_back(peak);
         ++i;
     }
-    // TODO: Sort peaks
     return peaks;
 }
 
