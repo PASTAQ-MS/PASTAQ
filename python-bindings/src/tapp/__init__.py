@@ -834,6 +834,7 @@ def debugging_qatar():
             'raw_roi_num_points': np.array([peak.raw_roi_num_points for peak in peaks]),
             'raw_roi_num_scans': np.array([peak.raw_roi_num_scans for peak in peaks]),
         })
+    peaks_df = peaks_df.loc[(np.array(peaks_df['raw_roi_num_scans']) >= 3),:]
 
     # print("Fitting peaks via least_squares")
     # fitted_peaks = []
@@ -1333,6 +1334,12 @@ def plot_raw_points(peak, raw_data, img_plot=None, rt_plot=None, mz_plot=None):
     mzs = data_points.mz
     intensities = data_points.intensity
 
+    # Calculate min/max values for the given peak.
+    min_mz = np.array(mzs).min()
+    max_mz = np.array(mzs).max()
+    min_rt = np.array(rts).min()
+    max_rt = np.array(rts).max()
+
     if not img_plot and not rt_plot and not mz_plot:
         plt.style.use('dark_background')
         plt.ion()
@@ -1344,15 +1351,17 @@ def plot_raw_points(peak, raw_data, img_plot=None, rt_plot=None, mz_plot=None):
         mz_plot.margins(x=0)
         mz_plot.set_xticks([])
         mz_plot.set_ylabel("Intensity")
-        mz_plot.set_xlim([np.array(mzs).min(), np.array(mzs).max()])
         rt_plot = plt.subplot(gs[1:, -1])
         rt_plot.margins(y=0)
         rt_plot.set_yticks([])
         rt_plot.set_xlabel("Intensity")
-        rt_plot.set_ylim([np.array(rts).min(), np.array(rts).max()])
         img_plot = plt.subplot(gs[1:, :-1])
-        img_plot.set_xlim([np.array(mzs).min(), np.array(mzs).max()])
-        img_plot.set_ylim([np.array(rts).min(), np.array(rts).max()])
+
+        # Set the min/max limits for mz/rt.
+        mz_plot.set_xlim([min_mz, max_mz])
+        rt_plot.set_ylim([min_rt, max_rt])
+        img_plot.set_xlim([min_mz, max_mz])
+        img_plot.set_ylim([min_rt, max_rt])
 
 
     # NOTE: Adding 200 for a more pleasant color map on the first peaks, found this
@@ -1362,8 +1371,12 @@ def plot_raw_points(peak, raw_data, img_plot=None, rt_plot=None, mz_plot=None):
     np.random.seed(None)
 
     if img_plot:
-        # Raw data plot.
-        img_plot.scatter(mzs, rts, c=np.sqrt(intensities), label='raw values for peak_id = {}'.format(peak.id), edgecolor=color)
+        img_plot.scatter(
+            mzs, rts,
+            c=np.sqrt(intensities),
+            label='raw values for peak_id = {}'.format(peak.id),
+            edgecolor=color,
+            )
         img_plot.scatter(
             peak.local_max_mz, peak.local_max_rt,
             color='red',
@@ -1379,6 +1392,22 @@ def plot_raw_points(peak, raw_data, img_plot=None, rt_plot=None, mz_plot=None):
             np.array(mzs)[sort_idx_mz], np.array(intensities)[sort_idx_mz], markerfmt=' ')
         plt.setp(baseline, color=color, alpha=0.5)
         plt.setp(stemlines, color=color, alpha=0.5)
+
+    # Set x/y limits if necessary.
+    lim_min_mz, lim_max_mz = img_plot.get_xlim()
+    lim_min_rt, lim_max_rt = img_plot.get_ylim()
+    if min_mz < lim_min_mz:
+        lim_min_mz = min_mz
+    if min_rt < lim_min_rt:
+        lim_min_rt = min_rt
+    if max_mz > lim_max_mz:
+        lim_max_mz = max_mz
+    if max_rt > lim_max_rt:
+        lim_max_rt = max_rt
+    mz_plot.set_xlim([lim_min_mz, lim_max_mz])
+    rt_plot.set_ylim([lim_min_rt, lim_max_rt])
+    img_plot.set_xlim([lim_min_mz, lim_max_mz])
+    img_plot.set_ylim([lim_min_rt, lim_max_rt])
 
     return({
         "img_plot": img_plot,
