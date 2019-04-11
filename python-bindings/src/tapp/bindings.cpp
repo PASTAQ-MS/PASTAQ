@@ -149,6 +149,8 @@ struct RawPoints {
     size_t num_points;
 };
 
+// FIXME: Should we memoize the rts as an array on RawData to be able to use the
+// normal lower_bound binary search?
 size_t find_min_rt_index(const RawData::RawData &raw_data, double min_rt) {
     const auto &scans = raw_data.scans;
 
@@ -752,66 +754,79 @@ struct Peak {
     double c_3() { return C[3]; }
     double c_4() { return C[4]; }
 
-    // (Rt, Intensity)
+    // Extracted Ion Chromatogram. Can be performed with summation or maxima
+    // (Total Ion Chromatogram/Base Peak Chromatogram). Returns two vectors
+    // (retention_time, aggregated_intensity).
     std::tuple<std::vector<double>, std::vector<double>> xic(
-        const RawData::RawData &raw_data) {
+        const RawData::RawData &raw_data, std::string method) {
         std::vector<double> rt;
         std::vector<double> intensity;
-        {
-            const auto &scans = raw_data.scans;
-            if (scans.size() == 0) {
-                return {rt, intensity};
+        const auto &scans = raw_data.scans;
+        if (scans.size() == 0) {
+            return {rt, intensity};
+        }
+
+        // Find scan indices.
+        double internal_min_rt = this->roi_min_rt;
+        double internal_max_rt = this->roi_max_rt;
+        if (internal_min_rt < raw_data.min_rt) {
+            internal_min_rt = raw_data.min_rt;
+        }
+        if (internal_max_rt > raw_data.max_rt) {
+            internal_max_rt = raw_data.max_rt;
+        }
+
+        size_t min_j = find_min_rt_index(raw_data, internal_min_rt);
+        size_t max_j = scans.size();
+        if (scans[min_j].retention_time < internal_min_rt) {
+            ++min_j;
+        }
+        for (size_t j = min_j; j < max_j; ++j) {
+            const auto &scan = scans[j];
+            if (scan.num_points == 0) {
+                continue;
+            }
+            if (scan.retention_time > internal_max_rt) {
+                break;
             }
 
-            // Find scan indices.
-            double internal_min_rt = this->roi_min_rt;
-            double internal_max_rt = this->roi_max_rt;
-            if (internal_min_rt < raw_data.min_rt) {
-                internal_min_rt = raw_data.min_rt;
+            double internal_min_mz = this->roi_min_mz;
+            double internal_max_mz = this->roi_max_mz;
+            if (internal_min_mz < scan.mz[0]) {
+                internal_min_mz = scan.mz[0];
             }
-            if (internal_max_rt > raw_data.max_rt) {
-                internal_max_rt = raw_data.max_rt;
+            if (internal_max_mz > scan.mz[scan.num_points - 1]) {
+                internal_max_mz = scan.mz[scan.num_points - 1];
+            }
+            size_t min_i = lower_bound(scan.mz, internal_min_mz);
+            size_t max_i = scan.num_points;
+            if (scan.mz[min_i] < internal_min_mz) {
+                ++min_i;
             }
 
-            size_t min_j = find_min_rt_index(raw_data, internal_min_rt);
-            size_t max_j = scans.size();
-            if (scans[min_j].retention_time < internal_min_rt) {
-                ++min_j;
-            }
-            for (size_t j = min_j; j < max_j; ++j) {
-                const auto &scan = scans[j];
-                if (scan.num_points == 0) {
-                    continue;
-                }
-                if (scan.retention_time > internal_max_rt) {
-                    break;
-                }
-
-                double internal_min_mz = this->roi_min_mz;
-                double internal_max_mz = this->roi_max_mz;
-                if (internal_min_mz < scan.mz[0]) {
-                    internal_min_mz = scan.mz[0];
-                }
-                if (internal_max_mz > scan.mz[scan.num_points - 1]) {
-                    internal_max_mz = scan.mz[scan.num_points - 1];
-                }
-                size_t min_i = lower_bound(scan.mz, internal_min_mz);
-                size_t max_i = scan.num_points;
-                if (scan.mz[min_i] < internal_min_mz) {
-                    ++min_i;
-                }
-
+            double aggregated_intensity = 0;
+            if (method == "sum") {
                 // Sum all points in the scan.
-                double intensity_sum = 0;
                 for (size_t i = min_i; i < max_i; ++i) {
                     if (scan.mz[i] > internal_max_mz) {
                         break;
                     }
-                    intensity_sum += scan.intensity[i];
+                    aggregated_intensity += scan.intensity[i];
                 }
-                rt.push_back(scan.retention_time);
-                intensity.push_back(intensity_sum);
             }
+            if (method == "max") {
+                // Find max point in the scan.
+                for (size_t i = min_i; i < max_i; ++i) {
+                    if (scan.mz[i] > internal_max_mz) {
+                        break;
+                    }
+                    if (scan.intensity[i] > aggregated_intensity) {
+                        aggregated_intensity = scan.intensity[i];
+                    }
+                }
+            }
+            rt.push_back(scan.retention_time);
+            intensity.push_back(aggregated_intensity);
         }
         return {rt, intensity};
     }
@@ -1259,8 +1274,8 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
             }
         }
         // FIXME: Not controlling for div/0.
-        peak.raw_roi_mz = y_sig;
-        peak.raw_roi_rt = y_sum;
+        peak.raw_roi_mz = x_sum / height_sum;
+        peak.raw_roi_rt = y_sum / height_sum;
         peak.raw_roi_sigma_mz =
             std::sqrt((x_sig / height_sum) - std::pow(x_sum / height_sum, 2));
         peak.raw_roi_sigma_rt =
@@ -1649,7 +1664,8 @@ PYBIND11_MODULE(tapp, m) {
         .def("c_2", &PythonAPI::Peak::c_2)
         .def("c_3", &PythonAPI::Peak::c_3)
         .def("c_4", &PythonAPI::Peak::c_4)
-        .def("xic", &PythonAPI::Peak::xic, py::arg("raw_data"));
+        .def("xic", &PythonAPI::Peak::xic, py::arg("raw_data"),
+             py::arg("method") = "sum");
 
     py::class_<PythonAPI::SimilarityResults>(m, "Similarity")
         .def_readonly("self_a", &PythonAPI::SimilarityResults::self_a)

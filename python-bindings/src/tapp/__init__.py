@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from scipy.optimize import curve_fit
 import matplotlib.colors as colors
+from matplotlib.patches import Ellipse
 
 # TODO(alex): Write documentation.
 
@@ -1014,8 +1015,8 @@ def testing_warping():
     # TODO: Warp file_b with file_a as reference
     # TODO: Compare total similarity before and after warping.
 
-def plot_xic(peak, raw_data, figure=None):
-    x, y = peak.xic(raw_data)
+def plot_xic(peak, raw_data, figure=None, method="max"):
+    x, y = peak.xic(raw_data, method=method)
     plt.style.use('dark_background')
     if not figure:
         figure = plt.figure()
@@ -1322,7 +1323,7 @@ def debugging_peak_fitting(fig = None):
     # print(data_points.rt)
     # print(data_points.intensity)
 
-def plot_raw_points(peak, raw_data, img_plot=None, rt_plot=None, mz_plot=None):
+def plot_raw_points(peak, raw_data, img_plot=None, rt_plot=None, mz_plot=None, xic_method="max"):
     data_points = find_raw_points(
         raw_data,
         peak.roi_min_mz,
@@ -1335,10 +1336,10 @@ def plot_raw_points(peak, raw_data, img_plot=None, rt_plot=None, mz_plot=None):
     intensities = data_points.intensity
 
     # Calculate min/max values for the given peak.
-    min_mz = np.array(mzs).min()
-    max_mz = np.array(mzs).max()
-    min_rt = np.array(rts).min()
-    max_rt = np.array(rts).max()
+    min_mz = peak.roi_min_mz
+    max_mz = peak.roi_max_mz
+    min_rt = peak.roi_min_rt
+    max_rt = peak.roi_max_rt
 
     if not img_plot and not rt_plot and not mz_plot:
         plt.style.use('dark_background')
@@ -1374,22 +1375,18 @@ def plot_raw_points(peak, raw_data, img_plot=None, rt_plot=None, mz_plot=None):
         img_plot.scatter(
             mzs, rts,
             c=np.sqrt(intensities),
-            label='raw values for peak_id = {}'.format(peak.id),
             edgecolor=color,
             )
-        img_plot.scatter(
-            peak.local_max_mz, peak.local_max_rt,
-            color='red',
-            alpha=0.5,
-            label='smoothed local max for peak_id = {}'.format(peak.id),
-            )
     if rt_plot:
-        x, y = peak.xic(raw_data)
+        x, y = peak.xic(raw_data, method=xic_method)
         rt_plot.plot(y, x, color=color)
     if mz_plot:
         sort_idx_mz = np.argsort(mzs)
         markerline, stemlines, baseline = mz_plot.stem(
-            np.array(mzs)[sort_idx_mz], np.array(intensities)[sort_idx_mz], markerfmt=' ')
+            np.array(mzs)[sort_idx_mz],
+            np.array(intensities)[sort_idx_mz],
+            markerfmt=' ',
+            )
         plt.setp(baseline, color=color, alpha=0.5)
         plt.setp(stemlines, color=color, alpha=0.5)
 
@@ -1415,10 +1412,294 @@ def plot_raw_points(peak, raw_data, img_plot=None, rt_plot=None, mz_plot=None):
         "rt_plot": rt_plot,
     })
 
+def plot_sigma(
+        peak,
+        height, mz, rt,
+        sigma_mz, sigma_rt,
+        img_plot=None, rt_plot=None, mz_plot=None,
+        linestyle='--',
+        label=None,
+        marker='.',
+        ):
+    # Calculate min/max values for the given peak.
+    min_mz = mz - 3 * sigma_mz
+    max_mz = mz + 3 * sigma_mz
+    min_rt = rt - 3 * sigma_rt
+    max_rt = rt + 3 * sigma_rt
+
+    if not img_plot and not rt_plot and not mz_plot:
+        plt.style.use('dark_background')
+        plt.ion()
+        plt.show()
+        fig = plt.figure()
+        plt.clf()
+        gs = gridspec.GridSpec(5, 5)
+        mz_plot = plt.subplot(gs[0, :-1])
+        mz_plot.margins(x=0)
+        mz_plot.set_xticks([])
+        mz_plot.set_ylabel("Intensity")
+        rt_plot = plt.subplot(gs[1:, -1])
+        rt_plot.margins(y=0)
+        rt_plot.set_yticks([])
+        rt_plot.set_xlabel("Intensity")
+        img_plot = plt.subplot(gs[1:, :-1])
+
+        # Set the min/max limits for mz/rt.
+        mz_plot.set_xlim([min_mz, max_mz])
+        rt_plot.set_ylim([min_rt, max_rt])
+        img_plot.set_xlim([min_mz, max_mz])
+        img_plot.set_ylim([min_rt, max_rt])
+
+
+
+    # NOTE: Adding 200 for a more pleasant color map on the first peaks, found this
+    # number by trial and error, dont @ me.
+    np.random.seed(peak.id + 200)
+    base_color = np.random.rand(3,1).flatten()
+    np.random.seed(None)
+
+    lim_min_mz, lim_max_mz = img_plot.get_xlim()
+    lim_min_rt, lim_max_rt = img_plot.get_ylim()
+    if img_plot:
+        # Set the limits for the img_plot
+        if min_mz < lim_min_mz:
+            lim_min_mz = min_mz
+        if min_rt < lim_min_rt:
+            lim_min_rt = min_rt
+        if max_mz > lim_max_mz:
+            lim_max_mz = max_mz
+        if max_rt > lim_max_rt:
+            lim_max_rt = max_rt
+        img_plot.set_xlim([lim_min_mz, lim_max_mz])
+        img_plot.set_ylim([lim_min_rt, lim_max_rt])
+
+        # Plotting the center of the peak.
+        color_0 = np.append(base_color, 1)
+        img_plot.scatter(
+            mz, rt,
+            marker=marker,
+            label=label,
+            color=color_0, facecolors='none', edgecolors=color_0,
+            )
+
+        color_1 = np.append(base_color, 0.9)
+        elip_1 = Ellipse(
+        (mz, rt),
+        2 * sigma_mz,
+        2 * sigma_rt,
+        fill=False,
+        color=color_1,
+        linestyle=linestyle,
+        )
+        color_2 = np.append(base_color, 0.6)
+        elip_2 = Ellipse(
+        (mz, rt),
+        2 * 2 * sigma_mz,
+        2 * 2 * sigma_rt,
+        fill=False,
+        color=color_2,
+        linestyle=linestyle,
+        )
+        color_3 = np.append(base_color, 0.4)
+        elip_3 = Ellipse(
+        (mz, rt),
+        3 * 2 * sigma_mz,
+        3 * 2 * sigma_rt,
+        fill=False,
+        color=color_3,
+        linestyle=linestyle,
+        )
+        img_plot.add_artist(elip_1)
+        img_plot.add_artist(elip_2)
+        img_plot.add_artist(elip_3)
+    if rt_plot:
+        # Set the limits for mz_plot.
+        if min_rt < lim_min_rt:
+            lim_min_rt = min_rt
+        if max_rt > lim_max_rt:
+            lim_max_rt = max_rt
+        img_plot.set_xlim([lim_min_mz, lim_max_mz])
+        img_plot.set_ylim([lim_min_rt, lim_max_rt])
+        rt_plot.set_ylim([lim_min_rt, lim_max_rt])
+        x = np.linspace(min_rt, max_rt, 100)
+        y = gaus(x, height, rt, sigma_rt)
+        rt_plot.plot(
+            y, x,
+            linestyle=linestyle,
+            color=base_color,
+            label=label,
+            )
+    if mz_plot:
+        # Set the limits for rt_plot.
+        if min_mz < lim_min_mz:
+            lim_min_mz = min_mz
+        if max_mz > lim_max_mz:
+            lim_max_mz = max_mz
+        mz_plot.set_xlim([lim_min_mz, lim_max_mz])
+        x = np.linspace(min_mz, max_mz, 100)
+        y = gaus(x, height, mz, sigma_mz)
+        mz_plot.plot(
+            x, y,
+            linestyle=linestyle, 
+            color=base_color,
+            label=label,
+            )
+
+
+    return({
+        "img_plot": img_plot,
+        "mz_plot": mz_plot,
+        "rt_plot": rt_plot,
+    })
+
+def plot_raw_roi_sigma(peak, img_plot=None, rt_plot=None, mz_plot=None):
+    return plot_sigma(
+        peak,
+        peak.raw_roi_max_height,
+        peak.raw_roi_mz,
+        peak.raw_roi_rt,
+        peak.raw_roi_sigma_mz,
+        peak.raw_roi_sigma_rt,
+        img_plot,
+        rt_plot,
+        mz_plot,
+        label='raw_roi',
+        marker='s',
+        )
+
+def plot_mesh_roi_sigma(peak, img_plot=None, rt_plot=None, mz_plot=None):
+    return plot_sigma(
+        peak,
+        peak.local_max_height,
+        peak.mesh_roi_mz,
+        peak.mesh_roi_rt,
+        peak.mesh_roi_sigma_mz,
+        peak.mesh_roi_sigma_rt,
+        img_plot,
+        rt_plot,
+        mz_plot,
+        linestyle=':',
+        label='mesh_roi',
+        marker='P',
+        )
+
+def plot_slope_descent_sigma(peak, img_plot=None, rt_plot=None, mz_plot=None):
+    return plot_sigma(
+        peak,
+        peak.local_max_height,
+        peak.slope_descent_mz,
+        peak.slope_descent_rt,
+        peak.slope_descent_sigma_mz,
+        peak.slope_descent_sigma_rt,
+        img_plot,
+        rt_plot,
+        mz_plot,
+        linestyle='-',
+        label='slope_descent',
+        marker='.',
+        )
+
+# def plot_fit_all(peak, img_plot=None, rt_plot=None, mz_plot=None):
+    # return plot_sigma(
+        # peak,
+        # peak.local_max_height,
+        # peak.slope_descent_mz,
+        # peak.slope_descent_rt,
+        # peak.slope_descent_sigma_mz,
+        # peak.slope_descent_sigma_rt,
+        # img_plot,
+        # rt_plot,
+        # mz_plot,
+        # linestyle='-',
+        # label='slope_descent',
+        # marker='.',
+        # )
+
+def testing_different_sigmas(peaks, raw_data):
+    plots = peaks[0].plot_raw_points(raw_data)
+    plots = peaks[0].plot_raw_roi_sigma(plots['img_plot'], plots['rt_plot'], plots['mz_plot'])
+    plots = peaks[0].plot_mesh_roi_sigma(plots['img_plot'], plots['rt_plot'], plots['mz_plot'])
+    plots = peaks[0].plot_slope_descent_sigma(plots['img_plot'], plots['rt_plot'], plots['mz_plot'])
+    plt.legend()
+    return plots
+
+from scipy.special import erfc
+def emg(t, h, tg, sigma, tau):
+    a = 1/(2 * tau)
+    b = 1/2 * np.power(sigma/tau, 2) - (t - tg)/tau
+    z = 1 / np.sqrt(2) * ((t - tg)/sigma - sigma/tau)
+    c = erfc(-z)
+    return h * a * np.exp(b) * c
+
+def gauss_mz_emg_rt(X, h, mz_0, sigma_mz, rt_0, sigma_rt, tau):
+    mz = X[0]
+    rt = X[1]
+    a = 1/(2 * tau)
+    b = 1/2 * np.power(sigma_rt/tau, 2) - (rt - rt_0)/tau
+    z = 1 / np.sqrt(2) * ((rt - rt_0)/sigma_rt - sigma_rt/tau)
+    c = erfc(-z)
+    d = np.exp(-0.5 * np.power((mz - mz_0) / sigma_mz, 2))
+    return h * a * np.exp(b) * c * d 
+
+def fitting_emg(peak, raw_data):
+    x, y = peak.xic(raw_data, method='max')
+    x = np.array(x)
+    # x = x + peak.roi_min_rt
+    fit_emg, cov = curve_fit(emg, x, y, p0=[peak.raw_roi_max_height, peak.local_max_rt, peak.raw_roi_sigma_rt, 1])
+    # x = x - peak.roi_min_rt
+    # fit_emg[1] = fit_emg[1] + peak.roi_min_rt
+    fit_gaus, cov = curve_fit(gaus, x, y, p0=[peak.raw_roi_max_height, peak.local_max_rt, peak.raw_roi_sigma_rt])
+    # Modified gaussian fit, fitting only height and sigma.
+    fit_mod_gaus, cov = curve_fit(
+        lambda x, h, sigma: gaus(x, h, peak.local_max_rt, sigma),
+        x, y,
+        p0=[peak.raw_roi_max_height, peak.raw_roi_sigma_rt])
+
+
+    # Fit 2D function (gaussian for mz, emg for rt).
+    data_points = find_raw_points(
+        raw_data,
+        peak.roi_min_mz,
+        peak.roi_max_mz,
+        peak.roi_min_rt,
+        peak.roi_max_rt,
+    )
+    rts = np.array(data_points.rt)
+    mzs = np.array(data_points.mz)
+    intensities = np.array(data_points.intensity)
+    X = np.array([mzs, rts])
+    fit_2d, cov = curve_fit(
+        gauss_mz_emg_rt, X, intensities,
+        p0=[
+            peak.raw_roi_max_height,
+            peak.local_max_mz, peak.raw_roi_sigma_mz,
+            peak.local_max_rt, peak.raw_roi_sigma_rt, 1,
+            ]
+        )
+    fitted_h, fitted_mz, fitted_sigma_mz, fitted_rt, fitted_sigma_rt, fitted_tau = fit_2d
+
+
+    plt.style.use('dark_background')
+    plt.ion()
+    plt.show()
+    fig = plt.figure()
+    plt.plot(x, y, label='raw data')
+    plt.plot(x, emg(x, *fit_emg), label='fitted data')
+    # plt.plot(x, gaus(x, *fit_gaus), label='fitted data (gaus)')
+    plt.plot(x, gaus(np.array(x), fit_mod_gaus[0], peak.local_max_rt, fit_mod_gaus[1]), label='fitted data (mod_gaus)')
+    plt.plot(x, emg(x, fitted_h, fitted_rt, fitted_sigma_rt, fitted_tau), label='fitted data (2d)')
+    plt.legend()
+
+    return fit
+
 RawData.tic = tic
 
 Peak.plot_xic = plot_xic
 Peak.plot_raw_points = plot_raw_points
+Peak.plot_raw_roi_sigma = plot_raw_roi_sigma
+Peak.plot_mesh_roi_sigma = plot_mesh_roi_sigma
+Peak.plot_slope_descent_sigma = plot_slope_descent_sigma
+Peak.plot_sigma = plot_sigma
 Peak.fit_mz_rt_height_and_sigmas = fit_guos_2d_from_peak
 Peak.fit_height_and_sigmas = fit_height_and_sigmas
 Peak.fit_sigmas = fit_sigmas
