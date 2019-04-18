@@ -716,6 +716,15 @@ struct Peak {
     double raw_roi_sigma_height;
     uint64_t raw_roi_num_points;
     uint64_t raw_roi_num_scans;
+    // Statistical moments for raw_roi.
+    double raw_roi_mz_mean;
+    double raw_roi_mz_m2;
+    double raw_roi_mz_m3;
+    double raw_roi_mz_m4;
+    double raw_roi_rt_mean;
+    double raw_roi_rt_m2;
+    double raw_roi_rt_m3;
+    double raw_roi_rt_m4;
 
     // Matrix A for 2D gaussian fitting using least squares.
     double A[5][5];
@@ -1167,6 +1176,117 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
             ++min_j;
         }
 
+        // Calculate the first 4 central moments for both mz/rt on the raw
+        // data points using a 2 pass algorithm.
+        {
+            size_t num_scans = 0;
+            size_t num_points = 0;
+            double max_value = 0;
+            double mz_mean = 0;
+            double mz_m2 = 0;
+            double mz_m3 = 0;
+            double mz_m4 = 0;
+            double rt_mean = 0;
+            double rt_m2 = 0;
+            double rt_m3 = 0;
+            double rt_m4 = 0;
+            double weight_sum = 0;
+            // First pass.
+            for (size_t j = min_j; j < max_j; ++j) {
+                const auto &scan = scans[j];
+                if (scan.retention_time > internal_max_rt) {
+                    break;
+                }
+                if (scan.num_points == 0) {
+                    continue;
+                }
+
+                size_t min_i = lower_bound(scan.mz, peak.roi_min_mz);
+                size_t max_i = scan.num_points;
+                if (scan.mz[min_i] < peak.roi_min_mz) {
+                    ++min_i;
+                }
+                bool scan_not_empty = false;
+                for (size_t i = min_i; i < max_i; ++i) {
+                    if (scan.mz[i] > peak.roi_max_mz) {
+                        break;
+                    }
+                    double mz = scan.mz[i];
+                    double rt = scan.retention_time;
+                    double value = scan.intensity[i];
+                    if (value > max_value) {
+                        max_value = value;
+                    }
+                    scan_not_empty = true;
+                    ++num_points;
+
+                    weight_sum += value;
+                    mz_mean += value * mz;
+                    rt_mean += value * rt;
+                }
+                if (scan_not_empty) {
+                    ++num_scans;
+                }
+            }
+            mz_mean /= weight_sum;
+            rt_mean /= weight_sum;
+
+            // Second pass.
+            for (size_t j = min_j; j < max_j; ++j) {
+                const auto &scan = scans[j];
+                if (scan.retention_time > peak.roi_max_rt) {
+                    break;
+                }
+                if (scan.num_points == 0) {
+                    continue;
+                }
+
+                size_t min_i = lower_bound(scan.mz, peak.roi_min_mz);
+                size_t max_i = scan.num_points;
+                if (scan.mz[min_i] < peak.roi_min_mz) {
+                    ++min_i;
+                }
+                for (size_t i = min_i; i < max_i; ++i) {
+                    if (scan.mz[i] > peak.roi_max_mz) {
+                        break;
+                    }
+                    double mz = scan.mz[i];
+                    double rt = scan.retention_time;
+                    double value = scan.intensity[i];
+
+                    double mz_delta = mz - mz_mean;
+                    mz_m2 += value * std::pow(mz_delta, 2);
+                    mz_m3 += value * std::pow(mz_delta, 3);
+                    mz_m4 += value * std::pow(mz_delta, 4);
+
+                    double rt_delta = rt - rt_mean;
+                    rt_m2 += value * std::pow(rt_delta, 2);
+                    rt_m3 += value * std::pow(rt_delta, 3);
+                    rt_m4 += value * std::pow(rt_delta, 4);
+                }
+            }
+            mz_m2 /= weight_sum;
+            mz_m3 /= weight_sum;
+            mz_m4 /= weight_sum;
+            rt_m2 /= weight_sum;
+            rt_m3 /= weight_sum;
+            rt_m4 /= weight_sum;
+
+            // Update the peak data structure.
+            peak.raw_roi_mz_mean = mz_mean;
+            peak.raw_roi_mz_m2 = mz_m2;
+            peak.raw_roi_mz_m3 = mz_m3;
+            peak.raw_roi_mz_m4 = mz_m4;
+            peak.raw_roi_rt_mean = rt_mean;
+            peak.raw_roi_rt_m2 = rt_m2;
+            peak.raw_roi_rt_m3 = rt_m3;
+            peak.raw_roi_rt_m4 = rt_m4;
+            peak.raw_roi_max_height = max_value;
+            peak.raw_roi_total_intensity = weight_sum;
+            peak.raw_roi_num_points = num_points;
+            peak.raw_roi_num_scans = num_scans;
+        }
+
         double height_sum = 0;
         double sq_height_sum = 0;
         double x_sum = 0;
@@ -1196,7 +1316,6 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
             if (scan.mz[min_i] < internal_min_mz) {
                 ++min_i;
             }
-            bool scan_not_empty = false;
             for (size_t i = min_i; i < max_i; ++i) {
                 if (scan.mz[i] > internal_max_mz) {
                     break;
@@ -1204,11 +1323,6 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
                 double mz = scan.mz[i];
                 double rt = scan.retention_time;
                 double value = scan.intensity[i];
-                if (value > peak.raw_roi_max_height) {
-                    peak.raw_roi_max_height = value;
-                }
-                scan_not_empty = true;
-                ++peak.raw_roi_num_points;
                 height_sum += value;
                 sq_height_sum += value * value;
                 x_sum += value * mz;
@@ -1268,9 +1382,6 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
                     peak.C[3] += z_2 * y * log_z;
                     peak.C[4] += z_2 * y_2 * log_z;
                 }
-            }
-            if (scan_not_empty) {
-                ++peak.raw_roi_num_scans;
             }
         }
         // FIXME: Not controlling for div/0.
@@ -1634,6 +1745,14 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("raw_roi_num_points",
                       &PythonAPI::Peak::raw_roi_num_points)
         .def_readonly("raw_roi_num_scans", &PythonAPI::Peak::raw_roi_num_scans)
+        .def_readonly("raw_roi_mz_mean", &PythonAPI::Peak::raw_roi_mz_mean)
+        .def_readonly("raw_roi_mz_m2", &PythonAPI::Peak::raw_roi_mz_m2)
+        .def_readonly("raw_roi_mz_m3", &PythonAPI::Peak::raw_roi_mz_m3)
+        .def_readonly("raw_roi_mz_m4", &PythonAPI::Peak::raw_roi_mz_m4)
+        .def_readonly("raw_roi_rt_mean", &PythonAPI::Peak::raw_roi_rt_mean)
+        .def_readonly("raw_roi_rt_m2", &PythonAPI::Peak::raw_roi_rt_m2)
+        .def_readonly("raw_roi_rt_m3", &PythonAPI::Peak::raw_roi_rt_m3)
+        .def_readonly("raw_roi_rt_m4", &PythonAPI::Peak::raw_roi_rt_m4)
         .def("a_0_0", &PythonAPI::Peak::a_0_0)
         .def("a_0_1", &PythonAPI::Peak::a_0_1)
         .def("a_0_2", &PythonAPI::Peak::a_0_2)
