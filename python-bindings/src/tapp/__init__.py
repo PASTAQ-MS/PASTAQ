@@ -1565,57 +1565,6 @@ def gauss_mz_emg_rt(X, h, mz_0, sigma_mz, rt_0, sigma_rt, tau):
     d = np.exp(-0.5 * np.power((mz - mz_0) / sigma_mz, 2))
     return h * a * np.exp(b) * c * d 
 
-def fitting_emg(peak, raw_data):
-    x, y = peak.xic(raw_data, method='max')
-    x = np.array(x)
-    # x = x + peak.roi_min_rt
-    fit_emg, cov = curve_fit(emg, x, y, p0=[peak.raw_roi_max_height, peak.local_max_rt, peak.raw_roi_sigma_rt, 1])
-    # x = x - peak.roi_min_rt
-    # fit_emg[1] = fit_emg[1] + peak.roi_min_rt
-    fit_gaus, cov = curve_fit(gaus, x, y, p0=[peak.raw_roi_max_height, peak.local_max_rt, peak.raw_roi_sigma_rt])
-    # Modified gaussian fit, fitting only height and sigma.
-    fit_mod_gaus, cov = curve_fit(
-        lambda x, h, sigma: gaus(x, h, peak.local_max_rt, sigma),
-        x, y,
-        p0=[peak.raw_roi_max_height, peak.raw_roi_sigma_rt])
-
-
-    # Fit 2D function (gaussian for mz, emg for rt).
-    data_points = find_raw_points(
-        raw_data,
-        peak.roi_min_mz,
-        peak.roi_max_mz,
-        peak.roi_min_rt,
-        peak.roi_max_rt,
-    )
-    rts = np.array(data_points.rt)
-    mzs = np.array(data_points.mz)
-    intensities = np.array(data_points.intensity)
-    X = np.array([mzs, rts])
-    fit_2d, cov = curve_fit(
-        gauss_mz_emg_rt, X, intensities,
-        p0=[
-            peak.raw_roi_max_height,
-            peak.local_max_mz, peak.raw_roi_sigma_mz,
-            peak.local_max_rt, peak.raw_roi_sigma_rt, 1,
-            ]
-        )
-    fitted_h, fitted_mz, fitted_sigma_mz, fitted_rt, fitted_sigma_rt, fitted_tau = fit_2d
-
-
-    plt.style.use('dark_background')
-    plt.ion()
-    plt.show()
-    fig = plt.figure()
-    plt.plot(x, y, label='raw data')
-    plt.plot(x, emg(x, *fit_emg), label='fitted data')
-    # plt.plot(x, gaus(x, *fit_gaus), label='fitted data (gaus)')
-    plt.plot(x, gaus(np.array(x), fit_mod_gaus[0], peak.local_max_rt, fit_mod_gaus[1]), label='fitted data (mod_gaus)')
-    plt.plot(x, emg(x, fitted_h, fitted_rt, fitted_sigma_rt, fitted_tau), label='fitted data (2d)')
-    plt.legend()
-
-    return fit
-
 RawData.tic = tic
 
 Peak.plot_xic = plot_xic
