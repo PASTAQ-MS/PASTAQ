@@ -149,30 +149,6 @@ struct RawPoints {
     size_t num_points;
 };
 
-// FIXME: Should we memoize the rts as an array on RawData to be able to use the
-// normal lower_bound binary search?
-size_t find_min_rt_index(const RawData::RawData &raw_data, double min_rt) {
-    const auto &scans = raw_data.scans;
-
-    size_t min_j = 0;
-    size_t l = min_j;
-    size_t r = scans.size() - 1;
-    while (l <= r) {
-        min_j = (l + r) / 2;
-        if (scans[min_j].retention_time < min_rt) {
-            l = min_j + 1;
-        } else if (scans[min_j].retention_time > min_rt) {
-            r = min_j - 1;
-        } else {
-            break;
-        }
-        if (min_j == 0) {
-            break;
-        }
-    }
-    return min_j;
-}
-
 size_t lower_bound(const std::vector<double> &haystack, double needle) {
     size_t index = 0;
     size_t l = 0;
@@ -209,7 +185,7 @@ RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
     if (max_rt > raw_data.max_rt) {
         max_rt = raw_data.max_rt;
     }
-    size_t min_j = find_min_rt_index(raw_data, min_rt);
+    size_t min_j = lower_bound(raw_data.retention_times, min_rt);
     size_t max_j = scans.size();
     if (scans[min_j].retention_time < min_rt) {
         ++min_j;
@@ -387,7 +363,7 @@ double fwhm_to_sigma(double fwhm) {
     return fwhm / (2 * std::sqrt(2 * std::log(2)));
 }
 
-// Applies a 2D kernel smoothing. The smoothing is performed in two passes.
+// Applies 2D kernel smoothing. The smoothing is performed in two passes.
 // First the raw data points are mapped into a 2D matrix by splatting them into
 // a matrix. Sparse areas might result in artifacts when the data is noisy, for
 // this reason, the data is smoothed again.
@@ -608,53 +584,6 @@ Mesh resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
     return mesh;
 }
 
-// TODO: For now returns a tuple, we should maybe return a definite struct.
-//
-//     returns: (i,j,mz,rt,intensity)
-//
-std::vector<std::tuple<uint64_t, uint64_t, double, double, double>>
-find_local_max(const Mesh &mesh) {
-    std::vector<std::tuple<uint64_t, uint64_t, double, double, double>> points;
-    // FIXME: This is performed in O(n^2), but using the divide and conquer
-    // strategy we might achieve O(n * log(n)) or lower.
-    // FIXME: Also, we should consider the corner case where neighbours are
-    // exactly equal, both should be considered a local maxima and the average
-    // of mz and rt should be reported.
-    for (size_t j = 1; j < mesh.m - 1; ++j) {
-        for (size_t i = 1; i < mesh.n - 1; ++i) {
-            int index = i + j * mesh.n;
-
-            // NOTE(alex): The definition of a local maxima in a 2D space might
-            // have different interpretations. i.e. We can select the 8
-            // neighbours and the local maxima will be marked if all points are
-            // below the central value. Alternatively, only a number N of
-            // neighbours can be used, for example only the 4 cardinal
-            // directions from the value under study.
-            //
-            // ----------------------------------------------
-            // |              | top_value    |              |
-            // ----------------------------------------------
-            // | left_value   | value        | right_value  |
-            // ----------------------------------------------
-            // |              | bottom_value |              |
-            // ----------------------------------------------
-            double value = mesh.matrix[index];
-            double right_value = mesh.matrix[index + 1];
-            double left_value = mesh.matrix[index - 1];
-            double top_value = mesh.matrix[index - mesh.n];
-            double bottom_value = mesh.matrix[index + mesh.n];
-
-            if ((value != 0) && (value > left_value) && (value > right_value) &&
-                (value > top_value) && (value > bottom_value)) {
-                points.push_back(
-                    {i, j, mesh.bins_mz[i], mesh.bins_rt[j], value});
-            }
-        }
-    }
-
-    return points;
-}
-
 struct Peak {
     // ID of this peak. Should be kept for futher processing.
     size_t id;
@@ -726,7 +655,7 @@ struct Peak {
         }
 
         // Find scan indices.
-        size_t min_j = find_min_rt_index(raw_data, this->roi_min_rt);
+        size_t min_j = lower_bound(raw_data.retention_times, this->roi_min_rt);
         size_t max_j = scans.size();
         if (scans[min_j].retention_time < this->roi_min_rt) {
             ++min_j;
@@ -785,7 +714,6 @@ struct MeshIndex {
     size_t j;
 };
 
-// FIXME: Probably this should be the default.
 std::vector<MeshIndex> find_local_max_idx(const Mesh &mesh) {
     std::vector<MeshIndex> points;
     // FIXME: This is performed in O(n^2), but using the divide and conquer
@@ -1060,7 +988,7 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
             throw std::invalid_argument(error_stream.str());
         }
 
-        size_t min_j = find_min_rt_index(raw_data, peak.roi_min_rt);
+        size_t min_j = lower_bound(raw_data.retention_times, peak.roi_min_rt);
         size_t max_j = scans.size();
         if (scans[min_j].retention_time < peak.roi_min_rt) {
             ++min_j;
@@ -1567,8 +1495,6 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("raw_data"), py::arg("num_mz") = 10,
              py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 0.5,
              py::arg("smoothing_coef_rt") = 0.5)
-        .def("find_local_max", &PythonAPI::find_local_max,
-             "Find all local maxima in the given mesh", py::arg("mesh"))
         .def("save_fitted_peaks", &PythonAPI::save_fitted_peaks,
              "Save the fitted peaks as a bpks file", py::arg("fitted_peaks"),
              py::arg("file_name"))

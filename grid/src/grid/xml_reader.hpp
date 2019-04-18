@@ -68,6 +68,9 @@ struct RawData {
 
     // Extracted scans.
     std::vector<::RawData::Scan> scans;
+    std::vector<double> retention_times;
+    std::vector<double> total_ion_chromatogram;
+    std::vector<double> base_peak_chromatogram;
 };
 }  // namespace RawData
 
