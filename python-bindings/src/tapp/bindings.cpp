@@ -616,12 +616,6 @@ struct Peak {
     double roi_max_mz;
     double roi_min_rt;
     double roi_max_rt;
-    // Simple estimation of the peak metrics on the mesh values.
-    double mesh_roi_mz;
-    double mesh_roi_rt;
-    double mesh_roi_sigma_mz;
-    double mesh_roi_sigma_rt;
-    double mesh_roi_total_intensity;
     // Simple estimation of the peak metrics on the raw data.
     double raw_roi_mean_mz;
     double raw_roi_mean_rt;
@@ -827,8 +821,6 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
                 const MeshIndex &local_max) {
     Peak peak = {};
     peak.id = 0;
-    peak.local_max_i = local_max.i;
-    peak.local_max_j = local_max.j;
     peak.local_max_mz = mesh.bins_mz[local_max.i];
     peak.local_max_rt = mesh.bins_rt[local_max.j];
     peak.local_max_height = mesh.matrix[local_max.i + local_max.j * mesh.n];
@@ -929,50 +921,6 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
         peak.roi_max_mz = mz + 3 * theoretical_sigma_mz;
         peak.roi_min_rt = rt - 3 * theoretical_sigma_rt;
         peak.roi_max_rt = rt + 3 * theoretical_sigma_rt;
-    }
-
-    // Calculate the estimation of values for the mesh points in the ROI.
-    {
-        // Find minimum indexes via binary search.
-        size_t min_i = lower_bound(mesh.bins_mz, peak.roi_min_mz);
-        size_t min_j = lower_bound(mesh.bins_rt, peak.roi_min_rt);
-        if (mesh.bins_mz[min_i] < peak.roi_min_mz) {
-            ++min_i;
-        }
-        if (mesh.bins_rt[min_j] < peak.roi_min_rt) {
-            ++min_j;
-        }
-
-        double height_sum = 0;
-        double x_sum = 0;
-        double y_sum = 0;
-        double x_sig = 0;
-        double y_sig = 0;
-        for (size_t j = min_j; j < mesh.m; ++j) {
-            if (mesh.bins_rt[j] > peak.roi_max_rt) {
-                break;
-            }
-            for (size_t i = min_i; i < mesh.n; ++i) {
-                if (mesh.bins_mz[i] > peak.roi_max_mz) {
-                    break;
-                }
-                double mz = mesh.bins_mz[i];
-                double rt = mesh.bins_rt[j];
-                double value = mesh.matrix[i + j * mesh.n];
-                height_sum += value;
-                x_sum += value * mz;
-                y_sum += value * rt;
-                x_sig += value * mz * mz;
-                y_sig += value * rt * rt;
-            }
-        }
-        peak.mesh_roi_mz = x_sum / height_sum;
-        peak.mesh_roi_rt = y_sum / height_sum;
-        peak.mesh_roi_sigma_mz =
-            std::sqrt((x_sig / height_sum) - std::pow(x_sum / height_sum, 2));
-        peak.mesh_roi_sigma_rt =
-            std::sqrt((y_sig / height_sum) - std::pow(y_sum / height_sum, 2));
-        peak.mesh_roi_total_intensity = height_sum;
     }
 
     {
@@ -1201,8 +1149,6 @@ std::vector<std::vector<Peak>> warp_peaks(
         -> std::vector<Centroid::Peak> {
         auto after_peaks = std::vector<Centroid::Peak>(before_peaks.size());
         for (size_t i = 0; i < before_peaks.size(); ++i) {
-            after_peaks[i].i = before_peaks[i].local_max_i;
-            after_peaks[i].j = before_peaks[i].local_max_j;
             after_peaks[i].mz = before_peaks[i].local_max_mz;
             after_peaks[i].rt = before_peaks[i].local_max_rt;
             after_peaks[i].height = before_peaks[i].local_max_height;
@@ -1222,8 +1168,6 @@ std::vector<std::vector<Peak>> warp_peaks(
         -> std::vector<Peak> {
         auto after_peaks = std::vector<Peak>(before_peaks.size());
         for (size_t i = 0; i < before_peaks.size(); ++i) {
-            after_peaks[i].local_max_i = before_peaks[i].i;
-            after_peaks[i].local_max_j = before_peaks[i].j;
             after_peaks[i].local_max_mz = before_peaks[i].mz;
             after_peaks[i].local_max_rt = before_peaks[i].rt;
             after_peaks[i].local_max_height = before_peaks[i].height;
@@ -1272,8 +1216,6 @@ SimilarityResults find_similarity(const std::vector<Peak> &peak_list_a,
         -> std::vector<Centroid::Peak> {
         auto after_peaks = std::vector<Centroid::Peak>(before_peaks.size());
         for (size_t i = 0; i < before_peaks.size(); ++i) {
-            after_peaks[i].i = before_peaks[i].local_max_i;
-            after_peaks[i].j = before_peaks[i].local_max_j;
             after_peaks[i].mz = before_peaks[i].local_max_mz;
             after_peaks[i].rt = before_peaks[i].local_max_rt;
             after_peaks[i].height = before_peaks[i].local_max_height;
@@ -1408,8 +1350,6 @@ PYBIND11_MODULE(tapp, m) {
 
     py::class_<PythonAPI::Peak>(m, "Peak")
         .def_readonly("id", &PythonAPI::Peak::id)
-        .def_readonly("local_max_i", &PythonAPI::Peak::local_max_i)
-        .def_readonly("local_max_j", &PythonAPI::Peak::local_max_j)
         .def_readonly("local_max_mz", &PythonAPI::Peak::local_max_mz)
         .def_readonly("local_max_rt", &PythonAPI::Peak::local_max_rt)
         .def_readonly("local_max_height", &PythonAPI::Peak::local_max_height)
@@ -1427,10 +1367,6 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("roi_max_mz", &PythonAPI::Peak::roi_max_mz)
         .def_readonly("roi_min_rt", &PythonAPI::Peak::roi_min_rt)
         .def_readonly("roi_max_rt", &PythonAPI::Peak::roi_max_rt)
-        .def_readonly("mesh_roi_mz", &PythonAPI::Peak::mesh_roi_mz)
-        .def_readonly("mesh_roi_rt", &PythonAPI::Peak::mesh_roi_rt)
-        .def_readonly("mesh_roi_sigma_mz", &PythonAPI::Peak::mesh_roi_sigma_mz)
-        .def_readonly("mesh_roi_sigma_rt", &PythonAPI::Peak::mesh_roi_sigma_rt)
         .def_readonly("raw_roi_mean_mz", &PythonAPI::Peak::raw_roi_mean_mz)
         .def_readonly("raw_roi_mean_rt", &PythonAPI::Peak::raw_roi_mean_rt)
         .def_readonly("raw_roi_sigma_mz", &PythonAPI::Peak::raw_roi_sigma_mz)
@@ -1443,8 +1379,6 @@ PYBIND11_MODULE(tapp, m) {
                       &PythonAPI::Peak::raw_roi_kurtosis_mz)
         .def_readonly("raw_roi_kurtosis_rt",
                       &PythonAPI::Peak::raw_roi_kurtosis_rt)
-        .def_readonly("mesh_roi_total_intensity",
-                      &PythonAPI::Peak::mesh_roi_total_intensity)
         .def_readonly("raw_roi_total_intensity",
                       &PythonAPI::Peak::raw_roi_total_intensity)
         .def_readonly("raw_roi_max_height",
