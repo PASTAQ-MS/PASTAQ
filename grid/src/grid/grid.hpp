@@ -4,11 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace Instrument {
-
-enum Type : unsigned char { QUAD, TOF, FTICR, ORBITRAP, UNKNOWN };
-
-}  // namespace Instrument
+#include "grid/raw_data.hpp"
 
 namespace Grid {
 
@@ -61,6 +57,28 @@ struct Point {
     double rt;
     double value;
 };
+
+struct Mesh {
+    uint64_t n;  // Number of sampling points in mz.
+    uint64_t m;  // Number of sampling points in rt.
+    uint64_t k;  // Number of sampling points per FWHM in mz.
+    uint64_t t;  // Number of sampling points per FWHM in rt.
+    std::vector<double> data;
+    std::vector<double> bins_mz;
+    std::vector<double> bins_rt;
+};
+
+// Applies 2D kernel smoothing. The smoothing is performed in two passes.
+// First the raw data points are mapped into a 2D matrix by splatting them into
+// a matrix. Sparse areas might result in artifacts when the data is noisy, for
+// this reason, the data is smoothed again.
+//
+// Since multiple passes of a Gaussian smoothing is equivalent to a single
+// pass with `sigma = sqrt(2) * sigma_pass`, we adjust the sigmas for each pass
+// accordingly.
+Mesh resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
+              uint64_t num_samples_rt, double smoothing_coef_mz,
+              double smoothing_coef_rt);
 
 // Perform gaussian splatting of the given point into the grid, returns the
 // success or failure of the operation.

@@ -28,6 +28,7 @@ if (NOT TARGET gridlib)
         "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_files.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_runners.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/xml_reader.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/raw_data.cpp"
         )
     target_include_directories(gridlib PUBLIC src)
     target_link_libraries(gridlib ${CMAKE_THREAD_LIBS_INIT} utilslib)

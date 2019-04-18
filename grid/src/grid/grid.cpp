@@ -1,7 +1,260 @@
+#include <cassert>
 #include <cmath>
 
-#include "grid.hpp"
+#include "grid/grid.hpp"
 #include "utils/serialization.hpp"
+
+// FIXME: Replace previous x_index.
+uint64_t this_x_index(const RawData::RawData &raw_data, double mz, uint64_t k) {
+    double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
+    switch (raw_data.instrument_type) {
+        case Instrument::ORBITRAP: {
+            double a = fwhm_ref / std::pow(raw_data.reference_mz, 1.5);
+            double b = (1 / std::sqrt(raw_data.min_mz) - 1 / std::sqrt(mz));
+            return static_cast<uint64_t>(k * 2 / a * b);
+        } break;
+        case Instrument::FTICR: {
+            double a = 1 - raw_data.min_mz / mz;
+            double b = raw_data.reference_mz * raw_data.reference_mz;
+            double c = fwhm_ref * raw_data.min_mz;
+            return static_cast<uint64_t>(k * a * b / c);
+        } break;
+        case Instrument::TOF: {
+            return static_cast<uint64_t>(k * raw_data.reference_mz / fwhm_ref *
+                                         std::log(mz / raw_data.min_mz));
+        } break;
+        case Instrument::QUAD: {
+            // Same as the regular grid.
+            return static_cast<uint64_t>(k * (mz - raw_data.min_mz) / fwhm_ref);
+        } break;
+        case Instrument::UNKNOWN: {
+            assert(false);  // Can't handle unknown instruments.
+        } break;
+    }
+    assert(false);  // Can't handle unknown instruments.
+    return 0;
+}
+
+// FIXME: Replace previous y_index.
+uint64_t this_y_index(const RawData::RawData &raw_data, double rt, uint64_t k) {
+    double delta_rt = raw_data.fwhm_rt / k;
+    return std::ceil((rt - raw_data.min_rt) / delta_rt);
+}
+
+Grid::Mesh Grid::resample(const RawData::RawData &raw_data,
+                          uint64_t num_samples_mz, uint64_t num_samples_rt,
+                          double smoothing_coef_mz, double smoothing_coef_rt) {
+    // Calculate the necessary dimensions for the Mesh.
+    uint64_t n = this_x_index(raw_data, raw_data.max_mz, num_samples_mz) + 1;
+    uint64_t m = this_y_index(raw_data, raw_data.max_rt, num_samples_rt) + 1;
+
+    Grid::Mesh mesh;
+    mesh.n = n;
+    mesh.m = m;
+    mesh.k = num_samples_mz;
+    mesh.t = num_samples_rt;
+    mesh.data = std::vector<double>(n * m);
+    mesh.bins_mz = std::vector<double>(n);
+    mesh.bins_rt = std::vector<double>(m);
+
+    // Generate bins_mz.
+    double mz_ref = raw_data.reference_mz;
+    double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
+    for (size_t i = 0; i < n; ++i) {
+        switch (raw_data.instrument_type) {
+            case Instrument::ORBITRAP: {
+                double a = 1 / std::sqrt(raw_data.min_mz);
+                double b = fwhm_ref / std::pow(mz_ref, 1.5) * i / 2 / mesh.k;
+                double c = a - b;
+                mesh.bins_mz[i] = 1 / (c * c);
+            } break;
+            case Instrument::FTICR: {
+                double a = fwhm_ref * raw_data.min_mz;
+                double b = mz_ref * mz_ref;
+                mesh.bins_mz[i] = raw_data.min_mz / (1 - (a / b) * i / mesh.k);
+            } break;
+            case Instrument::TOF: {
+                mesh.bins_mz[i] =
+                    raw_data.min_mz * std::exp(fwhm_ref / mz_ref * i / mesh.k);
+            } break;
+            case Instrument::QUAD: {
+                double delta_mz = (raw_data.max_mz - raw_data.min_mz) /
+                                  static_cast<double>(mesh.n - 1);
+                mesh.bins_mz[i] = raw_data.min_mz + delta_mz * i / mesh.k;
+            } break;
+            case Instrument::UNKNOWN: {
+                assert(false);  // Can't handle unknown instruments.
+            } break;
+        }
+    }
+
+    // Generate bins_rt.
+    double delta_rt = (raw_data.max_rt - raw_data.min_rt) / (m - 1);
+    for (size_t j = 0; j < m; ++j) {
+        mesh.bins_rt[j] = raw_data.min_rt + delta_rt * j;
+    }
+
+    // Pre-calculate the smoothing sigma values for all bins of the grid.
+    double sigma_rt = RawData::fwhm_to_sigma(raw_data.fwhm_rt) *
+                      smoothing_coef_rt / std::sqrt(2);
+    auto sigma_mz_vec = std::vector<double>(n);
+    for (size_t i = 0; i < n; ++i) {
+        sigma_mz_vec[i] = RawData::fwhm_to_sigma(RawData::theoretical_fwhm(
+                              raw_data, mesh.bins_mz[i])) *
+                          smoothing_coef_mz / std::sqrt(2);
+    }
+
+    // Pre-calculate the kernel half widths for rt and all mzs.
+    //
+    // Since sigma_rt is constant, the size of the kernel will be the same
+    // for the entire rt range.
+    uint64_t rt_kernel_hw = 3 * sigma_rt / delta_rt;
+    auto mz_kernel_hw = std::vector<uint64_t>(n);
+    for (size_t i = 0; i < n; ++i) {
+        double sigma_mz = sigma_mz_vec[i];
+        double delta_mz = 0;
+        if (i == 0) {
+            delta_mz = mesh.bins_mz[i + 1] - mesh.bins_mz[i];
+        } else {
+            delta_mz = mesh.bins_mz[i] - mesh.bins_mz[i - 1];
+        }
+        mz_kernel_hw[i] = 3 * sigma_mz / delta_mz;
+    }
+
+    // Gaussian splatting.
+    {
+        auto weights = std::vector<double>(n * m);
+        for (size_t i = 0; i < raw_data.scans.size(); ++i) {
+            const auto &scan = raw_data.scans[i];
+            double current_rt = scan.retention_time;
+
+            // Find the bin for the current retention time.
+            size_t index_rt = this_y_index(raw_data, current_rt, mesh.t);
+
+            // Find the min/max indexes for the rt kernel.
+            size_t j_min = 0;
+            if (index_rt >= rt_kernel_hw) {
+                j_min = index_rt - rt_kernel_hw;
+            }
+            size_t j_max = mesh.m - 1;
+            if ((index_rt + rt_kernel_hw) < mesh.m) {
+                j_max = index_rt + rt_kernel_hw;
+            }
+
+            for (size_t k = 0; k < scan.num_points; ++k) {
+                double current_intensity = scan.intensity[k];
+                double current_mz = scan.mz[k];
+
+                // Find the bin for the current mz.
+                size_t index_mz = this_x_index(raw_data, current_mz, mesh.k);
+
+                double sigma_mz = sigma_mz_vec[index_mz];
+
+                // Find the min/max indexes for the mz kernel.
+                size_t i_min = 0;
+                if (index_mz >= mz_kernel_hw[index_mz]) {
+                    i_min = index_mz - mz_kernel_hw[index_mz];
+                }
+                size_t i_max = mesh.n - 1;
+                if ((index_mz + mz_kernel_hw[index_mz]) < mesh.n) {
+                    i_max = index_mz + mz_kernel_hw[index_mz];
+                }
+
+                for (size_t j = j_min; j <= j_max; ++j) {
+                    for (size_t i = i_min; i <= i_max; ++i) {
+                        double x = mesh.bins_mz[i];
+                        double y = mesh.bins_rt[j];
+
+                        // Calculate the Gaussian weight for this point.
+                        double a = (x - current_mz) / sigma_mz;
+                        double b = (y - current_rt) / sigma_rt;
+                        double weight = std::exp(-0.5 * (a * a + b * b));
+
+                        mesh.data[i + j * n] += weight * current_intensity;
+                        weights[i + j * n] += weight;
+                    }
+                }
+            }
+        }
+        for (size_t i = 0; i < (n * m); ++i) {
+            double weight = weights[i];
+            if (weight == 0) {
+                weight = 1;
+            }
+            mesh.data[i] = mesh.data[i] / weight;
+        }
+    }
+
+    // Gaussian smoothing.
+    //
+    // The Gaussian 2D filter is separable. We obtain the same result with
+    // faster performance by applying two 1D kernel convolutions instead. This
+    // is specially noticeable on the full image.
+    {
+        auto smoothed_data = std::vector<double>(mesh.n * mesh.m);
+
+        // Retention time smoothing.
+        for (size_t j = 0; j < mesh.m; ++j) {
+            double current_rt = mesh.bins_rt[j];
+            size_t min_k = 0;
+            if (j >= rt_kernel_hw) {
+                min_k = j - rt_kernel_hw;
+            }
+            size_t max_k = mesh.m - 1;
+            if ((j + rt_kernel_hw) < mesh.m) {
+                max_k = j + rt_kernel_hw;
+            }
+            for (size_t i = 0; i < mesh.n; ++i) {
+                double sum_weights = 0;
+                double sum_weighted_values = 0;
+                for (size_t k = min_k; k <= max_k; ++k) {
+                    double a = (current_rt - mesh.bins_rt[k]) / sigma_rt;
+                    double weight = std::exp(-0.5 * (a * a));
+                    sum_weights += weight;
+                    sum_weighted_values += weight * mesh.data[i + k * mesh.n];
+                }
+                smoothed_data[i + j * mesh.n] =
+                    sum_weighted_values / sum_weights;
+            }
+        }
+        mesh.data = smoothed_data;
+    }
+    {
+        auto smoothed_data = std::vector<double>(mesh.n * mesh.m);
+
+        // mz smoothing.
+        //
+        // Since sigma_mz is not constant, we need to calculate the kernel half
+        // width for each potential mz value.
+        for (size_t i = 0; i < mesh.n; ++i) {
+            double sigma_mz = sigma_mz_vec[i];
+            double current_mz = mesh.bins_mz[i];
+
+            size_t min_k = 0;
+            if (i >= mz_kernel_hw[i]) {
+                min_k = i - mz_kernel_hw[i];
+            }
+            size_t max_k = mesh.n - 1;
+            if ((i + mz_kernel_hw[i]) < mesh.n) {
+                max_k = i + mz_kernel_hw[i];
+            }
+            for (size_t j = 0; j < mesh.m; ++j) {
+                double sum_weights = 0;
+                double sum_weighted_values = 0;
+                for (size_t k = min_k; k <= max_k; ++k) {
+                    double a = (current_mz - mesh.bins_mz[k]) / sigma_mz;
+                    double weight = std::exp(-0.5 * (a * a));
+                    sum_weights += weight;
+                    sum_weighted_values += weight * mesh.data[k + j * mesh.n];
+                }
+                smoothed_data[i + j * mesh.n] =
+                    sum_weighted_values / sum_weights;
+            }
+        }
+        mesh.data = smoothed_data;
+    }
+    return mesh;
+}
 
 // TODO(alex): Add optional normalization here.
 bool Grid::splat(const Grid::Point &point, const Grid::Parameters &parameters,

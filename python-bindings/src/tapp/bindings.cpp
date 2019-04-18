@@ -8,6 +8,7 @@
 #include "centroid/centroid_files.hpp"
 #include "grid/grid.hpp"
 #include "grid/grid_files.hpp"
+#include "grid/raw_data.hpp"
 #include "grid/xml_reader.hpp"
 #include "pybind11/numpy.h"
 #include "pybind11/pybind11.h"
@@ -226,72 +227,6 @@ RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
     return raw_points;
 }
 
-uint64_t x_index(const RawData::RawData &raw_data, double mz, uint64_t k) {
-    double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
-    switch (raw_data.instrument_type) {
-        case Instrument::ORBITRAP: {
-            double a = fwhm_ref / std::pow(raw_data.reference_mz, 1.5);
-            double b = (1 / std::sqrt(raw_data.min_mz) - 1 / std::sqrt(mz));
-            return static_cast<uint64_t>(k * 2 / a * b);
-        } break;
-        case Instrument::FTICR: {
-            double a = 1 - raw_data.min_mz / mz;
-            double b = raw_data.reference_mz * raw_data.reference_mz;
-            double c = fwhm_ref * raw_data.min_mz;
-            return static_cast<uint64_t>(k * a * b / c);
-        } break;
-        case Instrument::TOF: {
-            return static_cast<uint64_t>(k * raw_data.reference_mz / fwhm_ref *
-                                         std::log(mz / raw_data.min_mz));
-        } break;
-        case Instrument::QUAD: {
-            // Same as the regular grid.
-            return static_cast<uint64_t>(k * (mz - raw_data.min_mz) / fwhm_ref);
-        } break;
-        case Instrument::UNKNOWN: {
-            assert(false);  // Can't handle unknown instruments.
-        } break;
-    }
-    assert(false);  // Can't handle unknown instruments.
-    return 0;
-}
-
-uint64_t y_index(const RawData::RawData &raw_data, double rt, uint64_t k) {
-    double delta_rt = raw_data.fwhm_rt / k;
-    return std::ceil((rt - raw_data.min_rt) / delta_rt);
-}
-
-std::tuple<uint64_t, uint64_t> calculate_dimensions(
-    const RawData::RawData &raw_data, uint64_t k, uint64_t t) {
-    return std::tuple<uint64_t, uint64_t>(
-        x_index(raw_data, raw_data.max_mz, k) + 1,
-        y_index(raw_data, raw_data.max_rt, t) + 1);
-}
-
-double fwhm_at(const RawData::RawData &raw_data, double mz) {
-    double e = 0;
-    switch (raw_data.instrument_type) {
-        case Instrument::ORBITRAP: {
-            e = 1.5;
-        } break;
-        case Instrument::FTICR: {
-            e = 2;
-        } break;
-        case Instrument::TOF: {
-            e = 1;
-        } break;
-        case Instrument::QUAD: {
-            e = 0;
-        } break;
-        case Instrument::UNKNOWN: {
-            assert(false);  // Can't handle unknown instruments.
-        } break;
-    }
-    double mz_ref = raw_data.reference_mz;
-    double fwhm_ref = mz_ref / raw_data.resolution_ms1;
-    return fwhm_ref * std::pow(mz / mz_ref, e);
-}
-
 std::string to_string(const Instrument::Type &instrument_type) {
     switch (instrument_type) {
         case Instrument::Type::QUAD:
@@ -320,275 +255,11 @@ std::string to_string(const RawData::Polarity &polarity) {
     return "UNKNOWN";
 }
 
-struct Mesh {
-    uint64_t n;  // Number of mz sampling points.
-    uint64_t m;  // Number of rt sampling points.
-    uint64_t k;  // Number of sampling points per FWHM in mz.
-    uint64_t t;  // Number of sampling points per FWHM in rt.
-    std::vector<double> matrix;
-    std::vector<double> bins_mz;
-    std::vector<double> bins_rt;
-
-    // Dumps the mesh into a binary .dat file.
-    void save(std::string file_name) {
-        // Open file stream.
-        std::filesystem::path output_file = file_name;
-        std::ofstream stream;
-        stream.open(output_file);
-        if (!stream) {
-            std::ostringstream error_stream;
-            error_stream << "error: couldn't open output file" << output_file;
-            throw std::invalid_argument(error_stream.str());
-        }
-
-        // TODO: Error checking, out of bounds, correctness, etc.
-        auto parameters = Grid::Parameters{};
-        parameters.dimensions.n = n;
-        parameters.dimensions.m = m;
-        parameters.bounds.min_rt = bins_rt[0];
-        parameters.bounds.max_rt = bins_rt[m - 1];
-        parameters.bounds.min_mz = bins_mz[0];
-        parameters.bounds.max_mz = bins_mz[n - 1];
-        // FIXME: For now... Should we store instrument_type in Mesh?
-        parameters.instrument_type = Instrument::Type::ORBITRAP;
-        if (!Grid::Files::Dat::write(stream, matrix, parameters)) {
-            std::cout << "error: the grid could not be saved properly"
-                      << std::endl;
-            return;
-        }
-    }
-};
-
-double fwhm_to_sigma(double fwhm) {
-    return fwhm / (2 * std::sqrt(2 * std::log(2)));
-}
-
-// Applies 2D kernel smoothing. The smoothing is performed in two passes.
-// First the raw data points are mapped into a 2D matrix by splatting them into
-// a matrix. Sparse areas might result in artifacts when the data is noisy, for
-// this reason, the data is smoothed again.
-//
-// Since multiple passes of a Gaussian smoothing is equivalent to a single
-// pass with `sigma = sqrt(2) * sigma_pass`, we adjust the sigmas for each pass
-// accordingly.
-Mesh resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
-              uint64_t num_samples_rt, double smoothing_coef_mz,
-              double smoothing_coef_rt) {
-    // Initialize the Mesh object.
-    auto [n, m] =
-        calculate_dimensions(raw_data, num_samples_mz, num_samples_rt);
-    Mesh mesh;
-    mesh.n = n;
-    mesh.m = m;
-    mesh.k = num_samples_mz;
-    mesh.t = num_samples_rt;
-    mesh.matrix = std::vector<double>(n * m);
-    mesh.bins_mz = std::vector<double>(n);
-    mesh.bins_rt = std::vector<double>(m);
-
-    // Generate bins_mz.
-    double mz_ref = raw_data.reference_mz;
-    double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
-    for (size_t i = 0; i < n; ++i) {
-        switch (raw_data.instrument_type) {
-            case Instrument::ORBITRAP: {
-                double a = 1 / std::sqrt(raw_data.min_mz);
-                double b = fwhm_ref / std::pow(mz_ref, 1.5) * i / 2 / mesh.k;
-                double c = a - b;
-                mesh.bins_mz[i] = 1 / (c * c);
-            } break;
-            case Instrument::FTICR: {
-                double a = fwhm_ref * raw_data.min_mz;
-                double b = mz_ref * mz_ref;
-                mesh.bins_mz[i] = raw_data.min_mz / (1 - (a / b) * i / mesh.k);
-            } break;
-            case Instrument::TOF: {
-                mesh.bins_mz[i] =
-                    raw_data.min_mz * std::exp(fwhm_ref / mz_ref * i / mesh.k);
-            } break;
-            case Instrument::QUAD: {
-                double delta_mz = (raw_data.max_mz - raw_data.min_mz) /
-                                  static_cast<double>(mesh.n - 1);
-                mesh.bins_mz[i] = raw_data.min_mz + delta_mz * i / mesh.k;
-            } break;
-            case Instrument::UNKNOWN: {
-                assert(false);  // Can't handle unknown instruments.
-            } break;
-        }
-    }
-
-    // Generate bins_rt.
-    double delta_rt = (raw_data.max_rt - raw_data.min_rt) / (m - 1);
-    for (size_t j = 0; j < m; ++j) {
-        mesh.bins_rt[j] = raw_data.min_rt + delta_rt * j;
-    }
-
-    // Pre-calculate the smoothing sigma values for all bins of the grid.
-    double sigma_rt =
-        fwhm_to_sigma(raw_data.fwhm_rt) * smoothing_coef_rt / std::sqrt(2);
-    auto sigma_mz_vec = std::vector<double>(n);
-    for (size_t i = 0; i < n; ++i) {
-        sigma_mz_vec[i] = fwhm_to_sigma(fwhm_at(raw_data, mesh.bins_mz[i])) *
-                          smoothing_coef_mz / std::sqrt(2);
-    }
-
-    // Pre-calculate the kernel half widths for rt and all mzs.
-    //
-    // Since sigma_rt is constant, the size of the kernel will be the same
-    // for the entire rt range.
-    uint64_t rt_kernel_hw = 3 * sigma_rt / delta_rt;
-    auto mz_kernel_hw = std::vector<uint64_t>(n);
-    for (size_t i = 0; i < n; ++i) {
-        double sigma_mz = sigma_mz_vec[i];
-        double delta_mz = 0;
-        if (i == 0) {
-            delta_mz = mesh.bins_mz[i + 1] - mesh.bins_mz[i];
-        } else {
-            delta_mz = mesh.bins_mz[i] - mesh.bins_mz[i - 1];
-        }
-        mz_kernel_hw[i] = 3 * sigma_mz / delta_mz;
-    }
-
-    // Gaussian splatting.
-    {
-        auto weights = std::vector<double>(n * m);
-        for (size_t i = 0; i < raw_data.scans.size(); ++i) {
-            const auto &scan = raw_data.scans[i];
-            double current_rt = scan.retention_time;
-
-            // Find the bin for the current retention time.
-            size_t index_rt = y_index(raw_data, current_rt, mesh.t);
-
-            // Find the min/max indexes for the rt kernel.
-            size_t j_min = 0;
-            if (index_rt >= rt_kernel_hw) {
-                j_min = index_rt - rt_kernel_hw;
-            }
-            size_t j_max = mesh.m - 1;
-            if ((index_rt + rt_kernel_hw) < mesh.m) {
-                j_max = index_rt + rt_kernel_hw;
-            }
-
-            for (size_t k = 0; k < scan.num_points; ++k) {
-                double current_intensity = scan.intensity[k];
-                double current_mz = scan.mz[k];
-
-                // Find the bin for the current mz.
-                size_t index_mz = x_index(raw_data, current_mz, mesh.k);
-
-                double sigma_mz = sigma_mz_vec[index_mz];
-
-                // Find the min/max indexes for the mz kernel.
-                size_t i_min = 0;
-                if (index_mz >= mz_kernel_hw[index_mz]) {
-                    i_min = index_mz - mz_kernel_hw[index_mz];
-                }
-                size_t i_max = mesh.n - 1;
-                if ((index_mz + mz_kernel_hw[index_mz]) < mesh.n) {
-                    i_max = index_mz + mz_kernel_hw[index_mz];
-                }
-
-                for (size_t j = j_min; j <= j_max; ++j) {
-                    for (size_t i = i_min; i <= i_max; ++i) {
-                        double x = mesh.bins_mz[i];
-                        double y = mesh.bins_rt[j];
-
-                        // Calculate the Gaussian weight for this point.
-                        double a = (x - current_mz) / sigma_mz;
-                        double b = (y - current_rt) / sigma_rt;
-                        double weight = std::exp(-0.5 * (a * a + b * b));
-
-                        mesh.matrix[i + j * n] += weight * current_intensity;
-                        weights[i + j * n] += weight;
-                    }
-                }
-            }
-        }
-        for (size_t i = 0; i < (n * m); ++i) {
-            double weight = weights[i];
-            if (weight == 0) {
-                weight = 1;
-            }
-            mesh.matrix[i] = mesh.matrix[i] / weight;
-        }
-    }
-
-    // Gaussian smoothing.
-    //
-    // The Gaussian 2D filter is separable. We obtain the same result with
-    // faster performance by applying two 1D kernel convolutions instead. This
-    // is specially noticeable on the full image.
-    {
-        auto smoothed_matrix = std::vector<double>(mesh.n * mesh.m);
-
-        // Retention time smoothing.
-        for (size_t j = 0; j < mesh.m; ++j) {
-            double current_rt = mesh.bins_rt[j];
-            size_t min_k = 0;
-            if (j >= rt_kernel_hw) {
-                min_k = j - rt_kernel_hw;
-            }
-            size_t max_k = mesh.m - 1;
-            if ((j + rt_kernel_hw) < mesh.m) {
-                max_k = j + rt_kernel_hw;
-            }
-            for (size_t i = 0; i < mesh.n; ++i) {
-                double sum_weights = 0;
-                double sum_weighted_values = 0;
-                for (size_t k = min_k; k <= max_k; ++k) {
-                    double a = (current_rt - mesh.bins_rt[k]) / sigma_rt;
-                    double weight = std::exp(-0.5 * (a * a));
-                    sum_weights += weight;
-                    sum_weighted_values += weight * mesh.matrix[i + k * mesh.n];
-                }
-                smoothed_matrix[i + j * mesh.n] =
-                    sum_weighted_values / sum_weights;
-            }
-        }
-        mesh.matrix = smoothed_matrix;
-    }
-    {
-        auto smoothed_matrix = std::vector<double>(mesh.n * mesh.m);
-
-        // mz smoothing.
-        //
-        // Since sigma_mz is not constant, we need to calculate the kernel half
-        // width for each potential mz value.
-        for (size_t i = 0; i < mesh.n; ++i) {
-            double sigma_mz = sigma_mz_vec[i];
-            double current_mz = mesh.bins_mz[i];
-
-            size_t min_k = 0;
-            if (i >= mz_kernel_hw[i]) {
-                min_k = i - mz_kernel_hw[i];
-            }
-            size_t max_k = mesh.n - 1;
-            if ((i + mz_kernel_hw[i]) < mesh.n) {
-                max_k = i + mz_kernel_hw[i];
-            }
-            for (size_t j = 0; j < mesh.m; ++j) {
-                double sum_weights = 0;
-                double sum_weighted_values = 0;
-                for (size_t k = min_k; k <= max_k; ++k) {
-                    double a = (current_mz - mesh.bins_mz[k]) / sigma_mz;
-                    double weight = std::exp(-0.5 * (a * a));
-                    sum_weights += weight;
-                    sum_weighted_values += weight * mesh.matrix[k + j * mesh.n];
-                }
-                smoothed_matrix[i + j * mesh.n] =
-                    sum_weighted_values / sum_weights;
-            }
-        }
-        mesh.matrix = smoothed_matrix;
-    }
-    return mesh;
-}
-
 struct Peak {
     // ID of this peak. Should be kept for futher processing.
     size_t id;
-    // Height,mz and rt values for the center of this peak (From the local maxima
-    // coordinates on the mesh).
+    // Height,mz and rt values for the center of this peak (From the local
+    // maxima coordinates on the mesh).
     double local_max_mz;
     double local_max_rt;
     double local_max_height;
@@ -704,7 +375,7 @@ struct MeshIndex {
     size_t j;
 };
 
-std::vector<MeshIndex> find_local_max_idx(const Mesh &mesh) {
+std::vector<MeshIndex> find_local_max_idx(const Grid::Mesh &mesh) {
     std::vector<MeshIndex> points;
     // FIXME: This is performed in O(n^2), but using the divide and conquer
     // strategy we might achieve O(n * log(n)) or lower.
@@ -729,11 +400,11 @@ std::vector<MeshIndex> find_local_max_idx(const Mesh &mesh) {
             // ----------------------------------------------
             // |              | bottom_value |              |
             // ----------------------------------------------
-            double value = mesh.matrix[index];
-            double right_value = mesh.matrix[index + 1];
-            double left_value = mesh.matrix[index - 1];
-            double top_value = mesh.matrix[index - mesh.n];
-            double bottom_value = mesh.matrix[index + mesh.n];
+            double value = mesh.data[index];
+            double right_value = mesh.data[index + 1];
+            double left_value = mesh.data[index - 1];
+            double top_value = mesh.data[index - mesh.n];
+            double bottom_value = mesh.data[index + mesh.n];
 
             if ((value != 0) && (value > left_value) && (value > right_value) &&
                 (value > top_value) && (value > bottom_value)) {
@@ -744,8 +415,8 @@ std::vector<MeshIndex> find_local_max_idx(const Mesh &mesh) {
 
     auto sort_by_value = [&mesh](const MeshIndex &p1,
                                  const MeshIndex &p2) -> bool {
-        return (mesh.matrix[p1.i + p1.j * mesh.n] >
-                mesh.matrix[p2.i + p2.j * mesh.n]);
+        return (mesh.data[p1.i + p1.j * mesh.n] >
+                mesh.data[p2.i + p2.j * mesh.n]);
     };
     std::stable_sort(points.begin(), points.end(), sort_by_value);
 
@@ -753,7 +424,8 @@ std::vector<MeshIndex> find_local_max_idx(const Mesh &mesh) {
 }
 
 void explore_peak_slope(uint64_t i, uint64_t j, double previous_value,
-                        const Mesh &mesh, std::vector<MeshIndex> &points) {
+                        const Grid::Mesh &mesh,
+                        std::vector<MeshIndex> &points) {
     // Check that the point has not being already included.
     for (const auto &point : points) {
         if (point.i == i && point.j == j) {
@@ -761,7 +433,7 @@ void explore_peak_slope(uint64_t i, uint64_t j, double previous_value,
         }
     }
 
-    double value = mesh.matrix[i + j * mesh.n];
+    double value = mesh.data[i + j * mesh.n];
     if (previous_value >= 0 && (previous_value < value || value <= 0.00001)) {
         return;
     }
@@ -817,13 +489,13 @@ std::vector<MeshIndex> find_boundary(std::vector<MeshIndex> &points) {
     return boundary;
 }
 
-Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
+Peak build_peak(const RawData::RawData &raw_data, const Grid::Mesh &mesh,
                 const MeshIndex &local_max) {
     Peak peak = {};
     peak.id = 0;
     peak.local_max_mz = mesh.bins_mz[local_max.i];
     peak.local_max_rt = mesh.bins_rt[local_max.j];
-    peak.local_max_height = mesh.matrix[local_max.i + local_max.j * mesh.n];
+    peak.local_max_height = mesh.data[local_max.i + local_max.j * mesh.n];
 
     // Find the points within the boundary by slope descent on the mesh from the
     // local max.
@@ -858,7 +530,7 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
         // Calculate the average background intensity from the boundary.
         double boundary_sum = 0;
         for (const auto &point : peak_boundary) {
-            boundary_sum += mesh.matrix[point.i + point.j * mesh.n];
+            boundary_sum += mesh.data[point.i + point.j * mesh.n];
         }
         peak.slope_descent_border_background =
             boundary_sum / peak_boundary.size();
@@ -891,7 +563,7 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
         for (const auto &point : peak_points) {
             double mz = mesh.bins_mz[point.i];
             double rt = mesh.bins_rt[point.j];
-            double value = mesh.matrix[point.i + point.j * mesh.n];
+            double value = mesh.data[point.i + point.j * mesh.n];
 
             height_sum += value;
             x_sum += value * mz;
@@ -913,9 +585,9 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
         double mz = peak.local_max_mz;
         double rt = peak.local_max_rt;
 
-        double theoretical_sigma_mz =
-            fwhm_to_sigma(fwhm_at(raw_data, mesh.bins_mz[local_max.i]));
-        double theoretical_sigma_rt = fwhm_to_sigma(raw_data.fwhm_rt);
+        double theoretical_sigma_mz = RawData::fwhm_to_sigma(
+            RawData::theoretical_fwhm(raw_data, mesh.bins_mz[local_max.i]));
+        double theoretical_sigma_rt = RawData::fwhm_to_sigma(raw_data.fwhm_rt);
 
         peak.roi_min_mz = mz - 3 * theoretical_sigma_mz;
         peak.roi_max_mz = mz + 3 * theoretical_sigma_mz;
@@ -1060,7 +732,7 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
 }
 
 std::vector<Peak> find_peaks(const RawData::RawData &raw_data,
-                             const Mesh &mesh) {
+                             const Grid::Mesh &mesh) {
     auto local_max = find_local_max_idx(mesh);
     std::vector<Peak> peaks;
     size_t i = 0;
@@ -1335,13 +1007,12 @@ PYBIND11_MODULE(tapp, m) {
                    "\n> number of scans: " + std::to_string(rd.scans.size());
         });
 
-    py::class_<PythonAPI::Mesh>(m, "Mesh")
-        .def_readonly("n", &PythonAPI::Mesh::n)
-        .def_readonly("m", &PythonAPI::Mesh::m)
-        .def_readonly("matrix", &PythonAPI::Mesh::matrix)
-        .def_readonly("bins_mz", &PythonAPI::Mesh::bins_mz)
-        .def_readonly("bins_rt", &PythonAPI::Mesh::bins_rt)
-        .def("save", &PythonAPI::Mesh::save, py::arg("file_name"));
+    py::class_<Grid::Mesh>(m, "Mesh")
+        .def_readonly("n", &Grid::Mesh::n)
+        .def_readonly("m", &Grid::Mesh::m)
+        .def_readonly("data", &Grid::Mesh::data)
+        .def_readonly("bins_mz", &Grid::Mesh::bins_mz)
+        .def_readonly("bins_rt", &Grid::Mesh::bins_rt);
 
     py::class_<PythonAPI::RawPoints>(m, "RawPoints")
         .def_readonly("rt", &PythonAPI::RawPoints::rt)
@@ -1412,15 +1083,11 @@ PYBIND11_MODULE(tapp, m) {
           py::arg("instrument_type") = "", py::arg("resolution_ms1"),
           py::arg("resolution_msn"), py::arg("reference_mz"),
           py::arg("fwhm_rt"), py::arg("polarity") = "")
-        .def("calculate_dimensions", &PythonAPI::calculate_dimensions,
-             "Calculate the grid parameters for the given raw file",
-             py::arg("raw_data"), py::arg("num_mz") = 10,
-             py::arg("num_rt") = 10)
-        .def("fwhm_at", &PythonAPI::fwhm_at,
-             "Calculate the width of the peak at the given m/z for the given "
-             "raw file",
+        .def("theoretical_fwhm", &RawData::theoretical_fwhm,
+             "Calculate the theoretical width of the peak at the given m/z for "
+             "the given raw file",
              py::arg("raw_data"), py::arg("mz"))
-        .def("resample", &PythonAPI::resample,
+        .def("resample", &Grid::resample,
              "Resample the raw data into a smoothed warped grid",
              py::arg("raw_data"), py::arg("num_mz") = 10,
              py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 0.5,

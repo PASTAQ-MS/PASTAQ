@@ -76,7 +76,7 @@ def plot_mesh(mesh, transform='sqrt', figure=None):
     if figure is None:
         figure = plt.figure()
 
-    img = mesh.matrix
+    img = mesh.data
     img = np.reshape(img, (mesh.m, mesh.n))
     bins_rt = mesh.bins_rt
     bins_mz = mesh.bins_mz
@@ -558,7 +558,7 @@ def find_roi(raw_data, local_max, avg_rt_fwhm=10):
     peak_candidates = []
     for i in range(0, len(local_max)):
         selected_peak = local_max.iloc[i]
-        theoretical_sigma_mz = fwhm_at(
+        theoretical_sigma_mz = theoretical_fwhm(
             raw_data, selected_peak['mz']) / (2 * math.sqrt(2 * math.log(2)))
         theoretical_sigma_rt = avg_rt_fwhm / (2 * math.sqrt(2 * math.log(2)))
         tolerance_mz = 2.5 * theoretical_sigma_mz
