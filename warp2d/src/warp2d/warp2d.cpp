@@ -24,7 +24,7 @@ std::vector<Centroid::Peak> Warp2D::peaks_in_rt_range(
     double time_end) {
     std::vector<Centroid::Peak> ret;
     ret.reserve(source_peaks.size());
-    int i = 0;
+    size_t i = 0;
     for (const auto& peak : source_peaks) {
         if (peak.rt >= time_start && peak.rt < time_end) {
             ret.push_back(peak);
@@ -115,17 +115,17 @@ std::vector<Centroid::Peak> Warp2D::filter_peaks(
     return filtered_peaks;
 }
 
-std::vector<Warp2D::Level> Warp2D::initialize_levels(int N, int m, int t,
-                                                     int nP) {
+std::vector<Warp2D::Level> Warp2D::initialize_levels(int64_t N, int64_t m,
+                                                     int64_t t, int64_t nP) {
     std::vector<Level> levels(N + 1);
-    for (int i = 0; i < N; ++i) {
-        int start = std::max((i * (m - t)), (nP - (N - i) * (m + t)));
-        int end = std::min((i * (m + t)), (nP - (N - i) * (m - t)));
-        int length = end - start + 1;
+    for (int64_t i = 0; i < N; ++i) {
+        int64_t start = std::max((i * (m - t)), (nP - (N - i) * (m + t)));
+        int64_t end = std::min((i * (m + t)), (nP - (N - i) * (m - t)));
+        int64_t length = end - start + 1;
         levels[i].start = start;
         levels[i].end = end;
         levels[i].nodes = std::vector<Node>(length);
-        for (int j = 0; j < length; ++j) {
+        for (int64_t j = 0; j < length; ++j) {
             levels[i].nodes[j].f = -std::numeric_limits<double>::infinity();
             levels[i].nodes[j].u = 0;
         }
@@ -135,24 +135,24 @@ std::vector<Warp2D::Level> Warp2D::initialize_levels(int N, int m, int t,
     levels[N].nodes.push_back({0.0, 0});
 
     // Calculate potential warpings on each level.
-    for (int k = 0; k < N; ++k) {
+    for (int64_t k = 0; k < N; ++k) {
         auto& current_level = levels[k];
         const auto& next_level = levels[k + 1];
 
-        for (int i = 0; i < (int)current_level.nodes.size(); ++i) {
-            int src_start = current_level.start + i;
+        for (int64_t i = 0; i < (int64_t)current_level.nodes.size(); ++i) {
+            int64_t src_start = current_level.start + i;
 
             // The next node for the next level is subject to the following
             // constrains:
             //
             // x_{i + 1} = x_{i} + m + u, where u <- [-t, t]
             //
-            int x_end_min = std::max(src_start + m - t, next_level.start);
-            int x_end_max = std::min(src_start + m + t, next_level.end);
-            int j_min = x_end_min - next_level.start;
-            int j_max = x_end_max - next_level.start;
-            for (int j = j_min; j <= j_max; ++j) {
-                int src_end = next_level.start + j;
+            int64_t x_end_min = std::max(src_start + m - t, next_level.start);
+            int64_t x_end_max = std::min(src_start + m + t, next_level.end);
+            int64_t j_min = x_end_min - next_level.start;
+            int64_t j_max = x_end_max - next_level.start;
+            for (int64_t j = j_min; j <= j_max; ++j) {
+                int64_t src_end = next_level.start + j;
                 levels[k].potential_warpings.push_back(
                     {i, j, src_start, src_end, 0});
             }
@@ -183,8 +183,8 @@ void Warp2D::compute_warped_similarities(
         Warp2D::peaks_in_rt_range(target_peaks, rt_start, rt_end);
 
     for (auto& warping : level.potential_warpings) {
-        int src_start = warping.src_start;
-        int src_end = warping.src_end;
+        int64_t src_start = warping.src_start;
+        int64_t src_end = warping.src_end;
 
         double sample_rt_start = rt_min + warping.src_start * delta_rt;
         double sample_rt_width = (src_end - src_start) * delta_rt;
@@ -199,12 +199,12 @@ void Warp2D::compute_warped_similarities(
     }
 };
 
-std::vector<int> Warp2D::find_optimal_warping(std::vector<Level>& levels) {
-    int N = levels.size() - 1;
+std::vector<int64_t> Warp2D::find_optimal_warping(std::vector<Level>& levels) {
+    int64_t N = levels.size() - 1;
 
     // Perform dynamic programming to update the cumulative similarity and the
     // optimal predecessor.
-    for (int k = N - 1; k >= 0; --k) {
+    for (int64_t k = N - 1; k >= 0; --k) {
         auto& current_level = levels[k];
         const auto& next_level = levels[k + 1];
         for (const auto& warping : current_level.potential_warpings) {
@@ -219,10 +219,10 @@ std::vector<int> Warp2D::find_optimal_warping(std::vector<Level>& levels) {
     }
 
     // Walk forward nodes to find optimal warping path.
-    std::vector<int> warp_by;
+    std::vector<int64_t> warp_by;
     warp_by.reserve(N + 1);
     warp_by.push_back(0);
-    for (int i = 0; i < N; ++i) {
+    for (int64_t i = 0; i < N; ++i) {
         auto u = levels[i].nodes[warp_by[i]].u;
         warp_by.push_back(u);
     }

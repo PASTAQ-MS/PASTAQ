@@ -17,6 +17,9 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
                               resolution_msn,
                               reference_mz,
                               0,
+                              {},
+                              {},
+                              {},
                               {}};
     // TODO(alex): Can we automatically detect the instrument type and set
     // resolution from the header?
@@ -173,6 +176,8 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
             // Initialize Base64 decoder.
             Base64 decoder(reinterpret_cast<unsigned char *>(&data.value()[0]),
                            precision, little_endian);
+            double intensity_sum = 0;
+            double max_intensity = 0;
             for (size_t i = 0; i < num_points; ++i) {
                 auto mz = decoder.get_double();
                 auto intensity = decoder.get_double();
@@ -189,16 +194,23 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
                     raw_data.max_mz = mz;
                 }
 
+                if (intensity > max_intensity) {
+                    max_intensity = intensity;
+                }
+                intensity_sum += intensity;
+
                 // NOTE(alex): Not the most efficient way. It would be better to
                 // preallocate but we don't know at this point how many
                 // peaks from peak_count are inside our bounds.
                 scan.mz.push_back(mz);
                 scan.intensity.push_back(intensity);
             }
-            // TODO(alex): ASSERT scan.mz.size() == scan.intensity.size()
             scan.num_points = scan.mz.size();
             if (scan.num_points != 0) {
                 raw_data.scans.push_back(scan);
+                raw_data.retention_times.push_back(retention_time);
+                raw_data.total_ion_chromatogram.push_back(intensity_sum);
+                raw_data.base_peak_chromatogram.push_back(max_intensity);
             }
         }
     }

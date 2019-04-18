@@ -18,10 +18,10 @@ namespace Warp2D {
 // - rt_expand_factor: The algorithm will not warp at the range limits so we
 //   need to expand the range by some factor.
 struct Parameters {
-    int slack;
-    int window_size;
-    int num_points;
-    int peaks_per_window;
+    int64_t slack;
+    int64_t window_size;
+    int64_t num_points;
+    int64_t peaks_per_window;
     double rt_expand_factor;
 };
 
@@ -32,17 +32,17 @@ struct Parameters {
 // require the majority of the elements of that matrix it makes more sense to
 // structure the data as a list FU nodes for each segment.
 struct Node {
-    double f;  // Cumulative similarity value.
-    int u;     // Optimal predecessor index.
+    double f;   // Cumulative similarity value.
+    int64_t u;  // Optimal predecessor index.
 };
 
 // This structure describes the required data to perform a warping between two
 // nodes.
 struct PotentialWarping {
-    int i;          // Index of the node on the current level for x_start.
-    int j;          // Index of the node on the next level for x_end.
-    int src_start;  // The initial point to warp.
-    int src_end;    // The end point to warp.
+    int64_t i;          // Index of the node on the current level for x_start.
+    int64_t j;          // Index of the node on the next level for x_end.
+    int64_t src_start;  // The initial point to warp.
+    int64_t src_end;    // The end point to warp.
     double warped_similarity;  // The similarity obtained after warping.
 };
 
@@ -138,8 +138,8 @@ struct PotentialWarping {
 //     - potential_warpings: []
 //
 struct Level {
-    int start;
-    int end;
+    int64_t start;
+    int64_t end;
     std::vector<Node> nodes;
     std::vector<PotentialWarping> potential_warpings;
 };
@@ -171,8 +171,8 @@ std::vector<Centroid::Peak> filter_peaks(std::vector<Centroid::Peak>& peaks,
 
 // Initialize the vector of Levels, including the potential warpings and FU
 // nodes.
-std::vector<Level> initialize_levels(int num_sectors, int window_size,
-                                     int slack, int num_points);
+std::vector<Level> initialize_levels(int64_t num_sectors, int64_t window_size,
+                                     int64_t slack, int64_t num_points);
 
 // Calculate all warped similarities from each PotentialWarping in
 // level.warped_similarities.
@@ -185,7 +185,7 @@ void compute_warped_similarities(
 // similarities in levels. It does so in two steps: First it walks back the list
 // of warped similarities and updates the FU nodes, and then it walks forward
 // the FU nodes to find the optimal warping path.
-std::vector<int> find_optimal_warping(std::vector<Level>& levels);
+std::vector<int64_t> find_optimal_warping(std::vector<Level>& levels);
 }  // namespace Warp2D
 
 #endif /* WARP2D_WARP2D_HPP */
