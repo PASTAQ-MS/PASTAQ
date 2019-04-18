@@ -5,27 +5,28 @@
 #include "utils/serialization.hpp"
 
 // FIXME: Replace previous x_index.
-uint64_t this_x_index(const RawData::RawData &raw_data, double mz, uint64_t k) {
-    double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
-    switch (raw_data.instrument_type) {
+uint64_t Grid::Mesh::x_index(double mz) {
+    switch (this->instrument_type) {
         case Instrument::ORBITRAP: {
-            double a = fwhm_ref / std::pow(raw_data.reference_mz, 1.5);
-            double b = (1 / std::sqrt(raw_data.min_mz) - 1 / std::sqrt(mz));
-            return static_cast<uint64_t>(k * 2 / a * b);
+            double a = this->fwhm_mz / std::pow(this->reference_mz, 1.5);
+            double b = (1 / std::sqrt(this->min_mz) - 1 / std::sqrt(mz));
+            return static_cast<uint64_t>(this->k * 2 / a * b);
         } break;
         case Instrument::FTICR: {
-            double a = 1 - raw_data.min_mz / mz;
-            double b = raw_data.reference_mz * raw_data.reference_mz;
-            double c = fwhm_ref * raw_data.min_mz;
-            return static_cast<uint64_t>(k * a * b / c);
+            double a = 1 - this->min_mz / mz;
+            double b = this->reference_mz * this->reference_mz;
+            double c = this->fwhm_mz * this->min_mz;
+            return static_cast<uint64_t>(this->k * a * b / c);
         } break;
         case Instrument::TOF: {
-            return static_cast<uint64_t>(k * raw_data.reference_mz / fwhm_ref *
-                                         std::log(mz / raw_data.min_mz));
+            return static_cast<uint64_t>(this->k * this->reference_mz /
+                                         this->fwhm_mz *
+                                         std::log(mz / this->min_mz));
         } break;
         case Instrument::QUAD: {
             // Same as the regular grid.
-            return static_cast<uint64_t>(k * (mz - raw_data.min_mz) / fwhm_ref);
+            return static_cast<uint64_t>(this->k * (mz - this->min_mz) /
+                                         this->fwhm_mz);
         } break;
         case Instrument::UNKNOWN: {
             assert(false);  // Can't handle unknown instruments.
@@ -41,57 +42,75 @@ uint64_t this_y_index(const RawData::RawData &raw_data, double rt, uint64_t k) {
     return std::ceil((rt - raw_data.min_rt) / delta_rt);
 }
 
+double Grid::Mesh::mz_at(uint64_t i) {
+    switch (this->instrument_type) {
+        case Instrument::ORBITRAP: {
+            double a = 1 / std::sqrt(this->min_mz);
+            double b = this->fwhm_mz / std::pow(this->reference_mz, 1.5) * i /
+                       2 / this->k;
+            double c = a - b;
+            return 1 / (c * c);
+        } break;
+        case Instrument::FTICR: {
+            double a = this->fwhm_mz * this->min_mz;
+            double b = this->reference_mz * this->reference_mz;
+            return this->min_mz / (1 - (a / b) * i / this->k);
+        } break;
+        case Instrument::TOF: {
+            return this->min_mz *
+                   std::exp(this->fwhm_mz / this->reference_mz * i / this->k);
+        } break;
+        case Instrument::QUAD: {
+            double delta_mz = (this->max_mz - this->min_mz) /
+                              static_cast<double>(this->n - 1);
+            return this->min_mz + delta_mz * i / this->k;
+        } break;
+        case Instrument::UNKNOWN: {
+            assert(false);  // Can't handle unknown instruments.
+        } break;
+    }
+    assert(false);  // Can't handle unknown instruments.
+    return 0;
+}
+
+double Grid::Mesh::rt_at(uint64_t j) {
+    double delta_rt = (this->max_rt - this->min_rt) / (this->m - 1);
+    return this->min_rt + delta_rt * j;
+}
+
 Grid::Mesh Grid::resample(const RawData::RawData &raw_data,
                           uint64_t num_samples_mz, uint64_t num_samples_rt,
                           double smoothing_coef_mz, double smoothing_coef_rt) {
-    // Calculate the necessary dimensions for the Mesh.
-    uint64_t n = this_x_index(raw_data, raw_data.max_mz, num_samples_mz) + 1;
-    uint64_t m = this_y_index(raw_data, raw_data.max_rt, num_samples_rt) + 1;
-
+    // Initialize the Mesh.
     Grid::Mesh mesh;
-    mesh.n = n;
-    mesh.m = m;
     mesh.k = num_samples_mz;
     mesh.t = num_samples_rt;
+    mesh.reference_mz = raw_data.reference_mz;
+    mesh.fwhm_mz = raw_data.reference_mz / raw_data.resolution_ms1;
+    mesh.fwhm_rt = raw_data.fwhm_rt;
+    mesh.instrument_type = raw_data.instrument_type;
+    mesh.min_mz = raw_data.min_mz;
+    mesh.max_mz = raw_data.max_mz;
+    mesh.min_rt = raw_data.min_rt;
+    mesh.max_rt = raw_data.max_rt;
+
+    // Calculate the necessary dimensions for the Mesh.
+    uint64_t n = mesh.x_index(raw_data.max_mz) + 1;
+    uint64_t m = this_y_index(raw_data, raw_data.max_rt, num_samples_rt) + 1;
+    mesh.n = n;
+    mesh.m = m;
     mesh.data = std::vector<double>(n * m);
     mesh.bins_mz = std::vector<double>(n);
     mesh.bins_rt = std::vector<double>(m);
 
     // Generate bins_mz.
-    double mz_ref = raw_data.reference_mz;
-    double fwhm_ref = raw_data.reference_mz / raw_data.resolution_ms1;
     for (size_t i = 0; i < n; ++i) {
-        switch (raw_data.instrument_type) {
-            case Instrument::ORBITRAP: {
-                double a = 1 / std::sqrt(raw_data.min_mz);
-                double b = fwhm_ref / std::pow(mz_ref, 1.5) * i / 2 / mesh.k;
-                double c = a - b;
-                mesh.bins_mz[i] = 1 / (c * c);
-            } break;
-            case Instrument::FTICR: {
-                double a = fwhm_ref * raw_data.min_mz;
-                double b = mz_ref * mz_ref;
-                mesh.bins_mz[i] = raw_data.min_mz / (1 - (a / b) * i / mesh.k);
-            } break;
-            case Instrument::TOF: {
-                mesh.bins_mz[i] =
-                    raw_data.min_mz * std::exp(fwhm_ref / mz_ref * i / mesh.k);
-            } break;
-            case Instrument::QUAD: {
-                double delta_mz = (raw_data.max_mz - raw_data.min_mz) /
-                                  static_cast<double>(mesh.n - 1);
-                mesh.bins_mz[i] = raw_data.min_mz + delta_mz * i / mesh.k;
-            } break;
-            case Instrument::UNKNOWN: {
-                assert(false);  // Can't handle unknown instruments.
-            } break;
-        }
+        mesh.bins_mz[i] = mesh.mz_at(i);
     }
 
     // Generate bins_rt.
-    double delta_rt = (raw_data.max_rt - raw_data.min_rt) / (m - 1);
     for (size_t j = 0; j < m; ++j) {
-        mesh.bins_rt[j] = raw_data.min_rt + delta_rt * j;
+        mesh.bins_rt[j] = mesh.rt_at(j);
     }
 
     // Pre-calculate the smoothing sigma values for all bins of the grid.
@@ -108,6 +127,7 @@ Grid::Mesh Grid::resample(const RawData::RawData &raw_data,
     //
     // Since sigma_rt is constant, the size of the kernel will be the same
     // for the entire rt range.
+    double delta_rt = (mesh.max_rt - mesh.min_rt) / (m - 1);
     uint64_t rt_kernel_hw = 3 * sigma_rt / delta_rt;
     auto mz_kernel_hw = std::vector<uint64_t>(n);
     for (size_t i = 0; i < n; ++i) {
@@ -146,7 +166,7 @@ Grid::Mesh Grid::resample(const RawData::RawData &raw_data,
                 double current_mz = scan.mz[k];
 
                 // Find the bin for the current mz.
-                size_t index_mz = this_x_index(raw_data, current_mz, mesh.k);
+                size_t index_mz = mesh.x_index(current_mz);
 
                 double sigma_mz = sigma_mz_vec[index_mz];
 

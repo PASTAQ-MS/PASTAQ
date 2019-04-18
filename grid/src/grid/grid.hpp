@@ -66,6 +66,20 @@ struct Mesh {
     std::vector<double> data;
     std::vector<double> bins_mz;
     std::vector<double> bins_rt;
+
+    // Parameters extracted from the raw data.
+    double reference_mz;
+    double fwhm_mz;
+    double fwhm_rt;
+    Instrument::Type instrument_type;
+    double min_mz;
+    double max_mz;
+    double min_rt;
+    double max_rt;
+
+    uint64_t x_index(double mz);
+    double mz_at(uint64_t i);
+    double rt_at(uint64_t j);
 };
 
 // Applies 2D kernel smoothing. The smoothing is performed in two passes.
