@@ -587,14 +587,10 @@ Mesh resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
 struct Peak {
     // ID of this peak. Should be kept for futher processing.
     size_t id;
-    // Center of the peak in index space (Coordinates of local maxima).
-    uint64_t local_max_i;
-    uint64_t local_max_j;
-    // Real mz/rt values for the center of this peak (From the local maxima
-    // coordinates).
+    // Height,mz and rt values for the center of this peak (From the local maxima
+    // coordinates on the mesh).
     double local_max_mz;
     double local_max_rt;
-    // Height of the peak (Height of local maxima).
     double local_max_height;
 
     // Simple estimation of the peak metrics on the mesh values based on the
