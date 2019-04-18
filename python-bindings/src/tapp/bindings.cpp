@@ -224,21 +224,13 @@ RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
             break;
         }
 
-        double internal_min_mz = min_mz;
-        double internal_max_mz = max_mz;
-        if (internal_min_mz < scan.mz[0]) {
-            internal_min_mz = scan.mz[0];
-        }
-        if (internal_max_mz > scan.mz[scan.num_points - 1]) {
-            internal_max_mz = scan.mz[scan.num_points - 1];
-        }
-        size_t min_i = lower_bound(scan.mz, internal_min_mz);
+        size_t min_i = lower_bound(scan.mz, min_mz);
         size_t max_i = scan.num_points;
-        if (scan.mz[min_i] < internal_min_mz) {
+        if (scan.mz[min_i] < min_mz) {
             ++min_i;
         }
         for (size_t i = min_i; i < max_i; ++i) {
-            if (scan.mz[i] > internal_max_mz) {
+            if (scan.mz[i] > max_mz) {
                 break;
             }
 
@@ -706,62 +698,20 @@ struct Peak {
     double mesh_roi_sigma_rt;
     double mesh_roi_total_intensity;
     // Simple estimation of the peak metrics on the raw data.
-    double raw_roi_mz;
-    double raw_roi_rt;
+    double raw_roi_mean_mz;
+    double raw_roi_mean_rt;
     double raw_roi_sigma_mz;
     double raw_roi_sigma_rt;
+    double raw_roi_skewness_mz;
+    double raw_roi_skewness_rt;
+    double raw_roi_kurtosis_mz;
+    double raw_roi_kurtosis_rt;
     double raw_roi_max_height;
     double raw_roi_total_intensity;
     double raw_roi_mean_height;
     double raw_roi_sigma_height;
     uint64_t raw_roi_num_points;
     uint64_t raw_roi_num_scans;
-    // Statistical moments for raw_roi.
-    double raw_roi_mz_mean;
-    double raw_roi_mz_m2;
-    double raw_roi_mz_m3;
-    double raw_roi_mz_m4;
-    double raw_roi_rt_mean;
-    double raw_roi_rt_m2;
-    double raw_roi_rt_m3;
-    double raw_roi_rt_m4;
-
-    // Matrix A for 2D gaussian fitting using least squares.
-    double A[5][5];
-    // Vector C for 2D gaussian fitting using least squares.
-    double C[5];
-
-    // FIXME: OMG WHAT IS HAPPENINGGGGGGGG
-    double a_0_0() { return A[0][0]; }
-    double a_0_1() { return A[0][1]; }
-    double a_0_2() { return A[0][2]; }
-    double a_0_3() { return A[0][3]; }
-    double a_0_4() { return A[0][4]; }
-    double a_1_0() { return A[1][0]; }
-    double a_1_1() { return A[1][1]; }
-    double a_1_2() { return A[1][2]; }
-    double a_1_3() { return A[1][3]; }
-    double a_1_4() { return A[1][4]; }
-    double a_2_0() { return A[2][0]; }
-    double a_2_1() { return A[2][1]; }
-    double a_2_2() { return A[2][2]; }
-    double a_2_3() { return A[2][3]; }
-    double a_2_4() { return A[2][4]; }
-    double a_3_0() { return A[3][0]; }
-    double a_3_1() { return A[3][1]; }
-    double a_3_2() { return A[3][2]; }
-    double a_3_3() { return A[3][3]; }
-    double a_3_4() { return A[3][4]; }
-    double a_4_0() { return A[4][0]; }
-    double a_4_1() { return A[4][1]; }
-    double a_4_2() { return A[4][2]; }
-    double a_4_3() { return A[4][3]; }
-    double a_4_4() { return A[4][4]; }
-    double c_0() { return C[0]; }
-    double c_1() { return C[1]; }
-    double c_2() { return C[2]; }
-    double c_3() { return C[3]; }
-    double c_4() { return C[4]; }
 
     // Extracted Ion Chromatogram. Can be performed with summation or maxima
     // (Total Ion Chromatogram/Base Peak Chromatogram). Returns two vectors
@@ -776,18 +726,9 @@ struct Peak {
         }
 
         // Find scan indices.
-        double internal_min_rt = this->roi_min_rt;
-        double internal_max_rt = this->roi_max_rt;
-        if (internal_min_rt < raw_data.min_rt) {
-            internal_min_rt = raw_data.min_rt;
-        }
-        if (internal_max_rt > raw_data.max_rt) {
-            internal_max_rt = raw_data.max_rt;
-        }
-
-        size_t min_j = find_min_rt_index(raw_data, internal_min_rt);
+        size_t min_j = find_min_rt_index(raw_data, this->roi_min_rt);
         size_t max_j = scans.size();
-        if (scans[min_j].retention_time < internal_min_rt) {
+        if (scans[min_j].retention_time < this->roi_min_rt) {
             ++min_j;
         }
         for (size_t j = min_j; j < max_j; ++j) {
@@ -795,21 +736,19 @@ struct Peak {
             if (scan.num_points == 0) {
                 continue;
             }
-            if (scan.retention_time > internal_max_rt) {
+            if (scan.retention_time > this->roi_max_rt) {
                 break;
             }
 
-            double internal_min_mz = this->roi_min_mz;
-            double internal_max_mz = this->roi_max_mz;
-            if (internal_min_mz < scan.mz[0]) {
-                internal_min_mz = scan.mz[0];
+            if (this->roi_min_mz < scan.mz[0]) {
+                this->roi_min_mz = scan.mz[0];
             }
-            if (internal_max_mz > scan.mz[scan.num_points - 1]) {
-                internal_max_mz = scan.mz[scan.num_points - 1];
+            if (this->roi_max_mz > scan.mz[scan.num_points - 1]) {
+                this->roi_max_mz = scan.mz[scan.num_points - 1];
             }
-            size_t min_i = lower_bound(scan.mz, internal_min_mz);
+            size_t min_i = lower_bound(scan.mz, this->roi_min_mz);
             size_t max_i = scan.num_points;
-            if (scan.mz[min_i] < internal_min_mz) {
+            if (scan.mz[min_i] < this->roi_min_mz) {
                 ++min_i;
             }
 
@@ -817,7 +756,7 @@ struct Peak {
             if (method == "sum") {
                 // Sum all points in the scan.
                 for (size_t i = min_i; i < max_i; ++i) {
-                    if (scan.mz[i] > internal_max_mz) {
+                    if (scan.mz[i] > this->roi_max_mz) {
                         break;
                     }
                     aggregated_intensity += scan.intensity[i];
@@ -826,7 +765,7 @@ struct Peak {
             if (method == "max") {
                 // Find max point in the scan.
                 for (size_t i = min_i; i < max_i; ++i) {
-                    if (scan.mz[i] > internal_max_mz) {
+                    if (scan.mz[i] > this->roi_max_mz) {
                         break;
                     }
                     if (scan.intensity[i] > aggregated_intensity) {
@@ -1113,45 +1052,6 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
     }
 
     {
-        // Initializing A and C
-        // Matrix A.
-        // Row 0
-        peak.A[0][0] = 0;
-        peak.A[0][1] = 0;
-        peak.A[0][2] = 0;
-        peak.A[0][3] = 0;
-        peak.A[0][4] = 0;
-        // Row 1
-        peak.A[1][0] = 0;
-        peak.A[1][1] = 0;
-        peak.A[1][2] = 0;
-        peak.A[1][3] = 0;
-        peak.A[1][4] = 0;
-        // Row 2
-        peak.A[2][0] = 0;
-        peak.A[2][1] = 0;
-        peak.A[2][2] = 0;
-        peak.A[2][3] = 0;
-        peak.A[2][4] = 0;
-        // Row 3
-        peak.A[3][0] = 0;
-        peak.A[3][1] = 0;
-        peak.A[3][2] = 0;
-        peak.A[3][3] = 0;
-        peak.A[3][4] = 0;
-        // Row 4
-        peak.A[4][0] = 0;
-        peak.A[4][1] = 0;
-        peak.A[4][2] = 0;
-        peak.A[4][3] = 0;
-        peak.A[4][4] = 0;
-        // Vector C.
-        peak.C[0] = 0;
-        peak.C[1] = 0;
-        peak.C[2] = 0;
-        peak.C[3] = 0;
-        peak.C[4] = 0;
-
         const auto &scans = raw_data.scans;
         // FIXME: Make nan instead?
         if (scans.size() == 0) {
@@ -1160,242 +1060,121 @@ Peak build_peak(const RawData::RawData &raw_data, const Mesh &mesh,
             throw std::invalid_argument(error_stream.str());
         }
 
-        // Find scan indices.
-        double internal_min_rt = peak.roi_min_rt;
-        double internal_max_rt = peak.roi_max_rt;
-        if (internal_min_rt < raw_data.min_rt) {
-            internal_min_rt = raw_data.min_rt;
-        }
-        if (internal_max_rt > raw_data.max_rt) {
-            internal_max_rt = raw_data.max_rt;
-        }
-
-        size_t min_j = find_min_rt_index(raw_data, internal_min_rt);
+        size_t min_j = find_min_rt_index(raw_data, peak.roi_min_rt);
         size_t max_j = scans.size();
-        if (scans[min_j].retention_time < internal_min_rt) {
+        if (scans[min_j].retention_time < peak.roi_min_rt) {
             ++min_j;
         }
 
         // Calculate the first 4 central moments for both mz/rt on the raw
         // data points using a 2 pass algorithm.
-        {
-            size_t num_scans = 0;
-            size_t num_points = 0;
-            double max_value = 0;
-            double mz_mean = 0;
-            double mz_m2 = 0;
-            double mz_m3 = 0;
-            double mz_m4 = 0;
-            double rt_mean = 0;
-            double rt_m2 = 0;
-            double rt_m3 = 0;
-            double rt_m4 = 0;
-            double weight_sum = 0;
-            // First pass.
-            for (size_t j = min_j; j < max_j; ++j) {
-                const auto &scan = scans[j];
-                if (scan.retention_time > internal_max_rt) {
-                    break;
-                }
-                if (scan.num_points == 0) {
-                    continue;
-                }
-
-                size_t min_i = lower_bound(scan.mz, peak.roi_min_mz);
-                size_t max_i = scan.num_points;
-                if (scan.mz[min_i] < peak.roi_min_mz) {
-                    ++min_i;
-                }
-                bool scan_not_empty = false;
-                for (size_t i = min_i; i < max_i; ++i) {
-                    if (scan.mz[i] > peak.roi_max_mz) {
-                        break;
-                    }
-                    double mz = scan.mz[i];
-                    double rt = scan.retention_time;
-                    double value = scan.intensity[i];
-                    if (value > max_value) {
-                        max_value = value;
-                    }
-                    scan_not_empty = true;
-                    ++num_points;
-
-                    weight_sum += value;
-                    mz_mean += value * mz;
-                    rt_mean += value * rt;
-                }
-                if (scan_not_empty) {
-                    ++num_scans;
-                }
-            }
-            mz_mean /= weight_sum;
-            rt_mean /= weight_sum;
-
-            // Second pass.
-            for (size_t j = min_j; j < max_j; ++j) {
-                const auto &scan = scans[j];
-                if (scan.retention_time > peak.roi_max_rt) {
-                    break;
-                }
-                if (scan.num_points == 0) {
-                    continue;
-                }
-
-                size_t min_i = lower_bound(scan.mz, peak.roi_min_mz);
-                size_t max_i = scan.num_points;
-                if (scan.mz[min_i] < peak.roi_min_mz) {
-                    ++min_i;
-                }
-                for (size_t i = min_i; i < max_i; ++i) {
-                    if (scan.mz[i] > peak.roi_max_mz) {
-                        break;
-                    }
-                    double mz = scan.mz[i];
-                    double rt = scan.retention_time;
-                    double value = scan.intensity[i];
-
-                    double mz_delta = mz - mz_mean;
-                    mz_m2 += value * std::pow(mz_delta, 2);
-                    mz_m3 += value * std::pow(mz_delta, 3);
-                    mz_m4 += value * std::pow(mz_delta, 4);
-
-                    double rt_delta = rt - rt_mean;
-                    rt_m2 += value * std::pow(rt_delta, 2);
-                    rt_m3 += value * std::pow(rt_delta, 3);
-                    rt_m4 += value * std::pow(rt_delta, 4);
-                }
-            }
-            mz_m2 /= weight_sum;
-            mz_m3 /= weight_sum;
-            mz_m4 /= weight_sum;
-            rt_m2 /= weight_sum;
-            rt_m3 /= weight_sum;
-            rt_m4 /= weight_sum;
-
-            // Update the peak data structure.
-            peak.raw_roi_mz_mean = mz_mean;
-            peak.raw_roi_mz_m2 = mz_m2;
-            peak.raw_roi_mz_m3 = mz_m3;
-            peak.raw_roi_mz_m4 = mz_m4;
-            peak.raw_roi_rt_mean = rt_mean;
-            peak.raw_roi_rt_m2 = rt_m2;
-            peak.raw_roi_rt_m3 = rt_m3;
-            peak.raw_roi_rt_m4 = rt_m4;
-            peak.raw_roi_max_height = max_value;
-            peak.raw_roi_total_intensity = weight_sum;
-            peak.raw_roi_num_points = num_points;
-            peak.raw_roi_num_scans = num_scans;
-        }
-
-        double height_sum = 0;
-        double sq_height_sum = 0;
-        double x_sum = 0;
-        double y_sum = 0;
-        double x_sig = 0;
-        double y_sig = 0;
+        size_t num_scans = 0;
+        size_t num_points = 0;
+        double max_value = 0;
+        double mz_mean = 0;
+        double mz_m2 = 0;
+        double mz_m3 = 0;
+        double mz_m4 = 0;
+        double rt_mean = 0;
+        double rt_m2 = 0;
+        double rt_m3 = 0;
+        double rt_m4 = 0;
+        double weight_sum = 0;
+        // First pass.
         for (size_t j = min_j; j < max_j; ++j) {
             const auto &scan = scans[j];
+            if (scan.retention_time > peak.roi_max_rt) {
+                break;
+            }
             if (scan.num_points == 0) {
                 continue;
             }
-            if (scan.retention_time > internal_max_rt) {
-                break;
-            }
 
-            double internal_min_mz = peak.roi_min_mz;
-            double internal_max_mz = peak.roi_max_mz;
-            if (internal_min_mz < scan.mz[0]) {
-                internal_min_mz = scan.mz[0];
-            }
-            if (internal_max_mz > scan.mz[scan.num_points - 1]) {
-                internal_max_mz = scan.mz[scan.num_points - 1];
-            }
-
-            size_t min_i = lower_bound(scan.mz, internal_min_mz);
+            size_t min_i = lower_bound(scan.mz, peak.roi_min_mz);
             size_t max_i = scan.num_points;
-            if (scan.mz[min_i] < internal_min_mz) {
+            if (scan.mz[min_i] < peak.roi_min_mz) {
                 ++min_i;
             }
+            bool scan_not_empty = false;
             for (size_t i = min_i; i < max_i; ++i) {
-                if (scan.mz[i] > internal_max_mz) {
+                if (scan.mz[i] > peak.roi_max_mz) {
                     break;
                 }
                 double mz = scan.mz[i];
                 double rt = scan.retention_time;
                 double value = scan.intensity[i];
-                height_sum += value;
-                sq_height_sum += value * value;
-                x_sum += value * mz;
-                y_sum += value * rt;
-                x_sig += value * mz * mz;
-                y_sig += value * rt * rt;
-
-                // Calculate the values for the A matrix and C vector necessary
-                // for the 2D Gaussian fitting using least squares.
-                {
-                    double x = (mz - peak.local_max_mz);
-                    double y = (rt - peak.local_max_rt);
-                    double z = value;
-                    double log_z = std::log(z);
-                    double z_2 = std::pow(z, 2);
-                    double x_2 = std::pow(x, 2);
-                    double x_3 = std::pow(x, 3);
-                    double x_4 = std::pow(x, 4);
-                    double y_2 = std::pow(y, 2);
-                    double y_3 = std::pow(y, 3);
-                    double y_4 = std::pow(y, 4);
-                    // Matrix A.
-                    // Row 0
-                    peak.A[0][0] += z_2;
-                    peak.A[0][1] += z_2 * x;
-                    peak.A[0][2] += z_2 * x_2;
-                    peak.A[0][3] += z_2 * y;
-                    peak.A[0][4] += z_2 * y_2;
-                    // Row 1
-                    peak.A[1][0] += z_2 * x;
-                    peak.A[1][1] += z_2 * x_2;
-                    peak.A[1][2] += z_2 * x_3;
-                    peak.A[1][3] += z_2 * x * y;
-                    peak.A[1][4] += z_2 * x * y_2;
-                    // Row 2
-                    peak.A[2][0] += z_2 * x_2;
-                    peak.A[2][1] += z_2 * x_3;
-                    peak.A[2][2] += z_2 * x_4;
-                    peak.A[2][3] += z_2 * x_2 * y;
-                    peak.A[2][4] += z_2 * x_2 * y_2;
-                    // Row 3
-                    peak.A[3][0] += z_2 * y;
-                    peak.A[3][1] += z_2 * x * y;
-                    peak.A[3][2] += z_2 * x_2 * y;
-                    peak.A[3][3] += z_2 * y_2;
-                    peak.A[3][4] += z_2 * y_3;
-                    // Row 4
-                    peak.A[4][0] += z_2 * y_2;
-                    peak.A[4][1] += z_2 * x * y_2;
-                    peak.A[4][2] += z_2 * x_2 * y_2;
-                    peak.A[4][3] += z_2 * y_3;
-                    peak.A[4][4] += z_2 * y_4;
-                    // Vector C.
-                    peak.C[0] += z_2 * log_z;
-                    peak.C[1] += z_2 * x * log_z;
-                    peak.C[2] += z_2 * x_2 * log_z;
-                    peak.C[3] += z_2 * y * log_z;
-                    peak.C[4] += z_2 * y_2 * log_z;
+                if (value > max_value) {
+                    max_value = value;
                 }
+                scan_not_empty = true;
+                ++num_points;
+
+                weight_sum += value;
+                mz_mean += value * mz;
+                rt_mean += value * rt;
+            }
+            if (scan_not_empty) {
+                ++num_scans;
             }
         }
-        // FIXME: Not controlling for div/0.
-        peak.raw_roi_mz = x_sum / height_sum;
-        peak.raw_roi_rt = y_sum / height_sum;
-        peak.raw_roi_sigma_mz =
-            std::sqrt((x_sig / height_sum) - std::pow(x_sum / height_sum, 2));
-        peak.raw_roi_sigma_rt =
-            std::sqrt((y_sig / height_sum) - std::pow(y_sum / height_sum, 2));
-        peak.raw_roi_total_intensity = height_sum;
-        peak.raw_roi_mean_height = height_sum / peak.raw_roi_num_points;
-        peak.raw_roi_sigma_height =
-            std::sqrt(sq_height_sum / peak.raw_roi_num_points -
-                      peak.raw_roi_mean_height * peak.raw_roi_mean_height);
+        mz_mean /= weight_sum;
+        rt_mean /= weight_sum;
+
+        // Second pass.
+        for (size_t j = min_j; j < max_j; ++j) {
+            const auto &scan = scans[j];
+            if (scan.retention_time > peak.roi_max_rt) {
+                break;
+            }
+            if (scan.num_points == 0) {
+                continue;
+            }
+
+            size_t min_i = lower_bound(scan.mz, peak.roi_min_mz);
+            size_t max_i = scan.num_points;
+            if (scan.mz[min_i] < peak.roi_min_mz) {
+                ++min_i;
+            }
+            for (size_t i = min_i; i < max_i; ++i) {
+                if (scan.mz[i] > peak.roi_max_mz) {
+                    break;
+                }
+                double mz = scan.mz[i];
+                double rt = scan.retention_time;
+                double value = scan.intensity[i];
+
+                double mz_delta = mz - mz_mean;
+                mz_m2 += value * std::pow(mz_delta, 2);
+                mz_m3 += value * std::pow(mz_delta, 3);
+                mz_m4 += value * std::pow(mz_delta, 4);
+
+                double rt_delta = rt - rt_mean;
+                rt_m2 += value * std::pow(rt_delta, 2);
+                rt_m3 += value * std::pow(rt_delta, 3);
+                rt_m4 += value * std::pow(rt_delta, 4);
+            }
+        }
+        mz_m2 /= weight_sum;
+        mz_m3 /= weight_sum;
+        mz_m4 /= weight_sum;
+        rt_m2 /= weight_sum;
+        rt_m3 /= weight_sum;
+        rt_m4 /= weight_sum;
+
+        // Update the peak data structure.
+        peak.raw_roi_mean_mz = mz_mean;
+        peak.raw_roi_sigma_mz = std::sqrt(mz_m2);
+        peak.raw_roi_skewness_mz = mz_m3 / std::pow(mz_m2, 1.5);
+        peak.raw_roi_kurtosis_mz = mz_m4 / std::pow(mz_m2, 2);
+        peak.raw_roi_mean_rt = rt_mean;
+        peak.raw_roi_sigma_rt = std::sqrt(rt_m2);
+        peak.raw_roi_skewness_rt = rt_m3 / std::pow(rt_m2, 1.5);
+        peak.raw_roi_kurtosis_rt = rt_m4 / std::pow(rt_m2, 2);
+        peak.raw_roi_max_height = max_value;
+        peak.raw_roi_total_intensity = weight_sum;
+        peak.raw_roi_num_points = num_points;
+        peak.raw_roi_num_scans = num_scans;
+        peak.raw_roi_total_intensity = weight_sum;
 
         // FIXME: Make nan instead?
         // if (raw_points.num_points == 0) {
@@ -1728,61 +1507,27 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("mesh_roi_rt", &PythonAPI::Peak::mesh_roi_rt)
         .def_readonly("mesh_roi_sigma_mz", &PythonAPI::Peak::mesh_roi_sigma_mz)
         .def_readonly("mesh_roi_sigma_rt", &PythonAPI::Peak::mesh_roi_sigma_rt)
-        .def_readonly("mesh_roi_total_intensity",
-                      &PythonAPI::Peak::mesh_roi_total_intensity)
-        .def_readonly("raw_roi_mz", &PythonAPI::Peak::raw_roi_mz)
-        .def_readonly("raw_roi_rt", &PythonAPI::Peak::raw_roi_rt)
+        .def_readonly("raw_roi_mean_mz", &PythonAPI::Peak::raw_roi_mean_mz)
+        .def_readonly("raw_roi_mean_rt", &PythonAPI::Peak::raw_roi_mean_rt)
         .def_readonly("raw_roi_sigma_mz", &PythonAPI::Peak::raw_roi_sigma_mz)
         .def_readonly("raw_roi_sigma_rt", &PythonAPI::Peak::raw_roi_sigma_rt)
+        .def_readonly("raw_roi_skewness_mz",
+                      &PythonAPI::Peak::raw_roi_skewness_mz)
+        .def_readonly("raw_roi_skewness_rt",
+                      &PythonAPI::Peak::raw_roi_skewness_rt)
+        .def_readonly("raw_roi_kurtosis_mz",
+                      &PythonAPI::Peak::raw_roi_kurtosis_mz)
+        .def_readonly("raw_roi_kurtosis_rt",
+                      &PythonAPI::Peak::raw_roi_kurtosis_rt)
+        .def_readonly("mesh_roi_total_intensity",
+                      &PythonAPI::Peak::mesh_roi_total_intensity)
         .def_readonly("raw_roi_total_intensity",
                       &PythonAPI::Peak::raw_roi_total_intensity)
         .def_readonly("raw_roi_max_height",
                       &PythonAPI::Peak::raw_roi_max_height)
-        .def_readonly("raw_roi_mean_height",
-                      &PythonAPI::Peak::raw_roi_mean_height)
-        .def_readonly("raw_roi_sigma_height",
-                      &PythonAPI::Peak::raw_roi_sigma_height)
         .def_readonly("raw_roi_num_points",
                       &PythonAPI::Peak::raw_roi_num_points)
         .def_readonly("raw_roi_num_scans", &PythonAPI::Peak::raw_roi_num_scans)
-        .def_readonly("raw_roi_mz_mean", &PythonAPI::Peak::raw_roi_mz_mean)
-        .def_readonly("raw_roi_mz_m2", &PythonAPI::Peak::raw_roi_mz_m2)
-        .def_readonly("raw_roi_mz_m3", &PythonAPI::Peak::raw_roi_mz_m3)
-        .def_readonly("raw_roi_mz_m4", &PythonAPI::Peak::raw_roi_mz_m4)
-        .def_readonly("raw_roi_rt_mean", &PythonAPI::Peak::raw_roi_rt_mean)
-        .def_readonly("raw_roi_rt_m2", &PythonAPI::Peak::raw_roi_rt_m2)
-        .def_readonly("raw_roi_rt_m3", &PythonAPI::Peak::raw_roi_rt_m3)
-        .def_readonly("raw_roi_rt_m4", &PythonAPI::Peak::raw_roi_rt_m4)
-        .def("a_0_0", &PythonAPI::Peak::a_0_0)
-        .def("a_0_1", &PythonAPI::Peak::a_0_1)
-        .def("a_0_2", &PythonAPI::Peak::a_0_2)
-        .def("a_0_3", &PythonAPI::Peak::a_0_3)
-        .def("a_0_4", &PythonAPI::Peak::a_0_4)
-        .def("a_1_0", &PythonAPI::Peak::a_1_0)
-        .def("a_1_1", &PythonAPI::Peak::a_1_1)
-        .def("a_1_2", &PythonAPI::Peak::a_1_2)
-        .def("a_1_3", &PythonAPI::Peak::a_1_3)
-        .def("a_1_4", &PythonAPI::Peak::a_1_4)
-        .def("a_2_0", &PythonAPI::Peak::a_2_0)
-        .def("a_2_1", &PythonAPI::Peak::a_2_1)
-        .def("a_2_2", &PythonAPI::Peak::a_2_2)
-        .def("a_2_3", &PythonAPI::Peak::a_2_3)
-        .def("a_2_4", &PythonAPI::Peak::a_2_4)
-        .def("a_3_0", &PythonAPI::Peak::a_3_0)
-        .def("a_3_1", &PythonAPI::Peak::a_3_1)
-        .def("a_3_2", &PythonAPI::Peak::a_3_2)
-        .def("a_3_3", &PythonAPI::Peak::a_3_3)
-        .def("a_3_4", &PythonAPI::Peak::a_3_4)
-        .def("a_4_0", &PythonAPI::Peak::a_4_0)
-        .def("a_4_1", &PythonAPI::Peak::a_4_1)
-        .def("a_4_2", &PythonAPI::Peak::a_4_2)
-        .def("a_4_3", &PythonAPI::Peak::a_4_3)
-        .def("a_4_4", &PythonAPI::Peak::a_4_4)
-        .def("c_0", &PythonAPI::Peak::c_0)
-        .def("c_1", &PythonAPI::Peak::c_1)
-        .def("c_2", &PythonAPI::Peak::c_2)
-        .def("c_3", &PythonAPI::Peak::c_3)
-        .def("c_4", &PythonAPI::Peak::c_4)
         .def("xic", &PythonAPI::Peak::xic, py::arg("raw_data"),
              py::arg("method") = "sum");
 
