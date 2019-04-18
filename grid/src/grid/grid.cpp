@@ -37,9 +37,9 @@ uint64_t Grid::Mesh::x_index(double mz) {
 }
 
 // FIXME: Replace previous y_index.
-uint64_t this_y_index(const RawData::RawData &raw_data, double rt, uint64_t k) {
-    double delta_rt = raw_data.fwhm_rt / k;
-    return std::ceil((rt - raw_data.min_rt) / delta_rt);
+uint64_t Grid::Mesh::y_index(double rt) {
+    double delta_rt = this->fwhm_rt / this->k;
+    return std::ceil((rt - this->min_rt) / delta_rt);
 }
 
 double Grid::Mesh::mz_at(uint64_t i) {
@@ -96,7 +96,7 @@ Grid::Mesh Grid::resample(const RawData::RawData &raw_data,
 
     // Calculate the necessary dimensions for the Mesh.
     uint64_t n = mesh.x_index(raw_data.max_mz) + 1;
-    uint64_t m = this_y_index(raw_data, raw_data.max_rt, num_samples_rt) + 1;
+    uint64_t m = mesh.y_index(raw_data.max_rt) + 1;
     mesh.n = n;
     mesh.m = m;
     mesh.data = std::vector<double>(n * m);
@@ -149,7 +149,7 @@ Grid::Mesh Grid::resample(const RawData::RawData &raw_data,
             double current_rt = scan.retention_time;
 
             // Find the bin for the current retention time.
-            size_t index_rt = this_y_index(raw_data, current_rt, mesh.t);
+            size_t index_rt = mesh.y_index(current_rt);
 
             // Find the min/max indexes for the rt kernel.
             size_t j_min = 0;
