@@ -13,6 +13,7 @@
 #include "pybind11/numpy.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
+#include "utils/search.hpp"
 #include "warp2d/warp2d.hpp"
 #include "warp2d/warp2d_runners.hpp"
 
@@ -150,26 +151,6 @@ struct RawPoints {
     size_t num_points;
 };
 
-size_t lower_bound(const std::vector<double> &haystack, double needle) {
-    size_t index = 0;
-    size_t l = 0;
-    size_t r = haystack.size() - 1;
-    while (l <= r) {
-        index = (l + r) / 2;
-        if (haystack[index] < needle) {
-            l = index + 1;
-        } else if (haystack[index] > needle) {
-            r = index - 1;
-        } else {
-            break;
-        }
-        if (index == 0) {
-            break;
-        }
-    }
-    return index;
-}
-
 RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
                           double max_mz, double min_rt, double max_rt) {
     RawPoints raw_points;
@@ -186,7 +167,7 @@ RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
     if (max_rt > raw_data.max_rt) {
         max_rt = raw_data.max_rt;
     }
-    size_t min_j = lower_bound(raw_data.retention_times, min_rt);
+    size_t min_j = Search::lower_bound(raw_data.retention_times, min_rt);
     size_t max_j = scans.size();
     if (scans[min_j].retention_time < min_rt) {
         ++min_j;
@@ -201,7 +182,7 @@ RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
             break;
         }
 
-        size_t min_i = lower_bound(scan.mz, min_mz);
+        size_t min_i = Search::lower_bound(scan.mz, min_mz);
         size_t max_i = scan.num_points;
         if (scan.mz[min_i] < min_mz) {
             ++min_i;
@@ -254,119 +235,6 @@ std::string to_string(const RawData::Polarity &polarity) {
     };
     return "UNKNOWN";
 }
-
-struct Peak {
-    // ID of this peak. Should be kept for futher processing.
-    size_t id;
-    // Height,mz and rt values for the center of this peak (From the local
-    // maxima coordinates on the mesh).
-    double local_max_mz;
-    double local_max_rt;
-    double local_max_height;
-
-    // Simple estimation of the peak metrics on the mesh values based on the
-    // slope descent.
-    //
-    // Sumation of all intensities within the peak boundary. (Ignores holes,
-    // i.e. does not interpolate values in case of non closed set).
-    double slope_descent_total_intensity;
-    // Estimated values for the position of the 2D peak based on the slope
-    // descent points.
-    double slope_descent_mz;
-    double slope_descent_rt;
-    // Estimated mz/rt values for the standard deviation of the peak in both
-    // axes. (Ignores holes).
-    double slope_descent_sigma_mz;
-    double slope_descent_sigma_rt;
-    // Average intensity on the boundary of the peak.
-    double slope_descent_border_background;
-    // NOTE: number of points within the boundary found via slope descent?
-
-    // Region of interest for this peak.
-    double roi_min_mz;
-    double roi_max_mz;
-    double roi_min_rt;
-    double roi_max_rt;
-    // Simple estimation of the peak metrics on the raw data.
-    double raw_roi_mean_mz;
-    double raw_roi_mean_rt;
-    double raw_roi_sigma_mz;
-    double raw_roi_sigma_rt;
-    double raw_roi_skewness_mz;
-    double raw_roi_skewness_rt;
-    double raw_roi_kurtosis_mz;
-    double raw_roi_kurtosis_rt;
-    double raw_roi_max_height;
-    double raw_roi_total_intensity;
-    uint64_t raw_roi_num_points;
-    uint64_t raw_roi_num_scans;
-
-    // Extracted Ion Chromatogram. Can be performed with summation or maxima
-    // (Total Ion Chromatogram/Base Peak Chromatogram). Returns two vectors
-    // (retention_time, aggregated_intensity).
-    std::tuple<std::vector<double>, std::vector<double>> xic(
-        const RawData::RawData &raw_data, std::string method) {
-        std::vector<double> rt;
-        std::vector<double> intensity;
-        const auto &scans = raw_data.scans;
-        if (scans.size() == 0) {
-            return {rt, intensity};
-        }
-
-        // Find scan indices.
-        size_t min_j = lower_bound(raw_data.retention_times, this->roi_min_rt);
-        size_t max_j = scans.size();
-        if (scans[min_j].retention_time < this->roi_min_rt) {
-            ++min_j;
-        }
-        for (size_t j = min_j; j < max_j; ++j) {
-            const auto &scan = scans[j];
-            if (scan.num_points == 0) {
-                continue;
-            }
-            if (scan.retention_time > this->roi_max_rt) {
-                break;
-            }
-
-            if (this->roi_min_mz < scan.mz[0]) {
-                this->roi_min_mz = scan.mz[0];
-            }
-            if (this->roi_max_mz > scan.mz[scan.num_points - 1]) {
-                this->roi_max_mz = scan.mz[scan.num_points - 1];
-            }
-            size_t min_i = lower_bound(scan.mz, this->roi_min_mz);
-            size_t max_i = scan.num_points;
-            if (scan.mz[min_i] < this->roi_min_mz) {
-                ++min_i;
-            }
-
-            double aggregated_intensity = 0;
-            if (method == "sum") {
-                // Sum all points in the scan.
-                for (size_t i = min_i; i < max_i; ++i) {
-                    if (scan.mz[i] > this->roi_max_mz) {
-                        break;
-                    }
-                    aggregated_intensity += scan.intensity[i];
-                }
-            }
-            if (method == "max") {
-                // Find max point in the scan.
-                for (size_t i = min_i; i < max_i; ++i) {
-                    if (scan.mz[i] > this->roi_max_mz) {
-                        break;
-                    }
-                    if (scan.intensity[i] > aggregated_intensity) {
-                        aggregated_intensity = scan.intensity[i];
-                    }
-                }
-            }
-            rt.push_back(scan.retention_time);
-            intensity.push_back(aggregated_intensity);
-        }
-        return {rt, intensity};
-    }
-};
 
 struct MeshIndex {
     size_t i;
@@ -602,7 +470,8 @@ Centroid::Peak build_peak(const RawData::RawData &raw_data,
             throw std::invalid_argument(error_stream.str());
         }
 
-        size_t min_j = lower_bound(raw_data.retention_times, peak.roi_min_rt);
+        size_t min_j =
+            Search::lower_bound(raw_data.retention_times, peak.roi_min_rt);
         size_t max_j = scans.size();
         if (scans[min_j].retention_time < peak.roi_min_rt) {
             ++min_j;
@@ -632,7 +501,7 @@ Centroid::Peak build_peak(const RawData::RawData &raw_data,
                 continue;
             }
 
-            size_t min_i = lower_bound(scan.mz, peak.roi_min_mz);
+            size_t min_i = Search::lower_bound(scan.mz, peak.roi_min_mz);
             size_t max_i = scan.num_points;
             if (scan.mz[min_i] < peak.roi_min_mz) {
                 ++min_i;
@@ -672,7 +541,7 @@ Centroid::Peak build_peak(const RawData::RawData &raw_data,
                 continue;
             }
 
-            size_t min_i = lower_bound(scan.mz, peak.roi_min_mz);
+            size_t min_i = Search::lower_bound(scan.mz, peak.roi_min_mz);
             size_t max_i = scan.num_points;
             if (scan.mz[min_i] < peak.roi_min_mz) {
                 ++min_i;
@@ -800,7 +669,7 @@ SimilarityResults find_similarity(std::vector<Centroid::Peak> &peak_list_a,
 }
 
 struct PeakList {
-    std::vector<Peak> peaks;
+    std::vector<Centroid::Peak> peaks;
     std::string file_name;   // NOTE: Should this be on the raw_data instead?
     std::string class_name;  // NOTE: Should this be on the raw_data instead?
     std::shared_ptr<RawData::RawData> raw_data;

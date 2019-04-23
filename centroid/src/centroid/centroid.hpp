@@ -69,24 +69,14 @@ struct Peak {
     uint64_t raw_roi_num_points;
     uint64_t raw_roi_num_scans;
 
-    // FIXME: Implement
+    // FIXME: Better commments and documentation.
+    // FIXME: method should take an enum instead of a string.
+    // Extracted Ion Chromatogram. Can be performed with summation or maxima
+    // (Total Ion Chromatogram/Base Peak Chromatogram). Returns two vectors
+    // (retention_time, aggregated_intensity).
     std::tuple<std::vector<double>, std::vector<double>> xic(
-        const RawData::RawData &raw_data, std::string method) {
-        std::vector<double> rt;
-        std::vector<double> intensity;
-        return {rt, intensity};
-    }
+        const RawData::RawData &raw_data, std::string method);
 };
-
-// FIXME: Add implementation on the cpp file.
-// FIXME: Better commments and documentation.
-// FIXME: method should take an enum instead of a string.
-// Extracted Ion Chromatogram. Can be performed with summation or maxima
-// (Total Ion Chromatogram/Base Peak Chromatogram). Returns two vectors
-// (retention_time, aggregated_intensity).
-// std::tuple<std::vector<double>, std::vector<double>> xic(
-// const Centroid::Peak &peak, const RawData::RawData &raw_data,
-// std::string method);
 
 // Find all candidate points on the given mesh by calculating the local maxima
 // at each point of the grid. The local maxima is defined as follows: For the

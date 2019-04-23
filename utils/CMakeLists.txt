@@ -24,6 +24,7 @@ if (NOT TARGET utilslib)
     add_library(utilslib
         "${CMAKE_CURRENT_SOURCE_DIR}/src/utils/utils/base64.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/utils/utils/serialization.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/utils/utils/search.cpp"
         )
     target_include_directories(utilslib PUBLIC src/utils)
 endif()
