@@ -80,40 +80,40 @@ bool Centroid::Files::Csv::write_peaks(
         stream << i
                << cell_delimiter
                // X
-               << peak.mz
+               << peak.local_max_mz
                << cell_delimiter
                // Y
-               << peak.rt
+               << peak.local_max_rt
                << cell_delimiter
                // Height
-               << peak.height_centroid
+               << peak.local_max_height
                << cell_delimiter
                // Volume
-               << peak.total_intensity
+               << peak.slope_descent_total_intensity
                << cell_delimiter
                // VCentroid
-               << peak.total_intensity_centroid
+               << 0
                << cell_delimiter
                // XSigma
-               << peak.sigma_mz
+               << peak.slope_descent_sigma_mz
                << cell_delimiter
                // YSigma
-               << peak.sigma_rt
+               << peak.slope_descent_sigma_rt
                << cell_delimiter
                // Count
-               << peak.points.size()
+               << 0
                << cell_delimiter
                // LocalBkgnd
-               << peak.border_background
+               << peak.slope_descent_border_background
                << cell_delimiter
                // SNVolume
-               << (peak.total_intensity / peak.border_background)
+               << (peak.slope_descent_total_intensity / peak.slope_descent_border_background)
                << cell_delimiter
                // SNHeight
-               << (peak.height / peak.border_background)
+               << (peak.local_max_height / peak.slope_descent_border_background)
                << cell_delimiter
-               // SNHeight
-               << (peak.total_intensity_centroid / peak.border_background);
+               // SNCentroid
+               << 0;
         if (i != peaks.size() - 1) {
             stream << line_delimiter;
         }
@@ -158,53 +158,49 @@ bool Centroid::Files::Csv::read_peaks(std::istream &stream,
         std::getline(token_stream, token, cell_delimiter);
         // X
         std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.mz).eof()) {
+        if (!(std::istringstream(token) >> peak.local_max_mz).eof()) {
             return false;
         };
-        peak.mz_centroid = peak.mz;
         // Y
         std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.rt).eof()) {
+        if (!(std::istringstream(token) >> peak.local_max_rt).eof()) {
             return false;
         };
-        peak.rt_centroid = peak.rt;
         // Height
         std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.height_centroid).eof()) {
+        if (!(std::istringstream(token) >> peak.local_max_height).eof()) {
             return false;
         };
-        peak.height = peak.height_centroid;
         // Volume
         std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.total_intensity).eof()) {
+        if (!(std::istringstream(token) >> peak.slope_descent_total_intensity).eof()) {
             return false;
         };
-        // VCentroid
+        // VCentroid (Skip)
         std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.total_intensity_centroid)
-                 .eof()) {
-            return false;
-        };
         // XSigma
         std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.sigma_mz).eof()) {
+        if (!(std::istringstream(token) >> peak.slope_descent_sigma_mz).eof()) {
             return false;
         };
         // YSigma
         std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.sigma_rt).eof()) {
+        if (!(std::istringstream(token) >> peak.slope_descent_sigma_rt).eof()) {
             return false;
         };
         // Count (Skip).
         std::getline(token_stream, token, cell_delimiter);
         // LocalBkgnd
         std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.border_background).eof()) {
+        if (!(std::istringstream(token) >> peak.slope_descent_border_background).eof()) {
             return false;
         };
         // SNVolume (Skip)
+        std::getline(token_stream, token, cell_delimiter);
         // SNHeight (Skip)
-        // SNHeight (Skip)
+        std::getline(token_stream, token, cell_delimiter);
+        // SNCentroid (Skip)
+        std::getline(token_stream, token, cell_delimiter);
 
         // Add the peak to the list.
         peaks->push_back(peak);

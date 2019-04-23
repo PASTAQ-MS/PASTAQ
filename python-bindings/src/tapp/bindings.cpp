@@ -298,8 +298,6 @@ struct Peak {
     double raw_roi_kurtosis_rt;
     double raw_roi_max_height;
     double raw_roi_total_intensity;
-    double raw_roi_mean_height;
-    double raw_roi_sigma_height;
     uint64_t raw_roi_num_points;
     uint64_t raw_roi_num_scans;
 
@@ -489,9 +487,9 @@ std::vector<MeshIndex> find_boundary(std::vector<MeshIndex> &points) {
     return boundary;
 }
 
-Peak build_peak(const RawData::RawData &raw_data, const Grid::Mesh &mesh,
-                const MeshIndex &local_max) {
-    Peak peak = {};
+Centroid::Peak build_peak(const RawData::RawData &raw_data,
+                          const Grid::Mesh &mesh, const MeshIndex &local_max) {
+    Centroid::Peak peak = {};
     peak.id = 0;
     peak.local_max_mz = mesh.bins_mz[local_max.i];
     peak.local_max_rt = mesh.bins_rt[local_max.j];
@@ -571,8 +569,8 @@ Peak build_peak(const RawData::RawData &raw_data, const Grid::Mesh &mesh,
             x_sig += value * mz * mz;
             y_sig += value * rt * rt;
         }
-        peak.slope_descent_mz = x_sum / height_sum;
-        peak.slope_descent_rt = y_sum / height_sum;
+        peak.slope_descent_mean_mz = x_sum / height_sum;
+        peak.slope_descent_mean_rt = y_sum / height_sum;
         peak.slope_descent_sigma_mz =
             std::sqrt((x_sig / height_sum) - std::pow(x_sum / height_sum, 2));
         peak.slope_descent_sigma_rt =
@@ -731,10 +729,10 @@ Peak build_peak(const RawData::RawData &raw_data, const Grid::Mesh &mesh,
     return peak;
 }
 
-std::vector<Peak> find_peaks(const RawData::RawData &raw_data,
-                             const Grid::Mesh &mesh) {
+std::vector<Centroid::Peak> find_peaks(const RawData::RawData &raw_data,
+                                       const Grid::Mesh &mesh) {
     auto local_max = find_local_max_idx(mesh);
-    std::vector<Peak> peaks;
+    std::vector<Centroid::Peak> peaks;
     size_t i = 0;
     for (const auto &lm : local_max) {
         auto peak = build_peak(raw_data, mesh, lm);
@@ -745,130 +743,26 @@ std::vector<Peak> find_peaks(const RawData::RawData &raw_data,
     return peaks;
 }
 
-// FIXME: Terrible!
-// Tuple:
-//
-//     0      ,  1 ,  2 ,  3  ,  4  ,  5        ,  6        ,  7
-//     height ,  i ,  j ,  mz ,  rt ,  sigma_mz ,  sigma_rt ,  total_intensity
-//
-void save_fitted_peaks(
-    const std::vector<std::tuple<double, double, double, double, double, double,
-                                 double, double>> &fitted_peaks,
-    std::string file_name) {
-    std::vector<Centroid::Peak> peaks;
-    for (const auto &fitted_peak : fitted_peaks) {
-        Centroid::Peak peak = {};
-        peak.height = std::get<0>(fitted_peak);
-        peak.i = std::get<1>(fitted_peak);
-        peak.j = std::get<2>(fitted_peak);
-        peak.mz = std::get<3>(fitted_peak);
-        peak.rt = std::get<4>(fitted_peak);
-        peak.sigma_mz = std::get<5>(fitted_peak);
-        peak.sigma_rt = std::get<6>(fitted_peak);
-        peak.total_intensity = std::get<7>(fitted_peak);
-        peak.mz_centroid = std::get<3>(fitted_peak);
-        peak.rt_centroid = std::get<4>(fitted_peak);
-        peak.height_centroid = std::get<0>(fitted_peak);
-        peak.total_intensity_centroid = std::get<7>(fitted_peak);
-        peaks.push_back(peak);
-    }
-
-    std::filesystem::path output_file = file_name;
-    std::ofstream stream;
-    stream.open(output_file);
-    if (!stream) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't open output file" << output_file;
-        throw std::invalid_argument(error_stream.str());
-    }
-    Grid::Parameters grid_params;
-    if (!Centroid::Files::Bpks::write_peaks(stream, grid_params, peaks)) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't peaks into file " << file_name;
-        throw std::invalid_argument(error_stream.str());
-    }
-
-    std::cout << "Saving peaks to disk in csv..." << std::endl;
-    auto csv_outfile_name = output_file.filename().replace_extension(".csv");
-    std::ofstream csv_outfile_stream;
-    csv_outfile_stream.open(csv_outfile_name, std::ios::out | std::ios::binary);
-    std::cout << "Sorting peaks by height (centroid)..." << std::endl;
-    auto sort_peaks = [](const Centroid::Peak &p1,
-                         const Centroid::Peak &p2) -> bool {
-        return (p1.height_centroid > p2.height_centroid) ||
-               ((p1.height_centroid == p2.height_centroid) &&
-                (p1.total_intensity_centroid > p2.total_intensity_centroid));
-    };
-    std::stable_sort(peaks.begin(), peaks.end(), sort_peaks);
-    if (!Centroid::Files::Csv::write_peaks(csv_outfile_stream, peaks)) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't write peaks into file "
-                     << csv_outfile_name;
-        throw std::invalid_argument(error_stream.str());
-    }
-}
-
-std::vector<std::vector<Peak>> warp_peaks(
-    const std::vector<std::vector<Peak>> &all_peaks, size_t reference_index,
-    int64_t slack, int64_t window_size, int64_t num_points,
-    double rt_expand_factor, int64_t peaks_per_window) {
+std::vector<std::vector<Centroid::Peak>> warp_peaks(
+    const std::vector<std::vector<Centroid::Peak>> &all_peaks,
+    size_t reference_index, int64_t slack, int64_t window_size,
+    int64_t num_points, double rt_expand_factor, int64_t peaks_per_window) {
     // TODO(alex): Validate the parameters and throw an error if appropriate.
     Warp2D::Parameters parameters = {slack, window_size, num_points,
                                      peaks_per_window, rt_expand_factor};
-    auto reference_peaks_original = all_peaks[reference_index];
-    auto translate_peak_format_to_centroid =
-        [](const std::vector<Peak> &before_peaks)
-        -> std::vector<Centroid::Peak> {
-        auto after_peaks = std::vector<Centroid::Peak>(before_peaks.size());
-        for (size_t i = 0; i < before_peaks.size(); ++i) {
-            after_peaks[i].mz = before_peaks[i].local_max_mz;
-            after_peaks[i].rt = before_peaks[i].local_max_rt;
-            after_peaks[i].height = before_peaks[i].local_max_height;
+    auto reference_peaks = all_peaks[reference_index];
 
-            // NOTE: Currently using slope_descent quantification.
-            after_peaks[i].total_intensity =
-                before_peaks[i].slope_descent_total_intensity;
-            after_peaks[i].sigma_mz = before_peaks[i].slope_descent_sigma_mz;
-            after_peaks[i].sigma_rt = before_peaks[i].slope_descent_sigma_rt;
-            after_peaks[i].border_background =
-                before_peaks[i].slope_descent_border_background;
-        }
-        return after_peaks;
-    };
-    auto translate_peak_format_from_centroid =
-        [](const std::vector<Centroid::Peak> &before_peaks)
-        -> std::vector<Peak> {
-        auto after_peaks = std::vector<Peak>(before_peaks.size());
-        for (size_t i = 0; i < before_peaks.size(); ++i) {
-            after_peaks[i].local_max_mz = before_peaks[i].mz;
-            after_peaks[i].local_max_rt = before_peaks[i].rt;
-            after_peaks[i].local_max_height = before_peaks[i].height;
-
-            // NOTE: Currently using slope_descent quantification.
-            after_peaks[i].slope_descent_total_intensity =
-                before_peaks[i].total_intensity;
-            after_peaks[i].slope_descent_sigma_mz = before_peaks[i].sigma_mz;
-            after_peaks[i].slope_descent_sigma_rt = before_peaks[i].sigma_rt;
-            after_peaks[i].slope_descent_border_background =
-                before_peaks[i].border_background;
-        }
-        return after_peaks;
-    };
-    auto reference_peaks =
-        translate_peak_format_to_centroid(reference_peaks_original);
-
-    std::vector<std::vector<Peak>> all_warped_peaks;
+    std::vector<std::vector<Centroid::Peak>> all_warped_peaks;
     for (size_t i = 0; i < all_peaks.size(); ++i) {
         if (i == reference_index) {
             all_warped_peaks.push_back(all_peaks[i]);
             continue;
         }
-        auto peaks = translate_peak_format_to_centroid(all_peaks[i]);
+        auto peaks = all_peaks[i];
         std::vector<Centroid::Peak> warped_peaks;
         warped_peaks =
             Warp2D::Runners::Serial::run(reference_peaks, peaks, parameters);
-        all_warped_peaks.push_back(
-            translate_peak_format_from_centroid(warped_peaks));
+        all_warped_peaks.push_back(warped_peaks);
     }
     return all_warped_peaks;
 }
@@ -880,47 +774,22 @@ struct SimilarityResults {
     double geometric_ratio;
     double mean_ratio;
 };
-SimilarityResults find_similarity(const std::vector<Peak> &peak_list_a,
-                                  const std::vector<Peak> &peak_list_b,
+SimilarityResults find_similarity(std::vector<Centroid::Peak> &peak_list_a,
+                                  std::vector<Centroid::Peak> &peak_list_b,
                                   size_t n_peaks) {
-    auto translate_peak_format_to_centroid =
-        [](const std::vector<Peak> &before_peaks)
-        -> std::vector<Centroid::Peak> {
-        auto after_peaks = std::vector<Centroid::Peak>(before_peaks.size());
-        for (size_t i = 0; i < before_peaks.size(); ++i) {
-            after_peaks[i].mz = before_peaks[i].local_max_mz;
-            after_peaks[i].rt = before_peaks[i].local_max_rt;
-            after_peaks[i].height = before_peaks[i].local_max_height;
-
-            // NOTE: Currently using slope_descent quantification.
-            after_peaks[i].total_intensity =
-                before_peaks[i].slope_descent_total_intensity;
-            after_peaks[i].sigma_mz = before_peaks[i].slope_descent_sigma_mz;
-            after_peaks[i].sigma_rt = before_peaks[i].slope_descent_sigma_rt;
-            after_peaks[i].border_background =
-                before_peaks[i].slope_descent_border_background;
-        }
-        return after_peaks;
-    };
     auto sort_peaks = [](const Centroid::Peak &p1,
                          const Centroid::Peak &p2) -> bool {
-        return (p1.height > p2.height) || (p1.height == p2.height);
+        return (p1.local_max_height > p2.local_max_height) ||
+               (p1.local_max_height == p2.local_max_height);
     };
-    auto peak_list_a_centroid = translate_peak_format_to_centroid(peak_list_a);
-    auto peak_list_b_centroid = translate_peak_format_to_centroid(peak_list_b);
-    std::stable_sort(peak_list_a_centroid.begin(), peak_list_a_centroid.end(),
-                     sort_peaks);
-    std::stable_sort(peak_list_b_centroid.begin(), peak_list_b_centroid.end(),
-                     sort_peaks);
-    peak_list_a_centroid.resize(n_peaks);
-    peak_list_b_centroid.resize(n_peaks);
+    std::stable_sort(peak_list_a.begin(), peak_list_a.end(), sort_peaks);
+    std::stable_sort(peak_list_b.begin(), peak_list_b.end(), sort_peaks);
+    peak_list_a.resize(n_peaks);
+    peak_list_b.resize(n_peaks);
     SimilarityResults results = {};
-    results.self_a =
-        Warp2D::similarity_2D(peak_list_a_centroid, peak_list_a_centroid);
-    results.self_b =
-        Warp2D::similarity_2D(peak_list_b_centroid, peak_list_b_centroid);
-    results.overlap =
-        Warp2D::similarity_2D(peak_list_a_centroid, peak_list_b_centroid);
+    results.self_a = Warp2D::similarity_2D(peak_list_a, peak_list_a);
+    results.self_b = Warp2D::similarity_2D(peak_list_b, peak_list_b);
+    results.overlap = Warp2D::similarity_2D(peak_list_a, peak_list_b);
     // Overlap / (GeometricMean(self_a, self_b))
     results.geometric_ratio =
         results.overlap / std::sqrt(results.self_a * results.self_b);
@@ -1019,45 +888,45 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("mz", &PythonAPI::RawPoints::mz)
         .def_readonly("intensity", &PythonAPI::RawPoints::intensity);
 
-    py::class_<PythonAPI::Peak>(m, "Peak")
-        .def_readonly("id", &PythonAPI::Peak::id)
-        .def_readonly("local_max_mz", &PythonAPI::Peak::local_max_mz)
-        .def_readonly("local_max_rt", &PythonAPI::Peak::local_max_rt)
-        .def_readonly("local_max_height", &PythonAPI::Peak::local_max_height)
-        .def_readonly("slope_descent_mz", &PythonAPI::Peak::slope_descent_mz)
-        .def_readonly("slope_descent_rt", &PythonAPI::Peak::slope_descent_rt)
+    py::class_<Centroid::Peak>(m, "Peak")
+        .def_readonly("id", &Centroid::Peak::id)
+        .def_readonly("local_max_mz", &Centroid::Peak::local_max_mz)
+        .def_readonly("local_max_rt", &Centroid::Peak::local_max_rt)
+        .def_readonly("local_max_height", &Centroid::Peak::local_max_height)
+        .def_readonly("slope_descent_mean_mz",
+                      &Centroid::Peak::slope_descent_mean_mz)
+        .def_readonly("slope_descent_mean_rt",
+                      &Centroid::Peak::slope_descent_mean_rt)
         .def_readonly("slope_descent_sigma_mz",
-                      &PythonAPI::Peak::slope_descent_sigma_mz)
+                      &Centroid::Peak::slope_descent_sigma_mz)
         .def_readonly("slope_descent_sigma_rt",
-                      &PythonAPI::Peak::slope_descent_sigma_rt)
+                      &Centroid::Peak::slope_descent_sigma_rt)
         .def_readonly("slope_descent_total_intensity",
-                      &PythonAPI::Peak::slope_descent_total_intensity)
+                      &Centroid::Peak::slope_descent_total_intensity)
         .def_readonly("slope_descent_border_background",
-                      &PythonAPI::Peak::slope_descent_border_background)
-        .def_readonly("roi_min_mz", &PythonAPI::Peak::roi_min_mz)
-        .def_readonly("roi_max_mz", &PythonAPI::Peak::roi_max_mz)
-        .def_readonly("roi_min_rt", &PythonAPI::Peak::roi_min_rt)
-        .def_readonly("roi_max_rt", &PythonAPI::Peak::roi_max_rt)
-        .def_readonly("raw_roi_mean_mz", &PythonAPI::Peak::raw_roi_mean_mz)
-        .def_readonly("raw_roi_mean_rt", &PythonAPI::Peak::raw_roi_mean_rt)
-        .def_readonly("raw_roi_sigma_mz", &PythonAPI::Peak::raw_roi_sigma_mz)
-        .def_readonly("raw_roi_sigma_rt", &PythonAPI::Peak::raw_roi_sigma_rt)
+                      &Centroid::Peak::slope_descent_border_background)
+        .def_readonly("roi_min_mz", &Centroid::Peak::roi_min_mz)
+        .def_readonly("roi_max_mz", &Centroid::Peak::roi_max_mz)
+        .def_readonly("roi_min_rt", &Centroid::Peak::roi_min_rt)
+        .def_readonly("roi_max_rt", &Centroid::Peak::roi_max_rt)
+        .def_readonly("raw_roi_mean_mz", &Centroid::Peak::raw_roi_mean_mz)
+        .def_readonly("raw_roi_mean_rt", &Centroid::Peak::raw_roi_mean_rt)
+        .def_readonly("raw_roi_sigma_mz", &Centroid::Peak::raw_roi_sigma_mz)
+        .def_readonly("raw_roi_sigma_rt", &Centroid::Peak::raw_roi_sigma_rt)
         .def_readonly("raw_roi_skewness_mz",
-                      &PythonAPI::Peak::raw_roi_skewness_mz)
+                      &Centroid::Peak::raw_roi_skewness_mz)
         .def_readonly("raw_roi_skewness_rt",
-                      &PythonAPI::Peak::raw_roi_skewness_rt)
+                      &Centroid::Peak::raw_roi_skewness_rt)
         .def_readonly("raw_roi_kurtosis_mz",
-                      &PythonAPI::Peak::raw_roi_kurtosis_mz)
+                      &Centroid::Peak::raw_roi_kurtosis_mz)
         .def_readonly("raw_roi_kurtosis_rt",
-                      &PythonAPI::Peak::raw_roi_kurtosis_rt)
+                      &Centroid::Peak::raw_roi_kurtosis_rt)
         .def_readonly("raw_roi_total_intensity",
-                      &PythonAPI::Peak::raw_roi_total_intensity)
-        .def_readonly("raw_roi_max_height",
-                      &PythonAPI::Peak::raw_roi_max_height)
-        .def_readonly("raw_roi_num_points",
-                      &PythonAPI::Peak::raw_roi_num_points)
-        .def_readonly("raw_roi_num_scans", &PythonAPI::Peak::raw_roi_num_scans)
-        .def("xic", &PythonAPI::Peak::xic, py::arg("raw_data"),
+                      &Centroid::Peak::raw_roi_total_intensity)
+        .def_readonly("raw_roi_max_height", &Centroid::Peak::raw_roi_max_height)
+        .def_readonly("raw_roi_num_points", &Centroid::Peak::raw_roi_num_points)
+        .def_readonly("raw_roi_num_scans", &Centroid::Peak::raw_roi_num_scans)
+        .def("xic", &Centroid::Peak::xic, py::arg("raw_data"),
              py::arg("method") = "sum");
 
     py::class_<PythonAPI::SimilarityResults>(m, "Similarity")
@@ -1092,9 +961,6 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("raw_data"), py::arg("num_mz") = 10,
              py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 0.5,
              py::arg("smoothing_coef_rt") = 0.5)
-        .def("save_fitted_peaks", &PythonAPI::save_fitted_peaks,
-             "Save the fitted peaks as a bpks file", py::arg("fitted_peaks"),
-             py::arg("file_name"))
         .def("find_raw_points", &PythonAPI::find_raw_points,
              "Save the fitted peaks as a bpks file", py::arg("raw_data"),
              py::arg("min_mz"), py::arg("max_mz"), py::arg("min_rt"),

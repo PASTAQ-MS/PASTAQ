@@ -19,19 +19,19 @@ std::vector<Centroid::Peak> Warp2D::Runners::Parallel::run(
     double rt_min = std::numeric_limits<double>::infinity();
     double rt_max = -std::numeric_limits<double>::infinity();
     for (const auto& peak : target_peaks) {
-        if (peak.rt < rt_min) {
-            rt_min = peak.rt;
+        if (peak.local_max_rt < rt_min) {
+            rt_min = peak.local_max_rt;
         }
-        if (peak.rt > rt_max) {
-            rt_max = peak.rt;
+        if (peak.local_max_rt > rt_max) {
+            rt_max = peak.local_max_rt;
         }
     }
     for (const auto& peak : source_peaks) {
-        if (peak.rt < rt_min) {
-            rt_min = peak.rt;
+        if (peak.local_max_rt < rt_min) {
+            rt_min = peak.local_max_rt;
         }
-        if (peak.rt > rt_max) {
-            rt_max = peak.rt;
+        if (peak.local_max_rt > rt_max) {
+            rt_max = peak.local_max_rt;
         }
     }
 
@@ -148,19 +148,19 @@ std::vector<Centroid::Peak> Warp2D::Runners::Serial::run(
     double rt_min = std::numeric_limits<double>::infinity();
     double rt_max = -std::numeric_limits<double>::infinity();
     for (const auto& peak : target_peaks) {
-        if (peak.rt < rt_min) {
-            rt_min = peak.rt;
+        if (peak.local_max_rt < rt_min) {
+            rt_min = peak.local_max_rt;
         }
-        if (peak.rt > rt_max) {
-            rt_max = peak.rt;
+        if (peak.local_max_rt > rt_max) {
+            rt_max = peak.local_max_rt;
         }
     }
     for (const auto& peak : source_peaks) {
-        if (peak.rt < rt_min) {
-            rt_min = peak.rt;
+        if (peak.local_max_rt < rt_min) {
+            rt_min = peak.local_max_rt;
         }
-        if (peak.rt > rt_max) {
-            rt_max = peak.rt;
+        if (peak.local_max_rt > rt_max) {
+            rt_max = peak.local_max_rt;
         }
     }
 

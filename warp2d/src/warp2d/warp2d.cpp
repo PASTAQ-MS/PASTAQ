@@ -26,7 +26,7 @@ std::vector<Centroid::Peak> Warp2D::peaks_in_rt_range(
     ret.reserve(source_peaks.size());
     size_t i = 0;
     for (const auto& peak : source_peaks) {
-        if (peak.rt >= time_start && peak.rt < time_end) {
+        if (peak.local_max_rt >= time_start && peak.local_max_rt < time_end) {
             ret.push_back(peak);
             ++i;
         }
@@ -42,14 +42,14 @@ double Warp2D::peak_overlap(const Centroid::Peak& peak_a,
 
     // Early return if the peaks do not intersect in the +/-3 * sigma_mz/rt
     {
-        double min_rt_a = peak_a.rt - 3 * peak_a.sigma_rt;
-        double max_rt_a = peak_a.rt + 3 * peak_a.sigma_rt;
-        double min_mz_a = peak_a.mz - 3 * peak_a.sigma_mz;
-        double max_mz_a = peak_a.mz + 3 * peak_a.sigma_mz;
-        double min_rt_b = peak_b.rt - 3 * peak_b.sigma_rt;
-        double max_rt_b = peak_b.rt + 3 * peak_b.sigma_rt;
-        double min_mz_b = peak_b.mz - 3 * peak_b.sigma_mz;
-        double max_mz_b = peak_b.mz + 3 * peak_b.sigma_mz;
+        double min_rt_a = peak_a.local_max_rt - 3 * peak_a.slope_descent_sigma_rt;
+        double max_rt_a = peak_a.local_max_rt + 3 * peak_a.slope_descent_sigma_rt;
+        double min_mz_a = peak_a.local_max_mz - 3 * peak_a.slope_descent_sigma_mz;
+        double max_mz_a = peak_a.local_max_mz + 3 * peak_a.slope_descent_sigma_mz;
+        double min_rt_b = peak_b.local_max_rt - 3 * peak_b.slope_descent_sigma_rt;
+        double max_rt_b = peak_b.local_max_rt + 3 * peak_b.slope_descent_sigma_rt;
+        double min_mz_b = peak_b.local_max_mz - 3 * peak_b.slope_descent_sigma_mz;
+        double max_mz_b = peak_b.local_max_mz + 3 * peak_b.slope_descent_sigma_mz;
 
         if (max_rt_a < min_rt_b || max_rt_b < min_rt_a || max_mz_a < min_mz_b ||
             max_mz_b < min_mz_a) {
@@ -71,12 +71,12 @@ double Warp2D::peak_overlap(const Centroid::Peak& peak_a,
         return std::exp(0.5 * (a - b)) / std::sqrt(var_a + var_b);
     };
 
-    auto rt_contrib = gaussian_contribution(peak_a.rt, peak_b.rt,
-                                            peak_a.sigma_rt, peak_b.sigma_rt);
-    auto mz_contrib = gaussian_contribution(peak_a.mz, peak_b.mz,
-                                            peak_a.sigma_mz, peak_b.sigma_mz);
+    auto rt_contrib = gaussian_contribution(peak_a.local_max_rt, peak_b.local_max_rt,
+                                            peak_a.slope_descent_sigma_rt, peak_b.slope_descent_sigma_rt);
+    auto mz_contrib = gaussian_contribution(peak_a.local_max_mz, peak_b.local_max_mz,
+                                            peak_a.slope_descent_sigma_mz, peak_b.slope_descent_sigma_mz);
 
-    return rt_contrib * mz_contrib * peak_a.height * peak_b.height;
+    return rt_contrib * mz_contrib * peak_a.local_max_height * peak_b.local_max_height;
 }
 
 double Warp2D::similarity_2D(const std::vector<Centroid::Peak>& set_a,
@@ -100,16 +100,11 @@ std::vector<Centroid::Peak> Warp2D::filter_peaks(
     filtered_peaks.reserve(n_peaks);
     auto sort_by_height = [](const Centroid::Peak& p1,
                              const Centroid::Peak& p2) -> bool {
-        return (p1.height > p2.height);
+        return (p1.local_max_height > p2.local_max_height);
     };
     std::sort(peaks.begin(), peaks.end(), sort_by_height);
     for (size_t i = 0; i < n_peaks; ++i) {
         auto peak = peaks[i];
-        // We don't need the inner points or boundary points for this algorithm.
-        // In order to reduce the number of allocations and memory consumption
-        // we remove these from the peak object.
-        peak.points = {};
-        peak.boundary = {};
         filtered_peaks.push_back(peak);
     }
     return filtered_peaks;
@@ -168,9 +163,9 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
         Warp2D::peaks_in_rt_range(source_peaks, source_rt_start, source_rt_end);
 
     for (auto& peak : warped_peaks) {
-        double x =
-            (peak.rt - source_rt_start) / (source_rt_end - source_rt_start);
-        peak.rt = lerp(ref_rt_start, ref_rt_end, x);
+        double x = (peak.local_max_rt - source_rt_start) /
+                   (source_rt_end - source_rt_start);
+        peak.local_max_rt = lerp(ref_rt_start, ref_rt_end, x);
     }
     return warped_peaks;
 }

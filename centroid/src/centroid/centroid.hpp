@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <tuple>
 #include <vector>
 
 #include "grid/grid.hpp"
@@ -23,53 +24,69 @@ struct Point {
     double value;
 };
 
-// A Peak stores information regarding the peak detected in centroid. Note that
-// for proper interpretation of the index values we need access to the
-// Grid::Parameters from where these were calculated.
 struct Peak {
-    // Center of the peak in index space (Coordinates of local maxima).
-    uint64_t i;
-    uint64_t j;
+    // ID of this peak. Should be kept for futher processing.
+    size_t id;
+    // Height,mz and rt values for the center of this peak (From the local
+    // maxima coordinates on the mesh).
+    double local_max_mz;
+    double local_max_rt;
+    double local_max_height;
 
-    // Real mz/rt values for the center of this peak (From the local maxima
-    // coordinates).
-    double mz;
-    double rt;
-    // Height of the peak (Height of local maxima).
-    double height;
+    // Simple estimation of the peak metrics on the mesh values based on the
+    // slope descent.
+    //
     // Sumation of all intensities within the peak boundary. (Ignores holes,
     // i.e. does not interpolate values in case of non closed set).
-    double total_intensity;
-
+    double slope_descent_total_intensity;
+    // Estimated values for the position of the 2D peak based on the slope
+    // descent points.
+    double slope_descent_mean_mz;
+    double slope_descent_mean_rt;
     // Estimated mz/rt values for the standard deviation of the peak in both
     // axes. (Ignores holes).
-    double sigma_mz;
-    double sigma_rt;
-
-    // Metrics from the fitted weighted centroid.
-    double mz_centroid;
-    double rt_centroid;
-    double height_centroid;
-    double total_intensity_centroid;
-
+    double slope_descent_sigma_mz;
+    double slope_descent_sigma_rt;
     // Average intensity on the boundary of the peak.
-    double border_background;
+    double slope_descent_border_background;
 
-    // TODO(alex): Do we want to store these values?
-    // Area under the curve of the extracted ion chromatogram. (Raw data)
-    // double area_raw;
-    // Area under the curve of the extracted ion chromatogram (Grid file,
-    // smoothed data).
-    // double area_smooth;
-    // Sumation of all intensities within the peak boundary. (Raw data)
-    // double total_ion_intensity_raw;
-    // Number of ions contained within the peak boundary.
-    // double number_measured_intensities;
+    // Region of interest for this peak.
+    double roi_min_mz;
+    double roi_max_mz;
+    double roi_min_rt;
+    double roi_max_rt;
+    // Simple estimation of the peak metrics on the raw data.
+    double raw_roi_mean_mz;
+    double raw_roi_mean_rt;
+    double raw_roi_sigma_mz;
+    double raw_roi_sigma_rt;
+    double raw_roi_skewness_mz;
+    double raw_roi_skewness_rt;
+    double raw_roi_kurtosis_mz;
+    double raw_roi_kurtosis_rt;
+    double raw_roi_max_height;
+    double raw_roi_total_intensity;
+    uint64_t raw_roi_num_points;
+    uint64_t raw_roi_num_scans;
 
-    // All the points included within the peak boundary.
-    std::vector<Point> points;
-    std::vector<Point> boundary;
+    // FIXME: Implement
+    std::tuple<std::vector<double>, std::vector<double>> xic(
+        const RawData::RawData &raw_data, std::string method) {
+        std::vector<double> rt;
+        std::vector<double> intensity;
+        return {rt, intensity};
+    }
 };
+
+// FIXME: Add implementation on the cpp file.
+// FIXME: Better commments and documentation.
+// FIXME: method should take an enum instead of a string.
+// Extracted Ion Chromatogram. Can be performed with summation or maxima
+// (Total Ion Chromatogram/Base Peak Chromatogram). Returns two vectors
+// (retention_time, aggregated_intensity).
+// std::tuple<std::vector<double>, std::vector<double>> xic(
+// const Centroid::Peak &peak, const RawData::RawData &raw_data,
+// std::string method);
 
 // Find all candidate points on the given mesh by calculating the local maxima
 // at each point of the grid. The local maxima is defined as follows: For the

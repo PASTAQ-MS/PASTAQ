@@ -539,10 +539,10 @@ int main(int argc, char *argv[]) {
             std::cout << "Sorting peaks by height (centroid)..." << std::endl;
             auto sort_peaks = [](const Centroid::Peak &p1,
                                  const Centroid::Peak &p2) -> bool {
-                return (p1.height_centroid > p2.height_centroid) ||
-                       ((p1.height_centroid == p2.height_centroid) &&
-                        (p1.total_intensity_centroid >
-                         p2.total_intensity_centroid));
+                return (p1.local_max_height > p2.local_max_height) ||
+                       ((p1.local_max_height == p2.local_max_height) &&
+                        (p1.slope_descent_total_intensity >
+                         p2.slope_descent_total_intensity));
             };
             std::stable_sort(warped_peaks.begin(), warped_peaks.end(),
                              sort_peaks);
