@@ -123,23 +123,17 @@ Grid::Mesh Grid::resample(const RawData::RawData &raw_data,
                           smoothing_coef_mz / std::sqrt(2);
     }
 
-    // Pre-calculate the kernel half widths for rt and all mzs.
+    // Pre-calculate the kernel half widths for rt and mz.
     //
     // Since sigma_rt is constant, the size of the kernel will be the same
-    // for the entire rt range.
-    double delta_rt = (mesh.max_rt - mesh.min_rt) / (m - 1);
+    // for the entire rt range. The same applies for mz, as we are using a
+    // warped mesh that keeps the number of sampling points constant across the
+    // entire m/z range.
+    double delta_rt = mesh.fwhm_rt / num_samples_rt;
+    double delta_mz = mesh.fwhm_mz / num_samples_mz;
+    double sigma_mz_ref = RawData::fwhm_to_sigma(mesh.fwhm_mz);
     uint64_t rt_kernel_hw = 3 * sigma_rt / delta_rt;
-    auto mz_kernel_hw = std::vector<uint64_t>(n);
-    for (size_t i = 0; i < n; ++i) {
-        double sigma_mz = sigma_mz_vec[i];
-        double delta_mz = 0;
-        if (i == 0) {
-            delta_mz = mesh.bins_mz[i + 1] - mesh.bins_mz[i];
-        } else {
-            delta_mz = mesh.bins_mz[i] - mesh.bins_mz[i - 1];
-        }
-        mz_kernel_hw[i] = 3 * sigma_mz / delta_mz;
-    }
+    uint64_t mz_kernel_hw = 3 * sigma_mz_ref / delta_mz;
 
     // Gaussian splatting.
     {
@@ -172,12 +166,12 @@ Grid::Mesh Grid::resample(const RawData::RawData &raw_data,
 
                 // Find the min/max indexes for the mz kernel.
                 size_t i_min = 0;
-                if (index_mz >= mz_kernel_hw[index_mz]) {
-                    i_min = index_mz - mz_kernel_hw[index_mz];
+                if (index_mz >= mz_kernel_hw) {
+                    i_min = index_mz - mz_kernel_hw;
                 }
                 size_t i_max = mesh.n - 1;
-                if ((index_mz + mz_kernel_hw[index_mz]) < mesh.n) {
-                    i_max = index_mz + mz_kernel_hw[index_mz];
+                if ((index_mz + mz_kernel_hw) < mesh.n) {
+                    i_max = index_mz + mz_kernel_hw;
                 }
 
                 for (size_t j = j_min; j <= j_max; ++j) {
@@ -251,12 +245,12 @@ Grid::Mesh Grid::resample(const RawData::RawData &raw_data,
             double current_mz = mesh.bins_mz[i];
 
             size_t min_k = 0;
-            if (i >= mz_kernel_hw[i]) {
-                min_k = i - mz_kernel_hw[i];
+            if (i >= mz_kernel_hw) {
+                min_k = i - mz_kernel_hw;
             }
             size_t max_k = mesh.n - 1;
-            if ((i + mz_kernel_hw[i]) < mesh.n) {
-                max_k = i + mz_kernel_hw[i];
+            if ((i + mz_kernel_hw) < mesh.n) {
+                max_k = i + mz_kernel_hw;
             }
             for (size_t j = 0; j < mesh.m; ++j) {
                 double sum_weights = 0;
