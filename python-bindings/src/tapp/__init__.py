@@ -343,9 +343,9 @@ def fit_guos_2d(x, y, z):
     # print(np.allclose(np.dot(X, A), Y))
     return np.array([height, mz, sigma_mz, rt, sigma_rt])
 
-def fit_weighted_guos_2d(x, y, z, x_mean, y_mean, theoretical_sigma_mz, theoretical_sigma_rt):
-    x = x - x_mean
-    y = y - y_mean
+def fit_weighted_guos_2d(x, y, z, x_local_max, y_local_max, theoretical_sigma_mz, theoretical_sigma_rt):
+    x = x - x_local_max
+    y = y - y_local_max
 
     a_0_0 = 0
     a_0_1 = 0
@@ -465,17 +465,92 @@ def fit_weighted_guos_2d(x, y, z, x_mean, y_mean, theoretical_sigma_mz, theoreti
         c_3,
         c_4,
     ])
-    # a, b, c, d, e = np.linalg.solve(X, Y)
-    beta = np.linalg.lstsq(X, Y)
-    a, b, c, d, e = beta[0]
+    a, b, c, d, e = np.linalg.lstsq(X, Y, rcond=1)[0]
+
+    if c >= 0 or e >= 0:
+        return np.array([np.nan, np.nan, np.nan, np.nan, np.nan])
 
     sigma_mz = np.sqrt(1/(-2 * c))
-    mz = b / (-2 * c) + x_mean
+    mz = b / (-2 * c) + x_local_max
     sigma_rt = np.sqrt(1/(-2 * e))
-    rt = d / (-2 * e) + y_mean
+    rt = d / (-2 * e) + y_local_max
     height = np.exp(a - ((b ** 2) / (4 * c)) - ((d ** 2) / (4 * e)))
 
-    # print(np.allclose(np.dot(X, A), Y))
+    return np.array([height, mz, sigma_mz, rt, sigma_rt])
+
+def fit_weighted_guos_2d_constrained(x, y, z, x_local_max, y_local_max, theoretical_sigma_mz, theoretical_sigma_rt):
+    x = x - x_local_max
+    y = y - y_local_max
+
+    a_0_0 = 0
+    a_0_2 = 0
+    a_0_4 = 0
+    a_2_0 = 0
+    a_2_2 = 0
+    a_2_4 = 0
+    a_4_0 = 0
+    a_4_2 = 0
+    a_4_4 = 0
+    c_0 = 0
+    c_2 = 0
+    c_4 = 0
+    for i, intensity in enumerate(z):
+        mz = x[i] 
+        rt = y[i] 
+        w = gaus2d([mz, rt], 1, 0, theoretical_sigma_mz, 0, theoretical_sigma_rt)
+        w_2 = w * w
+
+        a_0_0 += w_2
+        a_0_2 += w_2 * mz * mz
+        a_0_4 += w_2 * rt * rt
+
+        a_2_0 += w_2 * mz * mz
+        a_2_2 += w_2 * mz * mz * mz * mz
+        a_2_4 += w_2 * rt * rt * mz * mz
+
+        a_4_0 += w_2 * rt * rt
+        a_4_2 += w_2 * mz * mz * rt * rt
+        a_4_4 += w_2 * rt * rt * rt * rt
+
+        c_0 += w_2 * np.log(intensity)
+        c_2 += w_2 * np.log(intensity) * mz * mz
+        c_4 += w_2 * np.log(intensity) * rt * rt
+
+    X = np.array(
+        [
+            [
+                a_0_0,
+                a_0_2,
+                a_0_4,
+            ],
+            [
+                a_2_0,
+                a_2_2,
+                a_2_4,
+            ],
+            [
+                a_4_0,
+                a_4_2,
+                a_4_4,
+            ],
+        ],
+    )
+    Y = np.array([
+        c_0,
+        c_2,
+        c_4,
+    ])
+    a, c, e = np.linalg.lstsq(X, Y, rcond=1)[0]
+
+    if c >= 0 or e >= 0:
+        return np.array([np.nan, np.nan, np.nan, np.nan, np.nan])
+
+    sigma_mz = np.sqrt(1/(-2 * c))
+    mz = x_local_max
+    sigma_rt = np.sqrt(1/(-2 * e))
+    rt = y_local_max
+    height = np.exp(a)
+
     return np.array([height, mz, sigma_mz, rt, sigma_rt])
 
 def test_gaus_fit():
@@ -1672,7 +1747,18 @@ def plot_raw_roi_fitted_sigma_weighted(peak, raw_data, img_plot=None, rt_plot=No
     fwhm_mz = raw_data.theoretical_fwhm(peak.local_max_mz)
     theoretical_sigma_rt = raw_data.fwhm_rt/(2 * np.sqrt(2 * np.log(2)))
     theoretical_sigma_mz = fwhm_mz/(2 * np.sqrt(2 * np.log(2)))
-    fitted_parameters = fit_weighted_guos_2d(mzs, rts, intensities, peak.local_max_mz, peak.local_max_rt, theoretical_sigma_mz, theoretical_sigma_rt)
+    # IMPORTANT: Since multiple peaks might appear within the 3 * sigma ROI of
+    # a peak, the R2 calculated from this number can be skewed. For this reason,
+    # we are only using +-1 * sigma for the estimation of R2.
+    min_mz = peak.local_max_mz - theoretical_sigma_mz
+    max_mz = peak.local_max_mz + theoretical_sigma_mz
+    min_rt = peak.local_max_rt - theoretical_sigma_rt
+    max_rt = peak.local_max_rt + theoretical_sigma_rt
+    idx = (mzs > min_mz) & (mzs < max_mz) & (rts > min_rt) & (rts < max_rt)
+    mzs = np.copy(mzs[idx])
+    rts = np.copy(rts[idx])
+    intensities = np.copy(intensities[idx])
+    fitted_parameters = fit_weighted_guos_2d_constrained(mzs, rts, intensities, peak.local_max_mz, peak.local_max_rt, theoretical_sigma_mz, theoretical_sigma_rt)
 
     fitted_height, fitted_mz, fitted_sigma_mz, fitted_rt, fitted_sigma_rt = fitted_parameters
 
@@ -1750,6 +1836,125 @@ def gauss_mz_emg_rt(X, h, mz_0, sigma_mz, rt_0, sigma_rt, tau):
     c = erfc(-z)
     d = np.exp(-0.5 * np.power((mz - mz_0) / sigma_mz, 2))
     return h * a * np.exp(b) * c * d 
+
+def calculate_r2(x, y, z, h, mz, sigma_mz, rt, sigma_rt):
+    x = np.array(x)
+    y = np.array(y)
+    z = np.array(z)
+    ss_tot = (np.power(z - z.mean(), 2)).sum()
+    ss_res = (np.power(z - gaus2d([x,y], h, mz, sigma_mz, rt, sigma_rt), 2)).sum()
+    r2 = 1 - ss_res / ss_tot
+    return r2
+
+def fit_and_evaluate_r2(peak, raw_data, verbose = True):
+    data_points = find_raw_points(
+        raw_data,
+        peak.roi_min_mz,
+        peak.roi_max_mz,
+        peak.roi_min_rt,
+        peak.roi_max_rt
+    )
+    mzs = np.array(data_points.mz)
+    rts = np.array(data_points.rt)
+    intensities = np.array(data_points.intensity)
+    fwhm_mz = raw_data.theoretical_fwhm(peak.local_max_mz)
+    theoretical_sigma_rt = raw_data.fwhm_rt/(2 * np.sqrt(2 * np.log(2)))
+    theoretical_sigma_mz = fwhm_mz/(2 * np.sqrt(2 * np.log(2)))
+
+    # IMPORTANT: Since multiple peaks might appear within the 3 * sigma ROI of
+    # a peak, the R2 calculated from this number can be skewed. For this reason,
+    # we are only using +-1 * sigma for the estimation of R2.
+    min_mz = peak.local_max_mz - theoretical_sigma_mz
+    max_mz = peak.local_max_mz + theoretical_sigma_mz
+    min_rt = peak.local_max_rt - theoretical_sigma_rt
+    max_rt = peak.local_max_rt + theoretical_sigma_rt
+    idx = (mzs > min_mz) & (mzs < max_mz) & (rts > min_rt) & (rts < max_rt)
+    mzs = np.copy(mzs[idx])
+    rts = np.copy(rts[idx])
+    intensities = np.copy(intensities[idx])
+    if idx.sum() == 0:
+        print(peak.id)
+
+    # Fit 0: Theoretical.
+    theoretical_r2 = calculate_r2(
+            mzs, rts, intensities,
+            peak.local_max_height,
+            peak.local_max_mz,
+            theoretical_sigma_mz,
+            peak.local_max_rt,
+            theoretical_sigma_rt,
+        )
+    if verbose:
+        print(
+            "[id = {0}][Theoretical]: mz = {1}, rt = {2}, height = {3}, sigma_mz = {4}, sigma_rt = {5}, r2 = {6}".format(
+                    peak.id,
+                    peak.local_max_mz,
+                    peak.local_max_rt,
+                    peak.local_max_height, 
+                    theoretical_sigma_mz, 
+                    theoretical_sigma_rt, 
+                    theoretical_r2,
+                )
+            )
+    # Fit 1: Estimated.
+    estimated_r2 = calculate_r2(
+            mzs, rts, intensities,
+            peak.local_max_height,
+            peak.local_max_mz,
+            peak.raw_roi_sigma_mz,
+            peak.local_max_rt,
+            peak.raw_roi_sigma_rt,
+        )
+    if verbose:
+        print(
+            "[id = {0}][Estimated]: mz = {1}, rt = {2}, height = {3}, sigma_mz = {4}, sigma_rt = {5}, r2 = {6}".format(
+                    peak.id,
+                    peak.local_max_mz,
+                    peak.local_max_rt,
+                    peak.local_max_height, 
+                    peak.raw_roi_sigma_mz, 
+                    peak.raw_roi_sigma_rt, 
+                    estimated_r2,
+                )
+            )
+    # Fit 2: Weighted Least Square Fitting.
+    fitted_parameters = fit_weighted_guos_2d_constrained(mzs, rts, intensities, peak.local_max_mz, peak.local_max_rt, theoretical_sigma_mz, theoretical_sigma_rt)
+    fitted_height, fitted_mz, fitted_sigma_mz, fitted_rt, fitted_sigma_rt = fitted_parameters
+    fitted_r2 = calculate_r2(
+            mzs, rts, intensities,
+            fitted_height,
+            fitted_mz,
+            fitted_sigma_mz,
+            fitted_rt,
+            fitted_sigma_rt,
+        )
+    if verbose:
+        print(
+            "[id = {0}][Fitted(WeightedLE)]: mz = {1}, rt = {2}, height = {3}, sigma_mz = {4}, sigma_rt = {5}, r2 = {6}".format(
+                    peak.id,
+                    fitted_mz,
+                    fitted_rt,
+                    fitted_height, 
+                    fitted_sigma_mz, 
+                    fitted_sigma_rt, 
+                    fitted_r2,
+                )
+            )
+    return (peak.id, theoretical_r2, estimated_r2, fitted_r2)
+
+def calculate_r2_all_peaks(peaks, raw_data, plot_density):
+    r2_values = [fit_and_evaluate_r2(peak, raw_data, verbose = False) for peak in peaks]
+    r2_values = pd.DataFrame(r2_values, columns=['id', 'theoretical_r2', 'estimated_r2', 'fitted_r2'])
+    if plot_density:
+        import seaborn as sns
+        plt.style.use('dark_background')
+        plt.ion()
+        plt.show()
+        fig = plt.figure()
+        sns.distplot(r2_values['theoretical_r2'].dropna(), hist=False, label='theoretical_r2')
+        sns.distplot(r2_values['estimated_r2'].dropna(), hist=False, label='estimated_r2')
+        sns.distplot(r2_values['fitted_r2'].dropna(), hist=False, label='fitted_r2')
+    return r2_values
 
 RawData.tic = tic
 
