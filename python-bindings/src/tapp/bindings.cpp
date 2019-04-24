@@ -446,14 +446,13 @@ Centroid::Peak build_peak(const RawData::RawData &raw_data,
         peak.slope_descent_total_intensity = height_sum;
     }
 
-    // Calculate the ROI for a given local max.
+    double theoretical_sigma_mz = RawData::fwhm_to_sigma(
+        RawData::theoretical_fwhm(raw_data, mesh.bins_mz[local_max.i]));
+    double theoretical_sigma_rt = RawData::fwhm_to_sigma(raw_data.fwhm_rt);
     {
+        // Calculate the ROI for a given local max.
         double mz = peak.local_max_mz;
         double rt = peak.local_max_rt;
-
-        double theoretical_sigma_mz = RawData::fwhm_to_sigma(
-            RawData::theoretical_fwhm(raw_data, mesh.bins_mz[local_max.i]));
-        double theoretical_sigma_rt = RawData::fwhm_to_sigma(raw_data.fwhm_rt);
 
         peak.roi_min_mz = mz - 3 * theoretical_sigma_mz;
         peak.roi_max_mz = mz + 3 * theoretical_sigma_mz;
@@ -519,6 +518,12 @@ Centroid::Peak build_peak(const RawData::RawData &raw_data,
                 }
                 scan_not_empty = true;
                 ++num_points;
+                if ((mz > peak.local_max_mz - theoretical_sigma_mz) &&
+                    (mz < peak.local_max_mz + theoretical_sigma_mz) &&
+                    (rt > peak.local_max_rt - theoretical_sigma_rt) &&
+                    (rt < peak.local_max_rt + theoretical_sigma_rt)) {
+                    peak.raw_roi_num_points_within_sigma++;
+                }
 
                 weight_sum += value;
                 mz_mean += value * mz;
@@ -605,6 +610,9 @@ std::vector<Centroid::Peak> find_peaks(const RawData::RawData &raw_data,
     size_t i = 0;
     for (const auto &lm : local_max) {
         auto peak = build_peak(raw_data, mesh, lm);
+        if (peak.raw_roi_num_points_within_sigma < 5) {
+            continue;
+        }
         peak.id = i;
         peaks.push_back(peak);
         ++i;

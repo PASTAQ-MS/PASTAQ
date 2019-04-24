@@ -67,6 +67,7 @@ struct Peak {
     double raw_roi_max_height;
     double raw_roi_total_intensity;
     uint64_t raw_roi_num_points;
+    uint64_t raw_roi_num_points_within_sigma;
     uint64_t raw_roi_num_scans;
 
     // FIXME: Better commments and documentation.
