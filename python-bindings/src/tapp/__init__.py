@@ -343,69 +343,140 @@ def fit_guos_2d(x, y, z):
     # print(np.allclose(np.dot(X, A), Y))
     return np.array([height, mz, sigma_mz, rt, sigma_rt])
 
+def fit_weighted_guos_2d(x, y, z, x_mean, y_mean, theoretical_sigma_mz, theoretical_sigma_rt):
+    x = x - x_mean
+    y = y - y_mean
 
-def fit_guos_2d_from_peak(peak):
+    a_0_0 = 0
+    a_0_1 = 0
+    a_0_2 = 0
+    a_0_3 = 0
+    a_0_4 = 0
+    a_1_0 = 0
+    a_1_1 = 0
+    a_1_2 = 0
+    a_1_3 = 0
+    a_1_4 = 0
+    a_2_0 = 0
+    a_2_1 = 0
+    a_2_2 = 0
+    a_2_3 = 0
+    a_2_4 = 0
+    a_3_0 = 0
+    a_3_1 = 0
+    a_3_2 = 0
+    a_3_3 = 0
+    a_3_4 = 0
+    a_4_0 = 0
+    a_4_1 = 0
+    a_4_2 = 0
+    a_4_3 = 0
+    a_4_4 = 0
+    c_0 = 0
+    c_1 = 0
+    c_2 = 0
+    c_3 = 0
+    c_4 = 0
+    for i, intensity in enumerate(z):
+        mz = x[i] 
+        rt = y[i] 
+        w = gaus2d([mz, rt], 1, 0, theoretical_sigma_mz, 0, theoretical_sigma_rt)
+        w_2 = w * w
+
+        a_0_0 += w_2
+        a_0_1 += w_2 * mz
+        a_0_2 += w_2 * mz * mz
+        a_0_3 += w_2 * rt
+        a_0_4 += w_2 * rt * rt
+
+        a_1_0 += w_2 * mz
+        a_1_1 += w_2 * mz * mz
+        a_1_2 += w_2 * mz * mz * mz
+        a_1_3 += w_2 * rt * mz
+        a_1_4 += w_2 * rt * rt * mz
+
+        a_2_0 += w_2 * mz * mz
+        a_2_1 += w_2 * mz * mz * mz
+        a_2_2 += w_2 * mz * mz * mz * mz
+        a_2_3 += w_2 * rt * mz * mz
+        a_2_4 += w_2 * rt * rt * mz * mz
+
+        a_3_0 += w_2 * rt
+        a_3_1 += w_2 * mz * rt 
+        a_3_2 += w_2 * mz * mz * rt
+        a_3_3 += w_2 * rt * rt
+        a_3_4 += w_2 * rt * rt * rt
+
+        a_4_0 += w_2 * rt * rt
+        a_4_1 += w_2 * mz * rt * rt 
+        a_4_2 += w_2 * mz * mz * rt * rt
+        a_4_3 += w_2 * rt * rt * rt
+        a_4_4 += w_2 * rt * rt * rt * rt
+
+        c_0 += w_2 * np.log(intensity)
+        c_1 += w_2 * np.log(intensity) * mz
+        c_2 += w_2 * np.log(intensity) * mz * mz
+        c_3 += w_2 * np.log(intensity) * rt
+        c_4 += w_2 * np.log(intensity) * rt * rt
+
     X = np.array(
         [
             [
-                peak.a_0_0(),
-                peak.a_0_1(),
-                peak.a_0_2(),
-                peak.a_0_3(),
-                peak.a_0_4(),
+                a_0_0,
+                a_0_1,
+                a_0_2,
+                a_0_3,
+                a_0_4,
             ],
             [
-                peak.a_1_0(),
-                peak.a_1_1(),
-                peak.a_1_2(),
-                peak.a_1_3(),
-                peak.a_1_4(),
+                a_1_0,
+                a_1_1,
+                a_1_2,
+                a_1_3,
+                a_1_4,
             ],
             [
-                peak.a_2_0(),
-                peak.a_2_1(),
-                peak.a_2_2(),
-                peak.a_2_3(),
-                peak.a_2_4(),
+                a_2_0,
+                a_2_1,
+                a_2_2,
+                a_2_3,
+                a_2_4,
             ],
             [
-                peak.a_3_0(),
-                peak.a_3_1(),
-                peak.a_3_2(),
-                peak.a_3_3(),
-                peak.a_3_4(),
+                a_3_0,
+                a_3_1,
+                a_3_2,
+                a_3_3,
+                a_3_4,
             ],
             [
-                peak.a_4_0(),
-                peak.a_4_1(),
-                peak.a_4_2(),
-                peak.a_4_3(),
-                peak.a_4_4(),
+                a_4_0,
+                a_4_1,
+                a_4_2,
+                a_4_3,
+                a_4_4,
             ],
         ],
     )
     Y = np.array([
-        peak.c_0(),
-        peak.c_1(),
-        peak.c_2(),
-        peak.c_3(),
-        peak.c_4(),
+        c_0,
+        c_1,
+        c_2,
+        c_3,
+        c_4,
     ])
     # a, b, c, d, e = np.linalg.solve(X, Y)
-    # print(X, Y)
-    beta = np.linalg.lstsq(X, Y, rcond=None)
-    # print(beta)
-    beta_0, beta_1, beta_2, beta_3, beta_4 = beta[0]
+    beta = np.linalg.lstsq(X, Y)
+    a, b, c, d, e = beta[0]
 
-    sigma_mz = np.sqrt(1/(-2 * beta_2))
-    mz = (beta_1 / (-2 * beta_2)) + peak.local_max_mz
-    sigma_rt = np.sqrt(1/(-2 * beta_4))
-    rt = (beta_3 / (-2 * beta_4)) + peak.local_max_rt
-    height = np.exp(beta_0)
+    sigma_mz = np.sqrt(1/(-2 * c))
+    mz = b / (-2 * c) + x_mean
+    sigma_rt = np.sqrt(1/(-2 * e))
+    rt = d / (-2 * e) + y_mean
+    height = np.exp(a - ((b ** 2) / (4 * c)) - ((d ** 2) / (4 * e)))
 
     # print(np.allclose(np.dot(X, A), Y))
     return np.array([height, mz, sigma_mz, rt, sigma_rt])
-
 
 def test_gaus_fit():
     x, y = generate_gaussian()
@@ -1512,7 +1583,7 @@ def plot_sigma(
 def plot_raw_roi_sigma(peak, img_plot=None, rt_plot=None, mz_plot=None):
     return plot_sigma(
         peak,
-        peak.raw_roi_max_height,
+        peak.local_max_height,
         peak.local_max_mz,
         peak.local_max_rt,
         peak.raw_roi_sigma_mz,
@@ -1522,6 +1593,121 @@ def plot_raw_roi_sigma(peak, img_plot=None, rt_plot=None, mz_plot=None):
         mz_plot,
         label='raw_roi',
         marker='s',
+        )
+
+def plot_raw_roi_fitted_sigma(peak, raw_data, img_plot=None, rt_plot=None, mz_plot=None):
+    data_points = find_raw_points(
+        raw_data,
+        peak.roi_min_mz,
+        peak.roi_max_mz,
+        peak.roi_min_rt,
+        peak.roi_max_rt
+    )
+    mzs = np.array(data_points.mz)
+    rts = np.array(data_points.rt)
+    intensities = np.array(data_points.intensity)
+    X = np.array([mzs, rts])
+    f = lambda x, h, mz, sigma_mz, rt, sigma_rt: gaus2d(x, h, peak.local_max_mz, sigma_mz, peak.local_max_rt, sigma_rt)
+    fitted_parameters, pcov_2d = curve_fit(f, X, intensities, p0=[
+        peak.raw_roi_max_height, peak.local_max_mz, peak.raw_roi_sigma_mz, peak.local_max_rt, peak.raw_roi_sigma_rt])
+
+    fitted_height, fitted_mz, fitted_sigma_mz, fitted_rt, fitted_sigma_rt = fitted_parameters
+
+    return plot_sigma(
+        peak,
+        fitted_height,
+        fitted_mz,
+        fitted_rt,
+        fitted_sigma_mz,
+        fitted_sigma_rt,
+        img_plot,
+        rt_plot,
+        mz_plot,
+        linestyle='-',
+        label='fitted_raw_roi',
+        marker='.',
+        )
+
+def plot_raw_roi_fitted_sigma_fast(peak, raw_data, img_plot=None, rt_plot=None, mz_plot=None):
+    data_points = find_raw_points(
+        raw_data,
+        peak.roi_min_mz,
+        peak.roi_max_mz,
+        peak.roi_min_rt,
+        peak.roi_max_rt
+    )
+    mzs = np.array(data_points.mz)
+    rts = np.array(data_points.rt)
+    intensities = np.array(data_points.intensity)
+    fitted_parameters = fit_guos_2d(mzs, rts, intensities)
+
+    fitted_height, fitted_mz, fitted_sigma_mz, fitted_rt, fitted_sigma_rt = fitted_parameters
+
+    return plot_sigma(
+        peak,
+        fitted_height,
+        fitted_mz,
+        fitted_rt,
+        fitted_sigma_mz,
+        fitted_sigma_rt,
+        img_plot,
+        rt_plot,
+        mz_plot,
+        linestyle=':',
+        label='fitted_raw_roi (fast)',
+        marker='P',
+        )
+
+def plot_raw_roi_fitted_sigma_weighted(peak, raw_data, img_plot=None, rt_plot=None, mz_plot=None):
+    data_points = find_raw_points(
+        raw_data,
+        peak.roi_min_mz,
+        peak.roi_max_mz,
+        peak.roi_min_rt,
+        peak.roi_max_rt
+    )
+    mzs = np.array(data_points.mz)
+    rts = np.array(data_points.rt)
+    intensities = np.array(data_points.intensity)
+    fwhm_mz = raw_data.theoretical_fwhm(peak.local_max_mz)
+    theoretical_sigma_rt = raw_data.fwhm_rt/(2 * np.sqrt(2 * np.log(2)))
+    theoretical_sigma_mz = fwhm_mz/(2 * np.sqrt(2 * np.log(2)))
+    fitted_parameters = fit_weighted_guos_2d(mzs, rts, intensities, peak.local_max_mz, peak.local_max_rt, theoretical_sigma_mz, theoretical_sigma_rt)
+
+    fitted_height, fitted_mz, fitted_sigma_mz, fitted_rt, fitted_sigma_rt = fitted_parameters
+
+    return plot_sigma(
+        peak,
+        fitted_height,
+        fitted_mz,
+        fitted_rt,
+        fitted_sigma_mz,
+        fitted_sigma_rt,
+        img_plot,
+        rt_plot,
+        mz_plot,
+        linestyle='-',
+        label='fitted_raw_roi (weighted)',
+        marker='P',
+        )
+
+def plot_theoretical_sigma(peak, raw_data, img_plot=None, rt_plot=None, mz_plot=None):
+    fwhm_mz = raw_data.theoretical_fwhm(peak.local_max_mz)
+    theoretical_sigma_rt = raw_data.fwhm_rt/(2 * np.sqrt(2 * np.log(2)))
+    theoretical_sigma_mz = fwhm_mz/(2 * np.sqrt(2 * np.log(2)))
+    return plot_sigma(
+        peak,
+        peak.local_max_height,
+        peak.local_max_mz,
+        peak.local_max_rt,
+        theoretical_sigma_mz,
+        theoretical_sigma_rt,
+        img_plot,
+        rt_plot,
+        mz_plot,
+        linestyle=':',
+        label='fitted_raw_roi (fast)',
+        marker='P',
         )
 
 def plot_slope_descent_sigma(peak, img_plot=None, rt_plot=None, mz_plot=None):
@@ -1570,8 +1756,11 @@ RawData.tic = tic
 Peak.plot_xic = plot_xic
 Peak.plot_raw_points = plot_raw_points
 Peak.plot_raw_roi_sigma = plot_raw_roi_sigma
+Peak.plot_theoretical_sigma = plot_theoretical_sigma
+Peak.plot_raw_roi_fitted_sigma = plot_raw_roi_fitted_sigma
+Peak.plot_raw_roi_fitted_sigma_fast = plot_raw_roi_fitted_sigma_fast
+Peak.plot_raw_roi_fitted_sigma_weighted = plot_raw_roi_fitted_sigma_weighted
 Peak.plot_slope_descent_sigma = plot_slope_descent_sigma
 Peak.plot_sigma = plot_sigma
-Peak.fit_mz_rt_height_and_sigmas = fit_guos_2d_from_peak
 Peak.fit_height_and_sigmas = fit_height_and_sigmas
 Peak.fit_sigmas = fit_sigmas

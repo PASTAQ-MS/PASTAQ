@@ -724,6 +724,7 @@ PYBIND11_MODULE(tapp, m) {
 
     py::class_<RawData::RawData>(m, "RawData")
         .def_readonly("scans", &RawData::RawData::scans)
+        .def_readonly("fwhm_rt", &RawData::RawData::fwhm_rt)
         .def_readonly("instrument_type", &RawData::RawData::instrument_type)
         .def_readonly("resolution_ms1", &RawData::RawData::resolution_ms1)
         .def_readonly("resolution_msn", &RawData::RawData::resolution_msn)
@@ -732,6 +733,7 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("max_mz", &RawData::RawData::max_mz)
         .def_readonly("min_rt", &RawData::RawData::min_rt)
         .def_readonly("max_rt", &RawData::RawData::max_rt)
+        .def("theoretical_fwhm", &RawData::theoretical_fwhm, py::arg("mz"))
         .def("__repr__", [](const RawData::RawData &rd) {
             return "RawData:\n> instrument_type: " +
                    PythonAPI::to_string(rd.instrument_type) +
