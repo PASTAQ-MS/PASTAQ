@@ -802,6 +802,104 @@ theoretical_isotopes_peptide(std::string sequence, int charge_state,
     return {mzs, perc};
 }
 
+namespace IdentData {
+struct SpectrumId {
+    bool pass_threshold;
+    std::string sequence;
+    size_t charge_state;
+    double theoretical_mz;
+    double experimental_mz;
+    double retention_time;
+    int rank;
+};
+}  // namespace IdentData
+
+std::vector<PythonAPI::IdentData::SpectrumId> _read_mzidentml(
+    std::istream &stream, bool threshold) {
+    std::vector<PythonAPI::IdentData::SpectrumId> spectrum_ids;
+
+    while (stream.good()) {
+        // Find the first tag for this data (SpectrumIdentificationResult).
+        auto tag = XmlReader::read_tag(stream);
+        if (!tag || tag.value().name != "SpectrumIdentificationResult") {
+            continue;
+        }
+        auto spectrum_id = PythonAPI::IdentData::SpectrumId{};
+        bool identification_item_found = false;
+        while (stream.good()) {
+            tag = XmlReader::read_tag(stream);
+            auto attributes = tag.value().attributes;
+
+            // Retention time.
+            if (tag.value().name == "cvParam" &&
+                attributes["accession"] == "MS:1000894") {
+                spectrum_id.retention_time = std::stod(attributes["value"]);
+            }
+
+            // Identification item.
+            if (tag.value().name == "SpectrumIdentificationItem" &&
+                !tag.value().closed) {
+                if (identification_item_found &&
+                    std::stoi(attributes["rank"]) < spectrum_id.rank) {
+                    continue;
+                }
+                spectrum_id.rank = std::stoi(attributes["rank"]);
+                spectrum_id.pass_threshold =
+                    attributes["passThreshold"] == "true";
+                spectrum_id.sequence = attributes["peptide_ref"];
+                spectrum_id.charge_state = std::stoi(attributes["chargeState"]);
+                spectrum_id.theoretical_mz =
+                    std::stod(attributes["calculatedMassToCharge"]);
+                spectrum_id.experimental_mz =
+                    std::stod(attributes["experimentalMassToCharge"]);
+                identification_item_found = true;
+            }
+
+            if (tag.value().name == "SpectrumIdentificationResult" &&
+                tag.value().closed) {
+                if (!threshold || spectrum_id.pass_threshold) {
+                    spectrum_ids.push_back(spectrum_id);
+                }
+                break;
+            }
+        }
+        if (tag.value().name == "SpectrumIdentificationList" &&
+            tag.value().closed) {
+            break;
+        }
+    }
+    return spectrum_ids;
+}
+
+std::vector<PythonAPI::IdentData::SpectrumId> read_mzidentml(
+    std::string file_name, bool threshold) {
+    std::filesystem::path input_file = file_name;
+
+    // Check for proper file extension.
+    std::string extension = input_file.extension();
+    std::string lowercase_extension = extension;
+    for (auto &ch : lowercase_extension) {
+        ch = std::tolower(ch);
+    }
+    if (lowercase_extension != ".mzid") {
+        std::ostringstream error_stream;
+        error_stream << "invalid file type: expected 'mzid' but given '"
+                     << extension << "'";
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    // Open file stream.
+    std::ifstream stream;
+    stream.open(input_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open input file" << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    return _read_mzidentml(stream, threshold);
+}
+
 }  // namespace PythonAPI
 
 PYBIND11_MODULE(tapp, m) {
@@ -921,6 +1019,23 @@ PYBIND11_MODULE(tapp, m) {
                    ", mean_ratio: " + std::to_string(s.mean_ratio);
         });
 
+    py::class_<PythonAPI::IdentData::SpectrumId>(m, "SpectrumId")
+        .def_readonly("pass_threshold",
+                      &PythonAPI::IdentData::SpectrumId::pass_threshold)
+        .def_readonly("sequence", &PythonAPI::IdentData::SpectrumId::sequence)
+        .def_readonly("charge_state",
+                      &PythonAPI::IdentData::SpectrumId::charge_state)
+        .def_readonly("theoretical_mz",
+                      &PythonAPI::IdentData::SpectrumId::theoretical_mz)
+        .def_readonly("experimental_mz",
+                      &PythonAPI::IdentData::SpectrumId::experimental_mz)
+        .def_readonly("retention_time",
+                      &PythonAPI::IdentData::SpectrumId::retention_time)
+        .def_readonly("rank", &PythonAPI::IdentData::SpectrumId::rank)
+        .def("__repr__", [](const PythonAPI::IdentData::SpectrumId &s) {
+            return s.sequence + "_" + std::to_string(s.charge_state);
+        });
+
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,
           "Read raw data from the given mzXML file ", py::arg("file_name"),
@@ -966,5 +1081,8 @@ PYBIND11_MODULE(tapp, m) {
              &PythonAPI::theoretical_isotopes_peptide,
              "Calculate the theoretical isotopic distribution of a peptide",
              py::arg("sequence"), py::arg("charge_state"),
-             py::arg("min_perc") = 0.01);
+             py::arg("min_perc") = 0.01)
+        .def("read_mzidentml", &PythonAPI::read_mzidentml,
+             "Read identification data from the given mzIdentML file ",
+             py::arg("file_name"), py::arg("threshold") = true);
 }
