@@ -27,7 +27,7 @@ struct Point {
 struct Peak {
     // ID of this peak. Should be kept for futher processing.
     size_t id;
-    // Height,mz and rt values for the center of this peak (From the local
+    // Height, mz and rt values for the center of this peak (From the local
     // maxima coordinates on the mesh).
     double local_max_mz;
     double local_max_rt;

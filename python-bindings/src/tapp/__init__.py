@@ -32,7 +32,7 @@ def load_example_data():
     raw_data = read_mzxml(
         '/data/toydata/toy_data.mzXML',
         instrument_type='orbitrap',
-        resolution_ms1=75000,
+        resolution_ms1=70000,
         resolution_msn=30000,
         reference_mz=200,
         fwhm_rt=9,
@@ -45,7 +45,7 @@ def load_example_data():
     # raw_data = read_mzxml(
     # '/data/ftp_data/150210_11_01.mzXML',
     # instrument_type = 'orbitrap',
-    # resolution_ms1 = 75000,
+    # resolution_ms1 = 70000,
     # resolution_msn = 30000,
     # reference_mz = 200,
     # polarity = 'pos',
@@ -733,7 +733,7 @@ def profile_resample():
     # raw_data = read_mzxml(
         # '/data/toydata/toy_data.mzXML',
         # instrument_type = 'orbitrap',
-        # resolution_ms1 = 75000,
+        # resolution_ms1 = 70000,
         # resolution_msn = 30000,
         # reference_mz = 200,
         # fwhm_rt = 9,
@@ -746,7 +746,7 @@ def profile_resample():
     raw_data = read_mzxml(
         '/data/qatar/17122018/mzXML/Acute2U_3001.mzXML',
         instrument_type='orbitrap',
-        resolution_ms1=75000,
+        resolution_ms1=70000,
         resolution_msn=30000,
         reference_mz=200,
         fwhm_rt=9,
@@ -774,7 +774,7 @@ def profile_peak_fitting(max_peaks=20):
     raw_data = read_mzxml(
         '/data/toydata/toy_data.mzXML',
         instrument_type='orbitrap',
-        resolution_ms1=75000,
+        resolution_ms1=70000,
         resolution_msn=30000,
         reference_mz=200,
         fwhm_rt=9,
@@ -832,7 +832,7 @@ def example_pipeline(show_mesh_plot=False, show_plot_fit=True, silent=True, max_
     # raw_data = read_mzxml(
     # '/data/toydata/toy_data.mzXML',
     # instrument_type = 'orbitrap',
-    # resolution_ms1 = 75000,
+    # resolution_ms1 = 70000,
     # resolution_msn = 30000,
     # reference_mz = 200,
     # fwhm_rt = 9,
@@ -916,7 +916,7 @@ def debugging_qatar():
     file_name = "/data/qatar/17122018/mzXML/Acute2U_3001.mzXML"
     tapp_parameters = {
         'instrument_type': 'orbitrap',
-        'resolution_ms1': 75000,
+        'resolution_ms1': 70000,
         'resolution_msn': 30000,
         'reference_mz': 200,
         'avg_fwhm_rt': 9,
@@ -1041,43 +1041,18 @@ def peak_extraction(file_name, tapp_parameters, polarity):
         polarity=polarity,
     )
     print("Resampling")
-    mesh = resample(raw_data, 5, 5, 0.5, 0.5)
+    mesh = resample(
+        raw_data,
+        tapp_parameters['num_samples_mz'],
+        tapp_parameters['num_samples_rt'],
+        tapp_parameters['smoothing_coefficient_mz'],
+        tapp_parameters['smoothing_coefficient_rt'],
+        )
 
     print("Finding peaks")
     peaks = find_peaks(raw_data, mesh)
-    peaks_df = pd.DataFrame(
-        {
-            'local_max_mz': np.array([peak.local_max_mz for peak in peaks]),
-            'local_max_rt': np.array([peak.local_max_rt for peak in peaks]),
-            'local_max_height': np.array([peak.local_max_height for peak in peaks]),
-            'slope_descent_mz': np.array([peak.slope_descent_mz for peak in peaks]),
-            'slope_descent_rt': np.array([peak.slope_descent_rt for peak in peaks]),
-            'slope_descent_sigma_mz': np.array([peak.slope_descent_sigma_mz for peak in peaks]),
-            'slope_descent_sigma_rt': np.array([peak.slope_descent_sigma_rt for peak in peaks]),
-            'slope_descent_total_intensity': np.array([peak.slope_descent_total_intensity for peak in peaks]),
-            'slope_descent_border_background': np.array([peak.slope_descent_border_background for peak in peaks]),
-            'raw_roi_mz': np.array([peak.raw_roi_mean_mz for peak in peaks]),
-            'raw_roi_rt': np.array([peak.raw_roi_mean_rt for peak in peaks]),
-            'raw_roi_sigma_mz': np.array([peak.raw_roi_sigma_mz for peak in peaks]),
-            'raw_roi_sigma_rt': np.array([peak.raw_roi_sigma_rt for peak in peaks]),
-            'raw_roi_total_intensity': np.array([peak.raw_roi_total_intensity for peak in peaks]),
-            'raw_roi_max_height': np.array([peak.raw_roi_max_height for peak in peaks]),
-            'raw_roi_num_points': np.array([peak.raw_roi_num_points for peak in peaks]),
-            'raw_roi_num_scans': np.array([peak.raw_roi_num_scans for peak in peaks]),
-        })
 
-    # print("Fitting peaks via least_squares")
-    # fitted_peaks = []
-    # for peak_candidate in peaks:
-        # fitted_peak = fit_guos_2d_from_peak(peak_candidate)
-        # fitted_peaks = fitted_peaks + [fitted_peak]
-
-    # fitted_peaks = pd.DataFrame(fitted_peaks)
-    # fitted_peaks.columns = ['fitted_height', 'fitted_mz',
-                            # 'fitted_sigma_mz', 'fitted_rt', 'fitted_sigma_rt']
-    # peaks_df = pd.concat([peaks_df, fitted_peaks], axis=1)
-
-    return raw_data, mesh, peaks_df, peaks
+    return raw_data, mesh, peaks
 
 def testing_warping():
     # TODO: Load and peak detect two files
@@ -1332,7 +1307,7 @@ def load_hye_data_example():
     # file_name = '/data/toydata/toy_data_hye_6.mzXML'
     tapp_parameters = {
         'instrument_type': 'orbitrap',
-        'resolution_ms1': 75000,
+        'resolution_ms1': 70000,
         'resolution_msn': 30000,
         'reference_mz': 200,
         'avg_fwhm_rt': 30,
@@ -1356,7 +1331,7 @@ def load_hye_data_example():
         max_rt=tapp_parameters['max_rt'],
     )
     print("Resampling")
-    mesh = resample(raw_data, 10, 10, 0.3, 0.3)
+    mesh = resample(raw_data, 10, 10, 0.4, 0.4)
     print("Finding peaks")
     peaks = find_peaks(raw_data, mesh)
     return raw_data, mesh, peaks
@@ -1553,8 +1528,6 @@ def plot_sigma(
         img_plot.set_xlim([min_mz, max_mz])
         img_plot.set_ylim([min_rt, max_rt])
 
-
-
     # NOTE: Adding 200 for a more pleasant color map on the first peaks, found this
     # number by trial and error, dont @ me.
     np.random.seed(peak.id + 200)
@@ -1647,7 +1620,6 @@ def plot_sigma(
             color=base_color,
             label=label,
             )
-
 
     return({
         "img_plot": img_plot,
@@ -1758,7 +1730,8 @@ def plot_raw_roi_fitted_sigma_weighted(peak, raw_data, img_plot=None, rt_plot=No
     mzs = np.copy(mzs[idx])
     rts = np.copy(rts[idx])
     intensities = np.copy(intensities[idx])
-    fitted_parameters = fit_weighted_guos_2d_constrained(mzs, rts, intensities, peak.local_max_mz, peak.local_max_rt, theoretical_sigma_mz, theoretical_sigma_rt)
+    # fitted_parameters = fit_weighted_guos_2d_constrained(mzs, rts, intensities, peak.local_max_mz, peak.local_max_rt, theoretical_sigma_mz, theoretical_sigma_rt)
+    fitted_parameters = fit_weighted_guos_2d(mzs, rts, intensities, peak.local_max_mz, peak.local_max_rt, theoretical_sigma_mz, theoretical_sigma_rt)
 
     fitted_height, fitted_mz, fitted_sigma_mz, fitted_rt, fitted_sigma_rt = fitted_parameters
 
@@ -1815,7 +1788,8 @@ def plot_slope_descent_sigma(peak, img_plot=None, rt_plot=None, mz_plot=None):
 def testing_different_sigmas(peaks, raw_data):
     plots = peaks[0].plot_raw_points(raw_data)
     plots = peaks[0].plot_raw_roi_sigma(plots['img_plot'], plots['rt_plot'], plots['mz_plot'])
-    plots = peaks[0].plot_slope_descent_sigma(plots['img_plot'], plots['rt_plot'], plots['mz_plot'])
+    plots = peaks[0].plot_theoretical_sigma(raw_data, plots['img_plot'], plots['rt_plot'], plots['mz_plot'])
+    plots = peaks[0].plot_raw_roi_fitted_sigma_weighted(raw_data, plots['img_plot'], plots['rt_plot'], plots['mz_plot'])
     plt.legend()
     return plots
 
@@ -1955,6 +1929,34 @@ def calculate_r2_all_peaks(peaks, raw_data, plot_density):
         sns.distplot(r2_values['estimated_r2'].dropna(), hist=False, label='estimated_r2')
         sns.distplot(r2_values['fitted_r2'].dropna(), hist=False, label='fitted_r2')
     return r2_values
+
+def to_table(peaks):
+    peaks_df = pd.DataFrame(
+        {
+            'id': np.array([peak.id for peak in peaks]),
+            'local_max_mz': np.array([peak.local_max_mz for peak in peaks]),
+            'local_max_rt': np.array([peak.local_max_rt for peak in peaks]),
+            'local_max_height': np.array([peak.local_max_height for peak in peaks]),
+            'slope_descent_mean_mz': np.array([peak.slope_descent_mean_mz for peak in peaks]),
+            'slope_descent_mean_rt': np.array([peak.slope_descent_mean_rt for peak in peaks]),
+            'slope_descent_sigma_mz': np.array([peak.slope_descent_sigma_mz for peak in peaks]),
+            'slope_descent_sigma_rt': np.array([peak.slope_descent_sigma_rt for peak in peaks]),
+            'slope_descent_total_intensity': np.array([peak.slope_descent_total_intensity for peak in peaks]),
+            'slope_descent_border_background': np.array([peak.slope_descent_border_background for peak in peaks]),
+            'raw_roi_mean_mz': np.array([peak.raw_roi_mean_mz for peak in peaks]),
+            'raw_roi_mean_rt': np.array([peak.raw_roi_mean_rt for peak in peaks]),
+            'raw_roi_sigma_mz': np.array([peak.raw_roi_sigma_mz for peak in peaks]),
+            'raw_roi_sigma_rt': np.array([peak.raw_roi_sigma_rt for peak in peaks]),
+            'raw_roi_skewness_mz': np.array([peak.raw_roi_skewness_mz for peak in peaks]),
+            'raw_roi_skewness_rt': np.array([peak.raw_roi_skewness_rt for peak in peaks]),
+            'raw_roi_kurtosis_mz': np.array([peak.raw_roi_kurtosis_mz for peak in peaks]),
+            'raw_roi_kurtosis_rt': np.array([peak.raw_roi_kurtosis_rt for peak in peaks]),
+            'raw_roi_max_height': np.array([peak.raw_roi_max_height for peak in peaks]),
+            'raw_roi_total_intensity': np.array([peak.raw_roi_total_intensity for peak in peaks]),
+            'raw_roi_num_points': np.array([peak.raw_roi_num_points for peak in peaks]),
+            'raw_roi_num_scans': np.array([peak.raw_roi_num_scans for peak in peaks]),
+        })
+    return peaks_df
 
 RawData.tic = tic
 

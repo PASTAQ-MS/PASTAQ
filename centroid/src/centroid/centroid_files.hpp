@@ -19,6 +19,9 @@ bool read_header(std::istream &stream, Header *header);
 bool write_header(std::ostream &stream, const Header &header);
 
 // Read/Write all peaks to/from the given binary stream.
+bool read_peaks(std::istream &stream, std::vector<Centroid::Peak> *peaks);
+bool write_peaks(std::ostream &stream,
+                 const std::vector<Centroid::Peak> &peaks);
 bool read_peaks(std::istream &stream, Grid::Parameters *grid_parameters,
                 std::vector<Centroid::Peak> *peaks);
 bool write_peaks(std::ostream &stream, const Grid::Parameters &grid_parameters,

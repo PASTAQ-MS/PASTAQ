@@ -83,13 +83,13 @@ struct Mesh {
     double rt_at(uint64_t j);
 };
 
-// Applies 2D kernel smoothing. The smoothing is performed in two passes.
-// First the raw data points are mapped into a 2D matrix by splatting them into
-// a matrix. Sparse areas might result in artifacts when the data is noisy, for
-// this reason, the data is smoothed again.
+// Applies 2D kernel smoothing. The smoothing is performed in two passes.  First
+// the raw data points are mapped into a 2D matrix by splatting them. Sparse
+// areas might result in artifacts when the data is noisy, for this reason, the
+// data is smoothed again.
 //
-// Since multiple passes of a Gaussian smoothing is equivalent to a single
-// pass with `sigma = sqrt(2) * sigma_pass`, we adjust the sigmas for each pass
+// Since multiple passes of a Gaussian smoothing is equivalent to a single pass
+// with `sigma = sqrt(2) * sigma_pass`, we adjust the sigmas for each pass
 // accordingly.
 Mesh resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
               uint64_t num_samples_rt, double smoothing_coef_mz,

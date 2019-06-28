@@ -21,7 +21,7 @@ find_package(Threads REQUIRED)
 # Add utils dependency.
 #add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../utils" ${CMAKE_CURRENT_BINARY_DIR}/utils)
 
-## Add grid dependency
+# Add grid dependency
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../grid" ${CMAKE_CURRENT_BINARY_DIR}/grid)
 
 # Add centroid dependency

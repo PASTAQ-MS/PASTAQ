@@ -37,12 +37,36 @@ bool Centroid::Files::Bpks::read_peaks(std::istream &stream,
     return stream.good();
 }
 
+bool Centroid::Files::Bpks::read_peaks(std::istream &stream,
+                                       std::vector<Centroid::Peak> *peaks) {
+    uint64_t num_peaks = 0;
+    Serialization::read_uint64(stream, &num_peaks);
+    peaks->resize(num_peaks);
+    for (auto &peak : *peaks) {
+        if (!Centroid::Serialize::read_peak(stream, &peak)) {
+            return false;
+        }
+    }
+    return stream.good();
+}
+
 bool Centroid::Files::Bpks::write_peaks(
     std::ostream &stream, const Grid::Parameters &grid_parameters,
     const std::vector<Centroid::Peak> &peaks) {
     if (!write_header(stream, {0, peaks.size(), grid_parameters})) {
         return false;
     }
+    for (const auto &peak : peaks) {
+        if (!Centroid::Serialize::write_peak(stream, peak)) {
+            return false;
+        }
+    }
+    return stream.good();
+}
+
+bool Centroid::Files::Bpks::write_peaks(
+    std::ostream &stream, const std::vector<Centroid::Peak> &peaks) {
+    Serialization::write_uint64(stream, peaks.size());
     for (const auto &peak : peaks) {
         if (!Centroid::Serialize::write_peak(stream, peak)) {
             return false;
@@ -86,19 +110,21 @@ bool Centroid::Files::Csv::write_peaks(
                << peak.local_max_rt
                << cell_delimiter
                // Height
+               // TODO: RETURN raw_roi_total_intensity here? other?
+               //<< peak.raw_roi_total_intensity
                << peak.local_max_height
                << cell_delimiter
                // Volume
-               << peak.slope_descent_total_intensity
+               << peak.raw_roi_total_intensity
                << cell_delimiter
                // VCentroid
                << 0
                << cell_delimiter
                // XSigma
-               << peak.slope_descent_sigma_mz
+               << peak.raw_roi_sigma_mz
                << cell_delimiter
                // YSigma
-               << peak.slope_descent_sigma_rt
+               << peak.raw_roi_sigma_rt
                << cell_delimiter
                // Count
                << 0
@@ -107,7 +133,8 @@ bool Centroid::Files::Csv::write_peaks(
                << peak.slope_descent_border_background
                << cell_delimiter
                // SNVolume
-               << (peak.slope_descent_total_intensity / peak.slope_descent_border_background)
+               << (peak.slope_descent_total_intensity /
+                   peak.slope_descent_border_background)
                << cell_delimiter
                // SNHeight
                << (peak.local_max_height / peak.slope_descent_border_background)
@@ -173,7 +200,8 @@ bool Centroid::Files::Csv::read_peaks(std::istream &stream,
         };
         // Volume
         std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.slope_descent_total_intensity).eof()) {
+        if (!(std::istringstream(token) >> peak.slope_descent_total_intensity)
+                 .eof()) {
             return false;
         };
         // VCentroid (Skip)
@@ -192,7 +220,8 @@ bool Centroid::Files::Csv::read_peaks(std::istream &stream,
         std::getline(token_stream, token, cell_delimiter);
         // LocalBkgnd
         std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.slope_descent_border_background).eof()) {
+        if (!(std::istringstream(token) >> peak.slope_descent_border_background)
+                 .eof()) {
             return false;
         };
         // SNVolume (Skip)

@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <thread>
 #include <tuple>
 
 #include "centroid/centroid.hpp"
@@ -610,6 +611,9 @@ std::vector<Centroid::Peak> find_peaks(const RawData::RawData &raw_data,
     size_t i = 0;
     for (const auto &lm : local_max) {
         auto peak = build_peak(raw_data, mesh, lm);
+        // FIXME: Number of raw points within the theoretical sigma should be
+        // set by the user, with a sensible default. Same with the minimum
+        // number of rt scans per peak.
         if (peak.raw_roi_num_points_within_sigma < 5) {
             continue;
         }
@@ -638,7 +642,8 @@ std::vector<std::vector<Centroid::Peak>> warp_peaks(
         auto peaks = all_peaks[i];
         std::vector<Centroid::Peak> warped_peaks;
         warped_peaks =
-            Warp2D::Runners::Serial::run(reference_peaks, peaks, parameters);
+            Warp2D::Runners::Parallel::run(reference_peaks, peaks, parameters,
+                                           std::thread::hardware_concurrency());
         all_warped_peaks.push_back(warped_peaks);
     }
     return all_warped_peaks;
@@ -703,6 +708,69 @@ struct MetaPeak {
 struct MetaPeaks {
     // TODO: ...
 };
+
+void to_csv(const std::vector<Centroid::Peak> &peaks, std::string file_name) {
+    std::filesystem::path output_file = file_name;
+
+    // Open file stream.
+    std::ofstream stream;
+    stream.open(output_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open output file" << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    if (!Centroid::Files::Csv::write_peaks(stream, peaks)) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't write the peaks into the output file"
+                     << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+}
+
+void write_peaks(const std::vector<Centroid::Peak> &peaks,
+                 std::string file_name) {
+    std::filesystem::path output_file = file_name;
+
+    // Open file stream.
+    std::ofstream stream;
+    stream.open(output_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open output file" << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    if (!Centroid::Files::Bpks::write_peaks(stream, peaks)) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't write the peaks into the output file"
+                     << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+}
+
+std::vector<Centroid::Peak> read_peaks(std::string file_name) {
+    std::filesystem::path input_file = file_name;
+
+    // Open file stream.
+    std::ifstream stream;
+    stream.open(input_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open input file" << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    std::vector<Centroid::Peak> peaks;
+    if (!Centroid::Files::Bpks::read_peaks(stream, &peaks)) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't write the peaks into the input file"
+                     << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+    return peaks;
+}
 
 }  // namespace PythonAPI
 
@@ -855,6 +923,13 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("rt_expand_factor"), py::arg("peaks_per_window"))
         .def("find_similarity", &PythonAPI::find_similarity,
              "Find the similarity between two peak lists",
-             py::arg("peak_list_a"), py::arg("peak_list_b"),
-             py::arg("n_peaks"));
+             py::arg("peak_list_a"), py::arg("peak_list_b"), py::arg("n_peaks"))
+        .def("write_peaks", &PythonAPI::write_peaks,
+             "Write the peaks to disk in a binary format", py::arg("peaks"),
+             py::arg("file_name"))
+        .def("to_csv", &PythonAPI::to_csv,
+             "Write the peaks to disk in csv format (compatibility)",
+             py::arg("peaks"), py::arg("file_name"))
+        .def("read_peaks", &PythonAPI::read_peaks,
+             "Read the peaks from the binary peaks file", py::arg("file_name"));
 }
