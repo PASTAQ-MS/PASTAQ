@@ -5,6 +5,7 @@
 #include <thread>
 #include <tuple>
 
+#include "MIDAs/MIDAs.h"
 #include "centroid/centroid.hpp"
 #include "centroid/centroid_files.hpp"
 #include "grid/grid.hpp"
@@ -772,6 +773,35 @@ std::vector<Centroid::Peak> read_peaks(std::string file_name) {
     return peaks;
 }
 
+std::tuple<std::vector<double>, std::vector<double>>
+theoretical_isotopes_peptide(std::string sequence, int charge_state,
+                             double min_perc) {
+    auto midas = MIDAs(charge_state = charge_state);
+    midas.Initialize_Elemental_Composition(sequence, "C00", "H", "OH", 1);
+    auto isotopes = midas.Coarse_Grained_Isotopic_Distribution();
+    auto full_mzs = std::vector<double>(isotopes.size());
+    auto probs = std::vector<double>(isotopes.size());
+    double max_prob = 0;
+    for (size_t i = 0; i < isotopes.size(); ++i) {
+        full_mzs[i] = isotopes[i].mw / charge_state;
+        probs[i] = isotopes[i].prob;
+        if (probs[i] > max_prob) {
+            max_prob = probs[i];
+        }
+    }
+    // Normalize the probabilities to 0-1.
+    std::vector<double> mzs;
+    std::vector<double> perc;
+    for (size_t i = 0; i < isotopes.size(); ++i) {
+        probs[i] = probs[i] / max_prob;
+        if (probs[i] > min_perc) {
+            mzs.push_back(full_mzs[i]);
+            perc.push_back(probs[i]);
+        }
+    }
+    return {mzs, perc};
+}
+
 }  // namespace PythonAPI
 
 PYBIND11_MODULE(tapp, m) {
@@ -931,5 +961,10 @@ PYBIND11_MODULE(tapp, m) {
              "Write the peaks to disk in csv format (compatibility)",
              py::arg("peaks"), py::arg("file_name"))
         .def("read_peaks", &PythonAPI::read_peaks,
-             "Read the peaks from the binary peaks file", py::arg("file_name"));
+             "Read the peaks from the binary peaks file", py::arg("file_name"))
+        .def("theoretical_isotopes_peptide",
+             &PythonAPI::theoretical_isotopes_peptide,
+             "Calculate the theoretical isotopic distribution of a peptide",
+             py::arg("sequence"), py::arg("charge_state"),
+             py::arg("min_perc") = 0.01);
 }
