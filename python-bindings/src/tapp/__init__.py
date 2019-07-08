@@ -1958,6 +1958,23 @@ def to_table(peaks):
         })
     return peaks_df
 
+
+def linked_peptides_to_table(linked_peptides):
+    linked_peptides_df = pd.DataFrame(
+        {
+            'sequence': np.array([linked_peptide.sequence for linked_peptide in linked_peptides]),
+            'charge_state': np.array([linked_peptide.charge_state for linked_peptide in linked_peptides]),
+            'ident_rt': np.array([linked_peptide.ident_rt for linked_peptide in linked_peptides]),
+            'ident_mz': np.array([linked_peptide.ident_mz for linked_peptide in linked_peptides]),
+            'number_of_isotopes': np.array([len(linked_peptide.linked_isotopes) for linked_peptide in linked_peptides]),
+            'monoisotopic_height': np.array([linked_peptide.monoisotopic_height for linked_peptide in linked_peptides]),
+            'monoisotopic_intensity': np.array([linked_peptide.monoisotopic_intensity for linked_peptide in linked_peptides]),
+            'total_height': np.array([linked_peptide.total_height for linked_peptide in linked_peptides]),
+            'total_intensity': np.array([linked_peptide.total_intensity for linked_peptide in linked_peptides]),
+            'weighted_error': np.array([linked_peptide.weighted_error for linked_peptide in linked_peptides]),
+        })
+    return linked_peptides_df
+
 RawData.tic = tic
 
 Peak.plot_xic = plot_xic

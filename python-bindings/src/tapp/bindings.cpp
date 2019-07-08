@@ -900,6 +900,213 @@ std::vector<PythonAPI::IdentData::SpectrumId> read_mzidentml(
     return _read_mzidentml(stream, threshold);
 }
 
+struct Isotope {
+    size_t id;
+    double mz;
+    double rt;
+    double height;
+    double intensity;
+    double normalized_height;
+    double expected_normalized_height;
+};
+
+struct LinkedPeptide {
+    std::string sequence;
+    size_t charge_state;
+    double ident_rt;
+    double ident_mz;
+    std::vector<double> theoretical_isotopes_mz;
+    std::vector<double> theoretical_isotopes_perc;
+
+    std::vector<Isotope> linked_isotopes;
+    double monoisotopic_height;
+    double monoisotopic_intensity;
+    double total_height;
+    double total_intensity;
+    double weighted_error;
+};
+
+std::vector<LinkedPeptide> link_identified_peptides(
+    const std::vector<Centroid::Peak> &peaks,
+    const std::vector<PythonAPI::IdentData::SpectrumId> &identifications,
+    double tolerance_rt, double minimum_isotope_perc) {
+    std::vector<LinkedPeptide> linked_peptides;
+    // Make a copy of the peaks and sort them by retention time.
+    auto sorted_peaks = std::vector<Centroid::Peak>(peaks.size());
+    for (size_t i = 0; i < peaks.size(); ++i) {
+        sorted_peaks[i] = peaks[i];
+    }
+    std::stable_sort(sorted_peaks.begin(), sorted_peaks.end(),
+                     [](const Centroid::Peak &p1, const Centroid::Peak &p2) {
+                         return (p1.local_max_rt < p2.local_max_rt);
+                     });
+
+    // Extract sorted arrays for quick searching.
+    std::vector<double> sorted_rts;
+    for (const auto &peak : sorted_peaks) {
+        sorted_rts.push_back(peak.local_max_rt);
+    }
+
+    for (const auto &ident : identifications) {
+        // Generate the theoretical isotope distribution for identified
+        // peptides.
+        auto [mzs, perc] = theoretical_isotopes_peptide(
+            ident.sequence, ident.charge_state, minimum_isotope_perc);
+
+        // Find the peaks within the rt tolerance range.
+        double min_rt = ident.retention_time - tolerance_rt;
+        double max_rt = ident.retention_time + tolerance_rt;
+        size_t min_j = Search::lower_bound(sorted_rts, min_rt);
+        size_t max_j = sorted_rts.size();
+        std::vector<Centroid::Peak> peaks_in_range;
+        for (size_t j = min_j; j < max_j; ++j) {
+            if (sorted_rts[j] > max_rt) {
+                break;
+            }
+            if (((sorted_peaks[j].local_max_mz +
+                  sorted_peaks[j].raw_roi_sigma_mz) < mzs[0]) ||
+                ((sorted_peaks[j].local_max_mz -
+                  sorted_peaks[j].raw_roi_sigma_mz) > mzs[mzs.size() - 1])) {
+                continue;
+            }
+            peaks_in_range.push_back(sorted_peaks[j]);
+        }
+        if (peaks_in_range.empty()) {
+            continue;
+        }
+
+        // Sort the peaks in range by mz for easier searching.
+        std::stable_sort(
+            peaks_in_range.begin(), peaks_in_range.end(),
+            [](const Centroid::Peak &p1, const Centroid::Peak &p2) {
+                return (p1.local_max_mz < p2.local_max_mz);
+            });
+
+        // The reference node is the theoretial max relative to the
+        // distribution.
+        size_t reference_node_index = 0;
+
+        // Create a graph the the potential isotope associations.
+        std::vector<std::vector<Isotope>> isotopes_graph;
+        for (size_t k = 0; k < mzs.size(); ++k) {
+            std::vector<Isotope> candidates;
+            double theoretical_mz = mzs[k];
+            double theoretical_percentage = perc[k];
+            if (theoretical_percentage == 1.0) {
+                reference_node_index = k;
+            }
+            for (const auto &peak : peaks_in_range) {
+                if ((peak.local_max_mz + peak.raw_roi_sigma_mz) <
+                    theoretical_mz) {
+                    continue;
+                }
+                if ((peak.local_max_mz - peak.raw_roi_sigma_mz) >
+                    theoretical_mz) {
+                    break;
+                }
+                candidates.push_back({
+                    peak.id,
+                    peak.local_max_mz,
+                    peak.local_max_rt,
+                    peak.local_max_height,
+                    peak.raw_roi_total_intensity,
+                    0.0,
+                    0.0,
+                });
+            }
+            isotopes_graph.push_back(candidates);
+        }
+        if (isotopes_graph.empty()) {
+            // FIXME: Should we return NaNs instead?
+            continue;
+        }
+
+        // In case more than one peak is linked to the reference mz isotope, the
+        // sequence with the less matching error should be selected. In order to
+        // do so, the heights for each candidate must be normalized by the
+        // reference isotope height.
+        std::vector<Isotope> selected_candidates;
+        double weighted_error = std::numeric_limits<double>::infinity();
+        for (size_t i = 0; i < isotopes_graph[reference_node_index].size();
+             ++i) {
+            const auto &ref_candidate = isotopes_graph[reference_node_index][i];
+            std::vector<Isotope> normalized_candidates;
+            for (size_t k = 0; k < mzs.size(); ++k) {
+                if (k == reference_node_index) {
+                    normalized_candidates.push_back(
+                        {ref_candidate.id, ref_candidate.mz, ref_candidate.rt,
+                         ref_candidate.height, ref_candidate.intensity, 1.0,
+                         1.0});
+                    continue;
+                }
+
+                // Find the best matching candidate for the selected reference.
+                double theoretical_percentage = perc[k];
+                auto best_matching_candidate =
+                    Isotope{0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            -std::numeric_limits<double>::infinity(),
+                            theoretical_percentage};
+                for (auto &candidate : isotopes_graph[k]) {
+                    double normalized_height =
+                        candidate.height / ref_candidate.height;
+                    if (std::abs(candidate.normalized_height -
+                                 theoretical_percentage) <
+                        (std::abs(best_matching_candidate.normalized_height -
+                                  theoretical_percentage))) {
+                        best_matching_candidate =
+                            Isotope{candidate.id,          candidate.mz,
+                                    candidate.rt,          candidate.height,
+                                    candidate.intensity,   normalized_height,
+                                    theoretical_percentage};
+                    }
+                }
+                normalized_candidates.push_back(best_matching_candidate);
+            }
+            // The weighted error for each normalized_candidate path can now be
+            // evaluated.
+            // NOTE: A potential alternative to an error function would be the
+            // Euclidean distance between the expected theoretical peak and
+            // candidates for that node.
+            double err_sum = 0.0;
+            for (const auto &candidate : normalized_candidates) {
+                err_sum += candidate.expected_normalized_height *
+                           std::pow((candidate.expected_normalized_height -
+                                     candidate.normalized_height),
+                                    2);
+            }
+            if (err_sum < weighted_error) {
+                weighted_error = err_sum;
+                selected_candidates = normalized_candidates;
+            }
+        }
+        if (selected_candidates.empty()) {
+            continue;
+        }
+        LinkedPeptide linked_peptide;
+        linked_peptide.sequence = ident.sequence;
+        linked_peptide.charge_state = ident.charge_state;
+        linked_peptide.ident_rt = ident.retention_time;
+        linked_peptide.ident_mz = ident.experimental_mz;
+        linked_peptide.theoretical_isotopes_mz = mzs;
+        linked_peptide.theoretical_isotopes_perc = perc;
+        linked_peptide.linked_isotopes = selected_candidates;
+        linked_peptide.monoisotopic_height = selected_candidates[0].height;
+        linked_peptide.monoisotopic_intensity =
+            selected_candidates[0].intensity;
+        linked_peptide.weighted_error = weighted_error;
+        for (const auto &candidate : selected_candidates) {
+            linked_peptide.total_height += candidate.height;
+            linked_peptide.total_intensity += candidate.intensity;
+        }
+        linked_peptides.push_back(linked_peptide);
+    }
+    return linked_peptides;
+}
+
 }  // namespace PythonAPI
 
 PYBIND11_MODULE(tapp, m) {
@@ -1036,6 +1243,43 @@ PYBIND11_MODULE(tapp, m) {
             return s.sequence + "_" + std::to_string(s.charge_state);
         });
 
+    py::class_<PythonAPI::LinkedPeptide>(m, "LinkedPeptide")
+        .def_readonly("sequence", &PythonAPI::LinkedPeptide::sequence)
+        .def_readonly("charge_state", &PythonAPI::LinkedPeptide::charge_state)
+        .def_readonly("ident_rt", &PythonAPI::LinkedPeptide::ident_rt)
+        .def_readonly("ident_mz", &PythonAPI::LinkedPeptide::ident_mz)
+        .def_readonly("theoretical_isotopes_mz",
+                      &PythonAPI::LinkedPeptide::theoretical_isotopes_mz)
+        .def_readonly("theoretical_isotopes_perc",
+                      &PythonAPI::LinkedPeptide::theoretical_isotopes_perc)
+        .def_readonly("linked_isotopes",
+                      &PythonAPI::LinkedPeptide::linked_isotopes)
+        .def_readonly("monoisotopic_height",
+                      &PythonAPI::LinkedPeptide::monoisotopic_height)
+        .def_readonly("monoisotopic_intensity",
+                      &PythonAPI::LinkedPeptide::monoisotopic_intensity)
+        .def_readonly("total_height", &PythonAPI::LinkedPeptide::total_height)
+        .def_readonly("total_intensity",
+                      &PythonAPI::LinkedPeptide::total_intensity)
+        .def_readonly("weighted_error",
+                      &PythonAPI::LinkedPeptide::weighted_error)
+        .def("__repr__", [](const PythonAPI::LinkedPeptide &s) {
+            return s.sequence + "_" + std::to_string(s.charge_state);
+        });
+
+    py::class_<PythonAPI::Isotope>(m, "Isotope")
+        .def_readonly("id", &PythonAPI::Isotope::id)
+        .def_readonly("mz", &PythonAPI::Isotope::mz)
+        .def_readonly("rt", &PythonAPI::Isotope::rt)
+        .def_readonly("height", &PythonAPI::Isotope::height)
+        .def_readonly("intensity", &PythonAPI::Isotope::intensity)
+        .def_readonly("normalized_height",
+                      &PythonAPI::Isotope::normalized_height)
+        .def_readonly("expected_normalized_height",
+                      &PythonAPI::Isotope::expected_normalized_height)
+        .def("__repr__",
+             [](const PythonAPI::Isotope &s) { return std::to_string(s.id); });
+
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,
           "Read raw data from the given mzXML file ", py::arg("file_name"),
@@ -1084,5 +1328,8 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("min_perc") = 0.01)
         .def("read_mzidentml", &PythonAPI::read_mzidentml,
              "Read identification data from the given mzIdentML file ",
-             py::arg("file_name"), py::arg("threshold") = true);
+             py::arg("file_name"), py::arg("threshold") = true)
+        .def("link_identified_peptides", &PythonAPI::link_identified_peptides,
+             "DEBUG", py::arg("peaks"), py::arg("identifications"),
+             py::arg("tolerance_rt"), py::arg("minimum_isotope_perc"));
 }
