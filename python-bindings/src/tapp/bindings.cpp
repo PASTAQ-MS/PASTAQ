@@ -777,6 +777,10 @@ std::tuple<std::vector<double>, std::vector<double>>
 theoretical_isotopes_peptide(std::string sequence, int charge_state,
                              double min_perc) {
     auto midas = MIDAs(charge_state = charge_state);
+    // NOTE: C00: Unmodified cysteine.
+    //       C31: Carboxymethylation or Iodoacetic acid.
+    //       C32: Carbamidomethylation or Iodoacetamide.
+    //       C33: Pyridylethylation.
     midas.Initialize_Elemental_Composition(sequence, "C00", "H", "OH", 1);
     auto isotopes = midas.Coarse_Grained_Isotopic_Distribution();
     auto full_mzs = std::vector<double>(isotopes.size());
@@ -804,20 +808,122 @@ theoretical_isotopes_peptide(std::string sequence, int charge_state,
 
 namespace IdentData {
 struct SpectrumId {
+    std::string id;
     bool pass_threshold;
+    bool modifications;
     std::string sequence;
+    std::string peptide_id;
     size_t charge_state;
     double theoretical_mz;
     double experimental_mz;
     double retention_time;
     int rank;
 };
+
+struct CVParam {
+    std::string name;
+    std::string accession;
+    std::string cv_ref;
+    std::string value;
+};
+
+struct PeptideModification {
+    double monoisotopic_mass_delta;
+    double average_mass_delta;
+    std::string residues;
+    int location;
+    std::vector<CVParam> cv_params;
+};
+
+struct Peptide {
+    std::string id;
+    std::string sequence;
+    std::vector<IdentData::PeptideModification> modifications;
+};
+
+struct IdentData {
+    std::vector<Peptide> peptides;
+    std::vector<SpectrumId> spectrum_ids;
+};
 }  // namespace IdentData
 
 std::vector<PythonAPI::IdentData::SpectrumId> _read_mzidentml(
     std::istream &stream, bool threshold) {
     std::vector<PythonAPI::IdentData::SpectrumId> spectrum_ids;
+    std::vector<PythonAPI::IdentData::Peptide> peptides;
 
+    // Find all Peptides in the file (SequenceCollection).
+    while (stream.good()) {
+        auto tag = XmlReader::read_tag(stream);
+        if (!tag) {
+            continue;
+        }
+        if (tag.value().name == "SequenceCollection" && tag.value().closed) {
+            break;
+        }
+        if (tag.value().name != "Peptide") {
+            continue;
+        }
+        auto peptide = PythonAPI::IdentData::Peptide{};
+        auto attributes = tag.value().attributes;
+        peptide.id = attributes["id"];
+        while (stream.good()) {
+            auto tag = XmlReader::read_tag(stream);
+            if (tag.value().name == "Peptide" && tag.value().closed) {
+                peptides.push_back(peptide);
+                break;
+            }
+            if (tag.value().name == "PeptideSequence" && !tag.value().closed) {
+                auto data = XmlReader::read_data(stream);
+                if (!data) {
+                    break;
+                    // FIXME: Throw exception? Return nullopt?
+                    // return std::nullopt;
+                }
+                peptide.sequence = data.value();
+            }
+            if (tag.value().name == "Modification" && !tag.value().closed) {
+                // Save modification info.
+                auto attributes = tag.value().attributes;
+                auto modification = IdentData::PeptideModification{};
+                if (attributes.find("monoisotopicMassDelta") !=
+                    attributes.end()) {
+                    modification.monoisotopic_mass_delta =
+                        std::stod(attributes["monoisotopicMassDelta"]);
+                }
+                if (attributes.find("avgMassDelta") != attributes.end()) {
+                    modification.average_mass_delta =
+                        std::stod(attributes["avgMassDelta"]);
+                }
+                if (attributes.find("residues") != attributes.end()) {
+                    modification.residues = attributes["residues"];
+                }
+                if (attributes.find("location") != attributes.end()) {
+                    modification.location = std::stoi(attributes["location"]);
+                }
+                // Find CVParams for this modification..
+                while (stream.good()) {
+                    auto tag = XmlReader::read_tag(stream);
+                    if (tag.value().name == "cvParam") {
+                        auto cv_param = IdentData::CVParam{};
+                        auto attributes = tag.value().attributes;
+                        cv_param.name = attributes["name"];
+                        cv_param.accession = attributes["accession"];
+                        cv_param.cv_ref = attributes["cvRef"];
+                        if (attributes.find("value") != attributes.end()) {
+                            cv_param.value = attributes["value"];
+                        }
+                        modification.cv_params.push_back(cv_param);
+                    }
+                    if (tag.value().name == "Modification" &&
+                        tag.value().closed) {
+                        peptide.modifications.push_back(modification);
+                        break;
+                    }
+                }
+            }
+        }
+    }
     while (stream.good()) {
         // Find the first tag for this data (SpectrumIdentificationResult).
         auto tag = XmlReader::read_tag(stream);
@@ -843,10 +949,11 @@ std::vector<PythonAPI::IdentData::SpectrumId> _read_mzidentml(
                     std::stoi(attributes["rank"]) < spectrum_id.rank) {
                     continue;
                 }
+                spectrum_id.id = attributes["id"];
                 spectrum_id.rank = std::stoi(attributes["rank"]);
                 spectrum_id.pass_threshold =
                     attributes["passThreshold"] == "true";
-                spectrum_id.sequence = attributes["peptide_ref"];
+                spectrum_id.peptide_id = attributes["peptide_ref"];
                 spectrum_id.charge_state = std::stoi(attributes["chargeState"]);
                 spectrum_id.theoretical_mz =
                     std::stod(attributes["calculatedMassToCharge"]);
@@ -868,8 +975,20 @@ std::vector<PythonAPI::IdentData::SpectrumId> _read_mzidentml(
             break;
         }
     }
+    // Cross link peptide_id per SpectrumId to obtain the original sequence.
+    for (auto &ident : spectrum_ids) {
+        for (const auto &peptide : peptides) {
+            if (peptide.id == ident.peptide_id) {
+                ident.sequence = peptide.sequence;
+                if (!peptide.modifications.empty()) {
+                    ident.modifications = true;
+                }
+                break;
+            }
+        }
+    }
     return spectrum_ids;
-}
+}  // namespace PythonAPI
 
 std::vector<PythonAPI::IdentData::SpectrumId> read_mzidentml(
     std::string file_name, bool threshold) {
@@ -1227,9 +1346,14 @@ PYBIND11_MODULE(tapp, m) {
         });
 
     py::class_<PythonAPI::IdentData::SpectrumId>(m, "SpectrumId")
+        .def_readonly("id", &PythonAPI::IdentData::SpectrumId::id)
         .def_readonly("pass_threshold",
                       &PythonAPI::IdentData::SpectrumId::pass_threshold)
+        .def_readonly("modifications",
+                      &PythonAPI::IdentData::SpectrumId::modifications)
         .def_readonly("sequence", &PythonAPI::IdentData::SpectrumId::sequence)
+        .def_readonly("peptide_id",
+                      &PythonAPI::IdentData::SpectrumId::peptide_id)
         .def_readonly("charge_state",
                       &PythonAPI::IdentData::SpectrumId::charge_state)
         .def_readonly("theoretical_mz",
