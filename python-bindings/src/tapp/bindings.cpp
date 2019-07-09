@@ -841,6 +841,11 @@ struct Peptide {
     std::vector<IdentData::PeptideModification> modifications;
 };
 
+struct DBSequence {
+    std::string id;
+    std::string value;
+};
+
 struct IdentData {
     std::vector<Peptide> peptides;
     std::vector<SpectrumId> spectrum_ids;
@@ -851,8 +856,9 @@ std::vector<PythonAPI::IdentData::SpectrumId> _read_mzidentml(
     std::istream &stream, bool threshold) {
     std::vector<PythonAPI::IdentData::SpectrumId> spectrum_ids;
     std::vector<PythonAPI::IdentData::Peptide> peptides;
+    std::vector<PythonAPI::IdentData::DBSequence> db_sequences;
 
-    // Find all Peptides in the file (SequenceCollection).
+    // Find all Peptides and DBSequences in the file (SequenceCollection).
     while (stream.good()) {
         auto tag = XmlReader::read_tag(stream);
         if (!tag) {
@@ -861,65 +867,83 @@ std::vector<PythonAPI::IdentData::SpectrumId> _read_mzidentml(
         if (tag.value().name == "SequenceCollection" && tag.value().closed) {
             break;
         }
-        if (tag.value().name != "Peptide") {
-            continue;
-        }
-        auto peptide = PythonAPI::IdentData::Peptide{};
-        auto attributes = tag.value().attributes;
-        peptide.id = attributes["id"];
-        while (stream.good()) {
-            auto tag = XmlReader::read_tag(stream);
-            if (tag.value().name == "Peptide" && tag.value().closed) {
-                peptides.push_back(peptide);
-                break;
-            }
-            if (tag.value().name == "PeptideSequence" && !tag.value().closed) {
-                auto data = XmlReader::read_data(stream);
-                if (!data) {
+        if (tag.value().name == "Peptide") {
+            auto peptide = PythonAPI::IdentData::Peptide{};
+            auto attributes = tag.value().attributes;
+            peptide.id = attributes["id"];
+            while (stream.good()) {
+                auto tag = XmlReader::read_tag(stream);
+                if (tag.value().name == "Peptide" && tag.value().closed) {
+                    peptides.push_back(peptide);
                     break;
-                    // FIXME: Throw exception? Return nullopt?
-                    // return std::nullopt;
                 }
-                peptide.sequence = data.value();
-            }
-            if (tag.value().name == "Modification" && !tag.value().closed) {
-                // Save modification info.
-                auto attributes = tag.value().attributes;
-                auto modification = IdentData::PeptideModification{};
-                if (attributes.find("monoisotopicMassDelta") !=
-                    attributes.end()) {
-                    modification.monoisotopic_mass_delta =
-                        std::stod(attributes["monoisotopicMassDelta"]);
-                }
-                if (attributes.find("avgMassDelta") != attributes.end()) {
-                    modification.average_mass_delta =
-                        std::stod(attributes["avgMassDelta"]);
-                }
-                if (attributes.find("residues") != attributes.end()) {
-                    modification.residues = attributes["residues"];
-                }
-                if (attributes.find("location") != attributes.end()) {
-                    modification.location = std::stoi(attributes["location"]);
-                }
-                // Find CVParams for this modification..
-                while (stream.good()) {
-                    auto tag = XmlReader::read_tag(stream);
-                    if (tag.value().name == "cvParam") {
-                        auto cv_param = IdentData::CVParam{};
-                        auto attributes = tag.value().attributes;
-                        cv_param.name = attributes["name"];
-                        cv_param.accession = attributes["accession"];
-                        cv_param.cv_ref = attributes["cvRef"];
-                        if (attributes.find("value") != attributes.end()) {
-                            cv_param.value = attributes["value"];
-                        }
-                        modification.cv_params.push_back(cv_param);
-                    }
-                    if (tag.value().name == "Modification" &&
-                        tag.value().closed) {
-                        peptide.modifications.push_back(modification);
+                if (tag.value().name == "PeptideSequence" &&
+                    !tag.value().closed) {
+                    auto data = XmlReader::read_data(stream);
+                    if (!data) {
                         break;
+                        // FIXME: Throw exception? Return nullopt?
+                        // return std::nullopt;
                     }
+                    peptide.sequence = data.value();
+                }
+                if (tag.value().name == "Modification" && !tag.value().closed) {
+                    // Save modification info.
+                    auto attributes = tag.value().attributes;
+                    auto modification = IdentData::PeptideModification{};
+                    if (attributes.find("monoisotopicMassDelta") !=
+                        attributes.end()) {
+                        modification.monoisotopic_mass_delta =
+                            std::stod(attributes["monoisotopicMassDelta"]);
+                    }
+                    if (attributes.find("avgMassDelta") != attributes.end()) {
+                        modification.average_mass_delta =
+                            std::stod(attributes["avgMassDelta"]);
+                    }
+                    if (attributes.find("residues") != attributes.end()) {
+                        modification.residues = attributes["residues"];
+                    }
+                    if (attributes.find("location") != attributes.end()) {
+                        modification.location =
+                            std::stoi(attributes["location"]);
+                    }
+                    // Find CVParams for this modification..
+                    while (stream.good()) {
+                        auto tag = XmlReader::read_tag(stream);
+                        if (tag.value().name == "cvParam") {
+                            auto cv_param = IdentData::CVParam{};
+                            auto attributes = tag.value().attributes;
+                            cv_param.name = attributes["name"];
+                            cv_param.accession = attributes["accession"];
+                            cv_param.cv_ref = attributes["cvRef"];
+                            if (attributes.find("value") != attributes.end()) {
+                                cv_param.value = attributes["value"];
+                            }
+                            modification.cv_params.push_back(cv_param);
+                        }
+                        if (tag.value().name == "Modification" &&
+                            tag.value().closed) {
+                            peptide.modifications.push_back(modification);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if (tag.value().name == "DBSequence") {
+            auto db_sequence = PythonAPI::IdentData::DBSequence{};
+            auto attributes = tag.value().attributes;
+            db_sequence.id = attributes["id"];
+            while (stream.good()) {
+                auto tag = XmlReader::read_tag(stream);
+                if (tag.value().name == "DBSequence" && tag.value().closed) {
+                    db_sequences.push_back(db_sequence);
+                    break;
+                }
+                auto attributes = tag.value().attributes;
+                if (tag.value().name == "cvParam" &&
+                    attributes["accession"] == "MS:1001088") {
+                    db_sequence.value = attributes["value"];
                 }
             }
         }
