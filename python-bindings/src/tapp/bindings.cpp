@@ -846,6 +846,12 @@ struct DBSequence {
     std::string value;
 };
 
+struct ProteinHypothesis {
+    std::string db_sequence_id;
+    bool pass_threshold;
+    std::vector<std::string> spectrum_ids;
+};
+
 struct IdentData {
     std::vector<Peptide> peptides;
     std::vector<SpectrumId> spectrum_ids;
@@ -857,6 +863,7 @@ std::vector<PythonAPI::IdentData::SpectrumId> _read_mzidentml(
     std::vector<PythonAPI::IdentData::SpectrumId> spectrum_ids;
     std::vector<PythonAPI::IdentData::Peptide> peptides;
     std::vector<PythonAPI::IdentData::DBSequence> db_sequences;
+    std::vector<PythonAPI::IdentData::ProteinHypothesis> protein_hypotheses;
 
     // Find all Peptides and DBSequences in the file (SequenceCollection).
     while (stream.good()) {
@@ -949,7 +956,7 @@ std::vector<PythonAPI::IdentData::SpectrumId> _read_mzidentml(
         }
     }
     while (stream.good()) {
-        // Find the first tag for this data (SpectrumIdentificationResult).
+        // Find the PSMs for this data (SpectrumIdentificationResult).
         auto tag = XmlReader::read_tag(stream);
         if (!tag || tag.value().name != "SpectrumIdentificationResult") {
             continue;
@@ -997,6 +1004,37 @@ std::vector<PythonAPI::IdentData::SpectrumId> _read_mzidentml(
         if (tag.value().name == "SpectrumIdentificationList" &&
             tag.value().closed) {
             break;
+        }
+    }
+    while (stream.good()) {
+        // Find the protein groups for this data (ProteinDetectionList).
+        auto tag = XmlReader::read_tag(stream);
+        if (!tag) {
+            continue;
+        }
+        if (tag.value().name == "ProteinDetectionList" && tag.value().closed) {
+            break;
+        }
+        if (tag.value().name == "ProteinDetectionHypothesis" &&
+            !tag.value().closed) {
+            auto protein_hypothesis = PythonAPI::IdentData::ProteinHypothesis{};
+            auto attributes = tag.value().attributes;
+            protein_hypothesis.db_sequence_id = attributes["dbSequence_ref"];
+            protein_hypothesis.pass_threshold =
+                attributes["passThreshold"] == "true";
+            while (stream.good()) {
+                tag = XmlReader::read_tag(stream);
+                if (tag.value().name == "ProteinDetectionHypothesis" &&
+                    tag.value().closed) {
+                    protein_hypotheses.push_back(protein_hypothesis);
+                    break;
+                }
+                if (tag.value().name == "SpectrumIdentificationItemRef") {
+                    auto attributes = tag.value().attributes;
+                    protein_hypothesis.spectrum_ids.push_back(
+                        attributes["spectrumIdentificationItem_ref"]);
+                }
+            }
         }
     }
     // Cross link peptide_id per SpectrumId to obtain the original sequence.
