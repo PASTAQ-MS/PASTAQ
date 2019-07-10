@@ -853,13 +853,15 @@ struct ProteinHypothesis {
 };
 
 struct IdentData {
-    std::vector<Peptide> peptides;
-    std::vector<SpectrumId> spectrum_ids;
+    std::vector<PythonAPI::IdentData::DBSequence> db_sequences;
+    std::vector<PythonAPI::IdentData::Peptide> peptides;
+    std::vector<PythonAPI::IdentData::SpectrumId> spectrum_ids;
+    std::vector<PythonAPI::IdentData::ProteinHypothesis> protein_hypotheses;
 };
 }  // namespace IdentData
 
-std::vector<PythonAPI::IdentData::SpectrumId> _read_mzidentml(
-    std::istream &stream, bool threshold) {
+PythonAPI::IdentData::IdentData _read_mzidentml(std::istream &stream,
+                                                bool threshold) {
     std::vector<PythonAPI::IdentData::SpectrumId> spectrum_ids;
     std::vector<PythonAPI::IdentData::Peptide> peptides;
     std::vector<PythonAPI::IdentData::DBSequence> db_sequences;
@@ -955,10 +957,17 @@ std::vector<PythonAPI::IdentData::SpectrumId> _read_mzidentml(
             }
         }
     }
+    // Find the PSMs for this data (SpectrumIdentificationResult).
     while (stream.good()) {
-        // Find the PSMs for this data (SpectrumIdentificationResult).
         auto tag = XmlReader::read_tag(stream);
-        if (!tag || tag.value().name != "SpectrumIdentificationResult") {
+        if (!tag) {
+            continue;
+        }
+        if (tag.value().name == "SpectrumIdentificationList" &&
+            tag.value().closed) {
+            break;
+        }
+        if (tag.value().name != "SpectrumIdentificationResult") {
             continue;
         }
         auto spectrum_id = PythonAPI::IdentData::SpectrumId{};
@@ -1001,13 +1010,9 @@ std::vector<PythonAPI::IdentData::SpectrumId> _read_mzidentml(
                 break;
             }
         }
-        if (tag.value().name == "SpectrumIdentificationList" &&
-            tag.value().closed) {
-            break;
-        }
     }
+    // Find the protein groups for this data (ProteinDetectionList).
     while (stream.good()) {
-        // Find the protein groups for this data (ProteinDetectionList).
         auto tag = XmlReader::read_tag(stream);
         if (!tag) {
             continue;
@@ -1019,14 +1024,16 @@ std::vector<PythonAPI::IdentData::SpectrumId> _read_mzidentml(
             !tag.value().closed) {
             auto protein_hypothesis = PythonAPI::IdentData::ProteinHypothesis{};
             auto attributes = tag.value().attributes;
-            protein_hypothesis.db_sequence_id = attributes["dbSequence_ref"];
+            protein_hypothesis.db_sequence_id = attributes["dBSequence_ref"];
             protein_hypothesis.pass_threshold =
                 attributes["passThreshold"] == "true";
             while (stream.good()) {
                 tag = XmlReader::read_tag(stream);
                 if (tag.value().name == "ProteinDetectionHypothesis" &&
                     tag.value().closed) {
-                    protein_hypotheses.push_back(protein_hypothesis);
+                    if (!threshold || protein_hypothesis.pass_threshold) {
+                        protein_hypotheses.push_back(protein_hypothesis);
+                    }
                     break;
                 }
                 if (tag.value().name == "SpectrumIdentificationItemRef") {
@@ -1049,11 +1056,11 @@ std::vector<PythonAPI::IdentData::SpectrumId> _read_mzidentml(
             }
         }
     }
-    return spectrum_ids;
+    return {db_sequences, peptides, spectrum_ids, protein_hypotheses};
 }  // namespace PythonAPI
 
-std::vector<PythonAPI::IdentData::SpectrumId> read_mzidentml(
-    std::string file_name, bool threshold) {
+PythonAPI::IdentData::IdentData read_mzidentml(std::string file_name,
+                                               bool threshold) {
     std::filesystem::path input_file = file_name;
 
     // Check for proper file extension.
@@ -1077,7 +1084,6 @@ std::vector<PythonAPI::IdentData::SpectrumId> read_mzidentml(
         error_stream << "error: couldn't open input file" << input_file;
         throw std::invalid_argument(error_stream.str());
     }
-
     return _read_mzidentml(stream, threshold);
 }
 
@@ -1093,6 +1099,7 @@ struct Isotope {
 
 struct LinkedPeptide {
     std::string sequence;
+    std::string psm_id;
     size_t charge_state;
     double ident_rt;
     double ident_mz;
@@ -1269,6 +1276,7 @@ std::vector<LinkedPeptide> link_identified_peptides(
         }
         LinkedPeptide linked_peptide;
         linked_peptide.sequence = ident.sequence;
+        linked_peptide.psm_id = ident.id;
         linked_peptide.charge_state = ident.charge_state;
         linked_peptide.ident_rt = ident.retention_time;
         linked_peptide.ident_mz = ident.experimental_mz;
@@ -1429,8 +1437,49 @@ PYBIND11_MODULE(tapp, m) {
             return s.sequence + "_" + std::to_string(s.charge_state);
         });
 
+    py::class_<PythonAPI::IdentData::DBSequence>(m, "DBSequence")
+        .def_readonly("id", &PythonAPI::IdentData::DBSequence::id)
+        .def_readonly("value", &PythonAPI::IdentData::DBSequence::value);
+
+    py::class_<PythonAPI::IdentData::PeptideModification>(m,
+                                                          "PeptideModification")
+        .def_readonly(
+            "monoisotopic_mass_delta",
+            &PythonAPI::IdentData::PeptideModification::monoisotopic_mass_delta)
+        .def_readonly(
+            "average_mass_delta",
+            &PythonAPI::IdentData::PeptideModification::average_mass_delta)
+        .def_readonly("residues",
+                      &PythonAPI::IdentData::PeptideModification::residues)
+        .def_readonly("location",
+                      &PythonAPI::IdentData::PeptideModification::location);
+
+    py::class_<PythonAPI::IdentData::Peptide>(m, "Peptide")
+        .def_readonly("id", &PythonAPI::IdentData::Peptide::id)
+        .def_readonly("sequence", &PythonAPI::IdentData::Peptide::sequence)
+        .def_readonly("modifications",
+                      &PythonAPI::IdentData::Peptide::modifications);
+
+    py::class_<PythonAPI::IdentData::ProteinHypothesis>(m, "ProteinHypothesis")
+        .def_readonly("db_sequence_id",
+                      &PythonAPI::IdentData::ProteinHypothesis::db_sequence_id)
+        .def_readonly("pass_threshold",
+                      &PythonAPI::IdentData::ProteinHypothesis::pass_threshold)
+        .def_readonly("spectrum_ids",
+                      &PythonAPI::IdentData::ProteinHypothesis::spectrum_ids);
+
+    py::class_<PythonAPI::IdentData::IdentData>(m, "IdentData")
+        .def_readonly("db_sequences",
+                      &PythonAPI::IdentData::IdentData::db_sequences)
+        .def_readonly("peptides", &PythonAPI::IdentData::IdentData::peptides)
+        .def_readonly("spectrum_ids",
+                      &PythonAPI::IdentData::IdentData::spectrum_ids)
+        .def_readonly("protein_hypotheses",
+                      &PythonAPI::IdentData::IdentData::protein_hypotheses);
+
     py::class_<PythonAPI::LinkedPeptide>(m, "LinkedPeptide")
         .def_readonly("sequence", &PythonAPI::LinkedPeptide::sequence)
+        .def_readonly("psm_id", &PythonAPI::LinkedPeptide::psm_id)
         .def_readonly("charge_state", &PythonAPI::LinkedPeptide::charge_state)
         .def_readonly("ident_rt", &PythonAPI::LinkedPeptide::ident_rt)
         .def_readonly("ident_mz", &PythonAPI::LinkedPeptide::ident_mz)

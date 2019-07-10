@@ -1972,8 +1972,71 @@ def linked_peptides_to_table(linked_peptides):
             'total_height': np.array([linked_peptide.total_height for linked_peptide in linked_peptides]),
             'total_intensity': np.array([linked_peptide.total_intensity for linked_peptide in linked_peptides]),
             'weighted_error': np.array([linked_peptide.weighted_error for linked_peptide in linked_peptides]),
+            'psm_id': np.array([linked_peptide.psm_id for linked_peptide in linked_peptides]),
         })
     return linked_peptides_df
+
+def create_psm_protein_graph(ident_data):
+    unique_proteins = pd.Series(
+        [
+            protein_hypothesis.db_sequence_id
+            for protein_hypothesis in ident_data.protein_hypotheses
+        ]).unique()
+    unique_psm = np.unique(np.concatenate(
+        [
+            protein_hypothesis.spectrum_ids
+            for protein_hypothesis in ident_data.protein_hypotheses
+        ]))
+    incidence_matrix = np.zeros([len(unique_psm), len(unique_proteins)])
+    for protein_hypothesis in ident_data.protein_hypotheses:
+        db_sequence = protein_hypothesis.db_sequence_id
+        i = np.where(unique_proteins == db_sequence)[0][0]
+        for spectrum_id in protein_hypothesis.spectrum_ids:
+            j = np.where(unique_psm == spectrum_id)[0][0]
+            incidence_matrix[j, i] = 1
+    return (unique_proteins, unique_psm, incidence_matrix)
+
+def razor_proteins(unique_proteins, unique_psm, incidence_matrix):
+    # Resolve shared peptides by the Occam's Razor approach.
+    # 1.- Sort proteins by number of associated PSM (Descendent).
+    number_of_psm_per_protein = incidence_matrix.sum(axis=0)
+    sort_index = np.argsort(number_of_psm_per_protein)[::-1]
+    unique_proteins = unique_proteins[sort_index]
+    incidence_matrix = incidence_matrix[:, sort_index]
+    for i in range(0,len(unique_proteins) - 1):
+        # FIXME: If we were to be correct, we should reorder the matrix after each
+        # iteration. This is computationally very expensive for this prototype
+        # function. A better approach should be used for the C++ version.
+
+        # 2.- Greedyly assign PSMs to the first protein they occur and remove PSM from the
+        # incidence matrix for the rest of proteins.
+        incidence_matrix[np.where(incidence_matrix[:,i] == 1)[0], (i + 1):] = 0
+
+    return (unique_proteins, unique_psm, incidence_matrix)
+
+def psm_db_sequences(ident_data):
+    unique_proteins, unique_psm, incidence_matrix = create_psm_protein_graph(ident_data)
+    unique_proteins, unique_psm, incidence_matrix = razor_proteins(
+        unique_proteins, unique_psm, incidence_matrix)
+    db_sequences = [] 
+    for psm in ident_data.spectrum_ids: 
+        unique_psm_index = np.where(psm.id == unique_psm)[0] 
+        if len(unique_psm_index) == 0: 
+            db_sequences += [""] 
+        else: 
+            unique_psm_index = unique_psm_index[0] 
+            db_sequence_id = unique_proteins[incidence_matrix[unique_psm_index,:] == 1][0] 
+            db_sequences += [db_sequence_id] 
+    db_sequences_df = pd.DataFrame(
+        {
+            "protein_id": [db_sequence.id for db_sequence in ident_data.db_sequences],
+            "protein_name": [db_sequence.value for db_sequence in ident_data.db_sequences],
+        })
+    db_sequences = pd.DataFrame({"protein_id" : db_sequences})
+    db_sequences_df = pd.merge(db_sequences, db_sequences_df, how='left')
+    db_sequences_df['psm_id'] = [psm.id for psm in ident_data.spectrum_ids]
+
+    return db_sequences_df
 
 RawData.tic = tic
 
