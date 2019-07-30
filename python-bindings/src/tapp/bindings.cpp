@@ -606,11 +606,15 @@ Centroid::Peak build_peak(const RawData::RawData &raw_data,
 }
 
 std::vector<Centroid::Peak> find_peaks(const RawData::RawData &raw_data,
-                                       const Grid::Mesh &mesh) {
+                                       const Grid::Mesh &mesh,
+                                       size_t max_peaks) {
     auto local_max = find_local_max_idx(mesh);
     std::vector<Centroid::Peak> peaks;
     size_t i = 0;
     for (const auto &lm : local_max) {
+        if (max_peaks != 0 && i >= max_peaks) {
+            break;
+        }
         auto peak = build_peak(raw_data, mesh, lm);
         // FIXME: Number of raw points within the theoretical sigma should be
         // set by the user, with a sensible default. Same with the minimum
@@ -1334,18 +1338,25 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("min_rt", &RawData::RawData::min_rt)
         .def_readonly("max_rt", &RawData::RawData::max_rt)
         .def("theoretical_fwhm", &RawData::theoretical_fwhm, py::arg("mz"))
-        .def("__repr__", [](const RawData::RawData &rd) {
-            return "RawData:\n> instrument_type: " +
-                   PythonAPI::to_string(rd.instrument_type) +
-                   "\n> resolution_ms1: " + std::to_string(rd.resolution_ms1) +
-                   "\n> resolution_msn: " + std::to_string(rd.resolution_msn) +
-                   "\n> reference_mz: " + std::to_string(rd.reference_mz) +
-                   "\n> min_mz: " + std::to_string(rd.min_mz) +
-                   "\n> max_mz: " + std::to_string(rd.max_mz) +
-                   "\n> min_rt: " + std::to_string(rd.min_rt) +
-                   "\n> max_rt: " + std::to_string(rd.max_rt) +
-                   "\n> number of scans: " + std::to_string(rd.scans.size());
-        });
+        .def("__repr__",
+             [](const RawData::RawData &rd) {
+                 return "RawData:\n> instrument_type: " +
+                        PythonAPI::to_string(rd.instrument_type) +
+                        "\n> resolution_ms1: " +
+                        std::to_string(rd.resolution_ms1) +
+                        "\n> resolution_msn: " +
+                        std::to_string(rd.resolution_msn) +
+                        "\n> reference_mz: " + std::to_string(rd.reference_mz) +
+                        "\n> min_mz: " + std::to_string(rd.min_mz) +
+                        "\n> max_mz: " + std::to_string(rd.max_mz) +
+                        "\n> min_rt: " + std::to_string(rd.min_rt) +
+                        "\n> max_rt: " + std::to_string(rd.max_rt) +
+                        "\n> number of scans: " +
+                        std::to_string(rd.scans.size());
+             })
+        .def("xic", &RawData::RawData::xic, py::arg("min_mz"),
+             py::arg("max_mz"), py::arg("min_rt"), py::arg("max_rt"),
+             py::arg("method") = "sum");
 
     py::class_<Grid::Mesh>(m, "Mesh")
         .def_readonly("n", &Grid::Mesh::n)
@@ -1538,7 +1549,7 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("max_rt"))
         .def("find_peaks", &PythonAPI::find_peaks,
              "Find all peaks in the given mesh", py::arg("raw_data"),
-             py::arg("mesh"))
+             py::arg("mesh"), py::arg("max_peaks") = 0)
         .def("warp_peaks", &PythonAPI::warp_peaks,
              "Warp peak lists to maximize the similarity with the given "
              "reference",

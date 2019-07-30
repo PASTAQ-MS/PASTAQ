@@ -1050,7 +1050,7 @@ def peak_extraction(file_name, tapp_parameters, polarity):
         )
 
     print("Finding peaks")
-    peaks = find_peaks(raw_data, mesh)
+    peaks = find_peaks(raw_data, mesh, tapp_parameters['max_peaks'])
 
     return raw_data, mesh, peaks
 

@@ -4,6 +4,8 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <string>
+#include <tuple>
 #include <vector>
 
 namespace Instrument {
@@ -77,6 +79,10 @@ struct RawData {
     std::vector<double> retention_times;
     std::vector<double> total_ion_chromatogram;
     std::vector<double> base_peak_chromatogram;
+
+    std::tuple<std::vector<double>, std::vector<double>> xic(
+        double min_mz, double max_mz, double min_rt, double max_rt,
+        std::string method) const;
 };
 
 // Calculate the theoretical FWHM of the peak for the given mz.
