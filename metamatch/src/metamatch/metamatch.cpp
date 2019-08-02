@@ -3,21 +3,6 @@
 
 #include "metamatch/metamatch.hpp"
 
-void print_metamatch_peaks(const std::vector<MetaMatch::Peak>& peaks) {
-    int k = 0;
-    for (const auto& peak : peaks) {
-        std::cout << "k: " << k;
-        std::cout << " mz: " << peak.mz;
-        std::cout << " rt: " << peak.rt;
-        std::cout << " height: " << peak.height;
-        std::cout << " file_id: " << peak.file_id;
-        std::cout << " class_id: " << peak.class_id;
-        std::cout << " cluster_id: " << peak.cluster_id;
-        std::cout << std::endl;
-        ++k;
-    }
-}
-
 void calculate_cluster_pos(double& cluster_mz, double& cluster_rt,
                            std::vector<MetaMatch::Peak>& peaks,
                            std::vector<size_t>& metapeak_indexes) {
@@ -25,9 +10,9 @@ void calculate_cluster_pos(double& cluster_mz, double& cluster_rt,
     double y_sum = 0;
     double height_sum = 0;
     for (const auto& index : metapeak_indexes) {
-        x_sum += peaks[index].mz * peaks[index].height;
-        y_sum += peaks[index].rt * peaks[index].height;
-        height_sum += peaks[index].height;
+        x_sum += peaks[index].local_max_mz * peaks[index].local_max_height;
+        y_sum += peaks[index].local_max_rt * peaks[index].local_max_height;
+        height_sum += peaks[index].local_max_height;
 
         // NOTE(alex): This is a weighted average, it might cause problems if
         // the overall intensity between the files are very different (The
@@ -35,8 +20,8 @@ void calculate_cluster_pos(double& cluster_mz, double& cluster_rt,
         // intensity). If instead of a weighted average we want a density
         // average we could use the following:
         //
-        //     x_sum += peaks[index].mz;
-        //     y_sum += peaks[index].rt;
+        //     x_sum += peaks[index].local_max_mz;
+        //     y_sum += peaks[index].local_max_rt;
         //     height_sum += 1;
         //
         // This might have a problem where the noise could have a greater impact
@@ -49,8 +34,11 @@ void calculate_cluster_pos(double& cluster_mz, double& cluster_rt,
 void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
                               const MetaMatch::Parameters& parameters) {
     auto sort_peaks = [](auto p1, auto p2) -> bool {
-        return (p1.mz < p2.mz) || ((p1.mz == p2.mz) && (p1.rt < p2.rt)) ||
-               ((p1.rt == p2.rt) && (p1.file_id < p2.file_id));
+        return (p1.local_max_mz < p2.local_max_mz) ||
+               ((p1.local_max_mz == p2.local_max_mz) &&
+                (p1.local_max_rt < p2.local_max_rt)) ||
+               ((p1.local_max_rt == p2.local_max_rt) &&
+                (p1.file_id < p2.file_id));
     };
     std::stable_sort(peaks.begin(), peaks.end(), sort_peaks);
 
@@ -70,22 +58,23 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
         for (size_t j = (i + 1); j < peaks.size(); ++j) {
             // Since we know that the peaks are sorted monotonically in mz and
             // then rt, in order to calculate the maximum potential j we only
-            // need to find the point where the peak.mz is above the cluster
-            // radius.
-            if (peaks[j].mz > cluster_mz + parameters.radius_mz) {
+            // need to find the point where the peak.local_max_mz is above the
+            // cluster radius.
+            if (peaks[j].local_max_mz > cluster_mz + parameters.radius_mz) {
                 break;
             }
             if (peaks[j].cluster_id == -1 &&
-                (peaks[j].mz < cluster_mz + parameters.radius_mz &&
-                 peaks[j].rt < cluster_rt + parameters.radius_rt)) {
+                (peaks[j].local_max_mz < cluster_mz + parameters.radius_mz &&
+                 peaks[j].local_max_rt < cluster_rt + parameters.radius_rt)) {
                 // If the cluster already contains a peak from the same file as
                 // peaks[j], check if height of said peak is greater than
-                // peaks[j].height, if it is, swap the index, otherwise,
-                // continue.
+                // peaks[j].local_max_height, if it is, swap the index,
+                // otherwise, continue.
                 bool file_found = false;
                 for (auto& index : metapeak_indexes) {
                     if (peaks[index].file_id == peaks[j].file_id &&
-                        peaks[index].height < peaks[j].height) {
+                        peaks[index].local_max_height <
+                            peaks[j].local_max_height) {
                         // Update cluster peaks.
                         peaks[index].cluster_id = -1;
                         index = j;
@@ -104,10 +93,14 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
                 // Cull far peaks.
                 for (int k = metapeak_indexes.size() - 1; k >= 0; --k) {
                     auto& index = metapeak_indexes[k];
-                    if (peaks[index].mz > cluster_mz + parameters.radius_mz ||
-                        peaks[index].mz < cluster_mz - parameters.radius_mz ||
-                        peaks[index].rt > cluster_rt + parameters.radius_rt ||
-                        peaks[index].rt < cluster_rt - parameters.radius_rt) {
+                    if (peaks[index].local_max_mz >
+                            cluster_mz + parameters.radius_mz ||
+                        peaks[index].local_max_mz <
+                            cluster_mz - parameters.radius_mz ||
+                        peaks[index].local_max_rt >
+                            cluster_rt + parameters.radius_rt ||
+                        peaks[index].local_max_rt <
+                            cluster_rt - parameters.radius_rt) {
                         peaks[index].cluster_id = -1;
                         metapeak_indexes.erase(metapeak_indexes.begin() + k);
                         calculate_cluster_pos(cluster_mz, cluster_rt, peaks,
@@ -197,7 +190,8 @@ std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
             cluster.file_heights = std::vector<double>(n_files);
             for (size_t file_index = 0; file_index < n_files; ++file_index) {
                 if (file_index == peaks[k].file_id) {
-                    cluster.file_heights[file_index] = peaks[k].height;
+                    cluster.file_heights[file_index] =
+                        peaks[k].local_max_height;
                     ++k;
                 } else {
                     cluster.file_heights[file_index] = 0;

@@ -1025,7 +1025,7 @@ def debugging_qatar():
 
     return raw_data, mesh, peaks_df, peaks
 
-def peak_extraction(file_name, tapp_parameters, polarity):
+def peak_extraction(file_name, tapp_parameters):
     print("Reading raw data")
     raw_data = tapp.read_mzxml(
         file_name,
@@ -1038,7 +1038,7 @@ def peak_extraction(file_name, tapp_parameters, polarity):
         resolution_msn=tapp_parameters['resolution_msn'],
         reference_mz=tapp_parameters['reference_mz'],
         fwhm_rt=tapp_parameters['avg_fwhm_rt'],
-        polarity=polarity,
+        polarity=tapp_parameters['polarity'],
     )
     print("Resampling")
     mesh = resample(
@@ -1051,6 +1051,7 @@ def peak_extraction(file_name, tapp_parameters, polarity):
 
     print("Finding peaks")
     peaks = find_peaks(raw_data, mesh, tapp_parameters['max_peaks'])
+    print("Found {} peaks".format(len(peaks)))
 
     return raw_data, mesh, peaks
 
@@ -2037,6 +2038,152 @@ def psm_db_sequences(ident_data):
     db_sequences_df['psm_id'] = [psm.id for psm in ident_data.spectrum_ids]
 
     return db_sequences_df
+
+def full_pipeline_test():
+    data_dir = '/data/HYE_DDA_Orbitrap/mzXML/subset/'
+    file_names = [
+        '1_1.mzXML' , '1_2.mzXML' , '1_3.mzXML' , '1_4.mzXML' , '1_5.mzXML'  ,
+        '1_6.mzXML' , '1_7.mzXML' , '1_8.mzXML' , '1_9.mzXML' , '1_10.mzXML' ,
+        '3_1.mzXML' , '3_2.mzXML' , '3_3.mzXML' , '3_4.mzXML' , '3_5.mzXML'  ,
+        '3_6.mzXML' , '3_7.mzXML' , '3_8.mzXML' , '3_9.mzXML' , '3_10.mzXML' ,
+        ]
+    class_ids = [
+        1,1,1,1,1,
+        1,1,1,1,1,
+        3,3,3,3,3,
+        3,3,3,3,3,
+    ]
+    tapp_parameters = {
+        'instrument_type': 'orbitrap',
+        'resolution_ms1': 70000,
+        'resolution_msn': 30000,
+        'reference_mz': 200,
+        'avg_fwhm_rt': 9,
+        'num_samples_mz': 5,
+        'num_samples_rt': 5,
+        'smoothing_coefficient_mz': 0.4,
+        'smoothing_coefficient_rt': 0.4,
+        'max_peaks': 1000,
+        'polarity': 'pos',
+        'min_mz': 0,
+        'max_mz': 100000,
+        'min_rt': 0,
+        'max_rt': 100000,
+    }
+
+    # Load raw_data, calculate mesh, find peaks.
+    import os
+    raw_data = []
+    mesh = []
+    peaks = []
+    for file_name in file_names:
+        print("Extracting peaks for:", file_name)
+        r, m, p = peak_extraction(os.path.join(data_dir, file_name), tapp_parameters)
+        raw_data += [r]
+        mesh += [m]
+        peaks += [p]
+
+    # Calculate similarity matrix.
+    print("Calculating unwarped similarity matrix.")
+    similarity_matrix = np.zeros(len(file_names) ** 2).reshape(len(file_names), len(file_names))
+    for i in range(0,len(file_names)):
+        file_name = file_names[i]
+        peaks_a = peaks[i]
+        for j in range(i,len(file_names)):
+            peaks_b = peaks[j]
+            similarity_matrix[j,i] = tapp.find_similarity(peaks_a, peaks_b, 2000).geometric_ratio
+            similarity_matrix[i,j] = similarity_matrix[j,i]
+    similarity_matrix_names = [file_name.split('.')[0] for file_name in file_names]
+    similarity_matrix_df = pd.DataFrame(similarity_matrix)
+    similarity_matrix_df.columns = similarity_matrix_names
+    similarity_matrix_df.rename(index=dict(zip(range(0,len(similarity_matrix_names),1), similarity_matrix_names)), inplace=True)
+    plt.ion()
+    plt.figure()
+    import seaborn as sns
+    sns.heatmap(similarity_matrix_df, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
+    plt.title('Unwarped similarity')
+
+    # Calculate similarity matrix after reference warping.
+    print("Calculating reference warping similarity matrix.")
+    similarity_matrix = np.zeros(len(file_names) ** 2).reshape(len(file_names), len(file_names))
+    ref_peaks = peaks[0]
+    warped_peaks = [ref_peaks]
+    for i, peaks_b in enumerate(peaks):
+        if i != 0:
+            warped_peaks += [warp_peaks([ref_peaks, peaks_b], 0, 100, 100, 2000, 0.2, 50)[1]]
+    for i in range(0,len(file_names)):
+        file_name = file_names[i]
+        peaks_a = warped_peaks[i]
+        for j in range(i,len(file_names)):
+            print("i:", i, "j:", j)
+            peaks_b = warped_peaks[j]
+            similarity_matrix[j,i] = tapp.find_similarity(peaks_a, peaks_b, 2000).geometric_ratio
+            similarity_matrix[i,j] = similarity_matrix[j,i]
+    similarity_matrix_names = [file_name.split('.')[0] for file_name in file_names]
+    similarity_matrix_df = pd.DataFrame(similarity_matrix)
+    similarity_matrix_df.columns = similarity_matrix_names
+    similarity_matrix_df.rename(index=dict(zip(range(0,len(similarity_matrix_names),1), similarity_matrix_names)), inplace=True)
+    plt.ion()
+    plt.figure()
+    import seaborn as sns
+    sns.heatmap(similarity_matrix_df, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
+    plt.title('Reference warping similarity')
+
+    # # Calculate similarity matrix after exhaustive warping.
+    # print("Calculating exhaustive warping similarity matrix.")
+    # similarity_matrix = np.zeros(len(file_names) ** 2).reshape(len(file_names), len(file_names))
+    # for i in range(0,len(file_names)):
+        # file_name = file_names[i]
+        # peaks_a = peaks[i]
+        # for j in range(0,len(file_names)):
+            # print("i:", i, "j:", j)
+            # peaks_b = peaks[j]
+            # peaks_b = warp_peaks([peaks_a, peaks_b], 0, 100, 100, 2000, 0.2, 50)[1]
+            # similarity_matrix[j,i] = tapp.find_similarity(peaks_a, peaks_b, 2000).geometric_ratio
+            # # similarity_matrix[i,j] = similarity_matrix[j,i]
+    # similarity_matrix_names = [file_name.split('.')[0] for file_name in file_names]
+    # similarity_matrix_df = pd.DataFrame(similarity_matrix)
+    # similarity_matrix_df.columns = similarity_matrix_names
+    # similarity_matrix_df.rename(index=dict(zip(range(0,len(similarity_matrix_names),1), similarity_matrix_names)), inplace=True)
+    # plt.ion()
+    # plt.figure()
+    # import seaborn as sns
+    # sns.heatmap(similarity_matrix_df, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
+    # plt.title('Exhaustive warping similarity')
+
+    # # Calculate similarity matrix after reference warping found with exhaustive.
+    # print("Calculating reference warping similarity matrix after exhaustive similarity search.")
+    # similarity_matrix = np.zeros(len(file_names) ** 2).reshape(len(file_names), len(file_names))
+    # ref_peaks = peaks[similarity_matrix.sum(axis=0).argmax()]
+    # warped_peaks = [ref_peaks]
+    # for i, peaks_b in enumerate(peaks):
+        # if i != 0:
+            # warped_peaks += [warp_peaks([ref_peaks, peaks_b], 0, 100, 100, 2000, 0.2, 50)[1]]
+    # for i in range(0,len(file_names)):
+        # file_name = file_names[i]
+        # peaks_a = warped_peaks[i]
+        # for j in range(i,len(file_names)):
+            # print("i:", i, "j:", j)
+            # peaks_b = warped_peaks[j]
+            # similarity_matrix[j,i] = tapp.find_similarity(peaks_a, peaks_b, 2000).geometric_ratio
+            # similarity_matrix[i,j] = similarity_matrix[j,i]
+    # similarity_matrix_names = [file_name.split('.')[0] for file_name in file_names]
+    # similarity_matrix_df = pd.DataFrame(similarity_matrix)
+    # similarity_matrix_df.columns = similarity_matrix_names
+    # similarity_matrix_df.rename(index=dict(zip(range(0,len(similarity_matrix_names),1), similarity_matrix_names)), inplace=True)
+    # plt.ion()
+    # plt.figure()
+    # import seaborn as sns
+    # sns.heatmap(similarity_matrix_df, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
+    # plt.title('Reference warping similarity after exhaustive similarity search')
+
+    # similarity_matrix_names = (sample_groups['group'] + "_" + sample_groups['sample_number'].map(str)).values
+    # similarity_matrix_df = pd.DataFrame(similarity_matrix)
+    # similarity_matrix_df.columns = similarity_matrix_names
+    # similarity_matrix_df.rename(index=dict(zip(range(0,len(similarity_matrix_names),1), similarity_matrix_names)), inplace=True)
+    # similarity_output_dir = "{0}".format(output_dir)
+
+    return raw_data, mesh, peaks, warped_peaks, similarity_matrix
 
 RawData.tic = tic
 

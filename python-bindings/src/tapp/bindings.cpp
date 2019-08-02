@@ -12,6 +12,7 @@
 #include "grid/grid_files.hpp"
 #include "grid/raw_data.hpp"
 #include "grid/xml_reader.hpp"
+#include "metamatch/metamatch.hpp"
 #include "pybind11/numpy.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
@@ -671,8 +672,12 @@ SimilarityResults find_similarity(std::vector<Centroid::Peak> &peak_list_a,
     };
     std::stable_sort(peak_list_a.begin(), peak_list_a.end(), sort_peaks);
     std::stable_sort(peak_list_b.begin(), peak_list_b.end(), sort_peaks);
-    peak_list_a.resize(n_peaks);
-    peak_list_b.resize(n_peaks);
+    if (peak_list_a.size() > n_peaks) {
+        peak_list_a.resize(n_peaks);
+    }
+    if (peak_list_b.size() > n_peaks) {
+        peak_list_b.resize(n_peaks);
+    }
     SimilarityResults results = {};
     results.self_a = Warp2D::similarity_2D(peak_list_a, peak_list_a);
     results.self_b = Warp2D::similarity_2D(peak_list_b, peak_list_b);
@@ -1300,6 +1305,42 @@ std::vector<LinkedPeptide> link_identified_peptides(
     return linked_peptides;
 }
 
+struct MetaMatchResults {
+    std::vector<MetaMatch::Cluster> clusters;
+    std::vector<MetaMatch::Peak> orphans;
+};
+
+MetaMatchResults perform_metamatch(
+    // NOTE: [(class_0, peaks_0),...(class_i, peaks_i)]
+    std::vector<std::tuple<size_t, std::vector<Centroid::Peak>>> input,
+    double radius_mz, double radius_rt, double fraction) {
+    MetaMatchResults results;
+
+    // Create the ClassMaps.
+    std::vector<MetaMatch::ClassMap> class_maps;
+    for (const auto &[class_id, peaks] : input) {
+        bool found = false;
+        for (auto &class_map : class_maps) {
+            if (class_map.id == class_id) {
+                found = true;
+                class_map.n_files++;
+                class_map.required_hits =
+                    std::ceil(class_map.n_files * fraction);
+                break;
+            }
+        }
+        if (!found) {
+            class_maps.push_back({class_id, 1, 0});
+        }
+    }
+    for (const auto &class_map : class_maps) {
+        std::cout << class_map.id << " " << class_map.n_files << " "
+                  << class_map.required_hits << std::endl;
+    }
+
+    return results;
+}
+
 }  // namespace PythonAPI
 
 PYBIND11_MODULE(tapp, m) {
@@ -1526,6 +1567,23 @@ PYBIND11_MODULE(tapp, m) {
         .def("__repr__",
              [](const PythonAPI::Isotope &s) { return std::to_string(s.id); });
 
+    py::class_<PythonAPI::MetaMatchResults>(m, "MetaMatchResults")
+        .def_readonly("clusters", &PythonAPI::MetaMatchResults::clusters)
+        .def_readonly("orphans", &PythonAPI::MetaMatchResults::orphans);
+
+    py::class_<MetaMatch::Cluster>(m, "MetaMatchCluster")
+        .def_readonly("id", &MetaMatch::Cluster::id)
+        .def_readonly("mz", &MetaMatch::Cluster::mz)
+        .def_readonly("rt", &MetaMatch::Cluster::rt)
+        .def_readonly("file_heights", &MetaMatch::Cluster::file_heights);
+
+    py::class_<MetaMatch::Peak>(m, "MetaMatchPeak")
+        .def_readonly("file_id", &MetaMatch::Peak::file_id)
+        .def_readonly("class_id", &MetaMatch::Peak::class_id)
+        .def_readonly("cluster_id", &MetaMatch::Peak::cluster_id)
+        .def_readonly("cluster_mz", &MetaMatch::Peak::cluster_mz)
+        .def_readonly("cluster_rt", &MetaMatch::Peak::cluster_rt);
+
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,
           "Read raw data from the given mzXML file ", py::arg("file_name"),
@@ -1575,6 +1633,9 @@ PYBIND11_MODULE(tapp, m) {
         .def("read_mzidentml", &PythonAPI::read_mzidentml,
              "Read identification data from the given mzIdentML file ",
              py::arg("file_name"), py::arg("threshold") = true)
+        .def("perform_metamatch", &PythonAPI::perform_metamatch,
+             "Perform metamatch for peak matching", py::arg("input"),
+             py::arg("radius_mz"), py::arg("radius_rt"), py::arg("fraction"))
         .def("link_identified_peptides", &PythonAPI::link_identified_peptides,
              "DEBUG", py::arg("peaks"), py::arg("identifications"),
              py::arg("tolerance_rt"), py::arg("minimum_isotope_perc"));

@@ -79,40 +79,42 @@ bool MetaMatch::Files::Csv::write_peaks(
         stream << i
                << cell_delimiter
                // X
-               << peak.mz
+               << peak.local_max_mz
                << cell_delimiter
                // Y
-               << peak.rt
+               << peak.local_max_rt
                << cell_delimiter
                // Height
-               << peak.height_centroid
+               << peak.local_max_height
                << cell_delimiter
                // Volume
-               << peak.total_intensity
+               << peak.raw_roi_total_intensity
                << cell_delimiter
                // VCentroid
-               << peak.total_intensity_centroid
+               << peak.raw_roi_total_intensity
                << cell_delimiter
                // XSigma
-               << peak.sigma_mz
+               << peak.raw_roi_sigma_mz
                << cell_delimiter
                // YSigma
-               << peak.sigma_rt
+               << peak.raw_roi_sigma_rt
                << cell_delimiter
                // Count
-               << peak.points.size()
+               << 0
                << cell_delimiter
                // LocalBkgnd
-               << peak.border_background
+               << peak.slope_descent_border_background
                << cell_delimiter
                // SNVolume
-               << (peak.total_intensity / peak.border_background)
+               << (peak.raw_roi_total_intensity /
+                   peak.slope_descent_border_background)
                << cell_delimiter
                // SNHeight
-               << (peak.height / peak.border_background)
+               << (peak.local_max_height / peak.slope_descent_border_background)
                << cell_delimiter
                // SNHeight
-               << (peak.total_intensity_centroid / peak.border_background)
+               << (peak.raw_roi_total_intensity /
+                   peak.slope_descent_border_background)
                << cell_delimiter
                // file_id
                << peak.file_id

@@ -31,7 +31,7 @@ struct Parameters {
 struct Peak : Centroid::Peak {
     size_t file_id;
     size_t class_id;
-    int cluster_id;
+    int64_t cluster_id;
     double cluster_mz;
     double cluster_rt;
 };

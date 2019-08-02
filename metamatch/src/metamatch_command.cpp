@@ -445,7 +445,7 @@ int main(int argc, char *argv[]) {
             }
             for (const auto &peak : peaks) {
                 metapeaks.push_back(
-                    {peak, file_id, class_id, -1, peak.mz, peak.rt});
+                    {peak, file_id, class_id, -1, peak.local_max_mz, peak.local_max_rt});
             }
             ++file_id;
         }
