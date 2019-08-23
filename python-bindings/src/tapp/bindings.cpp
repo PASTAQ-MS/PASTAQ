@@ -1318,6 +1318,8 @@ MetaMatchResults perform_metamatch(
 
     // Create the ClassMaps.
     std::vector<MetaMatch::ClassMap> class_maps;
+    std::vector<MetaMatch::Peak> metapeaks;
+    size_t file_id = 0;
     for (const auto &[class_id, peaks] : input) {
         bool found = false;
         for (auto &class_map : class_maps) {
@@ -1332,11 +1334,30 @@ MetaMatchResults perform_metamatch(
         if (!found) {
             class_maps.push_back({class_id, 1, 0});
         }
+        for (const auto &peak : peaks) {
+            metapeaks.push_back({peak, file_id, class_id, -1, peak.local_max_mz,
+                                 peak.local_max_rt});
+        }
+        ++file_id;
     }
     for (const auto &class_map : class_maps) {
         std::cout << class_map.id << " " << class_map.n_files << " "
                   << class_map.required_hits << std::endl;
     }
+
+    MetaMatch::Parameters parameters = {};
+    parameters.radius_mz = radius_mz;
+    parameters.radius_rt = radius_rt;
+    parameters.class_maps = class_maps;
+
+    std::cout << "Finding candidates..." << std::endl;
+    MetaMatch::find_clusters(metapeaks, parameters);
+
+    std::cout << "Extracting orphans..." << std::endl;
+    results.orphans = MetaMatch::extract_orphans(metapeaks);
+
+    std::cout << "Building cluster table..." << std::endl;
+    results.clusters = MetaMatch::reduce_cluster(metapeaks, file_id);
 
     return results;
 }
@@ -1575,14 +1596,18 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("id", &MetaMatch::Cluster::id)
         .def_readonly("mz", &MetaMatch::Cluster::mz)
         .def_readonly("rt", &MetaMatch::Cluster::rt)
-        .def_readonly("file_heights", &MetaMatch::Cluster::file_heights);
+        .def_readonly("file_heights", &MetaMatch::Cluster::file_heights)
+        .def_readonly("avg_height", &MetaMatch::Cluster::avg_height);
 
     py::class_<MetaMatch::Peak>(m, "MetaMatchPeak")
         .def_readonly("file_id", &MetaMatch::Peak::file_id)
         .def_readonly("class_id", &MetaMatch::Peak::class_id)
         .def_readonly("cluster_id", &MetaMatch::Peak::cluster_id)
         .def_readonly("cluster_mz", &MetaMatch::Peak::cluster_mz)
-        .def_readonly("cluster_rt", &MetaMatch::Peak::cluster_rt);
+        .def_readonly("cluster_rt", &MetaMatch::Peak::cluster_rt)
+        .def_readonly("height", &MetaMatch::Peak::local_max_height)
+        .def_readonly("local_max_mz", &MetaMatch::Peak::local_max_mz)
+        .def_readonly("local_max_rt", &MetaMatch::Peak::local_max_rt);
 
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,

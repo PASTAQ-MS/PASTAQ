@@ -72,15 +72,17 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
                 // otherwise, continue.
                 bool file_found = false;
                 for (auto& index : metapeak_indexes) {
-                    if (peaks[index].file_id == peaks[j].file_id &&
-                        peaks[index].local_max_height <
-                            peaks[j].local_max_height) {
-                        // Update cluster peaks.
-                        peaks[index].cluster_id = -1;
-                        index = j;
-                        peaks[index].cluster_id = cluster_id;
+                    if (peaks[index].file_id == peaks[j].file_id) {
                         file_found = true;
-                        break;
+                        if (peaks[index].file_id == peaks[j].file_id &&
+                            peaks[index].local_max_height <
+                                peaks[j].local_max_height) {
+                            // Update cluster peaks.
+                            peaks[index].cluster_id = -1;
+                            index = j;
+                            peaks[index].cluster_id = cluster_id;
+                            break;
+                        }
                     }
                 }
                 if (!file_found) {
@@ -179,7 +181,7 @@ std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
         return clusters;
     }
 
-    int cluster_id = peaks[0].cluster_id;
+    int64_t cluster_id = 0;
     size_t k = 0;
     for (size_t i = 1; i < peaks.size(); ++i) {
         if (cluster_id != peaks[i].cluster_id) {
@@ -188,19 +190,31 @@ std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
             cluster.mz = peaks[i - 1].cluster_mz;
             cluster.rt = peaks[i - 1].cluster_rt;
             cluster.file_heights = std::vector<double>(n_files);
-            for (size_t file_index = 0; file_index < n_files; ++file_index) {
-                if (file_index == peaks[k].file_id) {
-                    cluster.file_heights[file_index] =
-                        peaks[k].local_max_height;
-                    ++k;
-                } else {
-                    cluster.file_heights[file_index] = 0;
-                }
+            double sum_height = 0.0;
+            size_t hits = 0;
+            for (size_t j = k; j < i; ++j) {
+                auto file_id = peaks[j].file_id;
+                cluster.file_heights[file_id] = peaks[j].local_max_height;
+                sum_height += peaks[j].local_max_height;
+                hits++;
             }
+            cluster.avg_height = sum_height / hits;
             clusters.push_back(cluster);
             cluster_id = peaks[i].cluster_id;
             k = i;
         }
+    }
+
+    // Sort clusters by highest average height and change cluster ids
+    // accordingly.
+    auto sort_by_avg_height = [](auto c1, auto c2) -> bool {
+        return c1.avg_height > c2.avg_height;
+    };
+    std::stable_sort(clusters.begin(), clusters.end(), sort_by_avg_height);
+    size_t i = 0;
+    for (auto& cluster : clusters) {
+        cluster.id = i;
+        i++;
     }
 
     return clusters;

@@ -2043,15 +2043,15 @@ def full_pipeline_test():
     data_dir = '/data/HYE_DDA_Orbitrap/mzXML/subset/'
     file_names = [
         '1_1.mzXML' , '1_2.mzXML' , '1_3.mzXML' , '1_4.mzXML' , '1_5.mzXML'  ,
-        '1_6.mzXML' , '1_7.mzXML' , '1_8.mzXML' , '1_9.mzXML' , '1_10.mzXML' ,
+        # '1_6.mzXML' , '1_7.mzXML' , '1_8.mzXML' , '1_9.mzXML' , '1_10.mzXML' ,
         '3_1.mzXML' , '3_2.mzXML' , '3_3.mzXML' , '3_4.mzXML' , '3_5.mzXML'  ,
-        '3_6.mzXML' , '3_7.mzXML' , '3_8.mzXML' , '3_9.mzXML' , '3_10.mzXML' ,
+        # '3_6.mzXML' , '3_7.mzXML' , '3_8.mzXML' , '3_9.mzXML' , '3_10.mzXML' ,
         ]
     class_ids = [
         1,1,1,1,1,
-        1,1,1,1,1,
+        # 1,1,1,1,1,
         3,3,3,3,3,
-        3,3,3,3,3,
+        # 3,3,3,3,3,
     ]
     tapp_parameters = {
         'instrument_type': 'orbitrap',
@@ -2097,11 +2097,11 @@ def full_pipeline_test():
     similarity_matrix_df = pd.DataFrame(similarity_matrix)
     similarity_matrix_df.columns = similarity_matrix_names
     similarity_matrix_df.rename(index=dict(zip(range(0,len(similarity_matrix_names),1), similarity_matrix_names)), inplace=True)
-    plt.ion()
-    plt.figure()
-    import seaborn as sns
-    sns.heatmap(similarity_matrix_df, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
-    plt.title('Unwarped similarity')
+    # plt.ion()
+    # plt.figure()
+    # import seaborn as sns
+    # sns.heatmap(similarity_matrix_df, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
+    # plt.title('Unwarped similarity')
 
     # Calculate similarity matrix after reference warping.
     print("Calculating reference warping similarity matrix.")
@@ -2123,11 +2123,11 @@ def full_pipeline_test():
     similarity_matrix_df = pd.DataFrame(similarity_matrix)
     similarity_matrix_df.columns = similarity_matrix_names
     similarity_matrix_df.rename(index=dict(zip(range(0,len(similarity_matrix_names),1), similarity_matrix_names)), inplace=True)
-    plt.ion()
-    plt.figure()
-    import seaborn as sns
-    sns.heatmap(similarity_matrix_df, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
-    plt.title('Reference warping similarity')
+    # plt.ion()
+    # plt.figure()
+    # import seaborn as sns
+    # sns.heatmap(similarity_matrix_df, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
+    # plt.title('Reference warping similarity')
 
     # # Calculate similarity matrix after exhaustive warping.
     # print("Calculating exhaustive warping similarity matrix.")
@@ -2183,7 +2183,36 @@ def full_pipeline_test():
     # similarity_matrix_df.rename(index=dict(zip(range(0,len(similarity_matrix_names),1), similarity_matrix_names)), inplace=True)
     # similarity_output_dir = "{0}".format(output_dir)
 
-    return raw_data, mesh, peaks, warped_peaks, similarity_matrix
+    print("Performing metamatch")
+    metamatch_input = list(zip(class_ids, warped_peaks))
+    metamatch_results = perform_metamatch(metamatch_input, 0.005, 10, 0.7)
+
+    # DEBUG
+    metapeaks = pd.DataFrame({
+        'file_id': [peak.file_id for peak in metamatch_results.orphans],
+        'class_id': [peak.class_id for peak in metamatch_results.orphans],
+        'cluster_id': [peak.cluster_id for peak in metamatch_results.orphans],
+        'cluster_mz': [peak.cluster_mz for peak in metamatch_results.orphans],
+        'cluster_rt': [peak.cluster_rt for peak in metamatch_results.orphans],
+        'height': [peak.height for peak in metamatch_results.orphans],
+        'local_max_mz': [peak.local_max_mz for peak in metamatch_results.orphans],
+        'local_max_rt': [peak.local_max_rt for peak in metamatch_results.orphans],
+        })
+    metaclusters = pd.DataFrame({
+        'cluster_id': [cluster.id for cluster in metamatch_results.clusters],
+        'cluster_mz': [cluster.mz for cluster in metamatch_results.clusters],
+        'cluster_rt': [cluster.rt for cluster in metamatch_results.clusters],
+        'avg_height': [cluster.avg_height for cluster in metamatch_results.clusters],
+        })
+
+    for file in file_names:
+        metaclusters[file] = 0.0
+
+    for j, cluster in enumerate(metamatch_results.clusters):
+        for i, file in enumerate(file_names):
+            metaclusters.at[j, file] = cluster.file_heights[i]
+
+    return raw_data, mesh, peaks, warped_peaks, class_ids, metamatch_results, metapeaks, metaclusters
 
 RawData.tic = tic
 

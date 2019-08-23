@@ -43,6 +43,7 @@ struct Cluster {
     double rt;
     // TODO(alex): Other stats here...
     std::vector<double> file_heights;
+    double avg_height;
 };
 
 // Performs a centroid based clustering algorithm. This algorithm modifies the
