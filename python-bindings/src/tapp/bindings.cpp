@@ -11,6 +11,7 @@
 #include "grid/grid.hpp"
 #include "grid/grid_files.hpp"
 #include "grid/raw_data.hpp"
+#include "grid/raw_data_serialize.hpp"
 #include "grid/xml_reader.hpp"
 #include "metamatch/metamatch.hpp"
 #include "pybind11/numpy.h"
@@ -739,6 +740,49 @@ void to_csv(const std::vector<Centroid::Peak> &peaks, std::string file_name) {
     }
 }
 
+void write_raw_data(const RawData::RawData &raw_data, std::string file_name) {
+    std::filesystem::path output_file = file_name;
+
+    // Open file stream.
+    std::ofstream stream;
+    stream.open(output_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open output file" << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    if (!RawData::Serialize::write_raw_data(stream, raw_data)) {
+        std::ostringstream error_stream;
+        error_stream
+            << "error: couldn't write the raw_data into the output file"
+            << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+}
+
+RawData::RawData read_raw_data(std::string file_name) {
+    std::filesystem::path input_file = file_name;
+
+    // Open file stream.
+    std::ifstream stream;
+    stream.open(input_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open input file" << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    RawData::RawData raw_data;
+    if (!RawData::Serialize::read_raw_data(stream, &raw_data)) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't write the raw_data into the input file"
+                     << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+    return raw_data;
+}
+
 void write_peaks(const std::vector<Centroid::Peak> &peaks,
                  std::string file_name) {
     std::filesystem::path output_file = file_name;
@@ -1400,6 +1444,7 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("min_rt", &RawData::RawData::min_rt)
         .def_readonly("max_rt", &RawData::RawData::max_rt)
         .def("theoretical_fwhm", &RawData::theoretical_fwhm, py::arg("mz"))
+        .def("dump", &PythonAPI::write_raw_data)
         .def("__repr__",
              [](const RawData::RawData &rd) {
                  return "RawData:\n> instrument_type: " +
@@ -1650,6 +1695,9 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("peaks"), py::arg("file_name"))
         .def("read_peaks", &PythonAPI::read_peaks,
              "Read the peaks from the binary peaks file", py::arg("file_name"))
+        .def("read_raw_data", &PythonAPI::read_raw_data,
+             "Read the raw_data from the binary raw_data file",
+             py::arg("file_name"))
         .def("theoretical_isotopes_peptide",
              &PythonAPI::theoretical_isotopes_peptide,
              "Calculate the theoretical isotopic distribution of a peptide",

@@ -2132,7 +2132,7 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
     for i, file_name in enumerate(input_raw_files):
         # Check if file has already been processed.
         stem = input_stems[i]
-        out_path = os.path.join(output_dir, 'raw', "{}.ms1".join(stem))
+        out_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
         if os.path.exists(out_path) and not override_existing:
             continue
 
@@ -2162,8 +2162,8 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
     # Perform resampling/smoothing and save results to disk.
     for stem in input_stems:
         # Check if file has already been processed.
-        in_path = os.path.join(output_dir, 'raw', "{}.ms1".join(stem))
-        out_path = os.path.join(output_dir, 'mesh', "{}.mesh".join(stem))
+        in_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
+        out_path = os.path.join(output_dir, 'mesh', "{}.mesh".format(stem))
         if os.path.exists(out_path) and not override_existing:
             continue
         raw_data = tapp.read_raw_data(in_path)
@@ -2181,9 +2181,9 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
     # Perform peak detection and save results to disk.
     for stem in input_stems:
         # Check if file has already been processed.
-        in_path_raw = os.path.join(output_dir, 'raw', "{}.ms1".join(stem))
-        in_path_mesh = os.path.join(output_dir, 'mesh', "{}.mesh".join(stem))
-        out_path = os.path.join(output_dir, 'peaks', "{}.bpks".join(stem))
+        in_path_raw = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
+        in_path_mesh = os.path.join(output_dir, 'mesh', "{}.mesh".format(stem))
+        out_path = os.path.join(output_dir, 'peaks', "{}.bpks".format(stem))
         if os.path.exists(out_path) and not override_existing:
             continue
         raw_data = tapp.read_raw_data(in_path_raw)
