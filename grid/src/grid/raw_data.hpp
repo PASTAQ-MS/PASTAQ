@@ -10,15 +10,21 @@
 
 namespace Instrument {
 
-enum Type : unsigned char { QUAD, TOF, FTICR, ORBITRAP, UNKNOWN };
+enum Type : unsigned char {
+    QUAD = 0,
+    TOF = 1,
+    FTICR = 2,
+    ORBITRAP = 3,
+    UNKNOWN = 4
+};
 
 }  // namespace Instrument
 
 // In this namespace we have access to the data structures for working with the
 // read raw data.
 namespace RawData {
-enum Polarity : unsigned char { POSITIVE, NEGATIVE, BOTH };
-enum ActivationMethod : unsigned char { CID, HCD };
+enum Polarity : unsigned char { POSITIVE = 0, NEGATIVE = 1, BOTH = 2 };
+enum ActivationMethod : uint8_t { CID = 0, HCD = 1 };
 
 struct PrecursorInformation {
     // Index for the scan that caused the MSn event.

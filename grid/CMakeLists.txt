@@ -25,6 +25,7 @@ if (NOT TARGET gridlib)
     add_library(gridlib
         "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_serialize.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/raw_data_serialize.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_files.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_runners.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/xml_reader.cpp"
