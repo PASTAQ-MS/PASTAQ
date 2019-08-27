@@ -8,6 +8,9 @@ import matplotlib.gridspec as gridspec
 from scipy.optimize import curve_fit
 import matplotlib.colors as colors
 from matplotlib.patches import Ellipse
+import os
+# TODO: Use pathlib instead of os?
+# from pathlib import Path
 
 # TODO(alex): Write documentation.
 
@@ -2039,6 +2042,215 @@ def psm_db_sequences(ident_data):
 
     return db_sequences_df
 
+def default_parameters(instrument, avg_fwhm_rt):
+    if instrument == 'orbitrap':
+        tapp_parameters = {
+            'instrument_type': 'orbitrap',
+            'resolution_ms1': 70000,
+            'resolution_msn': 30000,
+            'reference_mz': 200,
+            'avg_fwhm_rt': avg_fwhm_rt,
+            # Meshing.
+            'num_samples_mz': 5,
+            'num_samples_rt': 5,
+            'smoothing_coefficient_mz': 0.4,
+            'smoothing_coefficient_rt': 0.4,
+            # Warp2D.
+            'warp2d_slack': 30,
+            'warp2d_window_size': 50,
+            'warp2d_num_points': 2000,
+            'warp2d_rt_expand_factor': 0.2,
+            'warp2d_peaks_per_window': 100,
+            # MetaMatch.
+            'metamatch_radius_mz': 0.005,
+            'metamatch_radius_rt': avg_fwhm_rt,
+            'metamatch_fraction': 0.7,
+            'max_peaks': 100000,
+            'polarity': 'both',
+            'min_mz': 0,
+            'max_mz': 100000,
+            'min_rt': 0,
+            'max_rt': 100000,
+            # Quality.
+            'similarity_num_peaks': 2000,
+        }
+        return tapp_parameters
+
+# TODO: Should be possible to only run certain steps if the output files already
+# exist, loading the data instead.
+def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_existing = False):
+    # TODO: Sanitize parameters.
+    # TODO: Sanitize input/outputs.
+    # TODO:     - Check if file names exist.
+    # TODO:     - Check if there are name conflicts.
+    # TODO:     - Check that input extension is valid.
+    # TODO:     - Check if we have permission to write on output directory.
+    # Create lists of files, and groups.
+    input_raw_files = []
+    input_stems = []
+    input_ident_files = []
+    groups = []
+    for key in sorted(input_files.keys()):
+        input_raw_files += [key]
+        base_name = os.path.basename(key)
+        base_name = os.path.splitext(base_name)
+        extension = base_name[1]
+        stem = base_name[0]
+        input_stems += [stem]
+        # TODO:     - Check that all files contain a group, if not, assign a default group distinct from the rest.
+        groups += [input_files[key]['group']]
+        # TODO:     - Check that all files contain a ident_path, if not, assign 'none'.
+        input_ident_files += [input_files[key]['ident_path']]
+
+    # Create output directory and subdirectoreis if necessary.
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    if not os.path.exists(os.path.join(output_dir, 'raw')):
+        os.makedirs(os.path.join(output_dir, 'raw'))
+    if not os.path.exists(os.path.join(output_dir, 'quality')):
+        os.makedirs(os.path.join(output_dir, 'quality'))
+    if not os.path.exists(os.path.join(output_dir, 'mesh')):
+        os.makedirs(os.path.join(output_dir, 'mesh'))
+    if not os.path.exists(os.path.join(output_dir, 'peaks')):
+        os.makedirs(os.path.join(output_dir, 'peaks'))
+    if not os.path.exists(os.path.join(output_dir, 'warped_peaks')):
+        os.makedirs(os.path.join(output_dir, 'warped_peaks'))
+    if not os.path.exists(os.path.join(output_dir, 'metamatch')):
+        os.makedirs(os.path.join(output_dir, 'metamatch'))
+    if not os.path.exists(os.path.join(output_dir, 'linking')):
+        os.makedirs(os.path.join(output_dir, 'linking'))
+    if not os.path.exists(os.path.join(output_dir, 'ident')):
+        os.makedirs(os.path.join(output_dir, 'ident'))
+    if not os.path.exists(os.path.join(output_dir, 'features')):
+        os.makedirs(os.path.join(output_dir, 'features'))
+    if not os.path.exists(os.path.join(output_dir, 'quant')):
+        os.makedirs(os.path.join(output_dir, 'quant'))
+
+    # TODO: Initialize summary, log and parameters files.
+
+    # Raw data to binary conversion.
+    for i, file_name in enumerate(input_raw_files):
+        # Check if file has already been processed.
+        stem = input_stems[i]
+        out_path = os.path.join(output_dir, 'raw', "{}.ms1".join(stem))
+        if os.path.exists(out_path) and not override_existing:
+            continue
+
+        # Read raw files (MS1).
+        print('Reading MS1:', file_name)
+        raw_data = tapp.read_mzxml(
+            file_name,
+            min_mz=tapp_parameters['min_mz'],
+            max_mz=tapp_parameters['max_mz'],
+            min_rt=tapp_parameters['min_rt'],
+            max_rt=tapp_parameters['max_rt'],
+            instrument_type=tapp_parameters['instrument_type'],
+            resolution_ms1=tapp_parameters['resolution_ms1'],
+            resolution_msn=tapp_parameters['resolution_msn'],
+            reference_mz=tapp_parameters['reference_mz'],
+            fwhm_rt=tapp_parameters['avg_fwhm_rt'],
+            polarity=tapp_parameters['polarity'],
+        )
+
+        # Write raw_data to disk (MS1).
+        print('Writing raw MS1:', stem, '({})'.format(out_path))
+        raw_data.dump(out_path)
+
+        # TODO: Read raw files (MS2).
+        # TODO: Write raw_data to disk (MS2).
+
+    # Perform resampling/smoothing and save results to disk.
+    for stem in input_stems:
+        # Check if file has already been processed.
+        in_path = os.path.join(output_dir, 'raw', "{}.ms1".join(stem))
+        out_path = os.path.join(output_dir, 'mesh', "{}.mesh".join(stem))
+        if os.path.exists(out_path) and not override_existing:
+            continue
+        raw_data = tapp.read_raw_data(in_path)
+        print("Resampling:", stem)
+        mesh = resample(
+            raw_data,
+            tapp_parameters['num_samples_mz'],
+            tapp_parameters['num_samples_rt'],
+            tapp_parameters['smoothing_coefficient_mz'],
+            tapp_parameters['smoothing_coefficient_rt'],
+            )
+        print('Writing mesh:', stem, '({})'.format(out_path))
+        mesh.dump(out_path)
+
+    # Perform peak detection and save results to disk.
+    for stem in input_stems:
+        # Check if file has already been processed.
+        in_path_raw = os.path.join(output_dir, 'raw', "{}.ms1".join(stem))
+        in_path_mesh = os.path.join(output_dir, 'mesh', "{}.mesh".join(stem))
+        out_path = os.path.join(output_dir, 'peaks', "{}.bpks".join(stem))
+        if os.path.exists(out_path) and not override_existing:
+            continue
+        raw_data = tapp.read_raw_data(in_path_raw)
+        mesh = tapp.read_mesh(in_path_mesh)
+        print("Finding peaks:", stem)
+        peaks = find_peaks(raw_data, mesh, tapp_parameters['max_peaks'])
+        print('Writing peaks:', stem, '({})'.format(out_path))
+        peaks.dump(out_path)
+
+    # Calculate similarity matrix before alignment, generate heatmap and save to disk.
+    # TODO: Sort by group and stem name before similarity calculation.
+    print("Calculating unwarped similarity matrix.")
+    similarity_matrix = np.zeros(len(input_stems) ** 2).reshape(len(input_stems), len(input_stems))
+    for i in range(0,len(input_stems)):
+        stem_a = input_stems[i]
+        peaks_a = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(stem_a)))
+        for j in range(i,len(input_stems)):
+            stem_b = input_stems[j]
+            peaks_b = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(stem_b)))
+            similarity_matrix[j,i] = tapp.find_similarity(peaks_a, peaks_b, tapp_parameters['similarity_num_peaks']).geometric_ratio
+            similarity_matrix[i,j] = similarity_matrix[j,i]
+    # TODO: Proper sorted names? Maybe group row/col colors?
+    # similarity_matrix_names = [file_name.split('.')[0] for file_name in file_names]
+    similarity_matrix_df = pd.DataFrame(similarity_matrix)
+    # similarity_matrix_df.columns = similarity_matrix_names
+    # similarity_matrix_df.rename(index=dict(zip(range(0,len(similarity_matrix_names),1), similarity_matrix_names)), inplace=True)
+    plt.ion() # TODO: plt.ioff()
+    plt.figure()
+    import seaborn as sns
+    sns.heatmap(similarity_matrix_df, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
+    # TODO: Save figure to disk.
+
+    # TODO: Correct retention time. If a reference sample is selected it will be used, otherwise, exhaustive warping will be performed.
+    # TODO: Calculate similarity matrix after alignment, generate heatmap and save to disk.
+    # TODO: Use metamatch to match warped peaks.
+    return metaclusters
+    # TODO: Match ms2 events with corresponding detected peaks.
+    # TODO: (If there is ident information)
+    # TODO:     - Read mzidentdata and save binaries to disk.
+    # TODO:     - Link ms2 events with ident information.
+    # TODO:     - Perform Occam's razor protein inference in linked peptides.
+    # TODO: Perform feature detection using averagine or linked identification if available in ms2 linked peaks.
+    # TODO: Link metamatch clusters and corresponding peaks with identification information of peptides and proteins.
+    # TODO: Use maximum likelihood to resolve conflicts among replicates and generate peptide/protein quantitative tables.
+    return
+
+def full_dda_pipeline_test():
+    input_files = {
+            '/data/HYE_DDA_Orbitrap/mzXML/subset/1_1.mzXML': {'group': 1, 'ident_path': 'none'},
+            '/data/HYE_DDA_Orbitrap/mzXML/subset/1_2.mzXML': {'group': 1, 'ident_path': 'none'},
+            '/data/HYE_DDA_Orbitrap/mzXML/subset/1_3.mzXML': {'group': 1, 'ident_path': 'none'},
+            '/data/HYE_DDA_Orbitrap/mzXML/subset/1_4.mzXML': {'group': 1, 'ident_path': 'none'},
+            '/data/HYE_DDA_Orbitrap/mzXML/subset/1_5.mzXML': {'group': 1, 'ident_path': 'none'},
+            '/data/HYE_DDA_Orbitrap/mzXML/subset/3_1.mzXML': {'group': 3, 'ident_path': 'none'},
+            '/data/HYE_DDA_Orbitrap/mzXML/subset/3_2.mzXML': {'group': 3, 'ident_path': 'none'},
+            '/data/HYE_DDA_Orbitrap/mzXML/subset/3_3.mzXML': {'group': 3, 'ident_path': 'none'},
+            '/data/HYE_DDA_Orbitrap/mzXML/subset/3_4.mzXML': {'group': 3, 'ident_path': 'none'},
+            '/data/HYE_DDA_Orbitrap/mzXML/subset/3_5.mzXML': {'group': 3, 'ident_path': 'none'},
+        }
+    tapp_parameters = default_parameters('orbitrap', 9)
+    tapp_parameters['max_peaks'] = 1000
+    tapp_parameters['polarity'] = 'pos'
+
+    metaclusters = dda_pipeline(tapp_parameters, input_files, 'tapp_pipeline_test')
+
+    return metaclusters
+
 def full_pipeline_test():
     data_dir = '/data/HYE_DDA_Orbitrap/mzXML/subset/'
     file_names = [
@@ -2072,7 +2284,6 @@ def full_pipeline_test():
     }
 
     # Load raw_data, calculate mesh, find peaks.
-    import os
     raw_data = []
     mesh = []
     peaks = []
