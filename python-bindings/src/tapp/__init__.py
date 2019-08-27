@@ -2322,18 +2322,25 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
 
     # Use metamatch to match warped peaks.
     out_path = os.path.join(output_dir, 'metamatch')
-    metamatch_input = []
-    for i, stem in enumerate(input_stems):
-        in_path = os.path.join(output_dir, 'warped_peaks', "{}.bpks".format(stem))
-        metamatch_input += [(groups[i], tapp.read_peaks(in_path))]
+    if not os.path.exists(os.path.join(out_path, "metamatch.clusters")) or override_existing:
+        metamatch_input = []
+        for i, stem in enumerate(input_stems):
+            in_path = os.path.join(output_dir, 'warped_peaks', "{}.bpks".format(stem))
+            metamatch_input += [(groups[i], tapp.read_peaks(in_path))]
 
-    metamatch_results = perform_metamatch(
-        metamatch_input,
-        tapp_parameters['metamatch_radius_mz'],
-        tapp_parameters['metamatch_radius_rt'],
-        tapp_parameters['metamatch_fraction'])
+        metamatch_results = perform_metamatch(
+            metamatch_input,
+            tapp_parameters['metamatch_radius_mz'],
+            tapp_parameters['metamatch_radius_rt'],
+            tapp_parameters['metamatch_fraction'])
 
-    return metamatch_results
+        # Save metamatch results to disk.
+        print("Writing metamatch results to disk")
+        tapp.write_metamatch_clusters(
+                metamatch_results.clusters, os.path.join(out_path, "metamatch.clusters"))
+        tapp.write_metamatch_peaks(
+                metamatch_results.orphans, os.path.join(out_path, "metamatch.orphans"))
+
     # TODO: Match ms2 events with corresponding detected peaks.
     # TODO: (If there is ident information)
     # TODO:     - Read mzidentdata and save binaries to disk.

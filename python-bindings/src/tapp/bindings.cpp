@@ -15,6 +15,7 @@
 #include "grid/raw_data_serialize.hpp"
 #include "grid/xml_reader.hpp"
 #include "metamatch/metamatch.hpp"
+#include "metamatch/metamatch_serialize.hpp"
 #include "pybind11/numpy.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
@@ -869,6 +870,97 @@ std::vector<Centroid::Peak> read_peaks(std::string file_name) {
     return peaks;
 }
 
+void write_metamatch_clusters(
+    const std::vector<MetaMatch::Cluster> &metamatch_clusters,
+    std::string file_name) {
+    std::filesystem::path output_file = file_name;
+
+    // Open file stream.
+    std::ofstream stream;
+    stream.open(output_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open output file" << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    if (!MetaMatch::Serialize::write_clusters(stream, metamatch_clusters)) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't write the metamatch_clusters into the "
+                        "output file"
+                     << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+}
+
+std::vector<MetaMatch::Cluster> read_metamatch_clusters(std::string file_name) {
+    std::filesystem::path input_file = file_name;
+
+    // Open file stream.
+    std::ifstream stream;
+    stream.open(input_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open input file" << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    std::vector<MetaMatch::Cluster> metamatch_clusters;
+    if (!MetaMatch::Serialize::read_clusters(stream, &metamatch_clusters)) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't write the metamatch_clusters into the "
+                        "input file"
+                     << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+    return metamatch_clusters;
+}
+
+void write_metamatch_peaks(const std::vector<MetaMatch::Peak> &metamatch_peaks,
+                           std::string file_name) {
+    std::filesystem::path output_file = file_name;
+
+    // Open file stream.
+    std::ofstream stream;
+    stream.open(output_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open output file" << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    if (!MetaMatch::Serialize::write_peaks(stream, metamatch_peaks)) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't write the metamatch_peaks into the "
+                        "output file"
+                     << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+}
+
+std::vector<MetaMatch::Peak> read_metamatch_peaks(std::string file_name) {
+    std::filesystem::path input_file = file_name;
+
+    // Open file stream.
+    std::ifstream stream;
+    stream.open(input_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open input file" << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    std::vector<MetaMatch::Peak> metamatch_peaks;
+    if (!MetaMatch::Serialize::read_peaks(stream, &metamatch_peaks)) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't write the metamatch_peaks into the "
+                        "input file"
+                     << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+    return metamatch_peaks;
+}
+
 std::tuple<std::vector<double>, std::vector<double>>
 theoretical_isotopes_peptide(std::string sequence, int charge_state,
                              double min_perc) {
@@ -1432,13 +1524,8 @@ MetaMatchResults perform_metamatch(
     parameters.radius_rt = radius_rt;
     parameters.class_maps = class_maps;
 
-    std::cout << "Finding candidates..." << std::endl;
     MetaMatch::find_clusters(metapeaks, parameters);
-
-    std::cout << "Extracting orphans..." << std::endl;
     results.orphans = MetaMatch::extract_orphans(metapeaks);
-
-    std::cout << "Building cluster table..." << std::endl;
     results.clusters = MetaMatch::reduce_cluster(metapeaks, file_id);
 
     return results;
@@ -1729,11 +1816,24 @@ PYBIND11_MODULE(tapp, m) {
         .def("write_peaks", &PythonAPI::write_peaks,
              "Write the peaks to disk in a binary format", py::arg("peaks"),
              py::arg("file_name"))
+        .def("write_metamatch_clusters", &PythonAPI::write_metamatch_clusters,
+             "Write the metamatch_clusters to disk in a binary format",
+             py::arg("metamatch_clusters"), py::arg("file_name"))
+        .def("write_metamatch_peaks", &PythonAPI::write_metamatch_peaks,
+             "Write the metamatch_peaks to disk in a binary format",
+             py::arg("metamatch_peaks"), py::arg("file_name"))
         .def("to_csv", &PythonAPI::to_csv,
              "Write the peaks to disk in csv format (compatibility)",
              py::arg("peaks"), py::arg("file_name"))
         .def("read_peaks", &PythonAPI::read_peaks,
              "Read the peaks from the binary peaks file", py::arg("file_name"))
+        .def("read_metamatch_clusters", &PythonAPI::read_metamatch_clusters,
+             "Read the metamatch_clusters from the binary metamatch_clusters "
+             "file",
+             py::arg("file_name"))
+        .def("read_metamatch_peaks", &PythonAPI::read_metamatch_peaks,
+             "Read the metamatch_peaks from the binary metamatch_peaks file",
+             py::arg("file_name"))
         .def("read_raw_data", &PythonAPI::read_raw_data,
              "Read the raw_data from the binary raw_data file",
              py::arg("file_name"))
