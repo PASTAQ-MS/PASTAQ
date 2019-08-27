@@ -103,6 +103,66 @@ bool Serialization::write_uint64(std::ostream &stream, uint64_t value) {
     return stream.good();
 }
 
+bool Serialization::read_int8(std::istream &stream, int8_t *value) {
+    uint8_t raw_value;
+    if (!read_uint8(stream, &raw_value)) {
+        return false;
+    }
+    std::memcpy(value, &raw_value, sizeof(raw_value));
+    return true;
+}
+
+bool Serialization::write_int8(std::ostream &stream, int8_t value) {
+    uint8_t raw_value;
+    std::memcpy(&raw_value, &value, sizeof(value));
+    return write_uint8(stream, raw_value);
+}
+
+bool Serialization::read_int16(std::istream &stream, int16_t *value) {
+    uint16_t raw_value;
+    if (!read_uint16(stream, &raw_value)) {
+        return false;
+    }
+    std::memcpy(value, &raw_value, sizeof(raw_value));
+    return true;
+}
+
+bool Serialization::write_int16(std::ostream &stream, int16_t value) {
+    uint16_t raw_value;
+    std::memcpy(&raw_value, &value, sizeof(value));
+    return write_uint16(stream, raw_value);
+}
+
+bool Serialization::read_int32(std::istream &stream, int32_t *value) {
+    uint32_t raw_value;
+    if (!read_uint32(stream, &raw_value)) {
+        return false;
+    }
+    std::memcpy(value, &raw_value, sizeof(raw_value));
+    return true;
+}
+
+bool Serialization::write_int32(std::ostream &stream, int32_t value) {
+    uint32_t raw_value;
+    std::memcpy(&raw_value, &value, sizeof(value));
+    return write_uint32(stream, raw_value);
+}
+
+bool Serialization::read_int64(std::istream &stream, int64_t *value) {
+    uint64_t raw_value;
+    if (!read_uint64(stream, &raw_value)) {
+        return false;
+    }
+    std::memcpy(value, &raw_value, sizeof(raw_value));
+    return true;
+}
+
+bool Serialization::write_int64(std::ostream &stream, int64_t value) {
+    uint64_t raw_value;
+    std::memcpy(&raw_value, &value, sizeof(value));
+    return write_uint64(stream, raw_value);
+}
+
 bool Serialization::read_float(std::istream &stream, float *value) {
     uint32_t raw_value;
     if (!read_uint32(stream, &raw_value)) {

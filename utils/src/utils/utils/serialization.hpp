@@ -23,9 +23,27 @@ bool write_uint32(std::ostream &stream, uint32_t value);
 bool read_uint64(std::istream &stream, uint64_t *value);
 bool write_uint64(std::ostream &stream, uint64_t value);
 
+// Write/read a single byte to/from the stream.
+bool read_int8(std::istream &stream, int8_t *value);
+bool write_int8(std::ostream &stream, int8_t value);
+
+// Write/read an int16 to/from the stream.
+bool read_int16(std::istream &stream, int16_t *value);
+bool write_int16(std::ostream &stream, int16_t value);
+
+// Write/read an int32 to/from the stream.
+bool read_int32(std::istream &stream, int32_t *value);
+bool write_int32(std::ostream &stream, int32_t value);
+
+// Write/read an int64 to/from the stream.
+bool read_int64(std::istream &stream, int64_t *value);
+bool write_int64(std::ostream &stream, int64_t value);
+
+// Write/read a single precision floating point value to/from the stream.
 bool read_float(std::istream &stream, float *value);
 bool write_float(std::ostream &stream, float value);
 
+// Write/read a double precision floating point value to/from the stream.
 bool read_double(std::istream &stream, double *value);
 bool write_double(std::ostream &stream, double value);
 
