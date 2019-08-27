@@ -1,16 +1,17 @@
 import math
+import os
+# TODO: Use pathlib instead of os?
+# from pathlib import Path
 
 from .tapp import *
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from scipy.optimize import curve_fit
 import matplotlib.colors as colors
 from matplotlib.patches import Ellipse
-import os
-# TODO: Use pathlib instead of os?
-# from pathlib import Path
+from scipy.optimize import curve_fit
 
 # TODO(alex): Write documentation.
 
@@ -2090,7 +2091,7 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
     input_stems = []
     input_ident_files = []
     groups = []
-    for key in sorted(input_files.keys()):
+    for key in (input_files.keys()):
         input_raw_files += [key]
         base_name = os.path.basename(key)
         base_name = os.path.splitext(base_name)
@@ -2101,6 +2102,10 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
         groups += [input_files[key]['group']]
         # TODO:     - Check that all files contain a ident_path, if not, assign 'none'.
         input_ident_files += [input_files[key]['ident_path']]
+
+    # Sort input files by groups and stems.
+    groups, input_stems, input_ident_files, input_raw_files = list(
+        zip(*sorted(zip(groups, input_stems, input_ident_files, input_raw_files))))
 
     # Create output directory and subdirectoreis if necessary.
     if not os.path.exists(output_dir):
@@ -2194,32 +2199,141 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
         tapp.write_peaks(peaks, out_path)
 
     # Calculate similarity matrix before alignment, generate heatmap and save to disk.
-    # TODO: Sort by group and stem name before similarity calculation.
-    print("Calculating unwarped similarity matrix.")
-    similarity_matrix = np.zeros(len(input_stems) ** 2).reshape(len(input_stems), len(input_stems))
-    for i in range(0,len(input_stems)):
-        stem_a = input_stems[i]
-        peaks_a = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(stem_a)))
-        for j in range(i,len(input_stems)):
-            stem_b = input_stems[j]
-            peaks_b = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(stem_b)))
-            similarity_matrix[j,i] = tapp.find_similarity(peaks_a, peaks_b, tapp_parameters['similarity_num_peaks']).geometric_ratio
-            similarity_matrix[i,j] = similarity_matrix[j,i]
-    # TODO: Proper sorted names? Maybe group row/col colors?
-    # similarity_matrix_names = [file_name.split('.')[0] for file_name in file_names]
-    similarity_matrix_df = pd.DataFrame(similarity_matrix)
-    # similarity_matrix_df.columns = similarity_matrix_names
-    # similarity_matrix_df.rename(index=dict(zip(range(0,len(similarity_matrix_names),1), similarity_matrix_names)), inplace=True)
-    plt.ion() # TODO: plt.ioff()
-    plt.figure()
-    import seaborn as sns
-    sns.heatmap(similarity_matrix_df, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
-    # TODO: Save figure to disk.
+    out_path = os.path.join(output_dir, 'quality', 'unwarped_similarity')
+    if not os.path.exists("{}.csv".format(out_path)) or override_existing:
+        print("Calculating unwarped similarity matrix.")
+        similarity_matrix = np.zeros(len(input_stems) ** 2).reshape(len(input_stems), len(input_stems))
+        for i in range(0,len(input_stems)):
+            stem_a = input_stems[i]
+            peaks_a = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(stem_a)))
+            for j in range(i,len(input_stems)):
+                stem_b = input_stems[j]
+                peaks_b = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(stem_b)))
+                similarity_matrix[j,i] = tapp.find_similarity(peaks_a, peaks_b, tapp_parameters['similarity_num_peaks']).geometric_ratio
+                similarity_matrix[i,j] = similarity_matrix[j,i]
+        similarity_matrix = pd.DataFrame(similarity_matrix)
+        similarity_matrix_names = [input_stem.split('.')[0] for input_stem in input_stems]
+        similarity_matrix.columns = similarity_matrix_names
+        similarity_matrix.rename(index=dict(zip(range(0,len(similarity_matrix_names),1), similarity_matrix_names)), inplace=True)
+        plt.ioff()
+        fig = plt.figure()
+        sns.heatmap(similarity_matrix, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
+        # Save similarity matrix and figure to disk.
+        similarity_matrix.to_csv("{}.csv".format(out_path))
+        # TODO: Use plot saving from utilities library.
+        fig.set_size_inches(7.5 * 16/9, 7.5)
+        plt.savefig("{}.png".format(out_path), dpi=100)
+        plt.close(fig)
 
-    # TODO: Correct retention time. If a reference sample is selected it will be used, otherwise, exhaustive warping will be performed.
-    # TODO: Calculate similarity matrix after alignment, generate heatmap and save to disk.
-    # TODO: Use metamatch to match warped peaks.
-    return metaclusters
+    # Correct retention time. If a reference sample is selected it will be used,
+    # otherwise, exhaustive warping will be performed.
+    # TODO: Allow usage of reference sample.
+    out_path = os.path.join(output_dir, 'quality', 'exhaustive_warping_similarity')
+    reference_index = 0
+    similarity_matrix = np.zeros(len(input_stems) ** 2).reshape(len(input_stems), len(input_stems))
+    if not os.path.exists("{}.csv".format(out_path)) or override_existing:
+        print("Calculating exhaustive warping similarity matrix.")
+        for i in range(0,len(input_stems)):
+            stem_a = input_stems[i]
+            peaks_a = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(stem_a)))
+            for j in range(i,len(input_stems)):
+                stem_b = input_stems[j]
+                peaks_b = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(stem_b)))
+                peaks_b = warp_peaks(
+                    [peaks_a, peaks_b],
+                    0,
+                    tapp_parameters['warp2d_slack'],
+                    tapp_parameters['warp2d_window_size'],
+                    tapp_parameters['warp2d_num_points'],
+                    tapp_parameters['warp2d_rt_expand_factor'],
+                    tapp_parameters['warp2d_peaks_per_window'])[1]
+                similarity_matrix[j,i] = tapp.find_similarity(peaks_a, peaks_b, tapp_parameters['similarity_num_peaks']).geometric_ratio
+                similarity_matrix[i,j] = similarity_matrix[j,i]
+        similarity_matrix = pd.DataFrame(similarity_matrix)
+        similarity_matrix_names = [input_stem.split('.')[0] for input_stem in input_stems]
+        similarity_matrix.columns = similarity_matrix_names
+        similarity_matrix.rename(index=dict(zip(range(0,len(similarity_matrix_names),1), similarity_matrix_names)), inplace=True)
+        plt.ioff()
+        fig = plt.figure()
+        sns.heatmap(similarity_matrix, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
+        # Save similarity matrix and figure to disk.
+        similarity_matrix.to_csv("{}.csv".format(out_path))
+        # TODO: Use plot saving from utilities library.
+        fig.set_size_inches(7.5 * 16/9, 7.5)
+        plt.savefig("{}.png".format(out_path), dpi=100)
+        plt.close(fig)
+        reference_index = similarity_matrix.sum(axis=0).values.argmax()
+    else:
+        # Load exhaustive_warping_similarity to calculate the reference idx.
+        similarity_matrix = pd.read_csv("{}.csv".format(out_path), index_col=0)
+        reference_index = similarity_matrix.sum(axis=0).values.argmax()
+
+    # Warp all peaks to the reference file.
+    reference_stem = input_stems[reference_index]
+    reference_peaks = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(reference_stem)))
+    for stem in input_stems:
+        # Check if file has already been processed.
+        in_path = os.path.join(output_dir, 'peaks', "{}.bpks".format(stem))
+        out_path = os.path.join(output_dir, 'warped_peaks', "{}.bpks".format(stem))
+        if os.path.exists(out_path) and not override_existing:
+            continue
+
+        print("Warping", stem, "to reference:", reference_stem)
+        if stem == reference_stem:
+            tapp.write_peaks(reference_peaks, out_path)
+        else:
+            peaks = tapp.read_peaks(in_path)
+            peaks = warp_peaks(
+                [reference_peaks, peaks],
+                0,
+                tapp_parameters['warp2d_slack'],
+                tapp_parameters['warp2d_window_size'],
+                tapp_parameters['warp2d_num_points'],
+                tapp_parameters['warp2d_rt_expand_factor'],
+                tapp_parameters['warp2d_peaks_per_window'])[1]
+            tapp.write_peaks(peaks, out_path)
+
+    # Calculate similarity matrix after alignment, generate heatmap and save to disk.
+    out_path = os.path.join(output_dir, 'quality', 'warped_similarity')
+    if not os.path.exists("{}.csv".format(out_path)) or override_existing:
+        print("Calculating warped similarity matrix.")
+        similarity_matrix = np.zeros(len(input_stems) ** 2).reshape(len(input_stems), len(input_stems))
+        for i in range(0,len(input_stems)):
+            stem_a = input_stems[i]
+            peaks_a = tapp.read_peaks(os.path.join(output_dir, 'warped_peaks', '{}.bpks'.format(stem_a)))
+            for j in range(i,len(input_stems)):
+                stem_b = input_stems[j]
+                peaks_b = tapp.read_peaks(os.path.join(output_dir, 'warped_peaks', '{}.bpks'.format(stem_b)))
+                similarity_matrix[j,i] = tapp.find_similarity(peaks_a, peaks_b, tapp_parameters['similarity_num_peaks']).geometric_ratio
+                similarity_matrix[i,j] = similarity_matrix[j,i]
+        similarity_matrix = pd.DataFrame(similarity_matrix)
+        similarity_matrix_names = [input_stem.split('.')[0] for input_stem in input_stems]
+        similarity_matrix.columns = similarity_matrix_names
+        similarity_matrix.rename(index=dict(zip(range(0,len(similarity_matrix_names),1), similarity_matrix_names)), inplace=True)
+        plt.ioff()
+        fig = plt.figure()
+        sns.heatmap(similarity_matrix, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
+        # Save similarity matrix and figure to disk.
+        similarity_matrix.to_csv("{}.csv".format(out_path))
+        # TODO: Use plot saving from utilities library.
+        fig.set_size_inches(7.5 * 16/9, 7.5)
+        plt.savefig("{}.png".format(out_path), dpi=100)
+        plt.close(fig)
+
+    # Use metamatch to match warped peaks.
+    out_path = os.path.join(output_dir, 'metamatch')
+    metamatch_input = []
+    for i, stem in enumerate(input_stems):
+        in_path = os.path.join(output_dir, 'warped_peaks', "{}.bpks".format(stem))
+        metamatch_input += [(groups[i], tapp.read_peaks(in_path))]
+
+    metamatch_results = perform_metamatch(
+        metamatch_input,
+        tapp_parameters['metamatch_radius_mz'],
+        tapp_parameters['metamatch_radius_rt'],
+        tapp_parameters['metamatch_fraction'])
+
+    return metamatch_results
     # TODO: Match ms2 events with corresponding detected peaks.
     # TODO: (If there is ident information)
     # TODO:     - Read mzidentdata and save binaries to disk.
@@ -2232,13 +2346,13 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
 
 def full_dda_pipeline_test():
     input_files = {
+            '/data/HYE_DDA_Orbitrap/mzXML/subset/3_1.mzXML': {'group': 3, 'ident_path': 'none'},
+            '/data/HYE_DDA_Orbitrap/mzXML/subset/3_2.mzXML': {'group': 3, 'ident_path': 'none'},
             '/data/HYE_DDA_Orbitrap/mzXML/subset/1_1.mzXML': {'group': 1, 'ident_path': 'none'},
             '/data/HYE_DDA_Orbitrap/mzXML/subset/1_2.mzXML': {'group': 1, 'ident_path': 'none'},
             '/data/HYE_DDA_Orbitrap/mzXML/subset/1_3.mzXML': {'group': 1, 'ident_path': 'none'},
             '/data/HYE_DDA_Orbitrap/mzXML/subset/1_4.mzXML': {'group': 1, 'ident_path': 'none'},
             '/data/HYE_DDA_Orbitrap/mzXML/subset/1_5.mzXML': {'group': 1, 'ident_path': 'none'},
-            '/data/HYE_DDA_Orbitrap/mzXML/subset/3_1.mzXML': {'group': 3, 'ident_path': 'none'},
-            '/data/HYE_DDA_Orbitrap/mzXML/subset/3_2.mzXML': {'group': 3, 'ident_path': 'none'},
             '/data/HYE_DDA_Orbitrap/mzXML/subset/3_3.mzXML': {'group': 3, 'ident_path': 'none'},
             '/data/HYE_DDA_Orbitrap/mzXML/subset/3_4.mzXML': {'group': 3, 'ident_path': 'none'},
             '/data/HYE_DDA_Orbitrap/mzXML/subset/3_5.mzXML': {'group': 3, 'ident_path': 'none'},
@@ -2246,6 +2360,10 @@ def full_dda_pipeline_test():
     tapp_parameters = default_parameters('orbitrap', 9)
     tapp_parameters['max_peaks'] = 1000
     tapp_parameters['polarity'] = 'pos'
+    # TODO: Can we optimize the default parameters for warp2d based on avg_fwhm_rt and min/max rt?
+    tapp_parameters['warp2d_slack'] = 100
+    tapp_parameters['warp2d_window_size'] = 100
+    tapp_parameters['warp2d_peaks_per_window'] = 50
 
     metaclusters = dda_pipeline(tapp_parameters, input_files, 'tapp_pipeline_test')
 
