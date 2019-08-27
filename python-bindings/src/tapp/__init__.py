@@ -2191,7 +2191,7 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
         print("Finding peaks:", stem)
         peaks = find_peaks(raw_data, mesh, tapp_parameters['max_peaks'])
         print('Writing peaks:', stem, '({})'.format(out_path))
-        peaks.dump(out_path)
+        tapp.write_peaks(peaks, out_path)
 
     # Calculate similarity matrix before alignment, generate heatmap and save to disk.
     # TODO: Sort by group and stem name before similarity calculation.

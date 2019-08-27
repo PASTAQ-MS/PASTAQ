@@ -10,6 +10,7 @@
 #include "centroid/centroid_files.hpp"
 #include "grid/grid.hpp"
 #include "grid/grid_files.hpp"
+#include "grid/grid_serialize.hpp"
 #include "grid/raw_data.hpp"
 #include "grid/raw_data_serialize.hpp"
 #include "grid/xml_reader.hpp"
@@ -783,6 +784,48 @@ RawData::RawData read_raw_data(std::string file_name) {
     return raw_data;
 }
 
+void write_mesh(const Grid::Mesh &mesh, std::string file_name) {
+    std::filesystem::path output_file = file_name;
+
+    // Open file stream.
+    std::ofstream stream;
+    stream.open(output_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open output file" << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    if (!Grid::Serialize::write_mesh(stream, mesh)) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't write the mesh into the output file"
+                     << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+}
+
+Grid::Mesh read_mesh(std::string file_name) {
+    std::filesystem::path input_file = file_name;
+
+    // Open file stream.
+    std::ifstream stream;
+    stream.open(input_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open input file" << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    Grid::Mesh mesh;
+    if (!Grid::Serialize::read_mesh(stream, &mesh)) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't write the mesh into the input file"
+                     << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+    return mesh;
+}
+
 void write_peaks(const std::vector<Centroid::Peak> &peaks,
                  std::string file_name) {
     std::filesystem::path output_file = file_name;
@@ -1470,7 +1513,8 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("m", &Grid::Mesh::m)
         .def_readonly("data", &Grid::Mesh::data)
         .def_readonly("bins_mz", &Grid::Mesh::bins_mz)
-        .def_readonly("bins_rt", &Grid::Mesh::bins_rt);
+        .def_readonly("bins_rt", &Grid::Mesh::bins_rt)
+        .def("dump", &PythonAPI::write_mesh);
 
     py::class_<PythonAPI::RawPoints>(m, "RawPoints")
         .def_readonly("rt", &PythonAPI::RawPoints::rt)
@@ -1698,6 +1742,8 @@ PYBIND11_MODULE(tapp, m) {
         .def("read_raw_data", &PythonAPI::read_raw_data,
              "Read the raw_data from the binary raw_data file",
              py::arg("file_name"))
+        .def("read_mesh", &PythonAPI::read_mesh,
+             "Read the mesh from the binary mesh file", py::arg("file_name"))
         .def("theoretical_isotopes_peptide",
              &PythonAPI::theoretical_isotopes_peptide,
              "Calculate the theoretical isotopic distribution of a peptide",
