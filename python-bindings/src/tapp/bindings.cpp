@@ -1427,11 +1427,6 @@ MetaMatchResults perform_metamatch(
         }
         ++file_id;
     }
-    for (const auto &class_map : class_maps) {
-        std::cout << class_map.id << " " << class_map.n_files << " "
-                  << class_map.required_hits << std::endl;
-    }
-
     MetaMatch::Parameters parameters = {};
     parameters.radius_mz = radius_mz;
     parameters.radius_rt = radius_rt;

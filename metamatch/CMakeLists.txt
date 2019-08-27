@@ -31,6 +31,7 @@ if (NOT TARGET metamatchlib)
     add_library(metamatchlib
         "${CMAKE_CURRENT_SOURCE_DIR}/src/metamatch/metamatch.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/metamatch/metamatch_files.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/metamatch/metamatch_serialize.cpp"
         )
     target_include_directories(metamatchlib PUBLIC src)
     target_link_libraries(metamatchlib gridlib centroidlib ${CMAKE_THREAD_LIBS_INIT})

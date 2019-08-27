@@ -38,7 +38,7 @@ struct Peak : Centroid::Peak {
 
 // The aggregate information for the peaks of a given cluster.
 struct Cluster {
-    int id;
+    int64_t id;
     double mz;
     double rt;
     // TODO(alex): Other stats here...
