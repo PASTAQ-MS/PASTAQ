@@ -2064,7 +2064,7 @@ def default_parameters(instrument, avg_fwhm_rt):
             'warp2d_peaks_per_window': 100,
             # MetaMatch.
             'metamatch_radius_mz': 0.005,
-            'metamatch_radius_rt': avg_fwhm_rt,
+            'metamatch_radius_rt': avg_fwhm_rt/2,
             'metamatch_fraction': 0.7,
             'max_peaks': 100000,
             'polarity': 'both',
@@ -2077,8 +2077,7 @@ def default_parameters(instrument, avg_fwhm_rt):
         }
         return tapp_parameters
 
-# TODO: Should be possible to only run certain steps if the output files already
-# exist, loading the data instead.
+# TODO: Logger should have different levels and user can configure the verbosity of output.
 def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_existing = False):
     # TODO: Sanitize parameters.
     # TODO: Sanitize input/outputs.
@@ -2132,8 +2131,33 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
         os.makedirs(os.path.join(output_dir, 'quant'))
 
     # TODO: Initialize summary, log and parameters files.
+    import logging
+    import time
+    import datetime
+    class DeltaTimeFilter(logging.Filter):
+        def filter(self, record):
+            current_time = time.time()
+            record.delta_time = datetime.timedelta(seconds = current_time - self.prev_time)
+            self.prev_time = current_time
+            return True
+
+        def __init__(self):
+            self.prev_time = time.time()
+
+    logger = logging.getLogger('pipeline')
+    logger.addFilter(DeltaTimeFilter())
+    logger.setLevel(logging.INFO)
+    logger_fh = logging.FileHandler(os.path.join(output_dir, 'info.log'))
+    logger_fh.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s | %(delta_time)s | %(message)s')
+    logger_fh.setFormatter(formatter)
+    logger.addHandler(logger_fh)
+
+    time_pipeline_start = time.time()
 
     # Raw data to binary conversion.
+    logger.info('Starting raw data conversion')
+    time_start = time.time()
     for i, file_name in enumerate(input_raw_files):
         # Check if file has already been processed.
         stem = input_stems[i]
@@ -2142,7 +2166,7 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
             continue
 
         # Read raw files (MS1).
-        print('Reading MS1:', file_name)
+        logger.info('Reading MS1: {}'.format(file_name))
         raw_data = tapp.read_mzxml(
             file_name,
             min_mz=tapp_parameters['min_mz'],
@@ -2155,16 +2179,46 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
             reference_mz=tapp_parameters['reference_mz'],
             fwhm_rt=tapp_parameters['avg_fwhm_rt'],
             polarity=tapp_parameters['polarity'],
+            ms_level=1,
         )
 
         # Write raw_data to disk (MS1).
-        print('Writing raw MS1:', stem, '({})'.format(out_path))
+        logger.info('Writing MS1: {}'.format(out_path))
         raw_data.dump(out_path)
 
-        # TODO: Read raw files (MS2).
-        # TODO: Write raw_data to disk (MS2).
+    for i, file_name in enumerate(input_raw_files):
+        # Check if file has already been processed.
+        stem = input_stems[i]
+        out_path = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
+        if os.path.exists(out_path) and not override_existing:
+            continue
+
+        # Read raw files (MS2).
+        logger.info('Reading MS2: {}'.format(file_name))
+        raw_data = tapp.read_mzxml(
+            file_name,
+            min_mz=tapp_parameters['min_mz'],
+            max_mz=tapp_parameters['max_mz'],
+            min_rt=tapp_parameters['min_rt'],
+            max_rt=tapp_parameters['max_rt'],
+            instrument_type=tapp_parameters['instrument_type'],
+            resolution_ms1=tapp_parameters['resolution_ms1'],
+            resolution_msn=tapp_parameters['resolution_msn'],
+            reference_mz=tapp_parameters['reference_mz'],
+            fwhm_rt=tapp_parameters['avg_fwhm_rt'],
+            polarity=tapp_parameters['polarity'],
+            ms_level=2,
+        )
+
+        # Write raw_data to disk (MS2).
+        logger.info('Writing MS2: {}'.format(out_path))
+        raw_data.dump(out_path)
+
+    logger.info('Finished raw data conversion in {}'.format(datetime.timedelta(seconds=time.time()-time_start)))
 
     # Perform resampling/smoothing and save results to disk.
+    logger.info('Starting mesh resampling')
+    time_start = time.time()
     for stem in input_stems:
         # Check if file has already been processed.
         in_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
@@ -2172,7 +2226,7 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
         if os.path.exists(out_path) and not override_existing:
             continue
         raw_data = tapp.read_raw_data(in_path)
-        print("Resampling:", stem)
+        logger.info("Resampling: {}".format(stem))
         mesh = resample(
             raw_data,
             tapp_parameters['num_samples_mz'],
@@ -2180,10 +2234,13 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
             tapp_parameters['smoothing_coefficient_mz'],
             tapp_parameters['smoothing_coefficient_rt'],
             )
-        print('Writing mesh:', stem, '({})'.format(out_path))
+        logger.info('Writing mesh: {}'.format(out_path))
         mesh.dump(out_path)
+    logger.info('Finished mesh resampling in {}'.format(datetime.timedelta(seconds=time.time()-time_start)))
 
     # Perform peak detection and save results to disk.
+    logger.info('Starting peak detection')
+    time_start = time.time()
     for stem in input_stems:
         # Check if file has already been processed.
         in_path_raw = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
@@ -2193,21 +2250,24 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
             continue
         raw_data = tapp.read_raw_data(in_path_raw)
         mesh = tapp.read_mesh(in_path_mesh)
-        print("Finding peaks:", stem)
+        logger.info("Finding peaks: {}".format(stem))
         peaks = find_peaks(raw_data, mesh, tapp_parameters['max_peaks'])
-        print('Writing peaks:', stem, '({})'.format(out_path))
+        logger.info('Writing peaks:'.format(out_path))
         tapp.write_peaks(peaks, out_path)
+    logger.info('Finished peak detection in {}'.format(datetime.timedelta(seconds=time.time()-time_start)))
 
     # Calculate similarity matrix before alignment, generate heatmap and save to disk.
     out_path = os.path.join(output_dir, 'quality', 'unwarped_similarity')
+    logger.info("Starting unwarped similarity matrix calculation")
+    time_start = time.time()
     if not os.path.exists("{}.csv".format(out_path)) or override_existing:
-        print("Calculating unwarped similarity matrix.")
         similarity_matrix = np.zeros(len(input_stems) ** 2).reshape(len(input_stems), len(input_stems))
         for i in range(0,len(input_stems)):
             stem_a = input_stems[i]
             peaks_a = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(stem_a)))
             for j in range(i,len(input_stems)):
                 stem_b = input_stems[j]
+                logger.info("Calculating similarity of {} vs {}".format(stem_a, stem_b))
                 peaks_b = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(stem_b)))
                 similarity_matrix[j,i] = tapp.find_similarity(peaks_a, peaks_b, tapp_parameters['similarity_num_peaks']).geometric_ratio
                 similarity_matrix[i,j] = similarity_matrix[j,i]
@@ -2219,11 +2279,14 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
         fig = plt.figure()
         sns.heatmap(similarity_matrix, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
         # Save similarity matrix and figure to disk.
+        logger.info("Saving similarity matrix: {}.csv".format(out_path))
         similarity_matrix.to_csv("{}.csv".format(out_path))
         # TODO: Use plot saving from utilities library.
         fig.set_size_inches(7.5 * 16/9, 7.5)
         plt.savefig("{}.png".format(out_path), dpi=100)
         plt.close(fig)
+        logger.info("Saving similarity matrix plot: {}.png".format(out_path))
+    logger.info('Finished unwarped similarity matrix calculation in {}'.format(datetime.timedelta(seconds=time.time()-time_start)))
 
     # Correct retention time. If a reference sample is selected it will be used,
     # otherwise, exhaustive warping will be performed.
@@ -2231,13 +2294,15 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
     out_path = os.path.join(output_dir, 'quality', 'exhaustive_warping_similarity')
     reference_index = 0
     similarity_matrix = np.zeros(len(input_stems) ** 2).reshape(len(input_stems), len(input_stems))
+    logger.info("Starting exhaustive warping similarity matrix calculation")
+    time_start = time.time()
     if not os.path.exists("{}.csv".format(out_path)) or override_existing:
-        print("Calculating exhaustive warping similarity matrix.")
         for i in range(0,len(input_stems)):
             stem_a = input_stems[i]
             peaks_a = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(stem_a)))
             for j in range(i,len(input_stems)):
                 stem_b = input_stems[j]
+                logger.info("Warping {} peaks to {}".format(stem_b, stem_a))
                 peaks_b = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(stem_b)))
                 peaks_b = warp_peaks(
                     [peaks_a, peaks_b],
@@ -2247,6 +2312,7 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
                     tapp_parameters['warp2d_num_points'],
                     tapp_parameters['warp2d_rt_expand_factor'],
                     tapp_parameters['warp2d_peaks_per_window'])[1]
+                logger.info("Calculating similarity of {} vs {} (warped)".format(stem_a, stem_b))
                 similarity_matrix[j,i] = tapp.find_similarity(peaks_a, peaks_b, tapp_parameters['similarity_num_peaks']).geometric_ratio
                 similarity_matrix[i,j] = similarity_matrix[j,i]
         similarity_matrix = pd.DataFrame(similarity_matrix)
@@ -2257,19 +2323,24 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
         fig = plt.figure()
         sns.heatmap(similarity_matrix, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
         # Save similarity matrix and figure to disk.
+        logger.info("Saving similarity matrix: {}.csv".format(out_path))
         similarity_matrix.to_csv("{}.csv".format(out_path))
         # TODO: Use plot saving from utilities library.
         fig.set_size_inches(7.5 * 16/9, 7.5)
         plt.savefig("{}.png".format(out_path), dpi=100)
         plt.close(fig)
-        reference_index = similarity_matrix.sum(axis=0).values.argmax()
+        logger.info("Saving similarity matrix plot: {}.png".format(out_path))
     else:
         # Load exhaustive_warping_similarity to calculate the reference idx.
         similarity_matrix = pd.read_csv("{}.csv".format(out_path), index_col=0)
         reference_index = similarity_matrix.sum(axis=0).values.argmax()
+    logger.info('Finished exhaustive warping similarity matrix calculation in {}'.format(datetime.timedelta(seconds=time.time()-time_start)))
 
     # Warp all peaks to the reference file.
     reference_stem = input_stems[reference_index]
+    logger.info("Starting peak warping to reference ({})".format(reference_stem))
+    time_start = time.time()
+    logger.info("Reading reference peaks")
     reference_peaks = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(reference_stem)))
     for stem in input_stems:
         # Check if file has already been processed.
@@ -2278,7 +2349,7 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
         if os.path.exists(out_path) and not override_existing:
             continue
 
-        print("Warping", stem, "to reference:", reference_stem)
+        logger.info("Warping peaks: {}".format(stem))
         if stem == reference_stem:
             tapp.write_peaks(reference_peaks, out_path)
         else:
@@ -2292,17 +2363,20 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
                 tapp_parameters['warp2d_rt_expand_factor'],
                 tapp_parameters['warp2d_peaks_per_window'])[1]
             tapp.write_peaks(peaks, out_path)
+    logger.info('Finished peak warping to reference ({}) in {}'.format(reference_stem, datetime.timedelta(seconds=time.time()-time_start)))
 
     # Calculate similarity matrix after alignment, generate heatmap and save to disk.
     out_path = os.path.join(output_dir, 'quality', 'warped_similarity')
+    logger.info("Starting warped similarity matrix calculation")
+    time_start = time.time()
     if not os.path.exists("{}.csv".format(out_path)) or override_existing:
-        print("Calculating warped similarity matrix.")
         similarity_matrix = np.zeros(len(input_stems) ** 2).reshape(len(input_stems), len(input_stems))
         for i in range(0,len(input_stems)):
             stem_a = input_stems[i]
             peaks_a = tapp.read_peaks(os.path.join(output_dir, 'warped_peaks', '{}.bpks'.format(stem_a)))
             for j in range(i,len(input_stems)):
                 stem_b = input_stems[j]
+                logger.info("Calculating similarity of {} vs {}".format(stem_a, stem_b))
                 peaks_b = tapp.read_peaks(os.path.join(output_dir, 'warped_peaks', '{}.bpks'.format(stem_b)))
                 similarity_matrix[j,i] = tapp.find_similarity(peaks_a, peaks_b, tapp_parameters['similarity_num_peaks']).geometric_ratio
                 similarity_matrix[i,j] = similarity_matrix[j,i]
@@ -2314,13 +2388,18 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
         fig = plt.figure()
         sns.heatmap(similarity_matrix, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
         # Save similarity matrix and figure to disk.
+        logger.info("Saving similarity matrix: {}.csv".format(out_path))
         similarity_matrix.to_csv("{}.csv".format(out_path))
         # TODO: Use plot saving from utilities library.
         fig.set_size_inches(7.5 * 16/9, 7.5)
         plt.savefig("{}.png".format(out_path), dpi=100)
         plt.close(fig)
+        logger.info("Saving similarity matrix plot: {}.png".format(out_path))
+    logger.info('Finished warped similarity matrix calculation in {}'.format(datetime.timedelta(seconds=time.time()-time_start)))
 
     # Use metamatch to match warped peaks.
+    logger.info("Starting metamatch")
+    time_start = time.time()
     out_path = os.path.join(output_dir, 'metamatch')
     if not os.path.exists(os.path.join(out_path, "metamatch.clusters")) or override_existing:
         metamatch_input = []
@@ -2335,11 +2414,12 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
             tapp_parameters['metamatch_fraction'])
 
         # Save metamatch results to disk.
-        print("Writing metamatch results to disk")
+        logger.info("Writing metamatch results to disk")
         tapp.write_metamatch_clusters(
                 metamatch_results.clusters, os.path.join(out_path, "metamatch.clusters"))
         tapp.write_metamatch_peaks(
                 metamatch_results.orphans, os.path.join(out_path, "metamatch.orphans"))
+    logger.info('Finished metamatch in {}'.format(datetime.timedelta(seconds=time.time()-time_start)))
 
     # TODO: Match ms2 events with corresponding detected peaks.
     # TODO: (If there is ident information)
@@ -2349,6 +2429,10 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
     # TODO: Perform feature detection using averagine or linked identification if available in ms2 linked peaks.
     # TODO: Link metamatch clusters and corresponding peaks with identification information of peptides and proteins.
     # TODO: Use maximum likelihood to resolve conflicts among replicates and generate peptide/protein quantitative tables.
+    logger.info('Total time elapsed: {}'.format(datetime.timedelta(seconds=time.time()-time_pipeline_start)))
+    # Stop logger.
+    logger.removeHandler(logger_fh)
+    logger_fh.close()
     return
 
 def full_dda_pipeline_test():

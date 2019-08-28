@@ -37,7 +37,7 @@ bool RawData::Serialize::read_scan(std::istream &stream, Scan *scan) {
         Serialization::read_double(stream, &scan->mz[i]);
         Serialization::read_double(stream, &scan->intensity[i]);
     }
-    // TODO: Precursor information if pointer is present.
+    Serialize::read_precursor_info(stream, &scan->precursor_information);
     return stream.good();
 }
 
@@ -50,7 +50,7 @@ bool RawData::Serialize::write_scan(std::ostream &stream, const Scan &scan) {
         Serialization::write_double(stream, scan.mz[i]);
         Serialization::write_double(stream, scan.intensity[i]);
     }
-    // TODO: Precursor information if pointer is present.
+    Serialize::write_precursor_info(stream, scan.precursor_information);
     return stream.good();
 }
 
@@ -81,7 +81,6 @@ bool RawData::Serialize::read_raw_data(std::istream &stream,
         Serialization::read_double(stream,
                                    &raw_data->base_peak_chromatogram[i]);
     }
-    // TODO: Precursor information if pointer is present.
     return stream.good();
 }
 

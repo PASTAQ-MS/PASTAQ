@@ -57,7 +57,7 @@ struct Scan {
     Polarity polarity;
     // In case this is a MSn scan, the precursor information will be stored
     // here.
-    PrecursorInformation *precursor_information;
+    PrecursorInformation precursor_information;
 };
 
 struct RawData {

@@ -31,7 +31,7 @@ RawData::RawData read_mzxml(std::string file_name, double min_mz, double max_mz,
                             std::string instrument_type_str,
                             double resolution_ms1, double resolution_msn,
                             double reference_mz, double fwhm_rt,
-                            std::string polarity_str) {
+                            std::string polarity_str, size_t ms_level) {
     // Setup infinite range if no point was specified.
     min_rt = min_rt < 0 ? 0 : min_rt;
     max_rt = max_rt < 0 ? std::numeric_limits<double>::infinity() : max_rt;
@@ -117,7 +117,7 @@ RawData::RawData read_mzxml(std::string file_name, double min_mz, double max_mz,
 
     auto raw_data = XmlReader::read_mzxml(
         stream, min_mz, max_mz, min_rt, max_rt, instrument_type, resolution_ms1,
-        resolution_msn, reference_mz, polarity);
+        resolution_msn, reference_mz, polarity, ms_level);
     if (!raw_data) {
         std::ostringstream error_stream;
         error_stream << "error: an error occurred when reading the file"
@@ -1545,7 +1545,27 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("retention_time", &RawData::Scan::retention_time)
         .def_readonly("mz", &RawData::Scan::mz)
         .def_readonly("intensity", &RawData::Scan::intensity)
-        .def_readonly("polarity", &RawData::Scan::polarity);
+        .def_readonly("polarity", &RawData::Scan::polarity)
+        .def("__repr__", [](const RawData::Scan &s) {
+            auto msg = "Scan <id: " + std::to_string(s.scan_number) +
+                       ", ms_level: " + std::to_string(s.ms_level) +
+                       ", retention_time: " + std::to_string(s.retention_time) +
+                       ", num_points: " + std::to_string(s.num_points) +
+                       ", polarity: " + PythonAPI::to_string(s.polarity);
+            if (s.ms_level != 1) {
+                msg += ", precursor_id: " +
+                       std::to_string(s.precursor_information.scan_number);
+                msg += ", precursor_charge: " +
+                       std::to_string(s.precursor_information.charge);
+                msg += ", precursor_mz: " +
+                       std::to_string(s.precursor_information.mz);
+                msg += ", precursor_intensity: " +
+                       std::to_string(s.precursor_information.intensity);
+                msg += ", precursor_window_wideness: " +
+                       std::to_string(s.precursor_information.window_wideness);
+            }
+            return msg + ">";
+        });
 
     py::class_<Instrument::Type>(m, "Instrument")
         .def("__repr__", [](const Instrument::Type &instrument_type) {
@@ -1596,7 +1616,17 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("data", &Grid::Mesh::data)
         .def_readonly("bins_mz", &Grid::Mesh::bins_mz)
         .def_readonly("bins_rt", &Grid::Mesh::bins_rt)
-        .def("dump", &PythonAPI::write_mesh);
+        .def("dump", &PythonAPI::write_mesh)
+        .def("__repr__", [](const Grid::Mesh &s) {
+            return "Mesh <n: " + std::to_string(s.n) +
+                   ", m: " + std::to_string(s.m) +
+                   ", k: " + std::to_string(s.k) +
+                   ", t: " + std::to_string(s.t) +
+                   ", min_mz: " + std::to_string(s.min_mz) +
+                   ", max_mz: " + std::to_string(s.max_mz) +
+                   ", min_rt: " + std::to_string(s.min_rt) +
+                   ", max_rt: " + std::to_string(s.max_rt) + ">";
+        });
 
     py::class_<PythonAPI::RawPoints>(m, "RawPoints")
         .def_readonly("rt", &PythonAPI::RawPoints::rt)
@@ -1642,7 +1672,19 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("raw_roi_num_points", &Centroid::Peak::raw_roi_num_points)
         .def_readonly("raw_roi_num_scans", &Centroid::Peak::raw_roi_num_scans)
         .def("xic", &Centroid::Peak::xic, py::arg("raw_data"),
-             py::arg("method") = "sum");
+             py::arg("method") = "sum")
+        .def("__repr__", [](const Centroid::Peak &p) {
+            return "Peak <id: " + std::to_string(p.id) +
+                   ", local_max_mz: " + std::to_string(p.local_max_mz) +
+                   ", local_max_rt: " + std::to_string(p.local_max_rt) +
+                   ", local_max_height: " + std::to_string(p.local_max_height) +
+                   ", raw_roi_sigma_mz: " + std::to_string(p.raw_roi_sigma_mz) +
+                   ", raw_roi_sigma_rt: " + std::to_string(p.raw_roi_sigma_rt) +
+                   ", raw_roi_num_points: " +
+                   std::to_string(p.raw_roi_num_points) +
+                   ", raw_roi_num_scans: " +
+                   std::to_string(p.raw_roi_num_scans) + ">";
+        });
 
     py::class_<PythonAPI::SimilarityResults>(m, "Similarity")
         .def_readonly("self_a", &PythonAPI::SimilarityResults::self_a)
@@ -1768,7 +1810,13 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("mz", &MetaMatch::Cluster::mz)
         .def_readonly("rt", &MetaMatch::Cluster::rt)
         .def_readonly("file_heights", &MetaMatch::Cluster::file_heights)
-        .def_readonly("avg_height", &MetaMatch::Cluster::avg_height);
+        .def_readonly("avg_height", &MetaMatch::Cluster::avg_height)
+        .def("__repr__", [](const MetaMatch::Cluster &c) {
+            return "MetaCluster <id: " + std::to_string(c.id) +
+                   ", mz: " + std::to_string(c.mz) +
+                   ", rt: " + std::to_string(c.rt) +
+                   ", avg_height: " + std::to_string(c.avg_height) + ">";
+        });
 
     py::class_<MetaMatch::Peak>(m, "MetaMatchPeak")
         .def_readonly("file_id", &MetaMatch::Peak::file_id)
@@ -1778,7 +1826,12 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("cluster_rt", &MetaMatch::Peak::cluster_rt)
         .def_readonly("height", &MetaMatch::Peak::local_max_height)
         .def_readonly("local_max_mz", &MetaMatch::Peak::local_max_mz)
-        .def_readonly("local_max_rt", &MetaMatch::Peak::local_max_rt);
+        .def_readonly("local_max_rt", &MetaMatch::Peak::local_max_rt)
+        .def("__repr__", [](const MetaMatch::Peak &p) {
+            return "MetaPeak <peak_id: " + std::to_string(p.id) +
+                   ", file_id: " + std::to_string(p.file_id) +
+                   ", class_id: " + std::to_string(p.class_id) + ">";
+        });
 
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,
@@ -1787,7 +1840,7 @@ PYBIND11_MODULE(tapp, m) {
           py::arg("min_rt") = -1.0, py::arg("max_rt") = -1.0,
           py::arg("instrument_type") = "", py::arg("resolution_ms1"),
           py::arg("resolution_msn"), py::arg("reference_mz"),
-          py::arg("fwhm_rt"), py::arg("polarity") = "")
+          py::arg("fwhm_rt"), py::arg("polarity") = "", py::arg("ms_level") = 1)
         .def("theoretical_fwhm", &RawData::theoretical_fwhm,
              "Calculate the theoretical width of the peak at the given m/z for "
              "the given raw file",
