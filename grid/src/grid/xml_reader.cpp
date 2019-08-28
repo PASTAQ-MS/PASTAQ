@@ -42,17 +42,18 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
             scan.scan_number = std::stoi(scan_attributes["num"]);
 
             // Find polarity.
-            if (scan_attributes.find("polarity") == scan_attributes.end()) {
-                return std::nullopt;
-            }
-            if (scan_attributes["polarity"] == "+") {
-                scan.polarity = RawData::Polarity::POSITIVE;
-            } else if (scan_attributes["polarity"] == "-") {
-                scan.polarity = RawData::Polarity::NEGATIVE;
-            }
-            if (polarity != RawData::Polarity::BOTH &&
-                scan.polarity != polarity) {
-                continue;
+            if (scan_attributes.find("polarity") != scan_attributes.end()) {
+                if (scan_attributes["polarity"] == "+") {
+                    scan.polarity = RawData::Polarity::POSITIVE;
+                } else if (scan_attributes["polarity"] == "-") {
+                    scan.polarity = RawData::Polarity::NEGATIVE;
+                } else {
+                    scan.polarity = RawData::Polarity::BOTH;
+                }
+                if (polarity != RawData::Polarity::BOTH &&
+                    scan.polarity != polarity) {
+                    continue;
+                }
             }
 
             // Find MS level.
@@ -77,6 +78,8 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
             // Extract the retention time.
             if (scan_attributes.find("retentionTime") ==
                 scan_attributes.end()) {
+                // NOTE(alex): On the spec, the retention time attribute is
+                // optional, however, we do require it.
                 return std::nullopt;
             }
 
@@ -217,41 +220,62 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
                 }
                 if (tag.value().name == "precursorMz") {
                     auto precursor_attributes = tag.value().attributes;
-                    if (precursor_attributes.find("precursorIntensity") ==
+                    if (precursor_attributes.find("precursorIntensity") !=
                         precursor_attributes.end()) {
-                        return std::nullopt;
+                        scan.precursor_information.intensity = std::stod(
+                            precursor_attributes["precursorIntensity"]);
                     }
-                    scan.precursor_information.intensity =
-                        std::stod(precursor_attributes["precursorIntensity"]);
 
-                    if (precursor_attributes.find("windowWideness") ==
+                    if (precursor_attributes.find("windowWideness") !=
                         precursor_attributes.end()) {
-                        return std::nullopt;
+                        scan.precursor_information.window_wideness =
+                            std::stod(precursor_attributes["windowWideness"]);
                     }
-                    scan.precursor_information.window_wideness =
-                        std::stod(precursor_attributes["windowWideness"]);
 
-                    if (precursor_attributes.find("windowWideness") ==
+                    if (precursor_attributes.find("windowWideness") !=
                         precursor_attributes.end()) {
-                        return std::nullopt;
+                        scan.precursor_information.window_wideness =
+                            std::stod(precursor_attributes["windowWideness"]);
                     }
-                    scan.precursor_information.window_wideness =
-                        std::stod(precursor_attributes["windowWideness"]);
 
-                    if (precursor_attributes.find("precursorCharge") ==
+                    if (precursor_attributes.find("precursorCharge") !=
                         precursor_attributes.end()) {
-                        return std::nullopt;
+                        scan.precursor_information.charge =
+                            std::stoi(precursor_attributes["precursorCharge"]);
                     }
-                    scan.precursor_information.charge =
-                        std::stoi(precursor_attributes["precursorCharge"]);
+
+                    if (precursor_attributes.find("activationMethod") !=
+                        precursor_attributes.end()) {
+                        if (precursor_attributes["activationMethod"] == "CID") {
+                            scan.precursor_information.activation_method =
+                                RawData::ActivationMethod::CID;
+                        } else if (precursor_attributes["activationMethod"] ==
+                                   "HCD") {
+                            scan.precursor_information.activation_method =
+                                RawData::ActivationMethod::HCD;
+                        } else {
+                            scan.precursor_information.activation_method =
+                                RawData::ActivationMethod::UNKNOWN;
+                        }
+                    } else {
+                        scan.precursor_information.activation_method =
+                            RawData::ActivationMethod::UNKNOWN;
+                    }
 
                     auto data = XmlReader::read_data(stream);
                     if (!data) {
                         return std::nullopt;
                     }
                     scan.precursor_information.mz = std::stod(data.value());
-                    scan.precursor_information.scan_number =
-                        previous_ms1_scan_number;
+
+                    if (precursor_attributes.find("precursorScanNum") !=
+                        precursor_attributes.end()) {
+                        scan.precursor_information.scan_number =
+                            std::stoi(precursor_attributes["precursorScanNum"]);
+                    } else {
+                        scan.precursor_information.scan_number =
+                            previous_ms1_scan_number;
+                    }
                 }
                 tag = XmlReader::read_tag(stream);
             }

@@ -256,7 +256,7 @@ std::vector<MeshIndex> find_local_max_idx(const Grid::Mesh &mesh) {
     // of mz and rt should be reported.
     for (size_t j = 1; j < mesh.m - 1; ++j) {
         for (size_t i = 1; i < mesh.n - 1; ++i) {
-            int index = i + j * mesh.n;
+            int64_t index = i + j * mesh.n;
 
             // NOTE(alex): The definition of a local maxima in a 2D space might
             // have different interpretations. i.e. We can select the 8
@@ -962,7 +962,7 @@ std::vector<MetaMatch::Peak> read_metamatch_peaks(std::string file_name) {
 }
 
 std::tuple<std::vector<double>, std::vector<double>>
-theoretical_isotopes_peptide(std::string sequence, int charge_state,
+theoretical_isotopes_peptide(std::string sequence, int8_t charge_state,
                              double min_perc) {
     auto midas = MIDAs(charge_state = charge_state);
     // NOTE: C00: Unmodified cysteine.
@@ -1005,7 +1005,7 @@ struct SpectrumId {
     double theoretical_mz;
     double experimental_mz;
     double retention_time;
-    int rank;
+    int64_t rank;
 };
 
 struct CVParam {
@@ -1019,7 +1019,7 @@ struct PeptideModification {
     double monoisotopic_mass_delta;
     double average_mass_delta;
     std::string residues;
-    int location;
+    int64_t location;
     std::vector<CVParam> cv_params;
 };
 
