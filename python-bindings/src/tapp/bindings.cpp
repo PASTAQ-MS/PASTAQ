@@ -612,24 +612,70 @@ Centroid::Peak build_peak(const RawData::RawData &raw_data,
 std::vector<Centroid::Peak> find_peaks(const RawData::RawData &raw_data,
                                        const Grid::Mesh &mesh,
                                        size_t max_peaks) {
+    // Finding local maxima.
     auto local_max = find_local_max_idx(mesh);
-    std::vector<Centroid::Peak> peaks;
-    size_t i = 0;
-    for (const auto &lm : local_max) {
-        if (max_peaks != 0 && i >= max_peaks) {
-            break;
-        }
-        auto peak = build_peak(raw_data, mesh, lm);
-        // FIXME: Number of raw points within the theoretical sigma should be
-        // set by the user, with a sensible default. Same with the minimum
-        // number of rt scans per peak.
-        if (peak.raw_roi_num_points_within_sigma < 5) {
-            continue;
-        }
-        peak.id = i;
-        peaks.push_back(peak);
-        ++i;
+
+    // The number of groups/threads is set to the maximum possible concurrency.
+    uint64_t max_threads = std::thread::hardware_concurrency();
+
+    // Split the points into different groups for concurrency.
+    std::vector<std::vector<size_t>> groups =
+        std::vector<std::vector<size_t>>(max_threads);
+    for (size_t i = 0; i < local_max.size(); ++i) {
+        size_t k = i % max_threads;
+        groups[k].push_back(i);
     }
+
+    std::vector<std::thread> threads(max_threads);
+    std::vector<std::vector<Centroid::Peak>> peaks_array(max_threads);
+    for (size_t i = 0; i < groups.size(); ++i) {
+        threads[i] = std::thread(
+            [&groups, &local_max, &peaks_array, &raw_data, &mesh, i]() {
+                for (const auto &k : groups[i]) {
+                    auto peak = build_peak(raw_data, mesh, local_max[k]);
+                    // FIXME: Number of raw points within the theoretical sigma
+                    // should be set by the user, with a sensible default. Same
+                    // with the minimum number of rt scans per peak.
+                    if (peak.raw_roi_num_points_within_sigma < 5) {
+                        continue;
+                    }
+                    peaks_array[i].push_back(peak);
+                }
+            });
+    }
+
+    // Wait for the threads to finish.
+    for (auto &thread : threads) {
+        thread.join();
+    }
+
+    // Join peak groups.
+    std::vector<Centroid::Peak> peaks;
+    for (size_t i = 0; i < peaks_array.size(); ++i) {
+        peaks.insert(end(peaks), begin(peaks_array[i]), end(peaks_array[i]));
+    }
+
+    // Sort the peaks by height.
+    auto sort_peaks = [](const Centroid::Peak &p1,
+                         const Centroid::Peak &p2) -> bool {
+        return (p1.local_max_height > p2.local_max_height) ||
+               (p1.local_max_height == p2.local_max_height);
+    };
+    std::stable_sort(peaks.begin(), peaks.end(), sort_peaks);
+
+    // Update the peak ids.
+    for (size_t i = 0; i < peaks.size(); ++i) {
+        peaks[i].id = i;
+    }
+
+    // Return maximum amount of peaks.
+    // TODO: Figure a way of performing max peaks when multiple threads are
+    // in place without having to go through all of them. Perhaps an atomic
+    // operation for increment counter?
+    if (peaks.size() > max_peaks) {
+        peaks.resize(max_peaks);
+    }
+
     return peaks;
 }
 
