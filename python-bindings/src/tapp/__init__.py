@@ -1538,6 +1538,7 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
         out_path = os.path.join(output_dir, 'mesh', "{}.mesh".format(stem))
         if os.path.exists(out_path) and not override_existing:
             continue
+        logger.info("Reading raw_data from disk: {}".format(stem))
         raw_data = tapp.read_raw_data(in_path)
         logger.info("Resampling: {}".format(stem))
         mesh = resample(
@@ -1561,6 +1562,7 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
         out_path = os.path.join(output_dir, 'peaks', "{}.bpks".format(stem))
         if os.path.exists(out_path) and not override_existing:
             continue
+        logger.info("Reading raw_data and mesh from disk: {}".format(stem))
         raw_data = tapp.read_raw_data(in_path_raw)
         mesh = tapp.read_mesh(in_path_mesh)
         logger.info("Finding peaks: {}".format(stem))
@@ -1577,11 +1579,13 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
         similarity_matrix = np.zeros(len(input_stems) ** 2).reshape(len(input_stems), len(input_stems))
         for i in range(0,len(input_stems)):
             stem_a = input_stems[i]
+            logger.info("Reading peaks_a from disk: {}".format(stem_a))
             peaks_a = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(stem_a)))
             for j in range(i,len(input_stems)):
                 stem_b = input_stems[j]
-                logger.info("Calculating similarity of {} vs {}".format(stem_a, stem_b))
+                logger.info("Reading peaks_b from disk: {}".format(stem_b))
                 peaks_b = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(stem_b)))
+                logger.info("Calculating similarity of {} vs {}".format(stem_a, stem_b))
                 similarity_matrix[j,i] = tapp.find_similarity(peaks_a, peaks_b, tapp_parameters['similarity_num_peaks']).geometric_ratio
                 similarity_matrix[i,j] = similarity_matrix[j,i]
         similarity_matrix = pd.DataFrame(similarity_matrix)
@@ -1612,11 +1616,13 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
     if not os.path.exists("{}.csv".format(out_path)) or override_existing:
         for i in range(0,len(input_stems)):
             stem_a = input_stems[i]
+            logger.info("Reading peaks_a from disk: {}".format(stem_a))
             peaks_a = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(stem_a)))
             for j in range(i,len(input_stems)):
                 stem_b = input_stems[j]
-                logger.info("Warping {} peaks to {}".format(stem_b, stem_a))
+                logger.info("Reading peaks_b from disk: {}".format(stem_b))
                 peaks_b = tapp.read_peaks(os.path.join(output_dir, 'peaks', '{}.bpks'.format(stem_b)))
+                logger.info("Warping {} peaks to {}".format(stem_b, stem_a))
                 peaks_b = warp_peaks(
                     [peaks_a, peaks_b],
                     0,
@@ -1666,6 +1672,7 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
         if stem == reference_stem:
             tapp.write_peaks(reference_peaks, out_path)
         else:
+            logger.info("Reading peaks from disk: {}".format(stem))
             peaks = tapp.read_peaks(in_path)
             peaks = warp_peaks(
                 [reference_peaks, peaks],
@@ -1686,11 +1693,13 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
         similarity_matrix = np.zeros(len(input_stems) ** 2).reshape(len(input_stems), len(input_stems))
         for i in range(0,len(input_stems)):
             stem_a = input_stems[i]
+            logger.info("Reading peaks_a from disk: {}".format(stem_a))
             peaks_a = tapp.read_peaks(os.path.join(output_dir, 'warped_peaks', '{}.bpks'.format(stem_a)))
             for j in range(i,len(input_stems)):
                 stem_b = input_stems[j]
-                logger.info("Calculating similarity of {} vs {}".format(stem_a, stem_b))
+                logger.info("Reading peaks_b from disk: {}".format(stem_b))
                 peaks_b = tapp.read_peaks(os.path.join(output_dir, 'warped_peaks', '{}.bpks'.format(stem_b)))
+                logger.info("Calculating similarity of {} vs {}".format(stem_a, stem_b))
                 similarity_matrix[j,i] = tapp.find_similarity(peaks_a, peaks_b, tapp_parameters['similarity_num_peaks']).geometric_ratio
                 similarity_matrix[i,j] = similarity_matrix[j,i]
         similarity_matrix = pd.DataFrame(similarity_matrix)
@@ -1718,6 +1727,7 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
         metamatch_input = []
         for i, stem in enumerate(input_stems):
             in_path = os.path.join(output_dir, 'warped_peaks', "{}.bpks".format(stem))
+            logger.info("Reading peaks from disk: {}".format(stem))
             metamatch_input += [(groups[i], tapp.read_peaks(in_path))]
 
         metamatch_results = perform_metamatch(
@@ -1732,6 +1742,7 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
                 metamatch_results.clusters, os.path.join(out_path, "metamatch.clusters"))
         tapp.write_metamatch_peaks(
                 metamatch_results.orphans, os.path.join(out_path, "metamatch.orphans"))
+
     logger.info('Finished metamatch in {}'.format(datetime.timedelta(seconds=time.time()-time_start)))
 
     # TODO: Match ms2 events with corresponding detected peaks.

@@ -51,7 +51,9 @@ struct Scan {
     Polarity polarity;
     // In case this is a MSn scan, the precursor information will be stored
     // here.
-    PrecursorInformation precursor_information;
+    // TODO(alex): We might want to make this a smart pointer, as this field is
+    // only useful for MSn scans.
+    PrecursorInformation precursor_information; 
 };
 
 struct RawData {
