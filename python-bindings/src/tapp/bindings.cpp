@@ -441,13 +441,6 @@ Centroid::Peak build_peak(const RawData::RawData &raw_data,
         peak.raw_roi_num_points = num_points;
         peak.raw_roi_num_scans = num_scans;
         peak.raw_roi_total_intensity = weight_sum;
-
-        // FIXME: Make nan instead?
-        // if (raw_points.num_points == 0) {
-        // std::ostringstream error_stream;
-        // error_stream << "couldn't find raw_data points on the given ROI";
-        // throw std::invalid_argument(error_stream.str());
-        //}
     }
 
     return peak;
@@ -473,19 +466,22 @@ std::vector<Centroid::Peak> find_peaks(const RawData::RawData &raw_data,
     std::vector<std::thread> threads(max_threads);
     std::vector<std::vector<Centroid::Peak>> peaks_array(max_threads);
     for (size_t i = 0; i < groups.size(); ++i) {
-        threads[i] = std::thread(
-            [&groups, &local_max, &peaks_array, &raw_data, &mesh, i]() {
-                for (const auto &k : groups[i]) {
-                    auto peak = build_peak(raw_data, mesh, local_max[k]);
-                    // FIXME: Number of raw points within the theoretical sigma
-                    // should be set by the user, with a sensible default. Same
-                    // with the minimum number of rt scans per peak.
-                    if (peak.raw_roi_num_points_within_sigma < 5) {
-                        continue;
-                    }
-                    peaks_array[i].push_back(peak);
+        threads[i] = std::thread([&groups, &local_max, &peaks_array, &raw_data,
+                                  &mesh, i]() {
+            for (const auto &k : groups[i]) {
+                auto peak = build_peak(raw_data, mesh, local_max[k]);
+                // FIXME: Number of raw points within the theoretical sigma
+                // should be set by the user, with a sensible default. Same
+                // with the minimum number of rt scans per peak.
+                // Ensure peak quality.
+                if (peak.raw_roi_num_points_within_sigma < 5 ||
+                    peak.raw_roi_num_scans < 3 || peak.raw_roi_sigma_mz == 0 ||
+                    peak.raw_roi_sigma_rt == 0) {
+                    continue;
                 }
-            });
+                peaks_array[i].push_back(peak);
+            }
+        });
     }
 
     // Wait for the threads to finish.
