@@ -33,23 +33,6 @@ struct Peak {
     double local_max_rt;
     double local_max_height;
 
-    // Simple estimation of the peak metrics on the mesh values based on the
-    // slope descent.
-    //
-    // Sumation of all intensities within the peak boundary. (Ignores holes,
-    // i.e. does not interpolate values in case of non closed set).
-    double slope_descent_total_intensity;
-    // Estimated values for the position of the 2D peak based on the slope
-    // descent points.
-    double slope_descent_mean_mz;
-    double slope_descent_mean_rt;
-    // Estimated mz/rt values for the standard deviation of the peak in both
-    // axes. (Ignores holes).
-    double slope_descent_sigma_mz;
-    double slope_descent_sigma_rt;
-    // Average intensity on the boundary of the peak.
-    double slope_descent_border_background;
-
     // Region of interest for this peak.
     double roi_min_mz;
     double roi_max_mz;
@@ -87,16 +70,6 @@ struct Peak {
 // only the first n_peaks Points will be returned.
 std::vector<Point> find_local_maxima(const Centroid::Parameters &parameters,
                                      const std::vector<double> &data);
-
-// Find the boundary of the given bag of points.
-std::vector<Point> find_boundary(std::vector<Point> &points);
-
-// Find all points that belong to a given local max point via recursive local
-// search of the slope of the peaks.
-void explore_peak_slope(uint64_t i, uint64_t j, double previous_value,
-                        const Centroid::Parameters &parameters,
-                        const std::vector<double> &data,
-                        std::vector<Point> &points);
 
 // Builds a Peak object for the given local_max.
 std::optional<Peak> build_peak(const Point &local_max,

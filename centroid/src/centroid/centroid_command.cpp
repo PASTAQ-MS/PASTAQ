@@ -441,8 +441,8 @@ int main(int argc, char *argv[]) {
                                  const Centroid::Peak &p2) -> bool {
                 return (p1.local_max_height > p2.local_max_height) ||
                        ((p1.local_max_height == p2.local_max_height) &&
-                        (p1.slope_descent_total_intensity >
-                         p2.slope_descent_total_intensity));
+                        (p1.raw_roi_total_intensity >
+                         p2.raw_roi_total_intensity));
             };
             std::stable_sort(peaks.begin(), peaks.end(), sort_peaks);
 

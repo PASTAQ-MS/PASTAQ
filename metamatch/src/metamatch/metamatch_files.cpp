@@ -103,18 +103,16 @@ bool MetaMatch::Files::Csv::write_peaks(
                << 0
                << cell_delimiter
                // LocalBkgnd
-               << peak.slope_descent_border_background
+               << 0
                << cell_delimiter
                // SNVolume
-               << (peak.raw_roi_total_intensity /
-                   peak.slope_descent_border_background)
+               << 0
                << cell_delimiter
                // SNHeight
-               << (peak.local_max_height / peak.slope_descent_border_background)
+               << 0
                << cell_delimiter
                // SNHeight
-               << (peak.raw_roi_total_intensity /
-                   peak.slope_descent_border_background)
+               << 0
                << cell_delimiter
                // file_id
                << peak.file_id

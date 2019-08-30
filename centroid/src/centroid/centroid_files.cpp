@@ -130,14 +130,14 @@ bool Centroid::Files::Csv::write_peaks(
                << 0
                << cell_delimiter
                // LocalBkgnd
-               << peak.slope_descent_border_background
+               //<< peak.slope_descent_border_background
+               << 0
                << cell_delimiter
                // SNVolume
-               << (peak.slope_descent_total_intensity /
-                   peak.slope_descent_border_background)
+               << 0
                << cell_delimiter
                // SNHeight
-               << (peak.local_max_height / peak.slope_descent_border_background)
+               << 0
                << cell_delimiter
                // SNCentroid
                << 0;
@@ -150,90 +150,5 @@ bool Centroid::Files::Csv::write_peaks(
 
 bool Centroid::Files::Csv::read_peaks(std::istream &stream,
                                       std::vector<Centroid::Peak> *peaks) {
-    char cell_delimiter = ' ';
-    char line_delimiter = '\n';
-
-    // Read the CSV header.
-    // TODO(alex): Must use only the values that we need. Using the old format
-    // for now to test if centroid is working properly.
-    std::vector<std::string> header_columns = {
-        "N",         "X",        "Y",         "Height", "Volume",
-        "VCentroid", "XSigma",   "YSigma",    "Count",  "LocalBkgnd",
-        "SNVolume",  "SNHeight", "SNCentroid"};
-    std::string line;
-    if (!std::getline(stream, line, line_delimiter)) {
-        return false;
-    }
-    // Verify that the read header matches the header_columns.
-    std::string token;
-    std::stringstream token_stream(line);
-    int i = 0;
-    while (std::getline(token_stream, token, cell_delimiter)) {
-        if (token != header_columns[i]) {
-            return false;
-        };
-        ++i;
-    }
-
-    // Read the rest of the file and build the list of peaks.
-    // TODO(alex): Should we make the parsing independent of the order of the
-    // columns?
-    while (std::getline(stream, line, line_delimiter)) {
-        Centroid::Peak peak = {};
-        token_stream = std::stringstream(line);
-        // N (Skip).
-        std::getline(token_stream, token, cell_delimiter);
-        // X
-        std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.local_max_mz).eof()) {
-            return false;
-        };
-        // Y
-        std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.local_max_rt).eof()) {
-            return false;
-        };
-        // Height
-        std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.local_max_height).eof()) {
-            return false;
-        };
-        // Volume
-        std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.slope_descent_total_intensity)
-                 .eof()) {
-            return false;
-        };
-        // VCentroid (Skip)
-        std::getline(token_stream, token, cell_delimiter);
-        // XSigma
-        std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.slope_descent_sigma_mz).eof()) {
-            return false;
-        };
-        // YSigma
-        std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.slope_descent_sigma_rt).eof()) {
-            return false;
-        };
-        // Count (Skip).
-        std::getline(token_stream, token, cell_delimiter);
-        // LocalBkgnd
-        std::getline(token_stream, token, cell_delimiter);
-        if (!(std::istringstream(token) >> peak.slope_descent_border_background)
-                 .eof()) {
-            return false;
-        };
-        // SNVolume (Skip)
-        std::getline(token_stream, token, cell_delimiter);
-        // SNHeight (Skip)
-        std::getline(token_stream, token, cell_delimiter);
-        // SNCentroid (Skip)
-        std::getline(token_stream, token, cell_delimiter);
-
-        // Add the peak to the list.
-        peaks->push_back(peak);
-    }
-
     return stream.good() || stream.eof();
 }

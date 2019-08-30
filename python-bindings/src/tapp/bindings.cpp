@@ -285,80 +285,7 @@ std::vector<MeshIndex> find_local_max_idx(const Grid::Mesh &mesh) {
         }
     }
 
-    auto sort_by_value = [&mesh](const MeshIndex &p1,
-                                 const MeshIndex &p2) -> bool {
-        return (mesh.data[p1.i + p1.j * mesh.n] >
-                mesh.data[p2.i + p2.j * mesh.n]);
-    };
-    std::stable_sort(points.begin(), points.end(), sort_by_value);
-
     return points;
-}
-
-void explore_peak_slope(uint64_t i, uint64_t j, double previous_value,
-                        const Grid::Mesh &mesh,
-                        std::vector<MeshIndex> &points) {
-    // Check that the point has not being already included.
-    for (const auto &point : points) {
-        if (point.i == i && point.j == j) {
-            return;
-        }
-    }
-
-    double value = mesh.data[i + j * mesh.n];
-    if (previous_value >= 0 && (previous_value < value || value <= 0.00001)) {
-        return;
-    }
-
-    points.push_back({i, j});
-
-    // Return if we are at the edge of the grid.
-    if (i < 1 || i >= mesh.n - 1 || j < 1 || j >= mesh.m - 1) {
-        return;
-    }
-
-    explore_peak_slope(i - 1, j, value, mesh, points);
-    explore_peak_slope(i + 1, j, value, mesh, points);
-    explore_peak_slope(i, j + 1, value, mesh, points);
-    explore_peak_slope(i, j - 1, value, mesh, points);
-    explore_peak_slope(i - 1, j - 1, value, mesh, points);
-    explore_peak_slope(i + 1, j + 1, value, mesh, points);
-    explore_peak_slope(i - 1, j + 1, value, mesh, points);
-    explore_peak_slope(i + 1, j - 1, value, mesh, points);
-}
-
-std::vector<MeshIndex> find_boundary(std::vector<MeshIndex> &points) {
-    // Under the constraints of the grid coordinates, we need at least 5 points
-    // in order to have a boundary that does not contain all the points in the
-    // initial set.
-    if (points.size() < 5) {
-        return points;
-    }
-
-    // Check if this point is a boundary by trying to find all 8 neighbours, if
-    // the point does not have all of them, then it is a boundary point.
-    auto point_exists = [&points](const MeshIndex &p) {
-        for (const auto &point : points) {
-            if (p.i == point.i && p.j == point.j) {
-                return true;
-            }
-        }
-        return false;
-    };
-    std::vector<MeshIndex> boundary;
-    for (const auto &point : points) {
-        if (!point_exists({point.i - 1, point.j - 1}) ||
-            !point_exists({point.i, point.j - 1}) ||
-            !point_exists({point.i + 1, point.j - 1}) ||
-            !point_exists({point.i - 1, point.j}) ||
-            !point_exists({point.i + 1, point.j}) ||
-            !point_exists({point.i - 1, point.j + 1}) ||
-            !point_exists({point.i, point.j + 1}) ||
-            !point_exists({point.i + 1, point.j + 1})) {
-            boundary.push_back(point);
-        }
-    }
-    return boundary;
 }
 
 Centroid::Peak build_peak(const RawData::RawData &raw_data,
@@ -368,89 +295,6 @@ Centroid::Peak build_peak(const RawData::RawData &raw_data,
     peak.local_max_mz = mesh.bins_mz[local_max.i];
     peak.local_max_rt = mesh.bins_rt[local_max.j];
     peak.local_max_height = mesh.data[local_max.i + local_max.j * mesh.n];
-
-    // Find the points within the boundary by slope descent on the mesh from the
-    // local max.
-    std::vector<MeshIndex> peak_points;
-    // std::cout << peak.id << std::endl;
-    explore_peak_slope(local_max.i, local_max.j, -1, mesh, peak_points);
-    // FIXME: Should this just set NaN to boundary related peaks?
-    if (peak_points.size() <= 1) {
-        std::ostringstream error_stream;
-        error_stream
-            << "couldn't find any points on the mesh for this local max";
-        throw std::invalid_argument(error_stream.str());
-    }
-
-    {
-        // TODO(alex): error handling. What happens if the number of points is
-        // very small? We should probably ignore peaks with less than 5 points
-        // so that it has dimensionality in both mz and rt:
-        //
-        //   | |+| |
-        //   |+|c|+|
-        //   | |+| |
-        std::vector<MeshIndex> peak_boundary;
-        peak_boundary = find_boundary(peak_points);
-        // FIXME: Should this just set NaN to boundary related peaks?
-        if (peak_boundary.empty()) {
-            std::ostringstream error_stream;
-            error_stream << "couldn't find any points inside the boundary";
-            throw std::invalid_argument(error_stream.str());
-        }
-
-        // Calculate the average background intensity from the boundary.
-        double boundary_sum = 0;
-        for (const auto &point : peak_boundary) {
-            boundary_sum += mesh.data[point.i + point.j * mesh.n];
-        }
-        peak.slope_descent_border_background =
-            boundary_sum / peak_boundary.size();
-    }
-
-    // Calculate the total ion intensity on the peak for the values on the grid
-    // and the sigma in mz and rt. The sigma is calculated by using the
-    // algebraic formula for the variance of the random variable X:
-    //
-    //     Var(X) = E[X^2] - E[X]
-    //
-    // Where E[X] is the estimated value for X.
-    //
-    // In order to generalize this formula for the 2D blob, all values at the
-    // same index will be aggregated together.
-    //
-    // TODO(alex): Note that this can cause catastrophic cancellation or
-    // loss of significance. Probably the best option is to use a variant of
-    // the Welford's method for computing the variance in a single pass. See:
-    //
-    //     http://jonisalonen.com/2013/deriving-welfords-method-for-computing-variance/
-    //     https://ipfs.io/ipfs/QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco/wiki/Algorithms_for_calculating_variance.html
-    //
-    {
-        double height_sum = 0;
-        double x_sum = 0;
-        double y_sum = 0;
-        double x_sig = 0;
-        double y_sig = 0;
-        for (const auto &point : peak_points) {
-            double mz = mesh.bins_mz[point.i];
-            double rt = mesh.bins_rt[point.j];
-            double value = mesh.data[point.i + point.j * mesh.n];
-
-            height_sum += value;
-            x_sum += value * mz;
-            y_sum += value * rt;
-            x_sig += value * mz * mz;
-            y_sig += value * rt * rt;
-        }
-        peak.slope_descent_mean_mz = x_sum / height_sum;
-        peak.slope_descent_mean_rt = y_sum / height_sum;
-        peak.slope_descent_sigma_mz =
-            std::sqrt((x_sig / height_sum) - std::pow(x_sum / height_sum, 2));
-        peak.slope_descent_sigma_rt =
-            std::sqrt((y_sig / height_sum) - std::pow(y_sum / height_sum, 2));
-        peak.slope_descent_total_intensity = height_sum;
-    }
 
     double theoretical_sigma_mz = RawData::fwhm_to_sigma(
         RawData::theoretical_fwhm(raw_data, mesh.bins_mz[local_max.i]));
@@ -1684,18 +1528,6 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("local_max_mz", &Centroid::Peak::local_max_mz)
         .def_readonly("local_max_rt", &Centroid::Peak::local_max_rt)
         .def_readonly("local_max_height", &Centroid::Peak::local_max_height)
-        .def_readonly("slope_descent_mean_mz",
-                      &Centroid::Peak::slope_descent_mean_mz)
-        .def_readonly("slope_descent_mean_rt",
-                      &Centroid::Peak::slope_descent_mean_rt)
-        .def_readonly("slope_descent_sigma_mz",
-                      &Centroid::Peak::slope_descent_sigma_mz)
-        .def_readonly("slope_descent_sigma_rt",
-                      &Centroid::Peak::slope_descent_sigma_rt)
-        .def_readonly("slope_descent_total_intensity",
-                      &Centroid::Peak::slope_descent_total_intensity)
-        .def_readonly("slope_descent_border_background",
-                      &Centroid::Peak::slope_descent_border_background)
         .def_readonly("roi_min_mz", &Centroid::Peak::roi_min_mz)
         .def_readonly("roi_max_mz", &Centroid::Peak::roi_max_mz)
         .def_readonly("roi_min_rt", &Centroid::Peak::roi_min_rt)

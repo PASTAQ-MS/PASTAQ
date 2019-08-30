@@ -7,12 +7,6 @@ bool Centroid::Serialize::read_peak(std::istream &stream,
     Serialization::read_double(stream, &peak->local_max_mz);
     Serialization::read_double(stream, &peak->local_max_rt);
     Serialization::read_double(stream, &peak->local_max_height);
-    Serialization::read_double(stream, &peak->slope_descent_total_intensity);
-    Serialization::read_double(stream, &peak->slope_descent_mean_mz);
-    Serialization::read_double(stream, &peak->slope_descent_mean_rt);
-    Serialization::read_double(stream, &peak->slope_descent_sigma_mz);
-    Serialization::read_double(stream, &peak->slope_descent_sigma_rt);
-    Serialization::read_double(stream, &peak->slope_descent_border_background);
     Serialization::read_double(stream, &peak->roi_min_mz);
     Serialization::read_double(stream, &peak->roi_max_mz);
     Serialization::read_double(stream, &peak->roi_min_rt);
@@ -38,12 +32,6 @@ bool Centroid::Serialize::write_peak(std::ostream &stream,
     Serialization::write_double(stream, peak.local_max_mz);
     Serialization::write_double(stream, peak.local_max_rt);
     Serialization::write_double(stream, peak.local_max_height);
-    Serialization::write_double(stream, peak.slope_descent_total_intensity);
-    Serialization::write_double(stream, peak.slope_descent_mean_mz);
-    Serialization::write_double(stream, peak.slope_descent_mean_rt);
-    Serialization::write_double(stream, peak.slope_descent_sigma_mz);
-    Serialization::write_double(stream, peak.slope_descent_sigma_rt);
-    Serialization::write_double(stream, peak.slope_descent_border_background);
     Serialization::write_double(stream, peak.roi_min_mz);
     Serialization::write_double(stream, peak.roi_max_mz);
     Serialization::write_double(stream, peak.roi_min_rt);
