@@ -53,9 +53,10 @@ struct Scan {
     // here.
     // TODO(alex): We might want to make this a smart pointer, as this field is
     // only useful for MSn scans.
-    PrecursorInformation precursor_information; 
+    PrecursorInformation precursor_information;
 };
 
+// Main structure that hold information about a RawData file.
 struct RawData {
     // The instrument type.
     Instrument::Type instrument_type;
@@ -87,12 +88,23 @@ struct RawData {
         std::string method) const;
 };
 
+// Raw data points in a struct of arrays format.
+struct RawPoints {
+    std::vector<double> rt;
+    std::vector<double> mz;
+    std::vector<double> intensity;
+    size_t num_points;
+};
+
 // Calculate the theoretical FWHM of the peak for the given mz.
 double theoretical_fwhm(const RawData &raw_data, double mz);
 
 // Transform the FWHM to sigma assuming a Gaussian distribution.
 double fwhm_to_sigma(double fwhm);
 
+// Find the raw data points within the square region defined by min/max_mz/rt.
+RawPoints find_raw_points(const RawData &raw_data, double min_mz, double max_mz,
+                          double min_rt, double max_rt);
 }  // namespace RawData
 
 #endif /* GRID_RAWDATA_HPP */

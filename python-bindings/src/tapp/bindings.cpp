@@ -129,91 +129,6 @@ RawData::RawData read_mzxml(std::string file_name, double min_mz, double max_mz,
     return raw_data.value();
 }
 
-struct Roi {
-    double min_mz;
-    double max_mz;
-    double min_rt;
-    double max_rt;
-};
-
-struct RoiIndices {
-    size_t min_j;
-    size_t max_j;
-
-    std::vector<size_t> min_i;
-    std::vector<size_t> max_i;
-};
-
-struct RawPoint {
-    double rt;
-    double mz;
-    double intensity;
-};
-
-struct RawPoints {
-    std::vector<double> rt;
-    std::vector<double> mz;
-    std::vector<double> intensity;
-    size_t num_points;
-};
-
-RawPoints find_raw_points(const RawData::RawData &raw_data, double min_mz,
-                          double max_mz, double min_rt, double max_rt) {
-    RawPoints raw_points;
-    const auto &scans = raw_data.scans;
-    if (scans.size() == 0) {
-        std::ostringstream error_stream;
-        error_stream << "the given raw_data is empty";
-        throw std::invalid_argument(error_stream.str());
-    }
-
-    if (min_rt < raw_data.min_rt) {
-        min_rt = raw_data.min_rt;
-    }
-    if (max_rt > raw_data.max_rt) {
-        max_rt = raw_data.max_rt;
-    }
-    size_t min_j = Search::lower_bound(raw_data.retention_times, min_rt);
-    size_t max_j = scans.size();
-    if (scans[min_j].retention_time < min_rt) {
-        ++min_j;
-    }
-
-    for (size_t j = min_j; j < max_j; ++j) {
-        const auto &scan = scans[j];
-        if (scan.num_points == 0) {
-            continue;
-        }
-        if (scan.retention_time > max_rt) {
-            break;
-        }
-
-        size_t min_i = Search::lower_bound(scan.mz, min_mz);
-        size_t max_i = scan.num_points;
-        if (scan.mz[min_i] < min_mz) {
-            ++min_i;
-        }
-        for (size_t i = min_i; i < max_i; ++i) {
-            if (scan.mz[i] > max_mz) {
-                break;
-            }
-
-            raw_points.rt.push_back(scan.retention_time);
-            raw_points.mz.push_back(scan.mz[i]);
-            raw_points.intensity.push_back(scan.intensity[i]);
-            ++raw_points.num_points;
-        }
-    }
-
-    if (raw_points.num_points == 0) {
-        std::ostringstream error_stream;
-        error_stream << "couldn't find raw_data points on the given ROI";
-        throw std::invalid_argument(error_stream.str());
-    }
-
-    return raw_points;
-}
-
 std::string to_string(const Instrument::Type &instrument_type) {
     switch (instrument_type) {
         case Instrument::Type::QUAD:
@@ -579,34 +494,6 @@ SimilarityResults find_similarity(std::vector<Centroid::Peak> &peak_list_a,
         2 * results.overlap / (results.self_a + results.self_b);
     return results;
 }
-
-struct PeakList {
-    std::vector<Centroid::Peak> peaks;
-    std::string file_name;   // NOTE: Should this be on the raw_data instead?
-    std::string class_name;  // NOTE: Should this be on the raw_data instead?
-    std::shared_ptr<RawData::RawData> raw_data;
-};
-
-struct WarpingTimeMap {
-    std::vector<double> rt_start;
-    std::vector<double> rt_end;
-    std::vector<double> warped_rt_start;
-    std::vector<double> warped_rt_end;
-    size_t n_warping_segments;
-};
-
-struct PeakLists {
-    std::vector<PeakList> peak_lists;
-    std::shared_ptr<WarpingTimeMap> warping_time_map;
-};
-
-struct MetaPeak {
-    // TODO: ...
-};
-
-struct MetaPeaks {
-    // TODO: ...
-};
 
 void to_csv(const std::vector<Centroid::Peak> &peaks, std::string file_name) {
     std::filesystem::path output_file = file_name;
@@ -1514,10 +1401,10 @@ PYBIND11_MODULE(tapp, m) {
                    ", max_rt: " + std::to_string(s.max_rt) + ">";
         });
 
-    py::class_<PythonAPI::RawPoints>(m, "RawPoints")
-        .def_readonly("rt", &PythonAPI::RawPoints::rt)
-        .def_readonly("mz", &PythonAPI::RawPoints::mz)
-        .def_readonly("intensity", &PythonAPI::RawPoints::intensity);
+    py::class_<RawData::RawPoints>(m, "RawPoints")
+        .def_readonly("rt", &RawData::RawPoints::rt)
+        .def_readonly("mz", &RawData::RawPoints::mz)
+        .def_readonly("intensity", &RawData::RawPoints::intensity);
 
     py::class_<Centroid::Peak>(m, "Peak")
         .def_readonly("id", &Centroid::Peak::id)
@@ -1724,7 +1611,7 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("raw_data"), py::arg("num_mz") = 10,
              py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 0.5,
              py::arg("smoothing_coef_rt") = 0.5)
-        .def("find_raw_points", &PythonAPI::find_raw_points,
+        .def("find_raw_points", &RawData::find_raw_points,
              "Save the fitted peaks as a bpks file", py::arg("raw_data"),
              py::arg("min_mz"), py::arg("max_mz"), py::arg("min_rt"),
              py::arg("max_rt"))

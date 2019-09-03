@@ -97,3 +97,47 @@ std::tuple<std::vector<double>, std::vector<double>> RawData::RawData::xic(
     }
     return {rt, intensity};
 }
+
+::RawData::RawPoints RawData::find_raw_points(const RawData &raw_data, double min_mz,
+                                   double max_mz, double min_rt,
+                                   double max_rt) {
+    RawPoints raw_points;
+    const auto &scans = raw_data.scans;
+    if (scans.size() == 0) {
+        return raw_points;
+    }
+
+    size_t min_j = Search::lower_bound(raw_data.retention_times, min_rt);
+    size_t max_j = scans.size();
+    if (scans[min_j].retention_time < min_rt) {
+        ++min_j;
+    }
+
+    for (size_t j = min_j; j < max_j; ++j) {
+        const auto &scan = scans[j];
+        if (scan.num_points == 0) {
+            continue;
+        }
+        if (scan.retention_time > max_rt) {
+            break;
+        }
+
+        size_t min_i = Search::lower_bound(scan.mz, min_mz);
+        size_t max_i = scan.num_points;
+        if (scan.mz[min_i] < min_mz) {
+            ++min_i;
+        }
+        for (size_t i = min_i; i < max_i; ++i) {
+            if (scan.mz[i] > max_mz) {
+                break;
+            }
+
+            raw_points.rt.push_back(scan.retention_time);
+            raw_points.mz.push_back(scan.mz[i]);
+            raw_points.intensity.push_back(scan.intensity[i]);
+            ++raw_points.num_points;
+        }
+    }
+
+    return raw_points;
+}
