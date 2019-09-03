@@ -7,18 +7,17 @@
 
 namespace Centroid::Runners::Serial {
 
-// Find the peaks on the given Grid in serial.
-std::vector<Centroid::Peak> run(const Centroid::Parameters &parameters,
-                                const std::vector<double> &data);
+// Find the peaks in serial.
+std::vector<Centroid::Peak> run(const RawData::RawData &raw_data,
+                                const Grid::Mesh &mesh, size_t max_peaks);
 
 }  // namespace Centroid::Runners::Serial
 
 namespace Centroid::Runners::Parallel {
 
-// Find the peaks on the given Grid in parallel.
-std::vector<Centroid::Peak> run(uint64_t max_threads,
-                                const Centroid::Parameters &parameters,
-                                const std::vector<double> &data);
+// Find the peaks in parallel.
+std::vector<Centroid::Peak> run(const RawData::RawData &raw_data,
+                                const Grid::Mesh &mesh, size_t max_peaks);
 
 }  // namespace Centroid::Runners::Parallel
 

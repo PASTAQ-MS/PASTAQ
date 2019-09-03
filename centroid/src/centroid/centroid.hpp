@@ -10,17 +10,9 @@
 
 namespace Centroid {
 
-struct Parameters {
-    uint64_t n_peaks;
-    double threshold;
-    Grid::Parameters grid_params;
-};
-
-// A Point represents the coordinates and value of those coordinates in the
-// Grid.
-struct Point {
-    uint64_t i;
-    uint64_t j;
+struct LocalMax {
+    double mz;
+    double rt;
     double value;
 };
 
@@ -55,6 +47,8 @@ struct Peak {
 
     // FIXME: Better commments and documentation.
     // FIXME: method should take an enum instead of a string.
+    // FIXME: Is is necessary to have this as a virtual method instead of
+    // a function?
     // Extracted Ion Chromatogram. Can be performed with summation or maxima
     // (Total Ion Chromatogram/Base Peak Chromatogram). Returns two vectors
     // (retention_time, aggregated_intensity).
@@ -65,16 +59,11 @@ struct Peak {
 // Find all candidate points on the given mesh by calculating the local maxima
 // at each point of the grid. The local maxima is defined as follows: For the
 // given indexes i and j the point at data[i][j] is greater than the neighbors
-// in all 8 directions. The resulting points are sorted in descending value
-// order. If a maximum number of peaks is given on Centroid::Parameters.n_peaks,
-// only the first n_peaks Points will be returned.
-std::vector<Point> find_local_maxima(const Centroid::Parameters &parameters,
-                                     const std::vector<double> &data);
+// in all 4 cardinal directions.
+std::vector<LocalMax> find_local_maxima(const Grid::Mesh &mesh);
 
 // Builds a Peak object for the given local_max.
-std::optional<Peak> build_peak(const Point &local_max,
-                               const Centroid::Parameters &parameters,
-                               const std::vector<double> &data);
+Peak build_peak(const RawData::RawData &raw_data, const LocalMax &local_max);
 
 }  // namespace Centroid
 
