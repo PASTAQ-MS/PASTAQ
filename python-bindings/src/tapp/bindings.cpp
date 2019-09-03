@@ -157,13 +157,14 @@ std::string to_string(const RawData::Polarity &polarity) {
     return "UNKNOWN";
 }
 
-struct MeshIndex {
-    size_t i;
-    size_t j;
+struct LocalMax {
+    double mz;
+    double rt;
+    double value;
 };
 
-std::vector<MeshIndex> find_local_max_idx(const Grid::Mesh &mesh) {
-    std::vector<MeshIndex> points;
+std::vector<LocalMax> find_local_max_idx(const Grid::Mesh &mesh) {
+    std::vector<LocalMax> points;
     // FIXME: This is performed in O(n^2), but using the divide and conquer
     // strategy we might achieve O(n * log(n)) or lower.
     // FIXME: Also, we should consider the corner case where neighbours are
@@ -195,7 +196,7 @@ std::vector<MeshIndex> find_local_max_idx(const Grid::Mesh &mesh) {
 
             if ((value != 0) && (value > left_value) && (value > right_value) &&
                 (value > top_value) && (value > bottom_value)) {
-                points.push_back({i, j});
+                points.push_back({mesh.bins_mz[i], mesh.bins_rt[j], value});
             }
         }
     }
@@ -204,15 +205,15 @@ std::vector<MeshIndex> find_local_max_idx(const Grid::Mesh &mesh) {
 }
 
 Centroid::Peak build_peak(const RawData::RawData &raw_data,
-                          const Grid::Mesh &mesh, const MeshIndex &local_max) {
+                          const LocalMax &local_max) {
     Centroid::Peak peak = {};
     peak.id = 0;
-    peak.local_max_mz = mesh.bins_mz[local_max.i];
-    peak.local_max_rt = mesh.bins_rt[local_max.j];
-    peak.local_max_height = mesh.data[local_max.i + local_max.j * mesh.n];
+    peak.local_max_mz = local_max.mz;
+    peak.local_max_rt = local_max.rt;
+    peak.local_max_height = local_max.value;
 
     double theoretical_sigma_mz = RawData::fwhm_to_sigma(
-        RawData::theoretical_fwhm(raw_data, mesh.bins_mz[local_max.i]));
+        RawData::theoretical_fwhm(raw_data, local_max.mz));
     double theoretical_sigma_rt = RawData::fwhm_to_sigma(raw_data.fwhm_rt);
     {
         // Calculate the ROI for a given local max.
@@ -384,7 +385,7 @@ std::vector<Centroid::Peak> find_peaks(const RawData::RawData &raw_data,
         threads[i] = std::thread([&groups, &local_max, &peaks_array, &raw_data,
                                   &mesh, i]() {
             for (const auto &k : groups[i]) {
-                auto peak = build_peak(raw_data, mesh, local_max[k]);
+                auto peak = build_peak(raw_data, local_max[k]);
                 // FIXME: Number of raw points within the theoretical sigma
                 // should be set by the user, with a sensible default. Same
                 // with the minimum number of rt scans per peak.
