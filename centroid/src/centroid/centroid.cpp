@@ -138,6 +138,9 @@ Centroid::Peak Centroid::build_peak(const RawData::RawData &raw_data,
                 ++num_scans;
             }
         }
+        if (weight_sum == 0) {
+            return {};
+        }
         mz_mean /= weight_sum;
         rt_mean /= weight_sum;
 

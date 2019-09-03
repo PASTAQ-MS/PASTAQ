@@ -21,6 +21,7 @@
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
 #include "utils/search.hpp"
+#include "utils/serialization.hpp"
 #include "warp2d/warp2d.hpp"
 #include "warp2d/warp2d_runners.hpp"
 
@@ -158,11 +159,148 @@ std::string to_string(const RawData::Polarity &polarity) {
     return "UNKNOWN";
 }
 
+struct LinkedMsms {
+    size_t peak_id;
+    size_t msms_id;
+    size_t scan_index;
+    double distance;
+};
+
+// NOTE: This algorithm relies on the peak vector to be sorted by id/height.
+// TODO(alex): Move linkedmsms and serialization functions to separate
+// namespace.
+std::vector<LinkedMsms> link_msms(const std::vector<Centroid::Peak> &peaks,
+                                  const RawData::RawData &raw_data) {
+    // Index the peak list by m/z.
+    struct PeakIndex {
+        size_t id;
+        double mz;
+    };
+    auto indices = std::vector<PeakIndex>(peaks.size());
+    for (size_t i = 0; i < peaks.size(); ++i) {
+        indices[i] = {peaks[i].id, peaks[i].local_max_mz};
+    }
+
+    // Sort mz index by mz.
+    std::stable_sort(indices.begin(), indices.end(),
+                     [](const PeakIndex &a, const PeakIndex &b) -> bool {
+                         return a.mz < b.mz;
+                     });
+
+    // Flatten index into separate arrays.
+    auto index_ids = std::vector<size_t>(indices.size());
+    auto index_mzs = std::vector<double>(indices.size());
+    for (size_t i = 0; i < indices.size(); ++i) {
+        index_ids[i] = indices[i].id;
+        index_mzs[i] = indices[i].mz;
+    }
+    indices.clear();
+
+    // Perform linkage of ms/ms events to closest peak.
+    std::vector<LinkedMsms> link_table;
+    for (size_t k = 0; k < raw_data.scans.size(); ++k) {
+        const auto &scan = raw_data.scans[k];
+        if (scan.ms_level != 2) {
+            continue;
+        }
+        size_t event_id = scan.scan_number;
+        double event_mz = scan.precursor_information.mz;
+        double event_rt = scan.retention_time;
+        double theoretical_sigma_mz = RawData::fwhm_to_sigma(
+            RawData::theoretical_fwhm(raw_data, event_mz));
+
+        // Find min_mz and loop until we reach the max_mz.
+        double min_mz = event_mz - 3 * theoretical_sigma_mz;
+        double max_mz = event_mz + 3 * theoretical_sigma_mz;
+        size_t min_j = Search::lower_bound(index_mzs, min_mz);
+        double min_distance = std::numeric_limits<double>::infinity();
+        size_t peak_id = 0;
+        for (size_t j = min_j; j < index_ids.size(); ++j) {
+            size_t i = index_ids[j];
+            if (peaks[i].local_max_mz > max_mz) {
+                break;
+            }
+            double a = event_mz - peaks[i].local_max_mz;
+            double b = event_rt - peaks[i].local_max_rt;
+            double distance = std::sqrt(a * a + b * b);
+            if (distance < min_distance) {
+                min_distance = distance;
+                peak_id = i;
+            }
+        }
+
+        // Check if linked event is within 10 sigma of the minimum distance peak.
+        double roi_min_mz =
+            peaks[peak_id].local_max_mz - 10 * peaks[peak_id].raw_roi_sigma_mz;
+        double roi_max_mz =
+            peaks[peak_id].local_max_mz + 10 * peaks[peak_id].raw_roi_sigma_mz;
+        double roi_min_rt =
+            peaks[peak_id].local_max_rt - 10 * peaks[peak_id].raw_roi_sigma_rt;
+        double roi_max_rt =
+            peaks[peak_id].local_max_rt + 10 * peaks[peak_id].raw_roi_sigma_rt;
+        if (event_mz < roi_min_mz || event_mz > roi_max_mz ||
+            event_rt < roi_min_rt || event_rt > roi_max_rt) {
+            continue;
+        }
+
+        if (min_distance != std::numeric_limits<double>::infinity()) {
+            link_table.push_back({peak_id, event_id, k, min_distance});
+        }
+    }
+
+    // Sort link_table by peak_id.
+    std::stable_sort(
+        link_table.begin(), link_table.end(),
+        [](const LinkedMsms &a, const LinkedMsms &b) -> bool {
+            return (a.peak_id < b.peak_id) ||
+                   ((a.peak_id == b.peak_id) && (a.distance < b.distance));
+        });
+    return link_table;
+}
+
+bool _read_linked_msms(std::istream &stream, LinkedMsms *link) {
+    Serialization::read_uint64(stream, &link->peak_id);
+    Serialization::read_uint64(stream, &link->msms_id);
+    Serialization::read_uint64(stream, &link->scan_index);
+    Serialization::read_double(stream, &link->distance);
+    return stream.good();
+}
+
+bool _write_linked_msms(std::ostream &stream, const LinkedMsms &link) {
+    Serialization::write_uint64(stream, link.peak_id);
+    Serialization::write_uint64(stream, link.msms_id);
+    Serialization::write_uint64(stream, link.scan_index);
+    Serialization::write_double(stream, link.distance);
+    return stream.good();
+}
+
+bool _read_linked_msms_table(std::istream &stream,
+                             std::vector<LinkedMsms> *links) {
+    uint64_t num_rows = 0;
+    Serialization::read_uint64(stream, &num_rows);
+    *links = std::vector<LinkedMsms>(num_rows);
+    for (size_t i = 0; i < num_rows; ++i) {
+        _read_linked_msms(stream, &(*links)[i]);
+    }
+    return stream.good();
+}
+
+bool _write_linked_msms_table(std::ostream &stream,
+                              const std::vector<LinkedMsms> &links) {
+    uint64_t num_rows = links.size();
+    Serialization::write_uint64(stream, num_rows);
+    for (size_t i = 0; i < num_rows; ++i) {
+        _write_linked_msms(stream, links[i]);
+    }
+    return stream.good();
+}
+
 std::vector<std::vector<Centroid::Peak>> warp_peaks(
     const std::vector<std::vector<Centroid::Peak>> &all_peaks,
     size_t reference_index, int64_t slack, int64_t window_size,
     int64_t num_points, double rt_expand_factor, int64_t peaks_per_window) {
-    // TODO(alex): Validate the parameters and throw an error if appropriate.
+    // TODO(alex): Validate the parameters and throw an error if
+    // appropriate.
     Warp2D::Parameters parameters = {slack, window_size, num_points,
                                      peaks_per_window, rt_expand_factor};
     auto reference_peaks = all_peaks[reference_index];
@@ -195,8 +333,7 @@ SimilarityResults find_similarity(std::vector<Centroid::Peak> &peak_list_a,
                                   size_t n_peaks) {
     auto sort_peaks = [](const Centroid::Peak &p1,
                          const Centroid::Peak &p2) -> bool {
-        return (p1.local_max_height > p2.local_max_height) ||
-               (p1.local_max_height == p2.local_max_height);
+        return (p1.local_max_height >= p2.local_max_height);
     };
     std::stable_sort(peak_list_a.begin(), peak_list_a.end(), sort_peaks);
     std::stable_sort(peak_list_b.begin(), peak_list_b.end(), sort_peaks);
@@ -213,7 +350,8 @@ SimilarityResults find_similarity(std::vector<Centroid::Peak> &peak_list_a,
     // Overlap / (GeometricMean(self_a, self_b))
     results.geometric_ratio =
         results.overlap / std::sqrt(results.self_a * results.self_b);
-    // Harmonic mean of the ratios between self_similarity/overlap_similarity
+    // Harmonic mean of the ratios between
+    // self_similarity/overlap_similarity
     results.mean_ratio =
         2 * results.overlap / (results.self_a + results.self_b);
     return results;
@@ -456,6 +594,51 @@ std::vector<MetaMatch::Peak> read_metamatch_peaks(std::string file_name) {
         throw std::invalid_argument(error_stream.str());
     }
     return metamatch_peaks;
+}
+
+void write_linked_msms(const std::vector<LinkedMsms> &linked_msms,
+                       std::string file_name) {
+    std::filesystem::path output_file = file_name;
+
+    // Open file stream.
+    std::ofstream stream;
+    stream.open(output_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open output file" << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    if (!_write_linked_msms_table(stream, linked_msms)) {
+        std::ostringstream error_stream;
+        error_stream
+            << "error: couldn't write the linked_msms into the output file"
+            << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+}
+
+std::vector<LinkedMsms> read_linked_msms(std::string file_name) {
+    std::filesystem::path input_file = file_name;
+
+    // Open file stream.
+    std::ifstream stream;
+    stream.open(input_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open input file" << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    std::vector<LinkedMsms> linked_msms;
+    if (!_read_linked_msms_table(stream, &linked_msms)) {
+        std::ostringstream error_stream;
+        error_stream
+            << "error: couldn't write the linked_msms into the input file"
+            << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+    return linked_msms;
 }
 
 std::tuple<std::vector<double>, std::vector<double>>
@@ -894,10 +1077,10 @@ std::vector<LinkedPeptide> link_identified_peptides(
             continue;
         }
 
-        // In case more than one peak is linked to the reference mz isotope, the
-        // sequence with the less matching error should be selected. In order to
-        // do so, the heights for each candidate must be normalized by the
-        // reference isotope height.
+        // In case more than one peak is linked to the reference mz isotope,
+        // the sequence with the less matching error should be selected. In
+        // order to do so, the heights for each candidate must be normalized
+        // by the reference isotope height.
         std::vector<Isotope> selected_candidates;
         double weighted_error = std::numeric_limits<double>::infinity();
         for (size_t i = 0; i < isotopes_graph[reference_node_index].size();
@@ -913,7 +1096,8 @@ std::vector<LinkedPeptide> link_identified_peptides(
                     continue;
                 }
 
-                // Find the best matching candidate for the selected reference.
+                // Find the best matching candidate for the selected
+                // reference.
                 double theoretical_percentage = perc[k];
                 auto best_matching_candidate =
                     Isotope{0,
@@ -939,11 +1123,10 @@ std::vector<LinkedPeptide> link_identified_peptides(
                 }
                 normalized_candidates.push_back(best_matching_candidate);
             }
-            // The weighted error for each normalized_candidate path can now be
-            // evaluated.
-            // NOTE: A potential alternative to an error function would be the
-            // Euclidean distance between the expected theoretical peak and
-            // candidates for that node.
+            // The weighted error for each normalized_candidate path can now
+            // be evaluated. NOTE: A potential alternative to an error
+            // function would be the Euclidean distance between the expected
+            // theoretical peak and candidates for that node.
             double err_sum = 0.0;
             for (const auto &candidate : normalized_candidates) {
                 err_sum += candidate.expected_normalized_height *
@@ -1318,6 +1501,17 @@ PYBIND11_MODULE(tapp, m) {
                    ", class_id: " + std::to_string(p.class_id) + ">";
         });
 
+    py::class_<PythonAPI::LinkedMsms>(m, "LinkedMsms")
+        .def_readonly("peak_id", &PythonAPI::LinkedMsms::peak_id)
+        .def_readonly("msms_id", &PythonAPI::LinkedMsms::msms_id)
+        .def_readonly("distance", &PythonAPI::LinkedMsms::distance)
+        .def("__repr__", [](const PythonAPI::LinkedMsms &p) {
+            return "LinkedMsms <peak_id: " + std::to_string(p.peak_id) +
+                   ", scan_index: " + std::to_string(p.scan_index) +
+                   ", msms_id: " + std::to_string(p.msms_id) +
+                   ", distance: " + std::to_string(p.distance) + ">";
+        });
+
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,
           "Read raw data from the given mzXML file ", py::arg("file_name"),
@@ -1360,6 +1554,9 @@ PYBIND11_MODULE(tapp, m) {
         .def("write_metamatch_peaks", &PythonAPI::write_metamatch_peaks,
              "Write the metamatch_peaks to disk in a binary format",
              py::arg("metamatch_peaks"), py::arg("file_name"))
+        .def("write_linked_msms", &PythonAPI::write_linked_msms,
+             "Write the linked_msms to disk in a binary format",
+             py::arg("linked_msms"), py::arg("file_name"))
         .def("to_csv", &PythonAPI::to_csv,
              "Write the peaks to disk in csv format (compatibility)",
              py::arg("peaks"), py::arg("file_name"))
@@ -1377,6 +1574,9 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("file_name"))
         .def("read_mesh", &PythonAPI::read_mesh,
              "Read the mesh from the binary mesh file", py::arg("file_name"))
+        .def("read_linked_msms", &PythonAPI::read_linked_msms,
+             "Read the linked_msms from the binary linked_msms file",
+             py::arg("file_name"))
         .def("theoretical_isotopes_peptide",
              &PythonAPI::theoretical_isotopes_peptide,
              "Calculate the theoretical isotopic distribution of a peptide",
@@ -1388,6 +1588,8 @@ PYBIND11_MODULE(tapp, m) {
         .def("perform_metamatch", &PythonAPI::perform_metamatch,
              "Perform metamatch for peak matching", py::arg("input"),
              py::arg("radius_mz"), py::arg("radius_rt"), py::arg("fraction"))
+        .def("link_msms", &PythonAPI::link_msms, "Link msms events to peak ids",
+             py::arg("peaks"), py::arg("raw_data"))
         .def("link_identified_peptides", &PythonAPI::link_identified_peptides,
              "DEBUG", py::arg("peaks"), py::arg("identifications"),
              py::arg("tolerance_rt"), py::arg("minimum_isotope_perc"));

@@ -1088,27 +1088,11 @@ def plot_theoretical_sigma(peak, raw_data, img_plot=None, rt_plot=None, mz_plot=
         marker='P',
         )
 
-def plot_slope_descent_sigma(peak, img_plot=None, rt_plot=None, mz_plot=None):
-    return plot_sigma(
-        peak,
-        peak.local_max_height,
-        peak.local_max_mz,
-        peak.local_max_rt,
-        peak.slope_descent_sigma_mz,
-        peak.slope_descent_sigma_rt,
-        img_plot,
-        rt_plot,
-        mz_plot,
-        linestyle='-',
-        label='slope_descent',
-        marker='.',
-        )
-
-def testing_different_sigmas(peaks, raw_data):
-    plots = peaks[0].plot_raw_points(raw_data)
-    plots = peaks[0].plot_raw_roi_sigma(plots['img_plot'], plots['rt_plot'], plots['mz_plot'])
-    plots = peaks[0].plot_theoretical_sigma(raw_data, plots['img_plot'], plots['rt_plot'], plots['mz_plot'])
-    plots = peaks[0].plot_raw_roi_fitted_sigma_weighted(raw_data, plots['img_plot'], plots['rt_plot'], plots['mz_plot'])
+def testing_different_sigmas(peaks, raw_data, i = 0):
+    plots = peaks[i].plot_raw_points(raw_data)
+    plots = peaks[i].plot_raw_roi_sigma(plots['img_plot'], plots['rt_plot'], plots['mz_plot'])
+    # plots = peaks[i].plot_theoretical_sigma(raw_data, plots['img_plot'], plots['rt_plot'], plots['mz_plot'])
+    plots = peaks[i].plot_raw_roi_fitted_sigma_weighted(raw_data, plots['img_plot'], plots['rt_plot'], plots['mz_plot'])
     plt.legend()
     return plots
 
@@ -1256,12 +1240,6 @@ def to_table(peaks):
             'local_max_mz': np.array([peak.local_max_mz for peak in peaks]),
             'local_max_rt': np.array([peak.local_max_rt for peak in peaks]),
             'local_max_height': np.array([peak.local_max_height for peak in peaks]),
-            'slope_descent_mean_mz': np.array([peak.slope_descent_mean_mz for peak in peaks]),
-            'slope_descent_mean_rt': np.array([peak.slope_descent_mean_rt for peak in peaks]),
-            'slope_descent_sigma_mz': np.array([peak.slope_descent_sigma_mz for peak in peaks]),
-            'slope_descent_sigma_rt': np.array([peak.slope_descent_sigma_rt for peak in peaks]),
-            'slope_descent_total_intensity': np.array([peak.slope_descent_total_intensity for peak in peaks]),
-            'slope_descent_border_background': np.array([peak.slope_descent_border_background for peak in peaks]),
             'raw_roi_mean_mz': np.array([peak.raw_roi_mean_mz for peak in peaks]),
             'raw_roi_mean_rt': np.array([peak.raw_roi_mean_rt for peak in peaks]),
             'raw_roi_sigma_mz': np.array([peak.raw_roi_sigma_mz for peak in peaks]),
@@ -1741,7 +1719,29 @@ def dda_pipeline(
 
     logger.info('Finished metamatch in {}'.format(datetime.timedelta(seconds=time.time()-time_start)))
 
-    # TODO: Match ms2 events with corresponding detected peaks.
+    # Match ms2 events with corresponding detected peaks.
+    logger.info('Starting msms linkage')
+    time_start = time.time()
+    for stem in input_stems:
+        # Check if file has already been processed.
+        in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
+        in_path_peaks = os.path.join(output_dir, 'peaks', "{}.bpks".format(stem))
+        out_path = os.path.join(output_dir, 'linking', "{}.ms2_peaks.link".format(stem))
+        if os.path.exists(out_path) and not override_existing:
+            continue
+
+        logger.info("Reading raw_data from disk (MS2): {}".format(stem))
+        raw_data = tapp.read_raw_data(in_path_raw)
+
+        logger.info("Reading peaks from disk: {}".format(stem))
+        peaks = tapp.read_peaks(in_path_peaks)
+
+        logger.info("Performing linkage: {}".format(stem))
+        linked_msms = tapp.link_msms(peaks, raw_data)
+        logger.info('Writing linked_msms: {}'.format(out_path))
+        tapp.write_linked_msms(linked_msms, out_path)
+    logger.info('Finished msms linkage in {}'.format(datetime.timedelta(seconds=time.time()-time_start)))
+
     # TODO: (If there is ident information)
     # TODO:     - Read mzidentdata and save binaries to disk.
     # TODO:     - Link ms2 events with ident information.
@@ -1810,7 +1810,6 @@ Peak.plot_theoretical_sigma = plot_theoretical_sigma
 Peak.plot_raw_roi_fitted_sigma = plot_raw_roi_fitted_sigma
 Peak.plot_raw_roi_fitted_sigma_fast = plot_raw_roi_fitted_sigma_fast
 Peak.plot_raw_roi_fitted_sigma_weighted = plot_raw_roi_fitted_sigma_weighted
-Peak.plot_slope_descent_sigma = plot_slope_descent_sigma
 Peak.plot_sigma = plot_sigma
 Peak.fit_height_and_sigmas = fit_height_and_sigmas
 Peak.fit_sigmas = fit_sigmas

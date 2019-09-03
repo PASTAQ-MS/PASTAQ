@@ -94,8 +94,7 @@ std::vector<Centroid::Peak> Centroid::Runners::Parallel::run(
     // Sort the peaks by height.
     auto sort_peaks = [](const Centroid::Peak &p1,
                          const Centroid::Peak &p2) -> bool {
-        return (p1.local_max_height > p2.local_max_height) ||
-               (p1.local_max_height == p2.local_max_height);
+        return (p1.local_max_height >= p2.local_max_height);
     };
     std::stable_sort(peaks.begin(), peaks.end(), sort_peaks);
 
