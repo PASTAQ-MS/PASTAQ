@@ -1391,7 +1391,12 @@ def default_parameters(instrument, avg_fwhm_rt):
         return tapp_parameters
 
 # TODO: Logger should have different levels and user can configure the verbosity of output.
-def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_existing = False):
+def dda_pipeline(
+    tapp_parameters,
+    input_files,
+    output_dir = "TAPP",
+    override_existing = False,
+    save_mesh = False):
     # TODO: Sanitize parameters.
     # TODO: Sanitize input/outputs.
     # TODO:     - Check if file names exist.
@@ -1426,7 +1431,7 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
         os.makedirs(os.path.join(output_dir, 'raw'))
     if not os.path.exists(os.path.join(output_dir, 'quality')):
         os.makedirs(os.path.join(output_dir, 'quality'))
-    if not os.path.exists(os.path.join(output_dir, 'mesh')):
+    if not os.path.exists(os.path.join(output_dir, 'mesh') and save_mesh):
         os.makedirs(os.path.join(output_dir, 'mesh'))
     if not os.path.exists(os.path.join(output_dir, 'peaks')):
         os.makedirs(os.path.join(output_dir, 'peaks'))
@@ -1529,17 +1534,19 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
 
     logger.info('Finished raw data conversion in {}'.format(datetime.timedelta(seconds=time.time()-time_start)))
 
-    # Perform resampling/smoothing and save results to disk.
-    logger.info('Starting mesh resampling')
+    # Perform resampling/smoothing and peak detection and save results to disk.
+    logger.info('Starting peak detection')
     time_start = time.time()
     for stem in input_stems:
         # Check if file has already been processed.
         in_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
-        out_path = os.path.join(output_dir, 'mesh', "{}.mesh".format(stem))
+        out_path = os.path.join(output_dir, 'peaks', "{}.bpks".format(stem))
         if os.path.exists(out_path) and not override_existing:
             continue
+
         logger.info("Reading raw_data from disk: {}".format(stem))
         raw_data = tapp.read_raw_data(in_path)
+
         logger.info("Resampling: {}".format(stem))
         mesh = resample(
             raw_data,
@@ -1548,27 +1555,16 @@ def dda_pipeline(tapp_parameters, input_files, output_dir = "TAPP", override_exi
             tapp_parameters['smoothing_coefficient_mz'],
             tapp_parameters['smoothing_coefficient_rt'],
             )
-        logger.info('Writing mesh: {}'.format(out_path))
-        mesh.dump(out_path)
-    logger.info('Finished mesh resampling in {}'.format(datetime.timedelta(seconds=time.time()-time_start)))
 
-    # Perform peak detection and save results to disk.
-    logger.info('Starting peak detection')
-    time_start = time.time()
-    for stem in input_stems:
-        # Check if file has already been processed.
-        in_path_raw = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
-        in_path_mesh = os.path.join(output_dir, 'mesh', "{}.mesh".format(stem))
-        out_path = os.path.join(output_dir, 'peaks', "{}.bpks".format(stem))
-        if os.path.exists(out_path) and not override_existing:
-            continue
-        logger.info("Reading raw_data and mesh from disk: {}".format(stem))
-        raw_data = tapp.read_raw_data(in_path_raw)
-        mesh = tapp.read_mesh(in_path_mesh)
+        if save_mesh:
+            logger.info('Writing mesh: {}'.format(out_path))
+            mesh.dump(out_path)
+
         logger.info("Finding peaks: {}".format(stem))
         peaks = find_peaks(raw_data, mesh, tapp_parameters['max_peaks'])
         logger.info('Writing peaks:'.format(out_path))
         tapp.write_peaks(peaks, out_path)
+
     logger.info('Finished peak detection in {}'.format(datetime.timedelta(seconds=time.time()-time_start)))
 
     # Calculate similarity matrix before alignment, generate heatmap and save to disk.
