@@ -36,14 +36,6 @@ if (NOT TARGET warp2dlib)
     target_link_libraries(warp2dlib gridlib centroidlib ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
-# Include executable target.
-if (NOT TARGET warp2d)
-    add_executable(warp2d
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/warp2d_command.cpp"
-        )
-    target_link_libraries(warp2d stdc++ stdc++fs warp2dlib ${CMAKE_THREAD_LIBS_INIT} gridlib centroidlib)
-endif()
-
 # Include tests if testing library is present.
 if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} OR (${CENTROID_ADD_TESTS}))
     unset(DOCTEST_LIBRARY_PATH CACHE)

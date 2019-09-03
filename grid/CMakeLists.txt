@@ -35,14 +35,6 @@ if (NOT TARGET gridlib)
     target_link_libraries(gridlib ${CMAKE_THREAD_LIBS_INIT} utilslib)
 endif()
 
-# Include executable target.
-if (NOT TARGET grid)
-    add_executable(grid
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/grid/grid_command.cpp"
-        )
-    target_link_libraries(grid stdc++ stdc++fs gridlib ${CMAKE_THREAD_LIBS_INIT})
-endif()
-
 # Include tests if testing library is present.
 if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} OR (${GRID_ADD_TESTS}))
     unset(DOCTEST_LIBRARY_PATH CACHE)

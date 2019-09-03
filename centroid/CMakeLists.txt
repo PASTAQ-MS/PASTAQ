@@ -35,14 +35,6 @@ if (NOT TARGET centroidlib)
     target_link_libraries(centroidlib gridlib ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
-# Include executable target.
-if (NOT TARGET centroid)
-    add_executable(centroid
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/centroid/centroid_command.cpp"
-        )
-    target_link_libraries(centroid stdc++ stdc++fs centroidlib ${CMAKE_THREAD_LIBS_INIT})
-endif()
-
 # Include tests if testing library is present.
 if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} OR (${CENTROID_ADD_TESTS}))
     unset(DOCTEST_LIBRARY_PATH CACHE)
