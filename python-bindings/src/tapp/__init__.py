@@ -7,6 +7,7 @@ import os
 # from pathlib import Path
 
 import tapp
+from .tapp import *
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -1899,13 +1900,13 @@ def full_dda_pipeline_test():
     dda_pipeline(tapp_parameters, input_files, 'tapp_pipeline_test')
 
 
-tapp.Peak.plot_xic = plot_xic
-tapp.Peak.plot_raw_points = plot_raw_points
-tapp.Peak.plot_raw_roi_sigma = plot_raw_roi_sigma
-tapp.Peak.plot_theoretical_sigma = plot_theoretical_sigma
-tapp.Peak.plot_fitted_sigma = plot_raw_roi_fitted_sigma
-tapp.Peak.plot_fitted_sigma_fast = plot_raw_roi_fitted_sigma_fast
-tapp.Peak.plot_fitted_sigma_weighted = plot_raw_roi_fitted_sigma_weighted
-tapp.Peak.plot_sigma = plot_sigma
-tapp.Peak.fit_height_and_sigmas = fit_height_and_sigmas
-tapp.Peak.fit_sigmas = fit_sigmas
+Peak.plot_xic = plot_xic
+Peak.plot_raw_points = plot_raw_points
+Peak.plot_raw_roi_sigma = plot_raw_roi_sigma
+Peak.plot_theoretical_sigma = plot_theoretical_sigma
+Peak.plot_fitted_sigma = plot_raw_roi_fitted_sigma
+Peak.plot_fitted_sigma_fast = plot_raw_roi_fitted_sigma_fast
+Peak.plot_fitted_sigma_weighted = plot_raw_roi_fitted_sigma_weighted
+Peak.plot_sigma = plot_sigma
+Peak.fit_height_and_sigmas = fit_height_and_sigmas
+Peak.fit_sigmas = fit_sigmas
