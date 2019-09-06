@@ -28,8 +28,8 @@
 namespace py = pybind11;
 
 namespace PythonAPI {
-RawData::RawData read_mzxml(std::string file_name, double min_mz, double max_mz,
-                            double min_rt, double max_rt,
+RawData::RawData read_mzxml(std::string &file_name, double min_mz,
+                            double max_mz, double min_rt, double max_rt,
                             std::string instrument_type_str,
                             double resolution_ms1, double resolution_msn,
                             double reference_mz, double fwhm_rt,
@@ -229,7 +229,8 @@ std::vector<LinkedMsms> link_msms(const std::vector<Centroid::Peak> &peaks,
             }
         }
 
-        // Check if linked event is within 10 sigma of the minimum distance peak.
+        // Check if linked event is within 10 sigma of the minimum distance
+        // peak.
         double roi_min_mz =
             peaks[peak_id].local_max_mz - 10 * peaks[peak_id].raw_roi_sigma_mz;
         double roi_max_mz =
@@ -357,7 +358,7 @@ SimilarityResults find_similarity(std::vector<Centroid::Peak> &peak_list_a,
     return results;
 }
 
-void to_csv(const std::vector<Centroid::Peak> &peaks, std::string file_name) {
+void to_csv(const std::vector<Centroid::Peak> &peaks, std::string &file_name) {
     std::filesystem::path output_file = file_name;
 
     // Open file stream.
@@ -377,7 +378,7 @@ void to_csv(const std::vector<Centroid::Peak> &peaks, std::string file_name) {
     }
 }
 
-void write_raw_data(const RawData::RawData &raw_data, std::string file_name) {
+void write_raw_data(const RawData::RawData &raw_data, std::string &file_name) {
     std::filesystem::path output_file = file_name;
 
     // Open file stream.
@@ -398,7 +399,7 @@ void write_raw_data(const RawData::RawData &raw_data, std::string file_name) {
     }
 }
 
-RawData::RawData read_raw_data(std::string file_name) {
+RawData::RawData read_raw_data(std::string &file_name) {
     std::filesystem::path input_file = file_name;
 
     // Open file stream.
@@ -420,7 +421,7 @@ RawData::RawData read_raw_data(std::string file_name) {
     return raw_data;
 }
 
-void write_mesh(const Grid::Mesh &mesh, std::string file_name) {
+void write_mesh(const Grid::Mesh &mesh, std::string &file_name) {
     std::filesystem::path output_file = file_name;
 
     // Open file stream.
@@ -440,7 +441,7 @@ void write_mesh(const Grid::Mesh &mesh, std::string file_name) {
     }
 }
 
-Grid::Mesh read_mesh(std::string file_name) {
+Grid::Mesh read_mesh(std::string &file_name) {
     std::filesystem::path input_file = file_name;
 
     // Open file stream.
@@ -463,7 +464,7 @@ Grid::Mesh read_mesh(std::string file_name) {
 }
 
 void write_peaks(const std::vector<Centroid::Peak> &peaks,
-                 std::string file_name) {
+                 std::string &file_name) {
     std::filesystem::path output_file = file_name;
 
     // Open file stream.
@@ -483,7 +484,7 @@ void write_peaks(const std::vector<Centroid::Peak> &peaks,
     }
 }
 
-std::vector<Centroid::Peak> read_peaks(std::string file_name) {
+std::vector<Centroid::Peak> read_peaks(std::string &file_name) {
     std::filesystem::path input_file = file_name;
 
     // Open file stream.
@@ -507,7 +508,7 @@ std::vector<Centroid::Peak> read_peaks(std::string file_name) {
 
 void write_metamatch_clusters(
     const std::vector<MetaMatch::Cluster> &metamatch_clusters,
-    std::string file_name) {
+    std::string &file_name) {
     std::filesystem::path output_file = file_name;
 
     // Open file stream.
@@ -528,7 +529,8 @@ void write_metamatch_clusters(
     }
 }
 
-std::vector<MetaMatch::Cluster> read_metamatch_clusters(std::string file_name) {
+std::vector<MetaMatch::Cluster> read_metamatch_clusters(
+    std::string &file_name) {
     std::filesystem::path input_file = file_name;
 
     // Open file stream.
@@ -552,7 +554,7 @@ std::vector<MetaMatch::Cluster> read_metamatch_clusters(std::string file_name) {
 }
 
 void write_metamatch_peaks(const std::vector<MetaMatch::Peak> &metamatch_peaks,
-                           std::string file_name) {
+                           std::string &file_name) {
     std::filesystem::path output_file = file_name;
 
     // Open file stream.
@@ -573,7 +575,7 @@ void write_metamatch_peaks(const std::vector<MetaMatch::Peak> &metamatch_peaks,
     }
 }
 
-std::vector<MetaMatch::Peak> read_metamatch_peaks(std::string file_name) {
+std::vector<MetaMatch::Peak> read_metamatch_peaks(std::string &file_name) {
     std::filesystem::path input_file = file_name;
 
     // Open file stream.
@@ -597,7 +599,7 @@ std::vector<MetaMatch::Peak> read_metamatch_peaks(std::string file_name) {
 }
 
 void write_linked_msms(const std::vector<LinkedMsms> &linked_msms,
-                       std::string file_name) {
+                       std::string &file_name) {
     std::filesystem::path output_file = file_name;
 
     // Open file stream.
@@ -618,7 +620,7 @@ void write_linked_msms(const std::vector<LinkedMsms> &linked_msms,
     }
 }
 
-std::vector<LinkedMsms> read_linked_msms(std::string file_name) {
+std::vector<LinkedMsms> read_linked_msms(std::string &file_name) {
     std::filesystem::path input_file = file_name;
 
     // Open file stream.
@@ -927,7 +929,7 @@ PythonAPI::IdentData::IdentData _read_mzidentml(std::istream &stream,
     return {db_sequences, peptides, spectrum_ids, protein_hypotheses};
 }  // namespace PythonAPI
 
-PythonAPI::IdentData::IdentData read_mzidentml(std::string file_name,
+PythonAPI::IdentData::IdentData read_mzidentml(std::string &file_name,
                                                bool threshold) {
     std::filesystem::path input_file = file_name;
 
@@ -998,9 +1000,9 @@ std::vector<LinkedPeptide> link_identified_peptides(
                      });
 
     // Extract sorted arrays for quick searching.
-    std::vector<double> sorted_rts;
-    for (const auto &peak : sorted_peaks) {
-        sorted_rts.push_back(peak.local_max_rt);
+    auto sorted_rts = std::vector<double>(sorted_peaks.size());
+    for (size_t i = 0; i < sorted_peaks.size(); ++i) {
+        sorted_rts[i] = sorted_peaks[i].local_max_rt;
     }
 
     for (const auto &ident : identifications) {
@@ -1142,7 +1144,7 @@ std::vector<LinkedPeptide> link_identified_peptides(
         if (selected_candidates.empty()) {
             continue;
         }
-        LinkedPeptide linked_peptide;
+        LinkedPeptide linked_peptide = {};
         linked_peptide.sequence = ident.sequence;
         linked_peptide.psm_id = ident.id;
         linked_peptide.charge_state = ident.charge_state;

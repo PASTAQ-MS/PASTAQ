@@ -138,8 +138,8 @@ Grid::Mesh Grid::resample(const RawData::RawData &raw_data,
     // Gaussian splatting.
     {
         auto weights = std::vector<double>(n * m);
-        for (size_t i = 0; i < raw_data.scans.size(); ++i) {
-            const auto &scan = raw_data.scans[i];
+        for (size_t s = 0; s < raw_data.scans.size(); ++s) {
+            const auto &scan = raw_data.scans[s];
             double current_rt = scan.retention_time;
 
             // Find the bin for the current retention time.
