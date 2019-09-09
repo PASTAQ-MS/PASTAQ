@@ -506,6 +506,51 @@ std::vector<Centroid::Peak> read_peaks(std::string &file_name) {
     return peaks;
 }
 
+void write_ident_data(const IdentData::IdentData &ident_data,
+                      std::string &file_name) {
+    std::filesystem::path output_file = file_name;
+
+    // Open file stream.
+    std::ofstream stream;
+    stream.open(output_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open output file" << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    if (!IdentData::Serialize::write_ident_data(stream, ident_data)) {
+        std::ostringstream error_stream;
+        error_stream
+            << "error: couldn't write the ident_data into the output file"
+            << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+}
+
+IdentData::IdentData read_ident_data(std::string &file_name) {
+    std::filesystem::path input_file = file_name;
+
+    // Open file stream.
+    std::ifstream stream;
+    stream.open(input_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open input file" << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    IdentData::IdentData ident_data;
+    if (!IdentData::Serialize::read_ident_data(stream, &ident_data)) {
+        std::ostringstream error_stream;
+        error_stream
+            << "error: couldn't write the ident_data into the input file"
+            << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+    return ident_data;
+}
+
 void write_metamatch_clusters(
     const std::vector<MetaMatch::Cluster> &metamatch_clusters,
     std::string &file_name) {
@@ -1319,6 +1364,12 @@ PYBIND11_MODULE(tapp, m) {
         .def("read_mzidentml", &PythonAPI::read_mzidentml,
              "Read identification data from the given mzIdentML file ",
              py::arg("file_name"))
+        .def("read_ident_data", &PythonAPI::read_ident_data,
+             "Read the ident_data from the binary ident_data file",
+             py::arg("file_name"))
+        .def("write_ident_data", &PythonAPI::write_ident_data,
+             "Write the ident_data to disk in a binary format",
+             py::arg("ident_data"), py::arg("file_name"))
         .def("perform_metamatch", &PythonAPI::perform_metamatch,
              "Perform metamatch for peak matching", py::arg("input"),
              py::arg("radius_mz"), py::arg("radius_rt"), py::arg("fraction"))
