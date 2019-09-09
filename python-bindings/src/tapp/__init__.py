@@ -1427,9 +1427,11 @@ def dda_pipeline(
         # group distinct from the rest.
         groups += [input_files[key]['group']]
 
-        # TODO: Check that all files contain a ident_path, if not, assign
-        # 'none'.
-        input_ident_files += [input_files[key]['ident_path']]
+        # Check that all files contain a ident_path, if not, assign 'none'.
+        if input_files[key]['ident_path']:
+            input_ident_files += [input_files[key]['ident_path']]
+        else:
+            input_ident_files += ['none']
 
     # Sort input files by groups and stems.
     groups, input_stems, input_ident_files, input_raw_files = list(
@@ -1833,9 +1835,22 @@ def dda_pipeline(
         datetime.timedelta(seconds=time.time()-time_start)))
 
     # TODO: (If there is ident information)
-    # TODO:     - Read mzidentdata and save binaries to disk.
     # TODO:     - Link ms2 events with ident information.
     # TODO:     - Perform Occam's razor protein inference in linked peptides.
+    # Read mzidentdata and save binary data to disk.
+    logger.info('Starting mzIdentML parsing')
+    time_start = time.time()
+    for i, stem in enumerate(input_stems):
+        in_path = input_ident_files[i]
+        out_path = os.path.join(output_dir, 'ident', "{}.ident".format(stem))
+        if in_path == 'none' or (os.path.exists(out_path) and not override_existing):
+            continue
+        logger.info('Reading mzIdentML: {}'.format(in_path))
+        ident_data = tapp.read_mzidentml(in_path)
+        logger.info('Writing ident data: {}'.format(out_path))
+        tapp.write_ident_data(ident_data, out_path)
+    logger.info('Finished mzIdentML parsing in {}'.format(
+        datetime.timedelta(seconds=time.time()-time_start)))
     # TODO: Perform feature detection using averagine or linked identification
     # if available in ms2 linked peaks.
     # TODO: Link metamatch clusters and corresponding peaks with identification
@@ -1877,16 +1892,16 @@ def dda_pipeline(
 
 def full_dda_pipeline_test():
     input_files = {
-        '/data/HYE_DDA_Orbitrap/mzXML/subset/3_1.mzXML': {'group': 3, 'ident_path': 'none'},
-        '/data/HYE_DDA_Orbitrap/mzXML/subset/3_2.mzXML': {'group': 3, 'ident_path': 'none'},
-        '/data/HYE_DDA_Orbitrap/mzXML/subset/1_1.mzXML': {'group': 1, 'ident_path': 'none'},
-        '/data/HYE_DDA_Orbitrap/mzXML/subset/1_2.mzXML': {'group': 1, 'ident_path': 'none'},
-        '/data/HYE_DDA_Orbitrap/mzXML/subset/1_3.mzXML': {'group': 1, 'ident_path': 'none'},
-        '/data/HYE_DDA_Orbitrap/mzXML/subset/1_4.mzXML': {'group': 1, 'ident_path': 'none'},
-        '/data/HYE_DDA_Orbitrap/mzXML/subset/1_5.mzXML': {'group': 1, 'ident_path': 'none'},
-        '/data/HYE_DDA_Orbitrap/mzXML/subset/3_3.mzXML': {'group': 3, 'ident_path': 'none'},
-        '/data/HYE_DDA_Orbitrap/mzXML/subset/3_4.mzXML': {'group': 3, 'ident_path': 'none'},
-        '/data/HYE_DDA_Orbitrap/mzXML/subset/3_5.mzXML': {'group': 3, 'ident_path': 'none'},
+        '/data/HYE_DDA_Orbitrap/mzXML/subset/3_1.mzXML': {'group': 3, 'ident_path': '/data/HYE_DDA_Orbitrap/mzXML/subset/identification/mzid/3_1.mzid'},
+        '/data/HYE_DDA_Orbitrap/mzXML/subset/3_2.mzXML': {'group': 3, 'ident_path': '/data/HYE_DDA_Orbitrap/mzXML/subset/identification/mzid/3_2.mzid'},
+        '/data/HYE_DDA_Orbitrap/mzXML/subset/1_1.mzXML': {'group': 1, 'ident_path': '/data/HYE_DDA_Orbitrap/mzXML/subset/identification/mzid/1_1.mzid'},
+        '/data/HYE_DDA_Orbitrap/mzXML/subset/1_2.mzXML': {'group': 1, 'ident_path': '/data/HYE_DDA_Orbitrap/mzXML/subset/identification/mzid/1_2.mzid'},
+        '/data/HYE_DDA_Orbitrap/mzXML/subset/1_3.mzXML': {'group': 1, 'ident_path': '/data/HYE_DDA_Orbitrap/mzXML/subset/identification/mzid/1_3.mzid'},
+        '/data/HYE_DDA_Orbitrap/mzXML/subset/1_4.mzXML': {'group': 1, 'ident_path': '/data/HYE_DDA_Orbitrap/mzXML/subset/identification/mzid/1_4.mzid'},
+        '/data/HYE_DDA_Orbitrap/mzXML/subset/1_5.mzXML': {'group': 1, 'ident_path': '/data/HYE_DDA_Orbitrap/mzXML/subset/identification/mzid/1_5.mzid'},
+        '/data/HYE_DDA_Orbitrap/mzXML/subset/3_3.mzXML': {'group': 3, 'ident_path': '/data/HYE_DDA_Orbitrap/mzXML/subset/identification/mzid/3_3.mzid'},
+        '/data/HYE_DDA_Orbitrap/mzXML/subset/3_4.mzXML': {'group': 3, 'ident_path': '/data/HYE_DDA_Orbitrap/mzXML/subset/identification/mzid/3_4.mzid'},
+        '/data/HYE_DDA_Orbitrap/mzXML/subset/3_5.mzXML': {'group': 3, 'ident_path': '/data/HYE_DDA_Orbitrap/mzXML/subset/identification/mzid/3_5.mzid'},
     }
     tapp_parameters = default_parameters('orbitrap', 9)
     tapp_parameters['max_peaks'] = 1000
