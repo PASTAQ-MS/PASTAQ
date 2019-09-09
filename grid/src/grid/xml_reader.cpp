@@ -492,3 +492,198 @@ std::optional<XmlReader::Tag> XmlReader::read_tag(std::istream &stream) {
 
     return tag;
 };
+
+IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream) {
+    std::vector<IdentData::SpectrumId> spectrum_ids;
+    std::vector<IdentData::Peptide> peptides;
+    std::vector<IdentData::DBSequence> db_sequences;
+    std::vector<IdentData::ProteinHypothesis> protein_hypotheses;
+
+    // Find all Peptides and DBSequences in the file (SequenceCollection).
+    while (stream.good()) {
+        auto tag = XmlReader::read_tag(stream);
+        if (!tag) {
+            continue;
+        }
+        if (tag.value().name == "SequenceCollection" && tag.value().closed) {
+            break;
+        }
+        if (tag.value().name == "Peptide") {
+            auto peptide = IdentData::Peptide{};
+            auto attributes = tag.value().attributes;
+            peptide.id = attributes["id"];
+            while (stream.good()) {
+                auto tag = XmlReader::read_tag(stream);
+                if (tag.value().name == "Peptide" && tag.value().closed) {
+                    peptides.push_back(peptide);
+                    break;
+                }
+                if (tag.value().name == "PeptideSequence" &&
+                    !tag.value().closed) {
+                    auto data = XmlReader::read_data(stream);
+                    if (!data) {
+                        break;
+                        // FIXME: Throw exception? Return nullopt?
+                        // return std::nullopt;
+                    }
+                    peptide.sequence = data.value();
+                }
+                if (tag.value().name == "Modification" && !tag.value().closed) {
+                    // Save modification info.
+                    auto attributes = tag.value().attributes;
+                    auto modification = IdentData::PeptideModification{};
+                    if (attributes.find("monoisotopicMassDelta") !=
+                        attributes.end()) {
+                        modification.monoisotopic_mass_delta =
+                            std::stod(attributes["monoisotopicMassDelta"]);
+                    }
+                    if (attributes.find("avgMassDelta") != attributes.end()) {
+                        modification.average_mass_delta =
+                            std::stod(attributes["avgMassDelta"]);
+                    }
+                    if (attributes.find("residues") != attributes.end()) {
+                        modification.residues = attributes["residues"];
+                    }
+                    if (attributes.find("location") != attributes.end()) {
+                        modification.location =
+                            std::stoi(attributes["location"]);
+                    }
+                    // Find CVParams for this modification..
+                    while (stream.good()) {
+                        auto tag = XmlReader::read_tag(stream);
+                        if (tag.value().name == "cvParam") {
+                            auto cv_param = IdentData::CVParam{};
+                            auto attributes = tag.value().attributes;
+                            cv_param.name = attributes["name"];
+                            cv_param.accession = attributes["accession"];
+                            cv_param.cv_ref = attributes["cvRef"];
+                            if (attributes.find("value") != attributes.end()) {
+                                cv_param.value = attributes["value"];
+                            }
+                            modification.cv_params.push_back(cv_param);
+                        }
+                        if (tag.value().name == "Modification" &&
+                            tag.value().closed) {
+                            peptide.modifications.push_back(modification);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if (tag.value().name == "DBSequence") {
+            auto db_sequence = IdentData::DBSequence{};
+            auto attributes = tag.value().attributes;
+            db_sequence.id = attributes["id"];
+            while (stream.good()) {
+                auto tag = XmlReader::read_tag(stream);
+                if (tag.value().name == "DBSequence" && tag.value().closed) {
+                    db_sequences.push_back(db_sequence);
+                    break;
+                }
+                auto attributes = tag.value().attributes;
+                if (tag.value().name == "cvParam" &&
+                    attributes["accession"] == "MS:1001088") {
+                    db_sequence.value = attributes["value"];
+                }
+            }
+        }
+    }
+    // Find the PSMs for this data (SpectrumIdentificationResult).
+    while (stream.good()) {
+        auto tag = XmlReader::read_tag(stream);
+        if (!tag) {
+            continue;
+        }
+        if (tag.value().name == "SpectrumIdentificationList" &&
+            tag.value().closed) {
+            break;
+        }
+        if (tag.value().name != "SpectrumIdentificationResult") {
+            continue;
+        }
+        auto spectrum_id = IdentData::SpectrumId{};
+        bool identification_item_found = false;
+        while (stream.good()) {
+            tag = XmlReader::read_tag(stream);
+            auto attributes = tag.value().attributes;
+
+            // Retention time.
+            if (tag.value().name == "cvParam" &&
+                attributes["accession"] == "MS:1000894") {
+                spectrum_id.retention_time = std::stod(attributes["value"]);
+            }
+
+            // Identification item.
+            if (tag.value().name == "SpectrumIdentificationItem" &&
+                !tag.value().closed) {
+                if (identification_item_found &&
+                    std::stoi(attributes["rank"]) < spectrum_id.rank) {
+                    continue;
+                }
+                spectrum_id.id = attributes["id"];
+                spectrum_id.rank = std::stoi(attributes["rank"]);
+                spectrum_id.pass_threshold =
+                    attributes["passThreshold"] == "true";
+                spectrum_id.peptide_id = attributes["peptide_ref"];
+                spectrum_id.charge_state = std::stoi(attributes["chargeState"]);
+                spectrum_id.theoretical_mz =
+                    std::stod(attributes["calculatedMassToCharge"]);
+                spectrum_id.experimental_mz =
+                    std::stod(attributes["experimentalMassToCharge"]);
+                identification_item_found = true;
+            }
+
+            if (tag.value().name == "SpectrumIdentificationResult" &&
+                tag.value().closed) {
+                spectrum_ids.push_back(spectrum_id);
+                break;
+            }
+        }
+    }
+    // Find the protein groups for this data (ProteinDetectionList).
+    while (stream.good()) {
+        auto tag = XmlReader::read_tag(stream);
+        if (!tag) {
+            continue;
+        }
+        if (tag.value().name == "ProteinDetectionList" && tag.value().closed) {
+            break;
+        }
+        if (tag.value().name == "ProteinDetectionHypothesis" &&
+            !tag.value().closed) {
+            auto protein_hypothesis = IdentData::ProteinHypothesis{};
+            auto attributes = tag.value().attributes;
+            protein_hypothesis.db_sequence_id = attributes["dBSequence_ref"];
+            protein_hypothesis.pass_threshold =
+                attributes["passThreshold"] == "true";
+            while (stream.good()) {
+                tag = XmlReader::read_tag(stream);
+                if (tag.value().name == "ProteinDetectionHypothesis" &&
+                    tag.value().closed) {
+                    protein_hypotheses.push_back(protein_hypothesis);
+                    break;
+                }
+                if (tag.value().name == "SpectrumIdentificationItemRef") {
+                    auto attributes = tag.value().attributes;
+                    protein_hypothesis.spectrum_ids.push_back(
+                        attributes["spectrumIdentificationItem_ref"]);
+                }
+            }
+        }
+    }
+    // Cross link peptide_id per SpectrumId to obtain the original sequence.
+    for (auto &ident : spectrum_ids) {
+        for (const auto &peptide : peptides) {
+            if (peptide.id == ident.peptide_id) {
+                ident.sequence = peptide.sequence;
+                if (!peptide.modifications.empty()) {
+                    ident.modifications = true;
+                }
+                break;
+            }
+        }
+    }
+    return {db_sequences, peptides, spectrum_ids, protein_hypotheses};
+}
+

@@ -14,8 +14,8 @@ enum Type : uint8_t { QUAD = 0, TOF = 1, FTICR = 2, ORBITRAP = 3, UNKNOWN = 4 };
 
 }  // namespace Instrument
 
-// In this namespace we have access to the data structures for working with the
-// read raw data.
+// In this namespace we have access to the data structures for working with raw
+// data.
 namespace RawData {
 enum Polarity : uint8_t { POSITIVE = 0, NEGATIVE = 1, BOTH = 2 };
 enum ActivationMethod : uint8_t { UNKNOWN = 0, CID = 1, HCD = 2 };
@@ -106,5 +106,61 @@ double fwhm_to_sigma(double fwhm);
 RawPoints find_raw_points(const RawData &raw_data, double min_mz, double max_mz,
                           double min_rt, double max_rt);
 }  // namespace RawData
+
+// In this namespace we have access to the data structures for working with
+// identification data in mzIdentML format.
+namespace IdentData {
+struct SpectrumId {
+    std::string id;
+    bool pass_threshold;
+    bool modifications;
+    std::string sequence;
+    std::string peptide_id;
+    size_t charge_state;
+    double theoretical_mz;
+    double experimental_mz;
+    double retention_time;
+    int64_t rank;
+};
+
+struct CVParam {
+    std::string name;
+    std::string accession;
+    std::string cv_ref;
+    std::string value;
+};
+
+struct PeptideModification {
+    double monoisotopic_mass_delta;
+    double average_mass_delta;
+    std::string residues;
+    int64_t location;
+    std::vector<CVParam> cv_params;
+};
+
+struct Peptide {
+    std::string id;
+    std::string sequence;
+    std::vector<PeptideModification> modifications;
+};
+
+struct DBSequence {
+    std::string id;
+    std::string value;
+};
+
+struct ProteinHypothesis {
+    std::string db_sequence_id;
+    bool pass_threshold;
+    std::vector<std::string> spectrum_ids;
+};
+
+struct IdentData {
+    std::vector<DBSequence> db_sequences;
+    std::vector<Peptide> peptides;
+    std::vector<SpectrumId> spectrum_ids;
+    std::vector<ProteinHypothesis> protein_hypotheses;
+};
+}  // namespace IdentData
 
 #endif /* GRID_RAWDATA_HPP */

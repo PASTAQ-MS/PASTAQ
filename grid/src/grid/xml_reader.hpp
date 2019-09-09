@@ -38,6 +38,9 @@ std::optional<RawData::RawData> read_mzxml(
     double max_rt, Instrument::Type instrument_type, double resolution_ms1,
     double resolution_msn, double reference_mz, RawData::Polarity polarity,
     size_t ms_level);
+
+// Read an entire mzIdentML file into a IdentData::IdentData data structure.
+IdentData::IdentData read_mzidentml(std::istream &stream);
 }  // namespace XmlReader
 
 #endif /* GRID_XMLREADER_HPP */
