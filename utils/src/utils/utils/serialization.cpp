@@ -14,6 +14,46 @@ static_assert(
 static_assert(std::numeric_limits<double>::is_iec559,
               "error: floating point type is not IEEE754");
 
+bool Serialization::read_bool(std::istream &stream, bool *value) {
+    uint8_t read_bool = 0;
+    read_uint8(stream, &read_bool);
+    if (read_bool == 1) {
+        *value = true;
+    } else {
+        *value = false;
+    }
+    return stream.good();
+}
+
+bool Serialization::write_bool(std::ostream &stream, bool value) {
+    if (value) {
+        write_uint8(stream, 1);
+    } else {
+        write_uint8(stream, 0);
+    }
+    return stream.good();
+}
+
+bool Serialization::read_string(std::istream &stream, std::string *value) {
+    uint64_t size = 0;
+    read_uint64(stream, &size);
+    *value = "";
+    for (size_t i = 0; i < size; ++i) {
+        uint8_t read_value = 0;
+        read_uint8(stream, &read_value);
+        value->push_back(read_value);
+    }
+    return stream.good();
+}
+
+bool Serialization::write_string(std::ostream &stream, std::string value) {
+    write_uint64(stream, value.length());
+    for (size_t i = 0; i < value.length(); ++i) {
+        write_uint8(stream, value[i]);
+    }
+    return stream.good();
+}
+
 bool Serialization::read_uint8(std::istream &stream, uint8_t *value) {
     stream.read(reinterpret_cast<char *>(value), sizeof(uint8_t));
     return stream.good();
