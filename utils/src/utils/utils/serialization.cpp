@@ -46,7 +46,8 @@ bool Serialization::read_string(std::istream &stream, std::string *value) {
     return stream.good();
 }
 
-bool Serialization::write_string(std::ostream &stream, std::string value) {
+bool Serialization::write_string(std::ostream &stream,
+                                 const std::string &value) {
     write_uint64(stream, value.length());
     for (size_t i = 0; i < value.length(); ++i) {
         write_uint8(stream, value[i]);

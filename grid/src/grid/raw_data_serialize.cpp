@@ -176,12 +176,78 @@ bool IdentData::Serialize::write_peptide_mod(
     return stream.good();
 }
 
+bool IdentData::Serialize::read_peptide(std::istream &stream,
+                                        Peptide *peptide) {
+    Serialization::read_string(stream, &peptide->id);
+    Serialization::read_string(stream, &peptide->sequence);
+    Serialization::read_vector<PeptideModification>(
+        stream, &peptide->modifications, read_peptide_mod);
+    return stream.good();
+}
+
+bool IdentData::Serialize::write_peptide(std::ostream &stream,
+                                         const Peptide &peptide) {
+    Serialization::write_string(stream, peptide.id);
+    Serialization::write_string(stream, peptide.sequence);
+    Serialization::write_vector<PeptideModification>(
+        stream, peptide.modifications, write_peptide_mod);
+    return stream.good();
+}
+
+bool IdentData::Serialize::read_db_sequence(std::istream &stream,
+                                            DBSequence *db_sequence) {
+    Serialization::read_string(stream, &db_sequence->id);
+    Serialization::read_string(stream, &db_sequence->value);
+    return stream.good();
+}
+
+bool IdentData::Serialize::write_db_sequence(std::ostream &stream,
+                                             const DBSequence &db_sequence) {
+    Serialization::write_string(stream, db_sequence.id);
+    Serialization::write_string(stream, db_sequence.value);
+    return stream.good();
+}
+
+bool IdentData::Serialize::read_protein_hypothesis(
+    std::istream &stream, ProteinHypothesis *protein_hypothesis) {
+    Serialization::read_string(stream, &protein_hypothesis->db_sequence_id);
+    Serialization::read_bool(stream, &protein_hypothesis->pass_threshold);
+    Serialization::read_vector<std::string>(
+        stream, &protein_hypothesis->spectrum_ids, Serialization::read_string);
+    return stream.good();
+}
+
+bool IdentData::Serialize::write_protein_hypothesis(
+    std::ostream &stream, const ProteinHypothesis &protein_hypothesis) {
+    Serialization::write_string(stream, protein_hypothesis.db_sequence_id);
+    Serialization::write_bool(stream, protein_hypothesis.pass_threshold);
+    Serialization::write_vector<std::string>(
+        stream, protein_hypothesis.spectrum_ids, Serialization::write_string);
+    return stream.good();
+}
+
 bool IdentData::Serialize::read_ident_data(std::istream &stream,
                                            IdentData *ident_data) {
+    Serialization::read_vector<DBSequence>(stream, &ident_data->db_sequences,
+                                           read_db_sequence);
+    Serialization::read_vector<Peptide>(stream, &ident_data->peptides,
+                                        read_peptide);
+    Serialization::read_vector<SpectrumId>(stream, &ident_data->spectrum_ids,
+                                           read_spectrum_id);
+    Serialization::read_vector<ProteinHypothesis>(
+        stream, &ident_data->protein_hypotheses, read_protein_hypothesis);
     return stream.good();
 }
 
 bool IdentData::Serialize::write_ident_data(std::ostream &stream,
                                             const IdentData &ident_data) {
+    Serialization::write_vector<DBSequence>(stream, ident_data.db_sequences,
+                                            write_db_sequence);
+    Serialization::write_vector<Peptide>(stream, ident_data.peptides,
+                                         write_peptide);
+    Serialization::write_vector<SpectrumId>(stream, ident_data.spectrum_ids,
+                                            write_spectrum_id);
+    Serialization::write_vector<ProteinHypothesis>(
+        stream, ident_data.protein_hypotheses, write_protein_hypothesis);
     return stream.good();
 }

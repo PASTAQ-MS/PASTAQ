@@ -12,9 +12,9 @@ namespace Serialization {
 bool read_bool(std::istream &stream, bool *value);
 bool write_bool(std::ostream &stream, bool value);
 
-// Write/read a boolean as a single byte to/from the stream.
+// Write/read a string to/from the stream.
 bool read_string(std::istream &stream, std::string *value);
-bool write_string(std::ostream &stream, std::string value);
+bool write_string(std::ostream &stream, const std::string &value);
 
 // Write/read a single byte to/from the stream.
 bool read_uint8(std::istream &stream, uint8_t *value);
