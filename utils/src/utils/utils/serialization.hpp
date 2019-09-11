@@ -2,6 +2,7 @@
 #define UTILS_SERIALIZATION_HPP
 
 #include <iostream>
+#include <vector>
 
 // This namespace contains necessary functions to serialize commonly used types
 // into a binary stream using the little endian byte order.
@@ -54,6 +55,19 @@ bool write_float(std::ostream &stream, float value);
 // Write/read a double precision floating point value to/from the stream.
 bool read_double(std::istream &stream, double *value);
 bool write_double(std::ostream &stream, double value);
+
+// Write/read a generic vector to/from the stream.
+template <typename T>
+bool read_vector(std::istream &stream, std::vector<T> *value,
+                 bool(f)(std::istream &, T *)) {
+    uint64_t num_elements = 0;
+    read_uint64(stream, &num_elements);
+    *value = std::vector<T>(num_elements);
+    for (size_t i = 0; i < num_elements; ++i) {
+        f(stream, &(*value)[i]);
+    }
+    return stream.good();
+}
 
 }  // namespace Serialization
 

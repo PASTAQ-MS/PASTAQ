@@ -33,17 +33,12 @@ bool MetaMatch::Serialize::write_cluster(std::ostream &stream,
 
 bool MetaMatch::Serialize::read_clusters(std::istream &stream,
                                          std::vector<Cluster> *clusters) {
-    uint64_t num_clusters = 0;
-    Serialization::read_uint64(stream, &num_clusters);
-    *clusters = std::vector<Cluster>(num_clusters);
-    for (size_t i = 0; i < num_clusters; ++i) {
-        MetaMatch::Serialize::read_cluster(stream, &(*clusters)[i]);
-    }
-    return stream.good();
+    return Serialization::read_vector<Cluster>(
+        stream, clusters, MetaMatch::Serialize::read_cluster);
 }
 
-bool MetaMatch::Serialize::write_clusters(std::ostream &stream,
-                                         const std::vector<Cluster> &clusters) {
+bool MetaMatch::Serialize::write_clusters(
+    std::ostream &stream, const std::vector<Cluster> &clusters) {
     uint64_t num_clusters = clusters.size();
     Serialization::write_uint64(stream, num_clusters);
     for (size_t i = 0; i < num_clusters; ++i) {
@@ -73,7 +68,7 @@ bool MetaMatch::Serialize::write_peak(std::ostream &stream, const Peak &peak) {
 }
 
 bool MetaMatch::Serialize::read_peaks(std::istream &stream,
-                                         std::vector<Peak> *peaks) {
+                                      std::vector<Peak> *peaks) {
     uint64_t num_peaks = 0;
     Serialization::read_uint64(stream, &num_peaks);
     *peaks = std::vector<Peak>(num_peaks);
@@ -84,7 +79,7 @@ bool MetaMatch::Serialize::read_peaks(std::istream &stream,
 }
 
 bool MetaMatch::Serialize::write_peaks(std::ostream &stream,
-                                         const std::vector<Peak> &peaks) {
+                                       const std::vector<Peak> &peaks) {
     uint64_t num_peaks = peaks.size();
     Serialization::write_uint64(stream, num_peaks);
     for (size_t i = 0; i < num_peaks; ++i) {
