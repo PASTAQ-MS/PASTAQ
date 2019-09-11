@@ -105,3 +105,43 @@ bool RawData::Serialize::write_raw_data(std::ostream &stream,
     }
     return stream.good();
 }
+
+bool IdentData::Serialize::read_spectrum_id(std::istream &stream,
+                                            SpectrumId *spectrum_id) {
+    Serialization::read_string(stream, &spectrum_id->id);
+    Serialization::read_bool(stream, &spectrum_id->pass_threshold);
+    Serialization::read_bool(stream, &spectrum_id->modifications);
+    Serialization::read_string(stream, &spectrum_id->sequence);
+    Serialization::read_string(stream, &spectrum_id->peptide_id);
+    Serialization::read_uint64(stream, &spectrum_id->charge_state);
+    Serialization::read_double(stream, &spectrum_id->theoretical_mz);
+    Serialization::read_double(stream, &spectrum_id->experimental_mz);
+    Serialization::read_double(stream, &spectrum_id->retention_time);
+    Serialization::read_int64(stream, &spectrum_id->rank);
+    return stream.good();
+}
+
+bool IdentData::Serialize::write_spectrum_id(std::ostream &stream,
+                                             const SpectrumId &spectrum_id) {
+    Serialization::write_string(stream, spectrum_id.id);
+    Serialization::write_bool(stream, spectrum_id.pass_threshold);
+    Serialization::write_bool(stream, spectrum_id.modifications);
+    Serialization::write_string(stream, spectrum_id.sequence);
+    Serialization::write_string(stream, spectrum_id.peptide_id);
+    Serialization::write_uint64(stream, spectrum_id.charge_state);
+    Serialization::write_double(stream, spectrum_id.theoretical_mz);
+    Serialization::write_double(stream, spectrum_id.experimental_mz);
+    Serialization::write_double(stream, spectrum_id.retention_time);
+    Serialization::write_int64(stream, spectrum_id.rank);
+    return stream.good();
+}
+
+bool IdentData::Serialize::read_ident_data(std::istream &stream,
+                                           IdentData *ident_data) {
+    return stream.good();
+}
+
+bool IdentData::Serialize::write_ident_data(std::ostream &stream,
+                                            const IdentData &ident_data) {
+    return stream.good();
+}
