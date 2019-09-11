@@ -33,14 +33,13 @@ bool MetaMatch::Serialize::write_cluster(std::ostream &stream,
 
 bool MetaMatch::Serialize::read_clusters(std::istream &stream,
                                          std::vector<Cluster> *clusters) {
-    return Serialization::read_vector<Cluster>(
-        stream, clusters, MetaMatch::Serialize::read_cluster);
+    return Serialization::read_vector<Cluster>(stream, clusters, read_cluster);
 }
 
 bool MetaMatch::Serialize::write_clusters(
     std::ostream &stream, const std::vector<Cluster> &clusters) {
-    return Serialization::write_vector<Cluster>(
-        stream, clusters, MetaMatch::Serialize::write_cluster);
+    return Serialization::write_vector<Cluster>(stream, clusters,
+                                                write_cluster);
 }
 
 bool MetaMatch::Serialize::read_peak(std::istream &stream, Peak *peak) {

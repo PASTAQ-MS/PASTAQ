@@ -154,6 +154,28 @@ bool IdentData::Serialize::write_cv_param(std::ostream &stream,
     return stream.good();
 }
 
+bool IdentData::Serialize::read_peptide_mod(std::istream &stream,
+                                            PeptideModification *peptide_mod) {
+    Serialization::read_double(stream, &peptide_mod->monoisotopic_mass_delta);
+    Serialization::read_double(stream, &peptide_mod->average_mass_delta);
+    Serialization::read_string(stream, &peptide_mod->residues);
+    Serialization::read_int64(stream, &peptide_mod->location);
+    Serialization::read_vector<CVParam>(stream, &peptide_mod->cv_params,
+                                        read_cv_param);
+    return stream.good();
+}
+
+bool IdentData::Serialize::write_peptide_mod(
+    std::ostream &stream, const PeptideModification &peptide_mod) {
+    Serialization::write_double(stream, peptide_mod.monoisotopic_mass_delta);
+    Serialization::write_double(stream, peptide_mod.average_mass_delta);
+    Serialization::write_string(stream, peptide_mod.residues);
+    Serialization::write_int64(stream, peptide_mod.location);
+    Serialization::write_vector<CVParam>(stream, peptide_mod.cv_params,
+                                         write_cv_param);
+    return stream.good();
+}
+
 bool IdentData::Serialize::read_ident_data(std::istream &stream,
                                            IdentData *ident_data) {
     return stream.good();
