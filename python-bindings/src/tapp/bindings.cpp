@@ -1175,12 +1175,24 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("retention_time", &IdentData::SpectrumId::retention_time)
         .def_readonly("rank", &IdentData::SpectrumId::rank)
         .def("__repr__", [](const IdentData::SpectrumId &s) {
-            return s.sequence + "_" + std::to_string(s.charge_state);
+            return "SpectrumId <id: " + s.id +
+                   ", pass_threshold: " + std::to_string(s.pass_threshold) +
+                   ", modifications: " + std::to_string(s.modifications) +
+                   ", sequence: " + s.sequence +
+                   ", peptide_id: " + s.peptide_id +
+                   ", charge_state: " + std::to_string(s.charge_state) +
+                   ", theoretical_mz: " + std::to_string(s.theoretical_mz) +
+                   ", experimental_mz: " + std::to_string(s.experimental_mz) +
+                   ", retention_time: " + std::to_string(s.retention_time) +
+                   ", rank: " + std::to_string(s.rank) + ">";
         });
 
     py::class_<IdentData::DBSequence>(m, "DBSequence")
         .def_readonly("id", &IdentData::DBSequence::id)
-        .def_readonly("value", &IdentData::DBSequence::value);
+        .def_readonly("value", &IdentData::DBSequence::value)
+        .def("__repr__", [](const IdentData::DBSequence &s) {
+            return "DBSequence <id: " + s.id + ", value: " + s.value + ">";
+        });
 
     py::class_<IdentData::PeptideModification>(m, "PeptideModification")
         .def_readonly("monoisotopic_mass_delta",
@@ -1188,12 +1200,27 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("average_mass_delta",
                       &IdentData::PeptideModification::average_mass_delta)
         .def_readonly("residues", &IdentData::PeptideModification::residues)
-        .def_readonly("location", &IdentData::PeptideModification::location);
+        .def_readonly("location", &IdentData::PeptideModification::location)
+        .def("__repr__", [](const IdentData::PeptideModification &s) {
+            return "PeptideModification <monoisotopic_mass_delta: " +
+                   std::to_string(s.monoisotopic_mass_delta) +
+                   ", average_mass_delta: " +
+                   std::to_string(s.average_mass_delta) +
+                   ", residues: " + s.residues +
+                   ", location: " + std::to_string(s.location) +
+                   ", num_cv_params: " + std::to_string(s.cv_params.size()) +
+                   ">";
+        });
 
     py::class_<IdentData::Peptide>(m, "Peptide")
         .def_readonly("id", &IdentData::Peptide::id)
         .def_readonly("sequence", &IdentData::Peptide::sequence)
-        .def_readonly("modifications", &IdentData::Peptide::modifications);
+        .def_readonly("modifications", &IdentData::Peptide::modifications)
+        .def("__repr__", [](const IdentData::Peptide &s) {
+            return "Peptide <id: " + s.id + ", sequence: " + s.sequence +
+                   ", num_modifications: " +
+                   std::to_string(s.modifications.size()) + ">";
+        });
 
     py::class_<IdentData::ProteinHypothesis>(m, "ProteinHypothesis")
         .def_readonly("db_sequence_id",
@@ -1201,7 +1228,13 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("pass_threshold",
                       &IdentData::ProteinHypothesis::pass_threshold)
         .def_readonly("spectrum_ids",
-                      &IdentData::ProteinHypothesis::spectrum_ids);
+                      &IdentData::ProteinHypothesis::spectrum_ids)
+        .def("__repr__", [](const IdentData::ProteinHypothesis &s) {
+            return "ProteinHypothesis <db_sequence_id: " + s.db_sequence_id +
+                   ", pass_threshold: " + std::to_string(s.pass_threshold) +
+                   ", num_spectrum_ids: " +
+                   std::to_string(s.spectrum_ids.size()) + ">";
+        });
 
     py::class_<IdentData::IdentData>(m, "IdentData")
         .def_readonly("db_sequences", &IdentData::IdentData::db_sequences)
