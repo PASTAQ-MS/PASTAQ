@@ -136,6 +136,24 @@ bool IdentData::Serialize::write_spectrum_id(std::ostream &stream,
     return stream.good();
 }
 
+bool IdentData::Serialize::read_cv_param(std::istream &stream,
+                                         CVParam *cv_param) {
+    Serialization::read_string(stream, &cv_param->name);
+    Serialization::read_string(stream, &cv_param->accession);
+    Serialization::read_string(stream, &cv_param->cv_ref);
+    Serialization::read_string(stream, &cv_param->value);
+    return stream.good();
+}
+
+bool IdentData::Serialize::write_cv_param(std::ostream &stream,
+                                          const CVParam &cv_param) {
+    Serialization::write_string(stream, cv_param.name);
+    Serialization::write_string(stream, cv_param.accession);
+    Serialization::write_string(stream, cv_param.cv_ref);
+    Serialization::write_string(stream, cv_param.value);
+    return stream.good();
+}
+
 bool IdentData::Serialize::read_ident_data(std::istream &stream,
                                            IdentData *ident_data) {
     return stream.good();
