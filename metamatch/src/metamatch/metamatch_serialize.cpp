@@ -39,12 +39,8 @@ bool MetaMatch::Serialize::read_clusters(std::istream &stream,
 
 bool MetaMatch::Serialize::write_clusters(
     std::ostream &stream, const std::vector<Cluster> &clusters) {
-    uint64_t num_clusters = clusters.size();
-    Serialization::write_uint64(stream, num_clusters);
-    for (size_t i = 0; i < num_clusters; ++i) {
-        MetaMatch::Serialize::write_cluster(stream, clusters[i]);
-    }
-    return stream.good();
+    return Serialization::write_vector<Cluster>(
+        stream, clusters, MetaMatch::Serialize::write_cluster);
 }
 
 bool MetaMatch::Serialize::read_peak(std::istream &stream, Peak *peak) {
