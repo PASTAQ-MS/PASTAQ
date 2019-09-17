@@ -1809,7 +1809,7 @@ def dda_pipeline(
         datetime.timedelta(seconds=time.time()-time_start)))
 
     # Match ms2 events with corresponding detected peaks.
-    logger.info('Starting msms linkage')
+    logger.info('Starting peaks/msms linkage')
     time_start = time.time()
     for stem in input_stems:
         # Check if file has already been processed.
@@ -1831,11 +1831,10 @@ def dda_pipeline(
         linked_msms = tapp.link_msms(peaks, raw_data)
         logger.info('Writing linked_msms: {}'.format(out_path))
         tapp.write_linked_msms(linked_msms, out_path)
-    logger.info('Finished msms linkage in {}'.format(
+    logger.info('Finished peaks/msms linkage in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
     # TODO: (If there is ident information)
-    # TODO:     - Link ms2 events with ident information.
     # TODO:     - Perform Occam's razor protein inference in linked peptides.
     # Read mzidentdata and save binary data to disk.
     logger.info('Starting mzIdentML parsing')
@@ -1851,6 +1850,32 @@ def dda_pipeline(
         tapp.write_ident_data(ident_data, out_path)
     logger.info('Finished mzIdentML parsing in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
+
+    # Link ms2 events with ident information.
+    logger.info('Starting ident/msms linkage')
+    time_start = time.time()
+    for stem in input_stems:
+        # Check if file has already been processed.
+        in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
+        in_path_idents = os.path.join(output_dir, 'ident', "{}.ident".format(stem))
+        out_path = os.path.join(output_dir, 'linking',
+                                "{}.ms2_idents.link".format(stem))
+        if os.path.exists(out_path) and not override_existing:
+            continue
+
+        logger.info("Reading raw_data from disk (MS2): {}".format(stem))
+        raw_data = tapp.read_raw_data(in_path_raw)
+
+        logger.info("Reading ident from disk: {}".format(stem))
+        idents = tapp.read_ident_data(in_path_idents)
+
+        logger.info("Performing linkage: {}".format(stem))
+        linked_idents = tapp.link_idents(idents, raw_data)
+        logger.info('Writing linked_msms: {}'.format(out_path))
+        tapp.write_linked_msms(linked_idents, out_path)
+    logger.info('Finished ident/msms linkage in {}'.format(
+        datetime.timedelta(seconds=time.time()-time_start)))
+
     # TODO: Perform feature detection using averagine or linked identification
     # if available in ms2 linked peaks.
     # TODO: Link metamatch clusters and corresponding peaks with identification

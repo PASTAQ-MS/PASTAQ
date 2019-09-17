@@ -159,8 +159,11 @@ std::string to_string(const RawData::Polarity &polarity) {
     return "UNKNOWN";
 }
 
+// This table can store linkage for both peak-msms and spectrum_id-msms. In
+// both cases, entity_id will store the index for the peak or spectrum_id lists
+// respectively.
 struct LinkedMsms {
-    size_t peak_id;
+    size_t entity_id;
     size_t msms_id;
     size_t scan_index;
     double distance;
@@ -253,14 +256,84 @@ std::vector<LinkedMsms> link_msms(const std::vector<Centroid::Peak> &peaks,
     std::stable_sort(
         link_table.begin(), link_table.end(),
         [](const LinkedMsms &a, const LinkedMsms &b) -> bool {
-            return (a.peak_id < b.peak_id) ||
-                   ((a.peak_id == b.peak_id) && (a.distance < b.distance));
+            return (a.entity_id < b.entity_id) ||
+                   ((a.entity_id == b.entity_id) && (a.distance < b.distance));
         });
     return link_table;
 }
 
+std::vector<LinkedMsms> link_idents(const IdentData::IdentData &ident_data,
+                                    const RawData::RawData &raw_data) {
+    // Index the spectrumid list by m/z.
+    struct SpectrumIdIndex {
+        size_t id;
+        double mz;
+    };
+    auto &spectrum_ids = ident_data.spectrum_ids;
+    auto indices = std::vector<SpectrumIdIndex>(spectrum_ids.size());
+    for (size_t i = 0; i < spectrum_ids.size(); ++i) {
+        indices[i] = {i, spectrum_ids[i].experimental_mz};
+    }
+
+    // Sort mz index by mz.
+    std::stable_sort(
+        indices.begin(), indices.end(),
+        [](const SpectrumIdIndex &a, const SpectrumIdIndex &b) -> bool {
+            return a.mz < b.mz;
+        });
+
+    // Flatten index into separate arrays.
+    auto index_ids = std::vector<size_t>(indices.size());
+    auto index_mzs = std::vector<double>(indices.size());
+    for (size_t i = 0; i < indices.size(); ++i) {
+        index_ids[i] = indices[i].id;
+        index_mzs[i] = indices[i].mz;
+    }
+    indices.clear();
+
+    // Perform linkage of ms/ms events to closest spectrum_id.
+    std::vector<LinkedMsms> link_table;
+    for (size_t k = 0; k < raw_data.scans.size(); ++k) {
+        const auto &scan = raw_data.scans[k];
+        if (scan.ms_level != 2) {
+            continue;
+        }
+        size_t event_id = scan.scan_number;
+        double event_mz = scan.precursor_information.mz;
+        double event_rt = scan.retention_time;
+        double theoretical_sigma_mz = RawData::fwhm_to_sigma(
+            RawData::theoretical_fwhm(raw_data, event_mz));
+
+        // Find min_mz and loop until we reach the max_mz.
+        double min_mz = event_mz - 1 * theoretical_sigma_mz;
+        double max_mz = event_mz + 1 * theoretical_sigma_mz;
+        size_t min_j = Search::lower_bound(index_mzs, min_mz);
+        double min_distance = std::numeric_limits<double>::infinity();
+        size_t spectrum_id_id = 0;
+        for (size_t j = min_j; j < index_ids.size(); ++j) {
+            size_t i = index_ids[j];
+            if (spectrum_ids[i].experimental_mz > max_mz) {
+                break;
+            }
+            double a = event_mz - spectrum_ids[i].experimental_mz;
+            double b = event_rt - spectrum_ids[i].retention_time;
+            double distance = std::sqrt(a * a + b * b);
+            if (distance < min_distance) {
+                min_distance = distance;
+                spectrum_id_id = i;
+            }
+        }
+
+        if (min_distance != std::numeric_limits<double>::infinity()) {
+            link_table.push_back({spectrum_id_id, event_id, k, min_distance});
+        }
+    }
+
+    return link_table;
+}
+
 bool _read_linked_msms(std::istream &stream, LinkedMsms *link) {
-    Serialization::read_uint64(stream, &link->peak_id);
+    Serialization::read_uint64(stream, &link->entity_id);
     Serialization::read_uint64(stream, &link->msms_id);
     Serialization::read_uint64(stream, &link->scan_index);
     Serialization::read_double(stream, &link->distance);
@@ -268,7 +341,7 @@ bool _read_linked_msms(std::istream &stream, LinkedMsms *link) {
 }
 
 bool _write_linked_msms(std::ostream &stream, const LinkedMsms &link) {
-    Serialization::write_uint64(stream, link.peak_id);
+    Serialization::write_uint64(stream, link.entity_id);
     Serialization::write_uint64(stream, link.msms_id);
     Serialization::write_uint64(stream, link.scan_index);
     Serialization::write_double(stream, link.distance);
@@ -1314,11 +1387,11 @@ PYBIND11_MODULE(tapp, m) {
         });
 
     py::class_<PythonAPI::LinkedMsms>(m, "LinkedMsms")
-        .def_readonly("peak_id", &PythonAPI::LinkedMsms::peak_id)
+        .def_readonly("entity_id", &PythonAPI::LinkedMsms::entity_id)
         .def_readonly("msms_id", &PythonAPI::LinkedMsms::msms_id)
         .def_readonly("distance", &PythonAPI::LinkedMsms::distance)
         .def("__repr__", [](const PythonAPI::LinkedMsms &p) {
-            return "LinkedMsms <peak_id: " + std::to_string(p.peak_id) +
+            return "LinkedMsms <entity_id: " + std::to_string(p.entity_id) +
                    ", scan_index: " + std::to_string(p.scan_index) +
                    ", msms_id: " + std::to_string(p.msms_id) +
                    ", distance: " + std::to_string(p.distance) + ">";
@@ -1408,6 +1481,9 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("radius_mz"), py::arg("radius_rt"), py::arg("fraction"))
         .def("link_msms", &PythonAPI::link_msms, "Link msms events to peak ids",
              py::arg("peaks"), py::arg("raw_data"))
+        .def("link_idents", &PythonAPI::link_idents,
+             "Link msms events to spectrum identifications",
+             py::arg("ident_data"), py::arg("raw_data"))
         .def("link_identified_peptides", &PythonAPI::link_identified_peptides,
              "DEBUG", py::arg("peaks"), py::arg("identifications"),
              py::arg("tolerance_rt"), py::arg("minimum_isotope_perc"));
