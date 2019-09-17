@@ -252,7 +252,7 @@ std::vector<LinkedMsms> link_msms(const std::vector<Centroid::Peak> &peaks,
         }
     }
 
-    // Sort link_table by peak_id.
+    // Sort link_table by entity_id.
     std::stable_sort(
         link_table.begin(), link_table.end(),
         [](const LinkedMsms &a, const LinkedMsms &b) -> bool {
@@ -329,6 +329,13 @@ std::vector<LinkedMsms> link_idents(const IdentData::IdentData &ident_data,
         }
     }
 
+    // Sort link_table by entity_id.
+    std::stable_sort(
+        link_table.begin(), link_table.end(),
+        [](const LinkedMsms &a, const LinkedMsms &b) -> bool {
+            return (a.entity_id < b.entity_id) ||
+                   ((a.entity_id == b.entity_id) && (a.distance < b.distance));
+        });
     return link_table;
 }
 
