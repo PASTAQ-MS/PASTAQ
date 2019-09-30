@@ -803,12 +803,191 @@ theoretical_isotopes_peptide(std::string sequence, int8_t charge_state,
 
 struct Feature {
     size_t id;
-    std::vector<size_t> peak_ids;
+    double min_perc;  // TODO: Is this necessary?
+    double rt;
+    double monoisotopic_mz;
+    double monoisotopic_rt;
+    double monoisotopic_height;
+    double average_mz;
+    double average_rt;
+    double average_height;
+    double total_height;
+    size_t n_theoretical_isotopes;
+    size_t n_found_isotopes;
+    std::vector<int64_t> peak_ids;
+    std::vector<double> theoretical_mzs;
+    std::vector<double> theoretical_percentages;
+};
+
+struct Isotope {
+    size_t id;
     double mz;
     double rt;
-    double monoisotopic_height;
-    double total_height;
+    double height;
+    double intensity;
+    double normalized_height;
+    double expected_normalized_height;
 };
+std::optional<Feature> build_feature(
+    const std::vector<Centroid::Peak> peaks,
+    const std::vector<Search::KeySort<double>> peaks_rt_key,
+    const std::vector<double> &mzs, const std::vector<double> &perc,
+    const IdentData::SpectrumId &ident, double tolerance_rt,
+    double retention_time) {
+    // Basic sanitation
+    if (mzs.size() != perc.size() || mzs.size() == 0) {
+        return std::nullopt;
+    }
+
+    // Find the peaks in range for matching.
+    double min_rt = retention_time - tolerance_rt;
+    double max_rt = retention_time + tolerance_rt;
+    size_t min_j = Search::lower_bound(peaks_rt_key, min_rt);
+    size_t max_j = peaks_rt_key.size();
+    std::vector<Centroid::Peak> peaks_in_range;
+    std::cout << "min_rt: " << min_rt << std::endl;
+    std::cout << "max_rt: " << max_rt << std::endl;
+    std::cout << "mzs[0]: " << mzs[0] << std::endl;
+    std::cout << "mzs[mzs.size() - 1]: " << mzs[mzs.size() - 1] << std::endl;
+    for (size_t j = min_j; j < max_j; ++j) {
+        if (peaks_rt_key[j].sorting_key > max_rt) {
+            break;
+        }
+        auto &peak = peaks[peaks_rt_key[j].index];
+        if ((peak.local_max_mz + peak.raw_roi_sigma_mz * 2) < mzs[0] ||
+            (peak.local_max_mz - peak.raw_roi_sigma_mz * 2) >
+                mzs[mzs.size() - 1]) {
+            continue;
+        }
+        std::cout << "peak.local_max_mz: " << peak.local_max_mz << std::endl;
+        std::cout << "peak.raw_roi_sigma_mz: " << peak.raw_roi_sigma_mz
+                  << std::endl;
+        peaks_in_range.push_back(peak);
+    }
+    std::cout << "FOUND: " << peaks_in_range.size() << " PEAKS" << std::endl;
+    if (peaks_in_range.empty()) {
+        return std::nullopt;
+    }
+    // Sort the peaks in range by mz for a faster search.
+    std::stable_sort(peaks_in_range.begin(), peaks_in_range.end(),
+                     [](const Centroid::Peak &p1, const Centroid::Peak &p2) {
+                         return (p1.local_max_mz < p2.local_max_mz);
+                     });
+
+    // The reference node is the theoretical max relative to the
+    // distribution.
+    size_t reference_node_index = 0;
+
+    // Create a graph with the potential isotope associations.
+    std::vector<std::vector<Isotope>> isotopes_graph;
+    std::cout << "starting graph building of potential isotopes... ["
+              << mzs.size() << "]" << std::endl;
+    for (size_t k = 0; k < mzs.size(); ++k) {
+        std::vector<Isotope> candidates;
+        double theoretical_mz = mzs[k];
+        double theoretical_percentage = perc[k];
+        std::cout << "mz: " << theoretical_mz
+                  << " perc: " << theoretical_percentage << std::endl;
+        // TODO: Comparing floats like this is a recipe for disaster.
+        if (theoretical_percentage == 1.0) {
+            reference_node_index = k;
+        }
+        for (const auto &peak : peaks_in_range) {
+            if ((peak.local_max_mz + peak.raw_roi_sigma_mz) > theoretical_mz &&
+                (peak.local_max_mz - peak.raw_roi_sigma_mz) < theoretical_mz) {
+                candidates.push_back({
+                    peak.id,
+                    peak.local_max_mz,
+                    peak.local_max_rt,
+                    peak.local_max_height,
+                    peak.raw_roi_total_intensity,
+                    0.0,
+                    0.0,
+                });
+            }
+        }
+        isotopes_graph.push_back(candidates);
+    }
+    std::cout << "reference_node_index: " << reference_node_index << std::endl;
+    if (isotopes_graph.empty()) {
+        return std::nullopt;
+    }
+    std::cout << "FOUND " << isotopes_graph.size() << " candidates"
+              << std::endl;
+
+    // In case more than one peak is linked to the reference mz isotope,
+    // the sequence with the less matching error should be selected. In
+    // order to do so, the heights for each candidate must be normalized
+    // by the reference isotope height.
+    std::vector<Isotope> selected_candidates;
+    double weighted_error = std::numeric_limits<double>::infinity();
+    for (size_t i = 0; i < isotopes_graph[reference_node_index].size(); ++i) {
+        const auto &ref_candidate = isotopes_graph[reference_node_index][i];
+        std::vector<Isotope> normalized_candidates;
+        for (size_t k = 0; k < mzs.size(); ++k) {
+            if (k == reference_node_index) {
+                normalized_candidates.push_back(
+                    {ref_candidate.id, ref_candidate.mz, ref_candidate.rt,
+                     ref_candidate.height, ref_candidate.intensity, 1.0, 1.0});
+                continue;
+            }
+
+            // Find the best matching candidate for the selected
+            // reference.
+            double theoretical_percentage = perc[k];
+            auto best_matching_candidate =
+                Isotope{0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        -std::numeric_limits<double>::infinity(),
+                        theoretical_percentage};
+            for (auto &candidate : isotopes_graph[k]) {
+                double normalized_height =
+                    candidate.height / ref_candidate.height;
+                if (std::abs(candidate.normalized_height -
+                             theoretical_percentage) <
+                    (std::abs(best_matching_candidate.normalized_height -
+                              theoretical_percentage))) {
+                    best_matching_candidate =
+                        Isotope{candidate.id,          candidate.mz,
+                                candidate.rt,          candidate.height,
+                                candidate.intensity,   normalized_height,
+                                theoretical_percentage};
+                }
+            }
+            normalized_candidates.push_back(best_matching_candidate);
+        }
+        // The weighted error for each normalized_candidate path can now
+        // be evaluated.
+        //
+        // NOTE: A potential alternative to an error function would be the
+        // Euclidean distance between the expected theoretical peak and
+        // candidates for that node.
+        double err_sum = 0.0;
+        for (const auto &candidate : normalized_candidates) {
+            err_sum += candidate.expected_normalized_height *
+                       std::pow((candidate.expected_normalized_height -
+                                 candidate.normalized_height),
+                                2);
+        }
+        if (err_sum < weighted_error) {
+            weighted_error = err_sum;
+            selected_candidates = normalized_candidates;
+        }
+    }
+    std::cout << "SELECTED " << selected_candidates.size() << " candidates"
+              << std::endl;
+    if (selected_candidates.empty()) {
+        // Not able to find a good candidate.
+        return std::nullopt;
+    }
+    // TODO: Fill feature data here.
+    Feature feature = {};
+    return feature;
+}
+
 std::vector<Feature> feature_detection(
     const std::vector<Centroid::Peak> &peaks,
     const RawData::RawData &raw_data_ms2,
@@ -834,40 +1013,32 @@ std::vector<Feature> feature_detection(
     //         that this is a greedy algorithm.
 
     // Copy and sort key vectors.
-    struct KeySort {
-        size_t index;
-        size_t sorting_key;
-    };
-    auto idents_msms_key = std::vector<KeySort>(link_table_idents.size());
+    auto idents_msms_key =
+        std::vector<Search::KeySort<size_t>>(link_table_idents.size());
     for (size_t i = 0; i < link_table_idents.size(); ++i) {
         idents_msms_key[i] = {i, link_table_idents[i].msms_id};
     }
-    auto sorting_key_func = [](const KeySort &p1, const KeySort &p2) {
-        return (p1.sorting_key < p2.sorting_key);
-    };
-    std::stable_sort(idents_msms_key.begin(), idents_msms_key.end(),
-                     sorting_key_func);
+    {
+        auto sorting_key_func = [](const Search::KeySort<size_t> &p1,
+                                   const Search::KeySort<size_t> &p2) {
+            return (p1.sorting_key < p2.sorting_key);
+        };
+        std::stable_sort(idents_msms_key.begin(), idents_msms_key.end(),
+                         sorting_key_func);
+    }
+    auto peaks_rt_key = std::vector<Search::KeySort<double>>(peaks.size());
+    for (size_t i = 0; i < peaks.size(); ++i) {
+        peaks_rt_key[i] = {i, peaks[i].local_max_rt};
+    }
+    {
+        auto sorting_key_func = [](const Search::KeySort<double> &p1,
+                                   const Search::KeySort<double> &p2) {
+            return (p1.sorting_key < p2.sorting_key);
+        };
+        std::stable_sort(peaks_rt_key.begin(), peaks_rt_key.end(),
+                         sorting_key_func);
+    }
 
-    auto lower_bound = [](const std::vector<KeySort> &haystack,
-                          size_t needle) -> size_t {
-        size_t index = 0;
-        size_t l = 0;
-        size_t r = haystack.size() - 1;
-        while (l <= r) {
-            index = (l + r) / 2;
-            if (haystack[index].sorting_key < needle) {
-                l = index + 1;
-            } else if (haystack[index].sorting_key > needle) {
-                r = index - 1;
-            } else {
-                break;
-            }
-            if (index == 0) {
-                break;
-            }
-        }
-        return index;
-    };
     // TODO: We should probably prioritize the MSMS events that HAVE an
     // identification, instead of just being intensity based only.
     // TODO: We are linking msms events independently, but we know that
@@ -902,10 +1073,9 @@ std::vector<Feature> feature_detection(
             // sequence.
             // TODO: Include modifications? There is probably more to it than
             // just calling midas with a sequence and a charge state.
-            auto sequence =
-                ident_data.spectrum_ids[ident.entity_id].sequence;
+            auto sequence = ident_data.spectrum_ids[ident.entity_id].sequence;
             auto [mzs, perc] =
-                theoretical_isotopes_peptide(sequence, charge_state, 0.1);
+                theoretical_isotopes_peptide(sequence, charge_state, 0.01);
             // DEBUG: ...
             // std::cout << ident.msms_id << std::endl;
             // std::cout << linked_msms.msms_id << std::endl;
@@ -914,8 +1084,17 @@ std::vector<Feature> feature_detection(
             // std::cout << ident.entity_id << std::endl;
             // std::cout << linked_msms.entity_id << std::endl;
             // std::cout << sequence << std::endl;
+            // std::cout << "-----------" << std::endl;
+            auto &peak = peaks[linked_msms.entity_id];
+            // We use the retention time of the APEX of the matched peak, not
+            // the msms event.
+            double peak_rt = peak.local_max_rt;
+            double peak_rt_sigma = peak.raw_roi_sigma_mz;
+            build_feature(peaks, peaks_rt_key, mzs, perc,
+                          ident_data.spectrum_ids[ident.entity_id],
+                          peak_rt_sigma, peak_rt);
+            break;
         }
-        // std::cout << "-----------" << std::endl;
     }
     return features;
 }
@@ -946,16 +1125,6 @@ IdentData::IdentData read_mzidentml(std::string &file_name) {
     }
     return XmlReader::read_mzidentml(stream);
 }
-
-struct Isotope {
-    size_t id;
-    double mz;
-    double rt;
-    double height;
-    double intensity;
-    double normalized_height;
-    double expected_normalized_height;
-};
 
 struct LinkedPeptide {
     std::string sequence;
@@ -1030,7 +1199,7 @@ std::vector<LinkedPeptide> link_identified_peptides(
                 return (p1.local_max_mz < p2.local_max_mz);
             });
 
-        // The reference node is the theoretial max relative to the
+        // The reference node is the theoretical max relative to the
         // distribution.
         size_t reference_node_index = 0;
 
