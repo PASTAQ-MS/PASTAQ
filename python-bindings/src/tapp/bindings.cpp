@@ -801,6 +801,125 @@ theoretical_isotopes_peptide(std::string sequence, int8_t charge_state,
     return {mzs, perc};
 }
 
+struct Feature {
+    size_t id;
+    std::vector<size_t> peak_ids;
+    double mz;
+    double rt;
+    double monoisotopic_height;
+    double total_height;
+};
+std::vector<Feature> feature_detection(
+    const std::vector<Centroid::Peak> &peaks,
+    const RawData::RawData &raw_data_ms2,
+    const IdentData::IdentData &ident_data,
+    const std::vector<LinkedMsms> &link_table_msms,
+    const std::vector<LinkedMsms> &link_table_idents) {
+    std::vector<Feature> features;
+
+    // The proposed algorithm goes as follows:
+    // [X] 0.- Copy and sort the necessary vectors for the use of binary search
+    //         (link_table_idents is sorted by msms, as that is the key being
+    //         used for searching). The peaks array and link_table_msms array
+    //         should have already been sorted by peak_id, which is what we
+    //         want, as we are going to start matching peaks from highest
+    //         intensity to lowest.
+    // [X] 1.- For each linked peak on the link_table_msms, find it's associated
+    //         entry on the link_table_idents.
+    // [X] 2.- If the entry is found, use it to generate a theoretical isotopic
+    //         distribution, otherwise, averagine will be generated.
+    // [ ] 3.- We try to find the proposed peaks from the theoretical
+    //         distribution on the peaks array (Maximum likelihood).
+    // [ ] 4.- The peaks are marked as non available for future use. This means
+    //         that this is a greedy algorithm.
+
+    // Copy and sort key vectors.
+    struct KeySort {
+        size_t index;
+        size_t sorting_key;
+    };
+    auto idents_msms_key = std::vector<KeySort>(link_table_idents.size());
+    for (size_t i = 0; i < link_table_idents.size(); ++i) {
+        idents_msms_key[i] = {i, link_table_idents[i].msms_id};
+    }
+    auto sorting_key_func = [](const KeySort &p1, const KeySort &p2) {
+        return (p1.sorting_key < p2.sorting_key);
+    };
+    std::stable_sort(idents_msms_key.begin(), idents_msms_key.end(),
+                     sorting_key_func);
+
+    auto lower_bound = [](const std::vector<KeySort> &haystack,
+                          size_t needle) -> size_t {
+        size_t index = 0;
+        size_t l = 0;
+        size_t r = haystack.size() - 1;
+        while (l <= r) {
+            index = (l + r) / 2;
+            if (haystack[index].sorting_key < needle) {
+                l = index + 1;
+            } else if (haystack[index].sorting_key > needle) {
+                r = index - 1;
+            } else {
+                break;
+            }
+            if (index == 0) {
+                break;
+            }
+        }
+        return index;
+    };
+    // TODO: We should probably prioritize the MSMS events that HAVE an
+    // identification, instead of just being intensity based only.
+    // TODO: We are linking msms events independently, but we know that
+    // multiple msms events can be linked to any given peak. If the selected
+    // identification is the same there is no problem, and if there is
+    // a majority of identifications they should result in a consensus.
+    // However, if the identification is ambiguous, we can choose to use
+    // averagine instead for that peak. To avoid duplication of effor, we
+    // should resolve conflicts and perform feature matching based only on the
+    // list of consensus candidates.
+    for (const auto &linked_msms : link_table_msms) {
+        // Find lower bound on the idents_msms_key.
+        // auto i = lower_bound(idents_msms_key, 99999);
+        auto i = lower_bound(idents_msms_key, linked_msms.msms_id);
+        auto charge_state = raw_data_ms2.scans[linked_msms.scan_index]
+                                .precursor_information.charge;
+
+        // We need to ensure that the search succeeded. For example if we are
+        // trying to find a number on an empty array, the lower bound will be 0,
+        // but that doesn't ensure that we found the right element. A similar
+        // situation applies if we try to find a needle not contained on the
+        // haystack, in which case the search will return the closest lower
+        // bound on the search array or last index of the array.
+        auto index = idents_msms_key[i].index;
+        auto ident = link_table_idents[index];
+        if (linked_msms.msms_id != ident.msms_id) {
+            // std::cout << "not found" << std::endl;
+            // Generate a theoretical_isotope_distribution based on averagine.
+            // auto midas = MIDAs(charge_state = charge_state);
+        } else {
+            // Generate a theoretical_isotope_distribution based on the given
+            // sequence.
+            // TODO: Include modifications? There is probably more to it than
+            // just calling midas with a sequence and a charge state.
+            auto sequence =
+                ident_data.spectrum_ids[ident.entity_id].sequence;
+            auto [mzs, perc] =
+                theoretical_isotopes_peptide(sequence, charge_state, 0.1);
+            // DEBUG: ...
+            // std::cout << ident.msms_id << std::endl;
+            // std::cout << linked_msms.msms_id << std::endl;
+            // std::cout << ident.scan_index << std::endl;
+            // std::cout << linked_msms.scan_index << std::endl;
+            // std::cout << ident.entity_id << std::endl;
+            // std::cout << linked_msms.entity_id << std::endl;
+            // std::cout << sequence << std::endl;
+        }
+        // std::cout << "-----------" << std::endl;
+    }
+    return features;
+}
+
 IdentData::IdentData read_mzidentml(std::string &file_name) {
     std::filesystem::path input_file = file_name;
 
@@ -1491,6 +1610,10 @@ PYBIND11_MODULE(tapp, m) {
         .def("link_idents", &PythonAPI::link_idents,
              "Link msms events to spectrum identifications",
              py::arg("ident_data"), py::arg("raw_data"))
+        .def("feature_detection", &PythonAPI::feature_detection,
+             "Link peaks as features", py::arg("peaks"),
+             py::arg("raw_data_ms2"), py::arg("ident_data"),
+             py::arg("link_table_idents"), py::arg("link_table_msms"))
         .def("link_identified_peptides", &PythonAPI::link_identified_peptides,
              "DEBUG", py::arg("peaks"), py::arg("identifications"),
              py::arg("tolerance_rt"), py::arg("minimum_isotope_perc"));

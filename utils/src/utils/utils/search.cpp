@@ -19,4 +19,3 @@ size_t Search::lower_bound(const std::vector<double> &haystack, double needle) {
     }
     return index;
 }
-

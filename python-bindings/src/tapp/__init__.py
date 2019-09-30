@@ -1939,6 +1939,14 @@ def full_dda_pipeline_test():
 
     dda_pipeline(tapp_parameters, input_files, 'tapp_pipeline_test')
 
+def testing_feature_detection():
+    peaks = tapp.read_peaks('tapp_pipeline_test/peaks/1_1.bpks')
+    ms2_data = tapp.read_raw_data('tapp_pipeline_test/raw/1_1.ms2')
+    link_table_msms = tapp.read_linked_msms('tapp_pipeline_test/linking/1_1.ms2_peaks.link')
+    link_table_idents = tapp.read_linked_msms('tapp_pipeline_test/linking/1_1.ms2_idents.link')
+    ident_data = tapp.read_ident_data('tapp_pipeline_test/ident/1_1.ident')
+    results = tapp.feature_detection(peaks, ms2_data, ident_data, link_table_msms, link_table_idents)
+    return (peaks, ms2_data, ident_data, link_table_msms, link_table_idents, results)
 
 Peak.plot_xic = plot_xic
 Peak.plot_raw_points = plot_raw_points
