@@ -812,9 +812,11 @@ struct Feature {
     double average_rt;
     double average_height;
     double total_height;
-    size_t n_theoretical_isotopes;
     size_t n_found_isotopes;
-    std::vector<int64_t> peak_ids;
+    std::vector<size_t> peak_ids;
+    std::vector<double> peak_mzs;
+    std::vector<double> peak_normalized_heights;
+    size_t n_theoretical_isotopes;
     std::vector<double> theoretical_mzs;
     std::vector<double> theoretical_percentages;
 };
@@ -874,115 +876,241 @@ std::optional<Feature> build_feature(
                          return (p1.local_max_mz < p2.local_max_mz);
                      });
 
-    // The reference node is the theoretical max relative to the
-    // distribution.
+    // Find the reference node and the list of candidates for each node.
     size_t reference_node_index = 0;
-
-    // Create a graph with the potential isotope associations.
-    std::vector<std::vector<Isotope>> isotopes_graph;
-    std::cout << "starting graph building of potential isotopes... ["
-              << mzs.size() << "]" << std::endl;
+    bool found_reference_node = false;
+    std::vector<std::vector<const Centroid::Peak *>> candidate_list;
     for (size_t k = 0; k < mzs.size(); ++k) {
-        std::vector<Isotope> candidates;
-        double theoretical_mz = mzs[k];
-        double theoretical_percentage = perc[k];
-        std::cout << "mz: " << theoretical_mz
-                  << " perc: " << theoretical_percentage << std::endl;
-        // TODO: Comparing floats like this is a recipe for disaster.
-        if (theoretical_percentage == 1.0) {
+        if (perc[k] == 1) {
             reference_node_index = k;
+            found_reference_node = true;
         }
+        double theoretical_mz = mzs[k];
+        std::vector<const Centroid::Peak *> candidates_node;
         for (const auto &peak : peaks_in_range) {
             if ((peak.local_max_mz + peak.raw_roi_sigma_mz) > theoretical_mz &&
                 (peak.local_max_mz - peak.raw_roi_sigma_mz) < theoretical_mz) {
-                candidates.push_back({
-                    peak.id,
-                    peak.local_max_mz,
-                    peak.local_max_rt,
-                    peak.local_max_height,
-                    peak.raw_roi_total_intensity,
-                    0.0,
-                    0.0,
-                });
+                candidates_node.push_back(&peak);
             }
         }
-        isotopes_graph.push_back(candidates);
+        candidate_list.push_back(candidates_node);
     }
-    std::cout << "reference_node_index: " << reference_node_index << std::endl;
-    if (isotopes_graph.empty()) {
+    if (!found_reference_node || candidate_list.empty()) {
         return std::nullopt;
     }
-    std::cout << "FOUND " << isotopes_graph.size() << " candidates"
-              << std::endl;
 
     // In case more than one peak is linked to the reference mz isotope,
     // the sequence with the less matching error should be selected. In
     // order to do so, the heights for each candidate must be normalized
     // by the reference isotope height.
-    std::vector<Isotope> selected_candidates;
-    double weighted_error = std::numeric_limits<double>::infinity();
-    for (size_t i = 0; i < isotopes_graph[reference_node_index].size(); ++i) {
-        const auto &ref_candidate = isotopes_graph[reference_node_index][i];
-        std::vector<Isotope> normalized_candidates;
+    std::vector<const Centroid::Peak *> selected_candidates;
+    std::vector<double> selected_candidates_norm_height;
+    double min_total_distance = std::numeric_limits<double>::infinity();
+    for (size_t i = 0; i < candidate_list[reference_node_index].size(); ++i) {
+        const auto ref_candidate = candidate_list[reference_node_index][i];
+        std::vector<const Centroid::Peak *> selected_candidates_for_reference;
+        std::vector<double> selected_candidates_for_reference_norm_height;
+        double total_distance = 0.0;
+        // TODO: We need to do a forwards and backwards approach in order for
+        // the algorithm to work. We will be stopping the pattern matching once
+        // we find a peak where the minimum height difference is greater than
+        // the given discrepancy_threshold. Currently only working on a forward
+        // way from 0->mzs.size(), but we need to do:
+        //     reference_node_index->mzs.size()
+        //     reference_node_index->0
         for (size_t k = 0; k < mzs.size(); ++k) {
             if (k == reference_node_index) {
-                normalized_candidates.push_back(
-                    {ref_candidate.id, ref_candidate.mz, ref_candidate.rt,
-                     ref_candidate.height, ref_candidate.intensity, 1.0, 1.0});
+                selected_candidates_for_reference.push_back(ref_candidate);
+                selected_candidates_for_reference_norm_height.push_back(1.0);
                 continue;
             }
 
-            // Find the best matching candidate for the selected
-            // reference.
+            // Find the best matching candidate for the selected reference. We
+            // define here the best matching candidate as the candidate peak
+            // with the minimum euclidean distance from the expected
+            // theoretical peak.
+            double theoretical_mz = mzs[k];
             double theoretical_percentage = perc[k];
-            auto best_matching_candidate =
-                Isotope{0,
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                        -std::numeric_limits<double>::infinity(),
-                        theoretical_percentage};
-            for (auto &candidate : isotopes_graph[k]) {
-                double normalized_height =
-                    candidate.height / ref_candidate.height;
-                if (std::abs(candidate.normalized_height -
-                             theoretical_percentage) <
-                    (std::abs(best_matching_candidate.normalized_height -
-                              theoretical_percentage))) {
-                    best_matching_candidate =
-                        Isotope{candidate.id,          candidate.mz,
-                                candidate.rt,          candidate.height,
-                                candidate.intensity,   normalized_height,
-                                theoretical_percentage};
+            double min_distance = std::numeric_limits<double>::infinity();
+            double selected_normalized_height = 0.0;
+            const Centroid::Peak *selected_candidate;
+            double selected_normalized_height_diff = 0.0;
+            for (size_t j = 0; j < candidate_list[k].size(); ++j) {
+                const auto candidate = candidate_list[k][j];
+                double normalized_height = candidate->local_max_height /
+                                           ref_candidate->local_max_height;
+                double a = candidate->local_max_mz - theoretical_mz;
+                double b = candidate->local_max_rt - retention_time;
+                double c = normalized_height - theoretical_percentage;
+                double distance = std::sqrt(a * a + b * b + c * c);
+                if (distance < min_distance) {
+                    min_distance = distance;
+                    selected_normalized_height = normalized_height;
+                    selected_candidate = candidate;
+                    selected_normalized_height_diff = std::abs(c);
                 }
             }
-            normalized_candidates.push_back(best_matching_candidate);
+
+            // TODO: Pass this as a parameter.
+            double discrepacy_threshold = 25;
+            if (selected_normalized_height_diff > discrepacy_threshold ||
+                selected_normalized_height == 0.0) {
+                break;
+            }
+            selected_candidates_for_reference.push_back(selected_candidate);
+            selected_candidates_for_reference_norm_height.push_back(
+                selected_normalized_height);
+            total_distance += min_distance;
         }
-        // The weighted error for each normalized_candidate path can now
-        // be evaluated.
-        //
-        // NOTE: A potential alternative to an error function would be the
-        // Euclidean distance between the expected theoretical peak and
-        // candidates for that node.
-        double err_sum = 0.0;
-        for (const auto &candidate : normalized_candidates) {
-            err_sum += candidate.expected_normalized_height *
-                       std::pow((candidate.expected_normalized_height -
-                                 candidate.normalized_height),
-                                2);
-        }
-        if (err_sum < weighted_error) {
-            weighted_error = err_sum;
-            selected_candidates = normalized_candidates;
+        if (total_distance < min_total_distance) {
+            selected_candidates = selected_candidates_for_reference;
+            selected_candidates_norm_height = selected_candidates_for_reference_norm_height;
+            min_total_distance = total_distance;
         }
     }
-    std::cout << "SELECTED " << selected_candidates.size() << " candidates"
-              << std::endl;
-    if (selected_candidates.empty()) {
-        // Not able to find a good candidate.
-        return std::nullopt;
+
+    for (size_t i = 0; i < selected_candidates.size(); ++i) {
+        auto candidate = selected_candidates[i];
+        std::cout << "mz: " << candidate->local_max_mz;
+        std::cout << " rt: " << candidate->local_max_rt;
+        std::cout << " height: " << candidate->local_max_height;
+        std::cout << " norm_height: " << selected_candidates_norm_height[i];
+        std::cout << std::endl;
     }
+
+    // DEBUG: This approach is a bit complicated. Let's see if a simple
+    // euclidean distance approximation give us a good approximation.
+    // // The reference node is the theoretical max relative to the
+    // // distribution.
+    // size_t reference_node_index = 0;
+
+    // // Create a graph with the potential isotope associations.
+    // std::vector<std::vector<Isotope>> isotopes_graph;
+    // std::cout << "starting graph building of potential isotopes... ["
+    //           << mzs.size() << "]" << std::endl;
+    // for (size_t k = 0; k < mzs.size(); ++k) {
+    //     std::vector<Isotope> candidates;
+    //     double theoretical_mz = mzs[k];
+    //     double theoretical_percentage = perc[k];
+    //     std::cout << "mz: " << theoretical_mz
+    //               << " perc: " << theoretical_percentage << std::endl;
+    //     // TODO: Comparing floats like this is a recipe for disaster.
+    //     if (theoretical_percentage == 1.0) {
+    //         reference_node_index = k;
+    //     }
+    //     for (const auto &peak : peaks_in_range) {
+    //         if ((peak.local_max_mz + peak.raw_roi_sigma_mz) > theoretical_mz
+    //         &&
+    //             (peak.local_max_mz - peak.raw_roi_sigma_mz) < theoretical_mz)
+    //             { candidates.push_back({
+    //                 peak.id,
+    //                 peak.local_max_mz,
+    //                 peak.local_max_rt,
+    //                 peak.local_max_height,
+    //                 peak.raw_roi_total_intensity,
+    //                 0.0,
+    //                 0.0,
+    //             });
+    //         }
+    //     }
+    //     isotopes_graph.push_back(candidates);
+    // }
+    // std::cout << "reference_node_index: " << reference_node_index <<
+    // std::endl; if (isotopes_graph.empty()) {
+    //     return std::nullopt;
+    // }
+    // std::cout << "FOUND " << isotopes_graph.size() << " candidates"
+    //           << std::endl;
+
+    // // In case more than one peak is linked to the reference mz isotope,
+    // // the sequence with the less matching error should be selected. In
+    // // order to do so, the heights for each candidate must be normalized
+    // // by the reference isotope height.
+    // std::vector<Isotope> selected_candidates;
+    // double weighted_error = std::numeric_limits<double>::infinity();
+    // for (size_t i = 0; i < isotopes_graph[reference_node_index].size(); ++i)
+    // {
+    //     const auto &ref_candidate = isotopes_graph[reference_node_index][i];
+    //     std::vector<Isotope> normalized_candidates;
+    //     for (size_t k = 0; k < mzs.size(); ++k) {
+    //         if (k == reference_node_index) {
+    //             normalized_candidates.push_back(
+    //                 {ref_candidate.id, ref_candidate.mz, ref_candidate.rt,
+    //                  ref_candidate.height,
+    //                  ref_candidate.intensity, 1.0, 1.0});
+    //             continue;
+    //         }
+
+    //         // Find the best matching candidate for the selected
+    //         // reference.
+    //         double theoretical_percentage = perc[k];
+    //         auto best_matching_candidate =
+    //             Isotope{0,
+    //                     0.0,
+    //                     0.0,
+    //                     0.0,
+    //                     0.0,
+    //                     -std::numeric_limits<double>::infinity(),
+    //                     theoretical_percentage};
+    //         for (auto &candidate : isotopes_graph[k]) {
+    //             double normalized_height =
+    //                 candidate.height / ref_candidate.height;
+    //             if (std::abs(candidate.normalized_height -
+    //                          theoretical_percentage) <
+    //                 (std::abs(best_matching_candidate.normalized_height -
+    //                           theoretical_percentage))) {
+    //                 best_matching_candidate =
+    //                     Isotope{candidate.id,          candidate.mz,
+    //                             candidate.rt,          candidate.height,
+    //                             candidate.intensity,   normalized_height,
+    //                             theoretical_percentage};
+    //             }
+    //         }
+    //         // FIXME: We must NOT push candidates that have too high of
+    //         // a discrepancy with the expected isotopic distribution for this
+    //         // node.
+    //         double discrepacy_threshold = 20;
+    //         if (std::abs(best_matching_candidate.normalized_height -
+    //                      theoretical_percentage) > discrepacy_threshold) {
+    //             best_matching_candidate =
+    //                 Isotope{0,
+    //                         0.0,
+    //                         0.0,
+    //                         0.0,
+    //                         0.0,
+    //                         -std::numeric_limits<double>::infinity(),
+    //                         theoretical_percentage};
+    //         }
+    //         normalized_candidates.push_back(best_matching_candidate);
+    //     }
+    //     // The weighted error for each normalized_candidate path can now
+    //     // be evaluated.
+    //     //
+    //     // NOTE: A potential alternative to an error function would be the
+    //     // Euclidean distance between the expected theoretical peak and
+    //     // candidates for that node. This can be done at the candidate
+    //     // acquisition stage though, and in that case there is no need to
+    //     build
+    //     // a candidate graph.
+    //     double err_sum = 0.0;
+    //     for (const auto &candidate : normalized_candidates) {
+    //         err_sum += candidate.expected_normalized_height *
+    //                    std::pow((candidate.expected_normalized_height -
+    //                              candidate.normalized_height),
+    //                             2);
+    //     }
+    //     if (err_sum < weighted_error) {
+    //         weighted_error = err_sum;
+    //         selected_candidates = normalized_candidates;
+    //     }
+    // }
+    // std::cout << "SELECTED " << selected_candidates.size() << " candidates"
+    //           << std::endl;
+    // if (selected_candidates.empty()) {
+    //     // Not able to find a good candidate.
+    //     return std::nullopt;
+    // }
+    // DEBUG: ------------------------------------------------------------------
     // TODO: Fill feature data here.
     Feature feature = {};
     return feature;
@@ -1093,7 +1221,7 @@ std::vector<Feature> feature_detection(
             build_feature(peaks, peaks_rt_key, mzs, perc,
                           ident_data.spectrum_ids[ident.entity_id],
                           peak_rt_sigma, peak_rt);
-            break;
+            break;  // DEBUG: <----
         }
     }
     return features;
