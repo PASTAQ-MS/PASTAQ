@@ -1385,6 +1385,7 @@ def default_parameters(instrument, avg_fwhm_rt):
             'metamatch_radius_mz': 0.005,
             'metamatch_radius_rt': avg_fwhm_rt/2,
             'metamatch_fraction': 0.7,
+            # Other
             'max_peaks': 100000,
             'polarity': 'both',
             'min_mz': 0,

@@ -803,22 +803,16 @@ theoretical_isotopes_peptide(std::string sequence, int8_t charge_state,
 
 struct Feature {
     size_t id;
-    double min_perc;  // TODO: Is this necessary?
     double rt;
     double monoisotopic_mz;
-    double monoisotopic_rt;
     double monoisotopic_height;
     double average_mz;
-    double average_rt;
-    double average_height;
     double total_height;
-    size_t n_found_isotopes;
     std::vector<size_t> peak_ids;
-    std::vector<double> peak_mzs;
-    std::vector<double> peak_normalized_heights;
-    size_t n_theoretical_isotopes;
-    std::vector<double> theoretical_mzs;
-    std::vector<double> theoretical_percentages;
+    // NOTE: Do we really want to store the theoretical istopes?
+    // size_t n_theoretical_isotopes;
+    // std::vector<double> theoretical_mzs;
+    // std::vector<double> theoretical_percentages;
 };
 
 struct Isotope {
@@ -834,8 +828,7 @@ std::optional<Feature> build_feature(
     const std::vector<Centroid::Peak> peaks,
     const std::vector<Search::KeySort<double>> peaks_rt_key,
     const std::vector<double> &mzs, const std::vector<double> &perc,
-    const IdentData::SpectrumId &ident, double tolerance_rt,
-    double retention_time) {
+    double tolerance_rt, double retention_time) {
     // Basic sanitation
     if (mzs.size() != perc.size() || mzs.size() == 0) {
         return std::nullopt;
@@ -847,10 +840,11 @@ std::optional<Feature> build_feature(
     size_t min_j = Search::lower_bound(peaks_rt_key, min_rt);
     size_t max_j = peaks_rt_key.size();
     std::vector<Centroid::Peak> peaks_in_range;
-    std::cout << "min_rt: " << min_rt << std::endl;
-    std::cout << "max_rt: " << max_rt << std::endl;
-    std::cout << "mzs[0]: " << mzs[0] << std::endl;
-    std::cout << "mzs[mzs.size() - 1]: " << mzs[mzs.size() - 1] << std::endl;
+    // DEBUG: ...
+    // std::cout << "min_rt: " << min_rt << std::endl;
+    // std::cout << "max_rt: " << max_rt << std::endl;
+    // std::cout << "mzs[0]: " << mzs[0] << std::endl;
+    // std::cout << "mzs[mzs.size() - 1]: " << mzs[mzs.size() - 1] << std::endl;
     for (size_t j = min_j; j < max_j; ++j) {
         if (peaks_rt_key[j].sorting_key > max_rt) {
             break;
@@ -861,12 +855,14 @@ std::optional<Feature> build_feature(
                 mzs[mzs.size() - 1]) {
             continue;
         }
-        std::cout << "peak.local_max_mz: " << peak.local_max_mz << std::endl;
-        std::cout << "peak.raw_roi_sigma_mz: " << peak.raw_roi_sigma_mz
-                  << std::endl;
+        // DEBUG: ...
+        // std::cout << "peak.local_max_mz: " << peak.local_max_mz << std::endl;
+        // std::cout << "peak.raw_roi_sigma_mz: " << peak.raw_roi_sigma_mz
+        //<< std::endl;
         peaks_in_range.push_back(peak);
     }
-    std::cout << "FOUND: " << peaks_in_range.size() << " PEAKS" << std::endl;
+    // DEBUG: ...
+    // std::cout << "FOUND: " << peaks_in_range.size() << " PEAKS" << std::endl;
     if (peaks_in_range.empty()) {
         return std::nullopt;
     }
@@ -952,8 +948,8 @@ std::optional<Feature> build_feature(
             }
 
             // TODO: Pass this as a parameter.
-            double discrepacy_threshold = 25;
-            if (selected_normalized_height_diff > discrepacy_threshold ||
+            double discrepancy_threshold = 0.25;
+            if (selected_normalized_height_diff > discrepancy_threshold ||
                 selected_normalized_height == 0.0) {
                 break;
             }
@@ -964,155 +960,40 @@ std::optional<Feature> build_feature(
         }
         if (total_distance < min_total_distance) {
             selected_candidates = selected_candidates_for_reference;
-            selected_candidates_norm_height = selected_candidates_for_reference_norm_height;
+            selected_candidates_norm_height =
+                selected_candidates_for_reference_norm_height;
             min_total_distance = total_distance;
         }
     }
-
-    for (size_t i = 0; i < selected_candidates.size(); ++i) {
-        auto candidate = selected_candidates[i];
-        std::cout << "mz: " << candidate->local_max_mz;
-        std::cout << " rt: " << candidate->local_max_rt;
-        std::cout << " height: " << candidate->local_max_height;
-        std::cout << " norm_height: " << selected_candidates_norm_height[i];
-        std::cout << std::endl;
+    if (selected_candidates.empty()) {
+        return std::nullopt;
     }
 
-    // DEBUG: This approach is a bit complicated. Let's see if a simple
-    // euclidean distance approximation give us a good approximation.
-    // // The reference node is the theoretical max relative to the
-    // // distribution.
-    // size_t reference_node_index = 0;
-
-    // // Create a graph with the potential isotope associations.
-    // std::vector<std::vector<Isotope>> isotopes_graph;
-    // std::cout << "starting graph building of potential isotopes... ["
-    //           << mzs.size() << "]" << std::endl;
-    // for (size_t k = 0; k < mzs.size(); ++k) {
-    //     std::vector<Isotope> candidates;
-    //     double theoretical_mz = mzs[k];
-    //     double theoretical_percentage = perc[k];
-    //     std::cout << "mz: " << theoretical_mz
-    //               << " perc: " << theoretical_percentage << std::endl;
-    //     // TODO: Comparing floats like this is a recipe for disaster.
-    //     if (theoretical_percentage == 1.0) {
-    //         reference_node_index = k;
-    //     }
-    //     for (const auto &peak : peaks_in_range) {
-    //         if ((peak.local_max_mz + peak.raw_roi_sigma_mz) > theoretical_mz
-    //         &&
-    //             (peak.local_max_mz - peak.raw_roi_sigma_mz) < theoretical_mz)
-    //             { candidates.push_back({
-    //                 peak.id,
-    //                 peak.local_max_mz,
-    //                 peak.local_max_rt,
-    //                 peak.local_max_height,
-    //                 peak.raw_roi_total_intensity,
-    //                 0.0,
-    //                 0.0,
-    //             });
-    //         }
-    //     }
-    //     isotopes_graph.push_back(candidates);
-    // }
-    // std::cout << "reference_node_index: " << reference_node_index <<
-    // std::endl; if (isotopes_graph.empty()) {
-    //     return std::nullopt;
-    // }
-    // std::cout << "FOUND " << isotopes_graph.size() << " candidates"
-    //           << std::endl;
-
-    // // In case more than one peak is linked to the reference mz isotope,
-    // // the sequence with the less matching error should be selected. In
-    // // order to do so, the heights for each candidate must be normalized
-    // // by the reference isotope height.
-    // std::vector<Isotope> selected_candidates;
-    // double weighted_error = std::numeric_limits<double>::infinity();
-    // for (size_t i = 0; i < isotopes_graph[reference_node_index].size(); ++i)
-    // {
-    //     const auto &ref_candidate = isotopes_graph[reference_node_index][i];
-    //     std::vector<Isotope> normalized_candidates;
-    //     for (size_t k = 0; k < mzs.size(); ++k) {
-    //         if (k == reference_node_index) {
-    //             normalized_candidates.push_back(
-    //                 {ref_candidate.id, ref_candidate.mz, ref_candidate.rt,
-    //                  ref_candidate.height,
-    //                  ref_candidate.intensity, 1.0, 1.0});
-    //             continue;
-    //         }
-
-    //         // Find the best matching candidate for the selected
-    //         // reference.
-    //         double theoretical_percentage = perc[k];
-    //         auto best_matching_candidate =
-    //             Isotope{0,
-    //                     0.0,
-    //                     0.0,
-    //                     0.0,
-    //                     0.0,
-    //                     -std::numeric_limits<double>::infinity(),
-    //                     theoretical_percentage};
-    //         for (auto &candidate : isotopes_graph[k]) {
-    //             double normalized_height =
-    //                 candidate.height / ref_candidate.height;
-    //             if (std::abs(candidate.normalized_height -
-    //                          theoretical_percentage) <
-    //                 (std::abs(best_matching_candidate.normalized_height -
-    //                           theoretical_percentage))) {
-    //                 best_matching_candidate =
-    //                     Isotope{candidate.id,          candidate.mz,
-    //                             candidate.rt,          candidate.height,
-    //                             candidate.intensity,   normalized_height,
-    //                             theoretical_percentage};
-    //             }
-    //         }
-    //         // FIXME: We must NOT push candidates that have too high of
-    //         // a discrepancy with the expected isotopic distribution for this
-    //         // node.
-    //         double discrepacy_threshold = 20;
-    //         if (std::abs(best_matching_candidate.normalized_height -
-    //                      theoretical_percentage) > discrepacy_threshold) {
-    //             best_matching_candidate =
-    //                 Isotope{0,
-    //                         0.0,
-    //                         0.0,
-    //                         0.0,
-    //                         0.0,
-    //                         -std::numeric_limits<double>::infinity(),
-    //                         theoretical_percentage};
-    //         }
-    //         normalized_candidates.push_back(best_matching_candidate);
-    //     }
-    //     // The weighted error for each normalized_candidate path can now
-    //     // be evaluated.
-    //     //
-    //     // NOTE: A potential alternative to an error function would be the
-    //     // Euclidean distance between the expected theoretical peak and
-    //     // candidates for that node. This can be done at the candidate
-    //     // acquisition stage though, and in that case there is no need to
-    //     build
-    //     // a candidate graph.
-    //     double err_sum = 0.0;
-    //     for (const auto &candidate : normalized_candidates) {
-    //         err_sum += candidate.expected_normalized_height *
-    //                    std::pow((candidate.expected_normalized_height -
-    //                              candidate.normalized_height),
-    //                             2);
-    //     }
-    //     if (err_sum < weighted_error) {
-    //         weighted_error = err_sum;
-    //         selected_candidates = normalized_candidates;
-    //     }
-    // }
-    // std::cout << "SELECTED " << selected_candidates.size() << " candidates"
-    //           << std::endl;
-    // if (selected_candidates.empty()) {
-    //     // Not able to find a good candidate.
-    //     return std::nullopt;
-    // }
-    // DEBUG: ------------------------------------------------------------------
-    // TODO: Fill feature data here.
+    // Build the actual feature data.
     Feature feature = {};
+    feature.rt = retention_time;
+    // FIXME: Currently assuming that the minimum detected isotope is the
+    // monoisotopic peak, but THIS MIGHT NOT BE THE CASE. For simplicity and to
+    // keep the flow going I'll leave this for now, but must go back and FIX
+    // it.
+    feature.monoisotopic_mz = selected_candidates[0]->local_max_mz;
+    feature.monoisotopic_height = selected_candidates[0]->local_max_height;
+    // Find the weighted average mz and the average height of the selected
+    // isotopes.
+    feature.average_mz = 0.0;
+    feature.total_height = 0.0;
+    for (size_t i = 0; i < selected_candidates.size(); ++i) {
+        auto candidate = selected_candidates[i];
+        feature.total_height += candidate->local_max_height;
+        feature.average_mz +=
+            candidate->local_max_height * candidate->local_max_mz;
+        feature.peak_ids.push_back(candidate->id);
+    }
+    if (feature.total_height == 0) {
+        return std::nullopt;
+    }
+    feature.average_mz /= feature.total_height;
+    feature.average_mz = feature.average_mz;
     return feature;
 }
 
@@ -1212,18 +1093,25 @@ std::vector<Feature> feature_detection(
             // std::cout << ident.entity_id << std::endl;
             // std::cout << linked_msms.entity_id << std::endl;
             // std::cout << sequence << std::endl;
-            // std::cout << "-----------" << std::endl;
             auto &peak = peaks[linked_msms.entity_id];
-            // We use the retention time of the APEX of the matched peak, not
-            // the msms event.
+            // DEBUG: Looking for some issues here...
+            // if (ident.msms_id == 17914 || ident.msms_id == 17679) {
+            // We use the retention time of the APEX of the matched peak,
+            // not the msms event.
             double peak_rt = peak.local_max_rt;
             double peak_rt_sigma = peak.raw_roi_sigma_mz;
-            build_feature(peaks, peaks_rt_key, mzs, perc,
-                          ident_data.spectrum_ids[ident.entity_id],
-                          peak_rt_sigma, peak_rt);
-            break;  // DEBUG: <----
+            auto maybe_feature = build_feature(peaks, peaks_rt_key, mzs, perc,
+                                               peak_rt_sigma, peak_rt);
+            // std::cout << "-----------" << std::endl;
+            // break;  // DEBUG: <----
+            //}
+            if (maybe_feature) {
+                features.push_back(maybe_feature.value());
+                // TODO: Remove used peaks on the feature from the pool.
+            }
         }
     }
+    // TODO: Sort features by height and assign feature ids.
     return features;
 }
 
@@ -1776,6 +1664,26 @@ PYBIND11_MODULE(tapp, m) {
                       &PythonAPI::Isotope::expected_normalized_height)
         .def("__repr__",
              [](const PythonAPI::Isotope &s) { return std::to_string(s.id); });
+
+    py::class_<PythonAPI::Feature>(m, "Feature")
+        .def_readonly("id", &PythonAPI::Feature::id)
+        .def_readonly("rt", &PythonAPI::Feature::rt)
+        .def_readonly("monoisotopic_mz", &PythonAPI::Feature::monoisotopic_mz)
+        .def_readonly("monoisotopic_height",
+                      &PythonAPI::Feature::monoisotopic_height)
+        .def_readonly("average_mz", &PythonAPI::Feature::average_mz)
+        .def_readonly("total_height", &PythonAPI::Feature::total_height)
+        .def_readonly("peak_ids", &PythonAPI::Feature::peak_ids)
+        .def("__repr__", [](const PythonAPI::Feature &f) {
+            return "Feature <id: " + std::to_string(f.id) +
+                   ", rt: " + std::to_string(f.rt) +
+                   ", monoisotopic_mz: " + std::to_string(f.monoisotopic_mz) +
+                   ", monoisotopic_height: " +
+                   std::to_string(f.monoisotopic_height) +
+                   ", average_mz: " + std::to_string(f.average_mz) +
+                   ", total_height: " + std::to_string(f.total_height) +
+                   ", n_isotopes: " + std::to_string(f.peak_ids.size()) + ">";
+        });
 
     py::class_<PythonAPI::MetaMatchResults>(m, "MetaMatchResults")
         .def_readonly("clusters", &PythonAPI::MetaMatchResults::clusters)
