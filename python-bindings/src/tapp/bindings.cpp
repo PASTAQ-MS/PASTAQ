@@ -809,10 +809,6 @@ struct Feature {
     double average_mz;
     double total_height;
     std::vector<size_t> peak_ids;
-    // NOTE: Do we really want to store the theoretical istopes?
-    // size_t n_theoretical_isotopes;
-    // std::vector<double> theoretical_mzs;
-    // std::vector<double> theoretical_percentages;
 };
 
 struct Isotope {
@@ -840,11 +836,6 @@ std::optional<Feature> build_feature(
     size_t min_j = Search::lower_bound(peaks_rt_key, min_rt);
     size_t max_j = peaks_rt_key.size();
     std::vector<Centroid::Peak> peaks_in_range;
-    // DEBUG: ...
-    // std::cout << "min_rt: " << min_rt << std::endl;
-    // std::cout << "max_rt: " << max_rt << std::endl;
-    // std::cout << "mzs[0]: " << mzs[0] << std::endl;
-    // std::cout << "mzs[mzs.size() - 1]: " << mzs[mzs.size() - 1] << std::endl;
     for (size_t j = min_j; j < max_j; ++j) {
         if (peaks_rt_key[j].sorting_key > max_rt) {
             break;
@@ -855,14 +846,8 @@ std::optional<Feature> build_feature(
                 mzs[mzs.size() - 1]) {
             continue;
         }
-        // DEBUG: ...
-        // std::cout << "peak.local_max_mz: " << peak.local_max_mz << std::endl;
-        // std::cout << "peak.raw_roi_sigma_mz: " << peak.raw_roi_sigma_mz
-        //<< std::endl;
         peaks_in_range.push_back(peak);
     }
-    // DEBUG: ...
-    // std::cout << "FOUND: " << peaks_in_range.size() << " PEAKS" << std::endl;
     if (peaks_in_range.empty()) {
         return std::nullopt;
     }
@@ -1085,26 +1070,14 @@ std::vector<Feature> feature_detection(
             auto sequence = ident_data.spectrum_ids[ident.entity_id].sequence;
             auto [mzs, perc] =
                 theoretical_isotopes_peptide(sequence, charge_state, 0.01);
-            // DEBUG: ...
-            // std::cout << ident.msms_id << std::endl;
-            // std::cout << linked_msms.msms_id << std::endl;
-            // std::cout << ident.scan_index << std::endl;
-            // std::cout << linked_msms.scan_index << std::endl;
-            // std::cout << ident.entity_id << std::endl;
-            // std::cout << linked_msms.entity_id << std::endl;
-            // std::cout << sequence << std::endl;
             auto &peak = peaks[linked_msms.entity_id];
-            // DEBUG: Looking for some issues here...
-            // if (ident.msms_id == 17914 || ident.msms_id == 17679) {
+
             // We use the retention time of the APEX of the matched peak,
             // not the msms event.
             double peak_rt = peak.local_max_rt;
             double peak_rt_sigma = peak.raw_roi_sigma_mz;
             auto maybe_feature = build_feature(peaks, peaks_rt_key, mzs, perc,
                                                peak_rt_sigma, peak_rt);
-            // std::cout << "-----------" << std::endl;
-            // break;  // DEBUG: <----
-            //}
             if (maybe_feature) {
                 features.push_back(maybe_feature.value());
                 // TODO: Remove used peaks on the feature from the pool.
