@@ -825,7 +825,7 @@ std::optional<Feature> build_feature(
     const std::vector<Centroid::Peak> &peaks,
     const std::vector<Search::KeySort<double>> &peaks_rt_key,
     const std::vector<double> &mzs, const std::vector<double> &perc,
-    double tolerance_rt, double retention_time) {
+    double tolerance_rt, double retention_time, double discrepancy_threshold) {
     // Basic sanitation.
     if (mzs.size() != perc.size() || mzs.size() == 0) {
         return std::nullopt;
@@ -937,8 +937,6 @@ std::optional<Feature> build_feature(
                 }
             }
 
-            // TODO: Pass this as a parameter.
-            double discrepancy_threshold = 0.25;
             if (selected_normalized_height_diff > discrepancy_threshold ||
                 selected_normalized_height == 0.0) {
                 return false;
@@ -1020,7 +1018,8 @@ std::vector<Feature> feature_detection(
     const RawData::RawData &raw_data_ms2,
     const IdentData::IdentData &ident_data,
     const std::vector<LinkedMsms> &link_table_msms,
-    const std::vector<LinkedMsms> &link_table_idents) {
+    const std::vector<LinkedMsms> &link_table_idents,
+    double discrepancy_threshold) {
     std::vector<Feature> features;
 
     // The proposed algorithm goes as follows:
@@ -1113,7 +1112,7 @@ std::vector<Feature> feature_detection(
             double peak_rt_sigma = peak.raw_roi_sigma_mz;
             auto maybe_feature =
                 build_feature(peaks_in_use, peaks, peaks_rt_key, mzs, perc,
-                              peak_rt_sigma, peak_rt);
+                              peak_rt_sigma, peak_rt, discrepancy_threshold);
             if (maybe_feature) {
                 auto feature = maybe_feature.value();
                 features.push_back(feature);
@@ -1843,7 +1842,8 @@ PYBIND11_MODULE(tapp, m) {
         .def("feature_detection", &PythonAPI::feature_detection,
              "Link peaks as features", py::arg("peaks"),
              py::arg("raw_data_ms2"), py::arg("ident_data"),
-             py::arg("link_table_idents"), py::arg("link_table_msms"))
+             py::arg("link_table_idents"), py::arg("link_table_msms"),
+             py::arg("discrepancy_threshold") = 0.25)
         .def("link_identified_peptides", &PythonAPI::link_identified_peptides,
              "DEBUG", py::arg("peaks"), py::arg("identifications"),
              py::arg("tolerance_rt"), py::arg("minimum_isotope_perc"));
