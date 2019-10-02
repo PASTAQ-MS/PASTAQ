@@ -821,11 +821,12 @@ struct Isotope {
     double expected_normalized_height;
 };
 std::optional<Feature> build_feature(
-    const std::vector<Centroid::Peak> peaks,
-    const std::vector<Search::KeySort<double>> peaks_rt_key,
+    const std::vector<bool> &peaks_in_use,
+    const std::vector<Centroid::Peak> &peaks,
+    const std::vector<Search::KeySort<double>> &peaks_rt_key,
     const std::vector<double> &mzs, const std::vector<double> &perc,
     double tolerance_rt, double retention_time) {
-    // Basic sanitation
+    // Basic sanitation.
     if (mzs.size() != perc.size() || mzs.size() == 0) {
         return std::nullopt;
     }
@@ -841,6 +842,9 @@ std::optional<Feature> build_feature(
             break;
         }
         auto &peak = peaks[peaks_rt_key[j].index];
+        if (peaks_in_use[peak.id]) {
+            continue;
+        }
         if ((peak.local_max_mz + peak.raw_roi_sigma_mz * 2) < mzs[0] ||
             (peak.local_max_mz - peak.raw_roi_sigma_mz * 2) >
                 mzs[mzs.size() - 1]) {
@@ -1061,6 +1065,8 @@ std::vector<Feature> feature_detection(
         std::stable_sort(peaks_rt_key.begin(), peaks_rt_key.end(),
                          sorting_key_func);
     }
+    // We use this variable to keep track of the peaks we have already linked.
+    auto peaks_in_use = std::vector<bool>(peaks.size());
 
     // TODO: We should probably prioritize the MSMS events that HAVE an
     // identification, instead of just being intensity based only.
@@ -1105,11 +1111,28 @@ std::vector<Feature> feature_detection(
             // not the msms event.
             double peak_rt = peak.local_max_rt;
             double peak_rt_sigma = peak.raw_roi_sigma_mz;
-            auto maybe_feature = build_feature(peaks, peaks_rt_key, mzs, perc,
-                                               peak_rt_sigma, peak_rt);
+            auto maybe_feature =
+                build_feature(peaks_in_use, peaks, peaks_rt_key, mzs, perc,
+                              peak_rt_sigma, peak_rt);
             if (maybe_feature) {
-                features.push_back(maybe_feature.value());
-                // TODO: Remove used peaks on the feature from the pool.
+                auto feature = maybe_feature.value();
+                features.push_back(feature);
+                // Remove used peaks on the feature from the pool.
+                for (const auto &peak_id : feature.peak_ids) {
+                    peaks_in_use[peak_id] = true;
+                }
+                // DEBUG: ...
+                //std::cout << " rt: " << maybe_feature.value().rt
+                          //<< " monoisotopic_mz: "
+                          //<< maybe_feature.value().monoisotopic_mz
+                          //<< " monoisotopic_height: "
+                          //<< maybe_feature.value().monoisotopic_height
+                          //<< " average_mz: " << maybe_feature.value().average_mz
+                          //<< " total_height: "
+                          //<< maybe_feature.value().total_height
+                          //<< " num_isotopes: "
+                          //<< maybe_feature.value().peak_ids.size() << std::endl;
+                // break; // DEBUG: <---
             }
         }
     }
