@@ -892,18 +892,19 @@ std::optional<Feature> build_feature(
         std::vector<const Centroid::Peak *> selected_candidates_for_reference;
         std::vector<double> selected_candidates_for_reference_norm_height;
         double total_distance = 0.0;
-        // TODO: We need to do a forwards and backwards approach in order for
-        // the algorithm to work. We will be stopping the pattern matching once
-        // we find a peak where the minimum height difference is greater than
-        // the given discrepancy_threshold. Currently only working on a forward
-        // way from 0->mzs.size(), but we need to do:
-        //     reference_node_index->mzs.size()
-        //     reference_node_index->0
-        for (size_t k = 0; k < mzs.size(); ++k) {
+        // We need to do a forwards and backwards pass in order for
+        // the algorithm to work, since we are be stopping the pattern matching
+        // once we find a peak where the minimum height difference is greater
+        // than the given discrepancy_threshold.
+        //     reference_node_index->0           // Backwards
+        //     reference_node_index->mzs.size()  // Forward
+        // The peaks are reversed after the backwards pass, so that we keep the
+        // proper ascending mz ordering.
+        auto select_candidates = [&](size_t k) -> bool {
             if (k == reference_node_index) {
                 selected_candidates_for_reference.push_back(ref_candidate);
                 selected_candidates_for_reference_norm_height.push_back(1.0);
-                continue;
+                return true;
             }
 
             // Find the best matching candidate for the selected reference. We
@@ -936,12 +937,40 @@ std::optional<Feature> build_feature(
             double discrepancy_threshold = 0.25;
             if (selected_normalized_height_diff > discrepancy_threshold ||
                 selected_normalized_height == 0.0) {
-                break;
+                return false;
             }
             selected_candidates_for_reference.push_back(selected_candidate);
             selected_candidates_for_reference_norm_height.push_back(
                 selected_normalized_height);
             total_distance += min_distance;
+            return true;
+        };
+        // Backwards from reference_node_index.
+        for (size_t k = reference_node_index; k > 0; --k) {
+            int success = select_candidates(k);
+            if (success) {
+                continue;
+            }
+            if (!success) {
+                break;
+            }
+        }
+        // Candidate at exactly 0.
+        select_candidates(0);
+        // Reverse list of candidates.
+        std::reverse(selected_candidates_for_reference.begin(),
+                     selected_candidates_for_reference.end());
+        std::reverse(selected_candidates_for_reference_norm_height.begin(),
+                     selected_candidates_for_reference_norm_height.end());
+        // Forward from reference_node_index.
+        for (size_t k = reference_node_index + 1; k < mzs.size(); ++k) {
+            int success = select_candidates(k);
+            if (success) {
+                continue;
+            }
+            if (!success) {
+                break;
+            }
         }
         if (total_distance < min_total_distance) {
             selected_candidates = selected_candidates_for_reference;
