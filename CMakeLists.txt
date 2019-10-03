@@ -32,6 +32,7 @@ add_library(tapplib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/grid/grid_serialize.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/grid/raw_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/grid/raw_data_serialize.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/grid/xml_reader.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid_runners.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid_serialize.cpp"

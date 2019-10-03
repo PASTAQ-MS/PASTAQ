@@ -20,6 +20,8 @@ namespace RawData {
 enum Polarity : uint8_t { POSITIVE = 0, NEGATIVE = 1, BOTH = 2 };
 enum ActivationMethod : uint8_t { UNKNOWN = 0, CID = 1, HCD = 2 };
 
+// For an MS/MS scan, some information about the precursor scan is saved by the
+// instrument.
 struct PrecursorInformation {
     // Index for the scan that caused the MSn event.
     uint64_t scan_number;
@@ -44,10 +46,14 @@ struct Scan {
     uint64_t num_points;
     // Retention time in seconds of this scan;
     double retention_time;
-    // mz-intensity vectors should have the same size (num_points).
+    // This is the actual data of the scan, split into two vectors, mz and
+    // intensity. These vectors should have the same size (num_points).
     std::vector<double> mz;
     std::vector<double> intensity;
-    // The polarity of the ionization for this scan.
+    // Store the maximum and total intensity for this scan.
+    double max_intensity;
+    double total_intensity;
+    // The ionization polarity for this scan.
     Polarity polarity;
     // In case this is a MSn scan, the precursor information will be stored
     // here.
@@ -78,11 +84,13 @@ struct RawData {
     double fwhm_rt;
 
     // Extracted scans.
-    std::vector<::RawData::Scan> scans;
+    std::vector<Scan> scans;
+    // This information is saved for quick search.
+    // TODO: Note that this is unnecessary if our search function is able to
+    // search through the `scansz array.
     std::vector<double> retention_times;
-    std::vector<double> total_ion_chromatogram;
-    std::vector<double> base_peak_chromatogram;
 
+    // TODO: Sigh... Methdos vs functions?
     std::tuple<std::vector<double>, std::vector<double>> xic(
         double min_mz, double max_mz, double min_rt, double max_rt,
         std::string method) const;
@@ -90,10 +98,10 @@ struct RawData {
 
 // Raw data points in a struct of arrays format.
 struct RawPoints {
+    uint64_t num_points;
     std::vector<double> rt;
     std::vector<double> mz;
     std::vector<double> intensity;
-    uint64_t num_points;
 };
 
 // Calculate the theoretical FWHM of the peak for the given mz.
@@ -110,6 +118,7 @@ RawPoints find_raw_points(const RawData &raw_data, double min_mz, double max_mz,
 // In this namespace we have access to the data structures for working with
 // identification data in mzIdentML format.
 namespace IdentData {
+// FIXME: A lot more documentation is necessary here.
 struct SpectrumId {
     std::string id;
     bool pass_threshold;

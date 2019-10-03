@@ -37,6 +37,11 @@ bool RawData::Serialize::read_scan(std::istream &stream, Scan *scan) {
         Serialization::read_double(stream, &scan->mz[i]);
         Serialization::read_double(stream, &scan->intensity[i]);
     }
+    uint8_t polarity = polarity;
+    Serialization::read_uint8(stream, &polarity);
+    scan->polarity = static_cast<Polarity>(polarity);
+    Serialization::read_double(stream, &scan->max_intensity);
+    Serialization::read_double(stream, &scan->total_intensity);
     Serialize::read_precursor_info(stream, &scan->precursor_information);
     return stream.good();
 }
@@ -50,6 +55,9 @@ bool RawData::Serialize::write_scan(std::ostream &stream, const Scan &scan) {
         Serialization::write_double(stream, scan.mz[i]);
         Serialization::write_double(stream, scan.intensity[i]);
     }
+    Serialization::write_uint8(stream, scan.polarity);
+    Serialization::write_double(stream, scan.max_intensity);
+    Serialization::write_double(stream, scan.total_intensity);
     Serialize::write_precursor_info(stream, scan.precursor_information);
     return stream.good();
 }
@@ -71,15 +79,9 @@ bool RawData::Serialize::read_raw_data(std::istream &stream,
     Serialization::read_uint64(stream, &num_scans);
     raw_data->scans = std::vector<Scan>(num_scans);
     raw_data->retention_times = std::vector<double>(num_scans);
-    raw_data->total_ion_chromatogram = std::vector<double>(num_scans);
-    raw_data->base_peak_chromatogram = std::vector<double>(num_scans);
     for (size_t i = 0; i < num_scans; ++i) {
         Serialize::read_scan(stream, &raw_data->scans[i]);
         Serialization::read_double(stream, &raw_data->retention_times[i]);
-        Serialization::read_double(stream,
-                                   &raw_data->total_ion_chromatogram[i]);
-        Serialization::read_double(stream,
-                                   &raw_data->base_peak_chromatogram[i]);
     }
     return stream.good();
 }
@@ -100,8 +102,6 @@ bool RawData::Serialize::write_raw_data(std::ostream &stream,
     for (size_t i = 0; i < num_scans; ++i) {
         Serialize::write_scan(stream, raw_data.scans[i]);
         Serialization::write_double(stream, raw_data.retention_times[i]);
-        Serialization::write_double(stream, raw_data.total_ion_chromatogram[i]);
-        Serialization::write_double(stream, raw_data.base_peak_chromatogram[i]);
     }
     return stream.good();
 }

@@ -9,19 +9,18 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
     double max_rt, Instrument::Type instrument_type, double resolution_ms1,
     double resolution_msn, double reference_mz, RawData::Polarity polarity,
     size_t ms_level) {
-    RawData::RawData raw_data{instrument_type,
-                              std::numeric_limits<double>::infinity(),
-                              -std::numeric_limits<double>::infinity(),
-                              std::numeric_limits<double>::infinity(),
-                              -std::numeric_limits<double>::infinity(),
-                              resolution_ms1,
-                              resolution_msn,
-                              reference_mz,
-                              0,
-                              {},
-                              {},
-                              {},
-                              {}};
+    RawData::RawData raw_data = {};
+    raw_data.instrument_type = instrument_type;
+    raw_data.min_mz = std::numeric_limits<double>::infinity();
+    raw_data.max_mz = -std::numeric_limits<double>::infinity();
+    raw_data.min_rt = std::numeric_limits<double>::infinity();
+    raw_data.max_rt = -std::numeric_limits<double>::infinity();
+    raw_data.resolution_ms1 = resolution_ms1;
+    raw_data.resolution_msn = resolution_msn;
+    raw_data.reference_mz = reference_mz;
+    raw_data.fwhm_rt = 0;  // TODO(alex): Should this be passed as well?
+    raw_data.scans = {};
+    raw_data.retention_times = {};
     // TODO(alex): Can we automatically detect the instrument type and set
     // resolution from the header?
     size_t previous_ms1_scan_number = 0;
@@ -212,10 +211,8 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
                     if (scan.num_points != 0) {
                         raw_data.scans.push_back(scan);
                         raw_data.retention_times.push_back(retention_time);
-                        raw_data.total_ion_chromatogram.push_back(
-                            intensity_sum);
-                        raw_data.base_peak_chromatogram.push_back(
-                            max_intensity);
+                        scan.max_intensity = max_intensity;
+                        scan.total_intensity = intensity_sum;
                     }
                 }
                 if (tag.value().name == "precursorMz") {
@@ -282,148 +279,6 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
         }
     }
     return raw_data;
-}
-
-// Read the next mz1 scan from the stream.
-std::optional<std::vector<Grid::Point>> XmlReader::read_next_scan(
-    std::istream &stream, const Grid::Parameters &parameters) {
-    // TODO(alex): This function does not need Grid::Parameters, only the
-    // Grid::Bounds.
-    while (stream.good()) {
-        auto tag = XmlReader::read_tag(stream);
-        if (!tag) {
-            continue;
-        }
-        if (tag.value().name == "scan" && !tag.value().closed) {
-            auto scan_attributes = tag.value().attributes;
-            // We are only interested on ms1 scans for now.
-            if (scan_attributes["msLevel"] != "1") {
-                continue;
-            }
-            // Extract the peak count.
-            if (scan_attributes.find("peaksCount") == scan_attributes.end()) {
-                return std::nullopt;
-            }
-            size_t peaks_count = std::stoi(scan_attributes["peaksCount"]);
-
-            // Extract the retention time.
-            if (scan_attributes.find("retentionTime") ==
-                scan_attributes.end()) {
-                return std::nullopt;
-            }
-
-            // The time is in xs:duration units. Here we are only accounting
-            // for the data as stored in seconds, minutes and hours. It is
-            // unlikely that we are going to need to parse the days, months
-            // and years. For more information about the format see:
-            //    https://www.ibm.com/support/knowledgecenter/en/ssw_ibm_i_72/rzasp/rzasp_xsduration.htm
-            std::regex rt_regex(
-                R"(P.*T(?:([[:digit:]]+)H)?(?:([[:digit:]]+)M)?(?:([[:digit:]]+\.?[[:digit:]]*)S))");
-            std::smatch matches;
-            if (!std::regex_search(scan_attributes["retentionTime"], matches,
-                                   rt_regex) ||
-                matches.size() != 4) {
-                return std::nullopt;
-            }
-            double retention_time = std::stod(matches[3]);
-            if (matches[2] != "") {
-                retention_time += std::stod(matches[2]) * 60;
-            }
-            if (matches[1] != "") {
-                retention_time += std::stod(matches[1]) * 60 * 60;
-            }
-
-            // Check if we are on the desired region as defined by
-            // Grid::Bounds.
-            if (retention_time < parameters.bounds.min_rt) {
-                continue;
-            }
-            // Assuming linearity of the retention time on the mzXML file.
-            // We stop searching for the scan, since we are out of bounds.
-            if (retention_time > parameters.bounds.max_rt) {
-                return std::nullopt;
-            }
-
-            // Fetch the peaks tag.
-            tag = XmlReader::read_tag(stream);
-            while (tag) {
-                if (tag.value().name == "scan" && tag.value().closed) {
-                    return std::nullopt;
-                }
-                if (tag.value().name == "peaks") {
-                    break;
-                }
-                tag = XmlReader::read_tag(stream);
-            }
-            auto peak_attributes = tag.value().attributes;
-
-            // Extract the precision from the peaks tag.
-            if (peak_attributes.find("precision") == peak_attributes.end()) {
-                return std::nullopt;
-            }
-            int precision = std::stoi(peak_attributes["precision"]);
-
-            // Extract the byteOrder from the peaks tag. This determines the
-            // endianness in which the data was stored. `network` ==
-            // `big_endian`.
-            if (peak_attributes.find("byteOrder") == peak_attributes.end()) {
-                return std::nullopt;
-            }
-            auto byte_order = peak_attributes["byteOrder"];
-            auto little_endian = byte_order != "network";
-
-            // Extract the contentType/pairOrder from the peaks tag and exit
-            // if it is not `m/z-int`. In older versions of ProteoWizard,
-            // the conversion was not validated and the tag was incorrect.
-            // Here we are supporting both versions for compatibility but we
-            // are not trying to be exhaustive.
-            auto content_type_found =
-                peak_attributes.find("contentType") != peak_attributes.end();
-            auto pair_order_found =
-                peak_attributes.find("pairOrder") != peak_attributes.end();
-            if (!content_type_found && !pair_order_found) {
-                return std::nullopt;
-            }
-            std::string pair_order;
-            if (content_type_found) {
-                pair_order = peak_attributes["contentType"];
-            } else {
-                pair_order = peak_attributes["pairOrder"];
-            }
-
-            // Extract the peaks from the data.
-            auto data = XmlReader::read_data(stream);
-            if (!data) {
-                return std::nullopt;
-            }
-
-            // Decode the points from the base 64 string.
-            std::vector<Grid::Point> points;
-
-            // Initialize Base64 decoder.
-            Base64 decoder(reinterpret_cast<unsigned char *>(&data.value()[0]),
-                           precision, little_endian);
-            for (size_t i = 0; i < peaks_count; ++i) {
-                auto mz = decoder.get_double();
-                auto intensity = decoder.get_double();
-
-                // We don't need to extract the peaks when we are not inside
-                // the mz bounds or contain no value.
-                if (mz < parameters.bounds.min_mz ||
-                    mz > parameters.bounds.max_mz || intensity == 0) {
-                    continue;
-                }
-
-                // Not the most efficient way. It would be better to
-                // preallocate but we don't know at this point how many
-                // peaks from peak_count are inside our bounds.
-                points.push_back({mz, retention_time, intensity});
-            }
-
-            return points;
-        }
-    }
-    return std::nullopt;
 }
 
 std::optional<std::string> XmlReader::read_data(std::istream &stream) {
@@ -686,4 +541,3 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream) {
     }
     return {db_sequences, peptides, spectrum_ids, protein_hypotheses};
 }
-

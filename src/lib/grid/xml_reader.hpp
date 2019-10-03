@@ -19,11 +19,6 @@ struct Tag {
     bool closed;
 };
 
-// Reads the next scan that fit into the given parameters from a mzXML file into
-// a vector of Grid::Point.
-std::optional<std::vector<Grid::Point>> read_next_scan(
-    std::istream &stream, const Grid::Parameters &parameters);
-
 // Reads the contents of the next tag in the stream.
 std::optional<Tag> read_tag(std::istream &stream);
 
