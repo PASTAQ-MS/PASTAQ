@@ -321,11 +321,10 @@ std::vector<Centroid::Peak> Centroid::find_peaks_parallel(
 
 std::tuple<std::vector<double>, std::vector<double>> Centroid::Peak::xic(
     const RawData::RawData &raw_data, std::string method) {
-    std::vector<double> rt;
-    std::vector<double> intensity;
     Centroid::Peak &peak = *this;
-    return raw_data.xic(peak.roi_min_mz, peak.roi_max_mz, peak.roi_min_rt,
-                        peak.roi_max_rt, method);
+    return raw_data.xic(peak.roi_min_mz, peak.roi_max_mz,
+                        peak.roi_min_rt + peak.warping_delta_rt,
+                        peak.roi_max_rt + peak.warping_delta_rt, method);
 }
 
 double Centroid::peak_overlap(const Centroid::Peak &peak_a,
@@ -373,7 +372,7 @@ double Centroid::peak_overlap(const Centroid::Peak &peak_a,
 }
 
 double Centroid::cumulative_overlap(const std::vector<Centroid::Peak> &set_a,
-                                     const std::vector<Centroid::Peak> &set_b) {
+                                    const std::vector<Centroid::Peak> &set_b) {
     double total_overlap = 0;
     for (const auto &peak_a : set_a) {
         for (const auto &peak_b : set_b) {
