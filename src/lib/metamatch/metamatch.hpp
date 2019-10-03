@@ -28,9 +28,16 @@ struct Parameters {
 
 // A MetaMatch::Peak is an extension of Centroid::Peak that allow us to store
 // the necessary information for the clustering algorithm.
+// FIXME: This might be overkill, I must find a better way of doing this.
+// Essentially we are requiring the copy of ALL the peaks in ALL the files for
+// annotation. It might not be a big deal with the file sizes we are currently
+// using, but why this waste?
 struct Peak : Centroid::Peak {
     uint32_t file_id;
     uint32_t class_id;
+    // FIXME: We are sacrificing half of our address space just so that we can
+    // put a -1 if the cluster is not linked yet, perhaps it's better to keep
+    // track of this as a separate vector so that we can use uint64_t
     int64_t cluster_id;
     double cluster_mz;
     double cluster_rt;
@@ -38,6 +45,9 @@ struct Peak : Centroid::Peak {
 
 // The aggregate information for the peaks of a given cluster.
 struct Cluster {
+    // FIXME: We are sacrificing half of our address space just so that we can
+    // put a -1 if the cluster is not linked yet, perhaps it's better to keep
+    // track of this as a separate vector so that we can use uint64_t
     int64_t id;
     double mz;
     double rt;
