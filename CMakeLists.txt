@@ -41,6 +41,7 @@ add_library(tapplib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/metamatch/metamatch_files.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/metamatch/metamatch_serialize.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/base64.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/interpolation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/search.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/serialization.cpp"
     )

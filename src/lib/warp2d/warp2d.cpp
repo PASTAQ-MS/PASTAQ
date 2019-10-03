@@ -5,19 +5,8 @@
 #include <limits>
 #include <thread>
 
+#include "utils/interpolation.hpp"
 #include "warp2d/warp2d.hpp"
-
-// TODO(alex): Move to utils module.
-// Perform numerically stable linear interpolation of x between y_0 and y_1.
-// Note that x is a number between 0 and 1. This is the equivalent of the
-// following formula:
-//
-//     (y - y_0) / (y_1 - y_0) = x;
-//     y = x * (y_1 - y_0) + y_0;
-//
-double lerp(double y_0, double y_1, double x) {
-    return (1 - x) * y_0 + x * y_1;
-}
 
 std::vector<Centroid::Peak> Warp2D::peaks_in_rt_range(
     const std::vector<Centroid::Peak>& source_peaks, double time_start,
@@ -168,7 +157,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
     for (auto& peak : warped_peaks) {
         double x = (peak.local_max_rt - source_rt_start) /
                    (source_rt_end - source_rt_start);
-        peak.local_max_rt = lerp(ref_rt_start, ref_rt_end, x);
+        peak.local_max_rt = Interpolation::lerp(ref_rt_start, ref_rt_end, x);
     }
     return warped_peaks;
 }
