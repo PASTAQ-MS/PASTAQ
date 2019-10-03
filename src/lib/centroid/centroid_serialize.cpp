@@ -50,3 +50,27 @@ bool Centroid::Serialize::write_peak(std::ostream &stream,
     Serialization::write_uint64(stream, peak.raw_roi_num_scans);
     return stream.good();
 }
+
+bool Centroid::Serialize::read_peaks(std::istream &stream,
+                                       std::vector<Centroid::Peak> *peaks) {
+    uint64_t num_peaks = 0;
+    Serialization::read_uint64(stream, &num_peaks);
+    peaks->resize(num_peaks);
+    for (auto &peak : *peaks) {
+        if (!Centroid::Serialize::read_peak(stream, &peak)) {
+            return false;
+        }
+    }
+    return stream.good();
+}
+
+bool Centroid::Serialize::write_peaks(
+    std::ostream &stream, const std::vector<Centroid::Peak> &peaks) {
+    Serialization::write_uint64(stream, peaks.size());
+    for (const auto &peak : peaks) {
+        if (!Centroid::Serialize::write_peak(stream, peak)) {
+            return false;
+        }
+    }
+    return stream.good();
+}

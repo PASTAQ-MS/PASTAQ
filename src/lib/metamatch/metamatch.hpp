@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "centroid/centroid_files.hpp"
+#include "centroid/centroid.hpp"
 
 namespace MetaMatch {
 

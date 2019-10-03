@@ -556,7 +556,7 @@ void write_peaks(const std::vector<Centroid::Peak> &peaks,
         throw std::invalid_argument(error_stream.str());
     }
 
-    if (!Centroid::Files::Bpks::write_peaks(stream, peaks)) {
+    if (!Centroid::Serialize::write_peaks(stream, peaks)) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't write the peaks into the output file"
                      << output_file;
@@ -577,7 +577,7 @@ std::vector<Centroid::Peak> read_peaks(std::string &file_name) {
     }
 
     std::vector<Centroid::Peak> peaks;
-    if (!Centroid::Files::Bpks::read_peaks(stream, &peaks)) {
+    if (!Centroid::Serialize::read_peaks(stream, &peaks)) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't write the peaks into the input file"
                      << input_file;
