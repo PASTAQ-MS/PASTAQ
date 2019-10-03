@@ -229,15 +229,21 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks_parallel(
     // Initialize nodes.
     auto levels = Warp2D::initialize_levels(N, m, t, nP);
 
+    // Prepare maximum concurrency.
+    uint64_t num_threads = std::thread::hardware_concurrency();
+    if (num_threads > max_threads) {
+        num_threads = max_threads;
+    }
+
     // Prepare which group of levels we are going to send to every core. We
     // store the index of the levels into a groups array.
-    auto groups = std::vector<std::vector<int>>(max_threads);
+    auto groups = std::vector<std::vector<int>>(num_threads);
     size_t i = 0;
     size_t k = 0;
     while ((int)k < N) {
         groups[i].push_back(k);
         ++k;
-        if (i == max_threads - 1) {
+        if (i == num_threads - 1) {
             i = 0;
         } else {
             ++i;

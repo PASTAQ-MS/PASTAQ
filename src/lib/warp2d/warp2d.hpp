@@ -182,11 +182,15 @@ void compute_warped_similarities(
 // the FU nodes to find the optimal warping path.
 std::vector<int64_t> find_optimal_warping(std::vector<Level>& levels);
 
+// Perform Warp2D in serial by trying to find optimal warping set to maximize
+// similarity between the reference_peaks and the source_peaks.
 std::vector<Centroid::Peak> warp_peaks_serial(
     const std::vector<Centroid::Peak>& reference_peaks,
     const std::vector<Centroid::Peak>& source_peaks,
     const Parameters& parameters);
 
+// Perform Warp2D in parallel by trying to find optimal warping set to maximize
+// similarity between the reference_peaks and the source_peaks.
 std::vector<Centroid::Peak> warp_peaks_parallel(
     const std::vector<Centroid::Peak>& reference_peaks,
     const std::vector<Centroid::Peak>& source_peaks,
