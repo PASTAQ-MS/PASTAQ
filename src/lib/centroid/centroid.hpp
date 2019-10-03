@@ -65,6 +65,14 @@ std::vector<LocalMax> find_local_maxima(const Grid::Mesh &mesh);
 // Builds a Peak object for the given local_max.
 Peak build_peak(const RawData::RawData &raw_data, const LocalMax &local_max);
 
+// Find the peaks in serial.
+std::vector<Peak> find_peaks_serial(const RawData::RawData &raw_data,
+                                    const Grid::Mesh &mesh, size_t max_peaks);
+
+// Find the peaks in parallel.
+std::vector<Peak> find_peaks_parallel(const RawData::RawData &raw_data,
+                                      const Grid::Mesh &mesh, size_t max_peaks,
+                                      size_t max_threads);
 }  // namespace Centroid
 
 #endif /* CENTROID_CENTROID_HPP */
