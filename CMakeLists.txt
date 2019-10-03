@@ -36,7 +36,6 @@ add_library(tapplib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid_serialize.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d_runners.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/metamatch/metamatch.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/metamatch/metamatch_files.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/metamatch/metamatch_serialize.cpp"
