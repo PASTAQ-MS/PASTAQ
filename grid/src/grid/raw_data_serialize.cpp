@@ -113,7 +113,7 @@ bool IdentData::Serialize::read_spectrum_id(std::istream &stream,
     Serialization::read_bool(stream, &spectrum_id->modifications);
     Serialization::read_string(stream, &spectrum_id->sequence);
     Serialization::read_string(stream, &spectrum_id->peptide_id);
-    Serialization::read_uint64(stream, &spectrum_id->charge_state);
+    Serialization::read_uint8(stream, &spectrum_id->charge_state);
     Serialization::read_double(stream, &spectrum_id->theoretical_mz);
     Serialization::read_double(stream, &spectrum_id->experimental_mz);
     Serialization::read_double(stream, &spectrum_id->retention_time);

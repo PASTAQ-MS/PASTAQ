@@ -14,9 +14,9 @@ namespace MetaMatch {
 // considered valid if it has peaks coming from 5 class `A` files or 10 class
 // `B` files.
 struct ClassMap {
-    size_t id;
-    size_t n_files;
-    size_t required_hits;
+    uint32_t id;
+    uint32_t n_files;
+    uint32_t required_hits;
 };
 
 // TODO(alex): Currently we don't use adaptative mz radius.
@@ -29,8 +29,8 @@ struct Parameters {
 // A MetaMatch::Peak is an extension of Centroid::Peak that allow us to store
 // the necessary information for the clustering algorithm.
 struct Peak : Centroid::Peak {
-    size_t file_id;
-    size_t class_id;
+    uint32_t file_id;
+    uint32_t class_id;
     int64_t cluster_id;
     double cluster_mz;
     double cluster_rt;

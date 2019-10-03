@@ -163,9 +163,9 @@ std::string to_string(const RawData::Polarity &polarity) {
 // both cases, entity_id will store the index for the peak or spectrum_id lists
 // respectively.
 struct LinkedMsms {
-    size_t entity_id;
-    size_t msms_id;
-    size_t scan_index;
+    uint64_t entity_id;
+    uint64_t msms_id;
+    uint64_t scan_index;
     double distance;
 };
 
@@ -176,7 +176,7 @@ std::vector<LinkedMsms> link_msms(const std::vector<Centroid::Peak> &peaks,
                                   const RawData::RawData &raw_data) {
     // Index the peak list by m/z.
     struct PeakIndex {
-        size_t id;
+        uint64_t id;
         double mz;
     };
     auto indices = std::vector<PeakIndex>(peaks.size());
@@ -266,7 +266,7 @@ std::vector<LinkedMsms> link_idents(const IdentData::IdentData &ident_data,
                                     const RawData::RawData &raw_data) {
     // Index the spectrumid list by m/z.
     struct SpectrumIdIndex {
-        size_t id;
+        uint64_t id;
         double mz;
     };
     auto &spectrum_ids = ident_data.spectrum_ids;
@@ -802,13 +802,13 @@ theoretical_isotopes_peptide(std::string sequence, int8_t charge_state,
 }
 
 struct Feature {
-    size_t id;
+    uint64_t id;
     double rt;
     double monoisotopic_mz;
     double monoisotopic_height;
     double average_mz;
     double total_height;
-    std::vector<size_t> peak_ids;
+    std::vector<uint64_t> peak_ids;
 };
 
 struct Isotope {
@@ -1040,13 +1040,13 @@ std::vector<Feature> feature_detection(
 
     // Copy and sort key vectors.
     auto idents_msms_key =
-        std::vector<Search::KeySort<size_t>>(link_table_idents.size());
+        std::vector<Search::KeySort<uint64_t>>(link_table_idents.size());
     for (size_t i = 0; i < link_table_idents.size(); ++i) {
         idents_msms_key[i] = {i, link_table_idents[i].msms_id};
     }
     {
-        auto sorting_key_func = [](const Search::KeySort<size_t> &p1,
-                                   const Search::KeySort<size_t> &p2) {
+        auto sorting_key_func = [](const Search::KeySort<uint64_t> &p1,
+                                   const Search::KeySort<uint64_t> &p2) {
             return (p1.sorting_key < p2.sorting_key);
         };
         std::stable_sort(idents_msms_key.begin(), idents_msms_key.end(),
@@ -1121,16 +1121,16 @@ std::vector<Feature> feature_detection(
                     peaks_in_use[peak_id] = true;
                 }
                 // DEBUG: ...
-                //std::cout << " rt: " << maybe_feature.value().rt
-                          //<< " monoisotopic_mz: "
-                          //<< maybe_feature.value().monoisotopic_mz
-                          //<< " monoisotopic_height: "
-                          //<< maybe_feature.value().monoisotopic_height
-                          //<< " average_mz: " << maybe_feature.value().average_mz
-                          //<< " total_height: "
-                          //<< maybe_feature.value().total_height
-                          //<< " num_isotopes: "
-                          //<< maybe_feature.value().peak_ids.size() << std::endl;
+                // std::cout << " rt: " << maybe_feature.value().rt
+                //<< " monoisotopic_mz: "
+                //<< maybe_feature.value().monoisotopic_mz
+                //<< " monoisotopic_height: "
+                //<< maybe_feature.value().monoisotopic_height
+                //<< " average_mz: " << maybe_feature.value().average_mz
+                //<< " total_height: "
+                //<< maybe_feature.value().total_height
+                //<< " num_isotopes: "
+                //<< maybe_feature.value().peak_ids.size() << std::endl;
                 // break; // DEBUG: <---
             }
         }

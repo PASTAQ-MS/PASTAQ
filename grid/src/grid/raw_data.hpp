@@ -93,7 +93,7 @@ struct RawPoints {
     std::vector<double> rt;
     std::vector<double> mz;
     std::vector<double> intensity;
-    size_t num_points;
+    uint64_t num_points;
 };
 
 // Calculate the theoretical FWHM of the peak for the given mz.
@@ -116,7 +116,7 @@ struct SpectrumId {
     bool modifications;
     std::string sequence;
     std::string peptide_id;
-    size_t charge_state;
+    uint8_t charge_state;
     double theoretical_mz;
     double experimental_mz;
     double retention_time;

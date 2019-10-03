@@ -44,8 +44,8 @@ bool MetaMatch::Serialize::write_clusters(
 
 bool MetaMatch::Serialize::read_peak(std::istream &stream, Peak *peak) {
     Centroid::Serialize::read_peak(stream, peak);
-    Serialization::read_uint64(stream, &peak->file_id);
-    Serialization::read_uint64(stream, &peak->class_id);
+    Serialization::read_uint32(stream, &peak->file_id);
+    Serialization::read_uint32(stream, &peak->class_id);
     Serialization::read_int64(stream, &peak->cluster_id);
     Serialization::read_double(stream, &peak->cluster_mz);
     Serialization::read_double(stream, &peak->cluster_rt);
