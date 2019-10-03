@@ -19,18 +19,25 @@ struct LocalMax {
 struct Peak {
     // ID of this peak. Should be kept for futher processing.
     uint64_t id;
+
     // Height, mz and rt values for the center of this peak (From the local
     // maxima coordinates on the mesh).
     double local_max_mz;
     double local_max_rt;
     double local_max_height;
 
+    // If the peak has been warped for retention time alignment, by adding the
+    // following delta we can recover its original retention time.
+    double warping_delta_rt;
+
     // Region of interest for this peak.
     double roi_min_mz;
     double roi_max_mz;
     double roi_min_rt;
     double roi_max_rt;
-    // Simple estimation of the peak metrics on the raw data.
+
+    // Simple estimation of the peak metrics on the raw data using the method
+    // of moments.
     double raw_roi_mean_mz;
     double raw_roi_mean_rt;
     double raw_roi_sigma_mz;
@@ -79,7 +86,7 @@ double peak_overlap(const Peak &peak_a, const Peak &peak_b);
 
 // Calculate the cumulative similarity between two sets of peaks.
 double cumulative_overlap(const std::vector<Peak> &set_a,
-                           const std::vector<Peak> &set_b);
+                          const std::vector<Peak> &set_b);
 
 }  // namespace Centroid
 

@@ -7,6 +7,7 @@ bool Centroid::Serialize::read_peak(std::istream &stream,
     Serialization::read_double(stream, &peak->local_max_mz);
     Serialization::read_double(stream, &peak->local_max_rt);
     Serialization::read_double(stream, &peak->local_max_height);
+    Serialization::read_double(stream, &peak->warping_delta_rt);
     Serialization::read_double(stream, &peak->roi_min_mz);
     Serialization::read_double(stream, &peak->roi_max_mz);
     Serialization::read_double(stream, &peak->roi_min_rt);
@@ -32,6 +33,7 @@ bool Centroid::Serialize::write_peak(std::ostream &stream,
     Serialization::write_double(stream, peak.local_max_mz);
     Serialization::write_double(stream, peak.local_max_rt);
     Serialization::write_double(stream, peak.local_max_height);
+    Serialization::write_double(stream, peak.warping_delta_rt);
     Serialization::write_double(stream, peak.roi_min_mz);
     Serialization::write_double(stream, peak.roi_max_mz);
     Serialization::write_double(stream, peak.roi_min_rt);
@@ -52,7 +54,7 @@ bool Centroid::Serialize::write_peak(std::ostream &stream,
 }
 
 bool Centroid::Serialize::read_peaks(std::istream &stream,
-                                       std::vector<Centroid::Peak> *peaks) {
+                                     std::vector<Centroid::Peak> *peaks) {
     uint64_t num_peaks = 0;
     Serialization::read_uint64(stream, &num_peaks);
     peaks->resize(num_peaks);

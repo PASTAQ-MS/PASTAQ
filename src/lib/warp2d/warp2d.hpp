@@ -149,7 +149,7 @@ struct Level {
 // Warp the peaks by linearly interpolating their retention time to the given
 // reference time. Note that we are just performing linear displacement of the
 // center of the peaks, we do not deform the peak shape by adjusting the sigmas.
-std::vector<Centroid::Peak> warp_peaks(
+std::vector<Centroid::Peak> interpolate_peaks(
     const std::vector<Centroid::Peak>& source_peaks, double source_rt_start,
     double source_rt_end, double ref_rt_start, double ref_rt_end);
 

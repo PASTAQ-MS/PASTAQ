@@ -90,7 +90,7 @@ std::vector<Warp2D::Level> Warp2D::initialize_levels(int64_t N, int64_t m,
     return levels;
 }
 
-std::vector<Centroid::Peak> Warp2D::warp_peaks(
+std::vector<Centroid::Peak> Warp2D::interpolate_peaks(
     const std::vector<Centroid::Peak>& source_peaks, double source_rt_start,
     double source_rt_end, double ref_rt_start, double ref_rt_end) {
     auto warped_peaks =
@@ -99,7 +99,9 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
     for (auto& peak : warped_peaks) {
         double x = (peak.local_max_rt - source_rt_start) /
                    (source_rt_end - source_rt_start);
+        double previous_rt = peak.local_max_rt;
         peak.local_max_rt = Interpolation::lerp(ref_rt_start, ref_rt_end, x);
+        peak.warping_delta_rt = peak.local_max_rt - previous_rt;
     }
     return warped_peaks;
 }
@@ -119,7 +121,7 @@ void Warp2D::compute_warped_similarities(
         double sample_rt_width = (src_end - src_start) * delta_rt;
         double sample_rt_end = sample_rt_start + sample_rt_width;
 
-        auto source_peaks_warped = Warp2D::warp_peaks(
+        auto source_peaks_warped = Warp2D::interpolate_peaks(
             source_peaks, sample_rt_start, sample_rt_end, rt_start, rt_end);
 
         double similarity = Centroid::cumulative_overlap(target_peaks_segment,
@@ -277,7 +279,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks_parallel(
         double sample_rt_width = (x_end - x_start) * delta_rt;
         double sample_rt_end = sample_rt_start + sample_rt_width;
 
-        auto warped_peaks_segment = Warp2D::warp_peaks(
+        auto warped_peaks_segment = Warp2D::interpolate_peaks(
             source_peaks, sample_rt_start, sample_rt_end, rt_start, rt_end);
         for (const auto& peak : warped_peaks_segment) {
             warped_peaks.push_back(peak);
@@ -381,7 +383,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks_serial(
         double sample_rt_width = (x_end - x_start) * delta_rt;
         double sample_rt_end = sample_rt_start + sample_rt_width;
 
-        auto warped_peaks_segment = Warp2D::warp_peaks(
+        auto warped_peaks_segment = Warp2D::interpolate_peaks(
             source_peaks, sample_rt_start, sample_rt_end, rt_start, rt_end);
         for (const auto& peak : warped_peaks_segment) {
             warped_peaks.push_back(peak);
