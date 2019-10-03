@@ -7,7 +7,7 @@ struct Base64 {
     unsigned char *m_string_pointer;
     int m_precision;
     bool m_little_endian;
-    static constexpr unsigned char m_translation_table[256] = {
+    static constexpr uint8_t m_translation_table[256] = {
         64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
         64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
         64, 64, 64, 64, 64, 64, 64, 62, 64, 64, 64, 63, 52, 53, 54, 55, 56, 57,

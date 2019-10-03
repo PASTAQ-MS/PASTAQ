@@ -34,6 +34,10 @@ size_t lower_bound(const std::vector<KeySort<T>> &haystack, T needle) {
     }
     return index;
 }
+// TODO(alex): We probably want a generic lower_bound function that takes a
+// predicate function and a generic type.
+// size_t lower_bound(
+// const std::vector<T1> &haystack, T2 needle, less_than, greater than)...
 
 }  // namespace Search
 
