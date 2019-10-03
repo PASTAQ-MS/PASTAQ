@@ -327,3 +327,58 @@ std::tuple<std::vector<double>, std::vector<double>> Centroid::Peak::xic(
     return raw_data.xic(peak.roi_min_mz, peak.roi_max_mz, peak.roi_min_rt,
                         peak.roi_max_rt, method);
 }
+
+double Centroid::peak_overlap(const Centroid::Peak &peak_a,
+                              const Centroid::Peak &peak_b) {
+    // Early return if the peaks do not intersect in the +/-3 * sigma_mz/rt
+    {
+        double min_rt_a = peak_a.local_max_rt - 3 * peak_a.raw_roi_sigma_rt;
+        double max_rt_a = peak_a.local_max_rt + 3 * peak_a.raw_roi_sigma_rt;
+        double min_mz_a = peak_a.local_max_mz - 3 * peak_a.raw_roi_sigma_mz;
+        double max_mz_a = peak_a.local_max_mz + 3 * peak_a.raw_roi_sigma_mz;
+        double min_rt_b = peak_b.local_max_rt - 3 * peak_b.raw_roi_sigma_rt;
+        double max_rt_b = peak_b.local_max_rt + 3 * peak_b.raw_roi_sigma_rt;
+        double min_mz_b = peak_b.local_max_mz - 3 * peak_b.raw_roi_sigma_mz;
+        double max_mz_b = peak_b.local_max_mz + 3 * peak_b.raw_roi_sigma_mz;
+
+        if (max_rt_a < min_rt_b || max_rt_b < min_rt_a || max_mz_a < min_mz_b ||
+            max_mz_b < min_mz_a) {
+            return 0;
+        }
+    }
+
+    // Calculate the gaussian contribution of the overlap between two points in
+    // one dimension.
+    auto gaussian_contribution = [](double x_a, double x_b, double sigma_a,
+                                    double sigma_b) -> double {
+        double var_a = std::pow(sigma_a, 2);
+        double var_b = std::pow(sigma_b, 2);
+
+        double a = (var_a + var_b) / (var_a * var_b) *
+                   std::pow((x_a * var_b + x_b * var_a) / (var_a + var_b), 2);
+        double b = (x_a * x_a) / var_a + (x_b * x_b) / var_b;
+
+        return std::exp(0.5 * (a - b)) / std::sqrt(var_a + var_b);
+    };
+
+    auto rt_contrib =
+        gaussian_contribution(peak_a.local_max_rt, peak_b.local_max_rt,
+                              peak_a.raw_roi_sigma_rt, peak_b.raw_roi_sigma_rt);
+    auto mz_contrib =
+        gaussian_contribution(peak_a.local_max_mz, peak_b.local_max_mz,
+                              peak_a.raw_roi_sigma_mz, peak_b.raw_roi_sigma_mz);
+
+    return rt_contrib * mz_contrib * peak_a.local_max_height *
+           peak_b.local_max_height;
+}
+
+double Centroid::cumulative_overlap(const std::vector<Centroid::Peak> &set_a,
+                                     const std::vector<Centroid::Peak> &set_b) {
+    double total_overlap = 0;
+    for (const auto &peak_a : set_a) {
+        for (const auto &peak_b : set_b) {
+            total_overlap += Centroid::peak_overlap(peak_a, peak_b);
+        }
+    }
+    return total_overlap;
+}

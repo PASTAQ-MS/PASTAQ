@@ -17,6 +17,8 @@ namespace Warp2D {
 //   segments.
 // - rt_expand_factor: The algorithm will not warp at the range limits so we
 //   need to expand the range by some factor.
+// TODO: Revise if the type of these parameters is correct, i.e. Why would the
+// slack be negative?
 struct Parameters {
     int64_t slack;
     int64_t window_size;
@@ -144,13 +146,6 @@ struct Level {
     std::vector<PotentialWarping> potential_warpings;
 };
 
-// Calculate the overlaping area between two peaks.
-double peak_overlap(const Centroid::Peak& peak_a, const Centroid::Peak& peak_b);
-
-// Calculate the cumulative similarity between two sets of peaks.
-double similarity_2D(const std::vector<Centroid::Peak>& set_a,
-                     const std::vector<Centroid::Peak>& set_b);
-
 // Warp the peaks by linearly interpolating their retention time to the given
 // reference time. Note that we are just performing linear displacement of the
 // center of the peaks, we do not deform the peak shape by adjusting the sigmas.
@@ -186,6 +181,7 @@ void compute_warped_similarities(
 // of warped similarities and updates the FU nodes, and then it walks forward
 // the FU nodes to find the optimal warping path.
 std::vector<int64_t> find_optimal_warping(std::vector<Level>& levels);
+
 }  // namespace Warp2D
 
 #endif /* WARP2D_WARP2D_HPP */

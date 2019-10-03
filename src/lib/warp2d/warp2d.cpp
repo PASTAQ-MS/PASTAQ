@@ -19,67 +19,9 @@ std::vector<Centroid::Peak> Warp2D::peaks_in_rt_range(
             ret.push_back(peak);
             ++i;
         }
-        // TODO(alex): Should we use rt or rt_centroid?
     }
     ret.resize(i);
     return ret;
-}
-
-double Warp2D::peak_overlap(const Centroid::Peak& peak_a,
-                            const Centroid::Peak& peak_b) {
-    // TODO(alex): Use rt/mz/height or rt_centroid/mz_centroid/height_centroid?
-
-    // Early return if the peaks do not intersect in the +/-3 * sigma_mz/rt
-    {
-        double min_rt_a = peak_a.local_max_rt - 3 * peak_a.raw_roi_sigma_rt;
-        double max_rt_a = peak_a.local_max_rt + 3 * peak_a.raw_roi_sigma_rt;
-        double min_mz_a = peak_a.local_max_mz - 3 * peak_a.raw_roi_sigma_mz;
-        double max_mz_a = peak_a.local_max_mz + 3 * peak_a.raw_roi_sigma_mz;
-        double min_rt_b = peak_b.local_max_rt - 3 * peak_b.raw_roi_sigma_rt;
-        double max_rt_b = peak_b.local_max_rt + 3 * peak_b.raw_roi_sigma_rt;
-        double min_mz_b = peak_b.local_max_mz - 3 * peak_b.raw_roi_sigma_mz;
-        double max_mz_b = peak_b.local_max_mz + 3 * peak_b.raw_roi_sigma_mz;
-
-        if (max_rt_a < min_rt_b || max_rt_b < min_rt_a || max_mz_a < min_mz_b ||
-            max_mz_b < min_mz_a) {
-            return 0;
-        }
-    }
-
-    // Calculate the gaussian contribution of the overlap between two points in
-    // one dimension.
-    auto gaussian_contribution = [](double x_a, double x_b, double sigma_a,
-                                    double sigma_b) -> double {
-        double var_a = std::pow(sigma_a, 2);
-        double var_b = std::pow(sigma_b, 2);
-
-        double a = (var_a + var_b) / (var_a * var_b) *
-                   std::pow((x_a * var_b + x_b * var_a) / (var_a + var_b), 2);
-        double b = (x_a * x_a) / var_a + (x_b * x_b) / var_b;
-
-        return std::exp(0.5 * (a - b)) / std::sqrt(var_a + var_b);
-    };
-
-    auto rt_contrib =
-        gaussian_contribution(peak_a.local_max_rt, peak_b.local_max_rt,
-                              peak_a.raw_roi_sigma_rt, peak_b.raw_roi_sigma_rt);
-    auto mz_contrib =
-        gaussian_contribution(peak_a.local_max_mz, peak_b.local_max_mz,
-                              peak_a.raw_roi_sigma_mz, peak_b.raw_roi_sigma_mz);
-
-    return rt_contrib * mz_contrib * peak_a.local_max_height *
-           peak_b.local_max_height;
-}
-
-double Warp2D::similarity_2D(const std::vector<Centroid::Peak>& set_a,
-                             const std::vector<Centroid::Peak>& set_b) {
-    double cumulative_similarity = 0;
-    for (const auto& peak_a : set_a) {
-        for (const auto& peak_b : set_b) {
-            cumulative_similarity += Warp2D::peak_overlap(peak_a, peak_b);
-        }
-    }
-    return cumulative_similarity;
 }
 
 std::vector<Centroid::Peak> Warp2D::filter_peaks(
@@ -180,8 +122,8 @@ void Warp2D::compute_warped_similarities(
         auto source_peaks_warped = Warp2D::warp_peaks(
             source_peaks, sample_rt_start, sample_rt_end, rt_start, rt_end);
 
-        double similarity =
-            Warp2D::similarity_2D(target_peaks_segment, source_peaks_warped);
+        double similarity = Centroid::cumulative_overlap(target_peaks_segment,
+                                                          source_peaks_warped);
         warping.warped_similarity = similarity;
     }
 };

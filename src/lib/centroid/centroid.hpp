@@ -73,6 +73,14 @@ std::vector<Peak> find_peaks_serial(const RawData::RawData &raw_data,
 std::vector<Peak> find_peaks_parallel(const RawData::RawData &raw_data,
                                       const Grid::Mesh &mesh, size_t max_peaks,
                                       size_t max_threads);
+
+// Calculate the overlaping area between two peaks.
+double peak_overlap(const Peak &peak_a, const Peak &peak_b);
+
+// Calculate the cumulative similarity between two sets of peaks.
+double cumulative_overlap(const std::vector<Peak> &set_a,
+                           const std::vector<Peak> &set_b);
+
 }  // namespace Centroid
 
 #endif /* CENTROID_CENTROID_HPP */
