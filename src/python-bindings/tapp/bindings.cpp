@@ -1,33 +1,33 @@
 #include <cassert>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <thread>
 #include <tuple>
 
-#include "centroid/centroid.hpp"
-#include "centroid/centroid_files.hpp"
-#include "centroid/centroid_runners.hpp"
-#include "grid/grid.hpp"
-#include "grid/grid_files.hpp"
-#include "grid/grid_serialize.hpp"
-#include "grid/raw_data.hpp"
-#include "grid/raw_data_serialize.hpp"
-#include "grid/xml_reader.hpp"
-#include "metamatch/metamatch.hpp"
-#include "metamatch/metamatch_serialize.hpp"
 #include "pybind11/numpy.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
+
+#include "centroid/centroid.hpp"
+#include "centroid/centroid_serialize.hpp"
+#include "feature_detection/feature_detection.hpp"
+#include "grid/grid.hpp"
+#include "grid/grid_serialize.hpp"
+#include "link/link.hpp"
+#include "link/link_serialize.hpp"
+#include "metamatch/metamatch.hpp"
+#include "metamatch/metamatch_serialize.hpp"
+#include "raw_data/raw_data.hpp"
+#include "raw_data/raw_data_serialize.hpp"
+#include "raw_data/xml_reader.hpp"
 #include "utils/search.hpp"
 #include "utils/serialization.hpp"
 #include "warp2d/warp2d.hpp"
-#include "warp2d/warp2d_runners.hpp"
 
 namespace py = pybind11;
 
 namespace PythonAPI {
-RawData::RawData read_mzxml(std::string &file_name, double min_mz,
+RawData::RawData read_mzxml(std::string &input_file, double min_mz,
                             double max_mz, double min_rt, double max_rt,
                             std::string instrument_type_str,
                             double resolution_ms1, double resolution_msn,
@@ -92,21 +92,6 @@ RawData::RawData read_mzxml(std::string &file_name, double min_mz,
         throw std::invalid_argument(error_stream.str());
     }
 
-    std::filesystem::path input_file = file_name;
-
-    // Check for proper file extension.
-    std::string extension = input_file.extension();
-    std::string lowercase_extension = extension;
-    for (auto &ch : lowercase_extension) {
-        ch = std::tolower(ch);
-    }
-    if (lowercase_extension != ".mzxml") {
-        std::ostringstream error_stream;
-        error_stream << "invalid file type: expected 'mzXML' but given '"
-                     << extension << "'";
-        throw std::invalid_argument(error_stream.str());
-    }
-
     // Open file stream.
     std::ifstream stream;
     stream.open(input_file);
@@ -154,8 +139,9 @@ std::string to_string(const RawData::Polarity &polarity) {
             return "NEGATIVE";
         case RawData::Polarity::BOTH:
             return "BOTH";
+        case RawData::Polarity::UNKNOWN_POLARITY:
+            return "UNKNOWN";
     };
-    return "UNKNOWN";
 }
 
 std::vector<std::vector<Centroid::Peak>> warp_peaks(
@@ -177,8 +163,8 @@ std::vector<std::vector<Centroid::Peak>> warp_peaks(
         auto peaks = all_peaks[i];
         std::vector<Centroid::Peak> warped_peaks;
         warped_peaks =
-            Warp2D::Runners::Parallel::run(reference_peaks, peaks, parameters,
-                                           std::thread::hardware_concurrency());
+            Warp2D::warp_peaks_parallel(reference_peaks, peaks, parameters,
+                                        std::thread::hardware_concurrency());
         all_warped_peaks.push_back(warped_peaks);
     }
     return all_warped_peaks;
@@ -208,9 +194,9 @@ SimilarityResults find_similarity(std::vector<Centroid::Peak> &peak_list_a,
         peak_list_b.resize(n_peaks);
     }
     SimilarityResults results = {};
-    results.self_a = Warp2D::similarity_2D(peak_list_a, peak_list_a);
-    results.self_b = Warp2D::similarity_2D(peak_list_b, peak_list_b);
-    results.overlap = Warp2D::similarity_2D(peak_list_a, peak_list_b);
+    results.self_a = Centroid::cumulative_overlap(peak_list_a, peak_list_a);
+    results.self_b = Centroid::cumulative_overlap(peak_list_b, peak_list_b);
+    results.overlap = Centroid::cumulative_overlap(peak_list_a, peak_list_b);
     // Overlap / (GeometricMean(self_a, self_b))
     results.geometric_ratio =
         results.overlap / std::sqrt(results.self_a * results.self_b);
@@ -221,29 +207,8 @@ SimilarityResults find_similarity(std::vector<Centroid::Peak> &peak_list_a,
     return results;
 }
 
-void to_csv(const std::vector<Centroid::Peak> &peaks, std::string &file_name) {
-    std::filesystem::path output_file = file_name;
-
-    // Open file stream.
-    std::ofstream stream;
-    stream.open(output_file);
-    if (!stream) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't open output file" << output_file;
-        throw std::invalid_argument(error_stream.str());
-    }
-
-    if (!Centroid::Files::Csv::write_peaks(stream, peaks)) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't write the peaks into the output file"
-                     << output_file;
-        throw std::invalid_argument(error_stream.str());
-    }
-}
-
-void write_raw_data(const RawData::RawData &raw_data, std::string &file_name) {
-    std::filesystem::path output_file = file_name;
-
+void write_raw_data(const RawData::RawData &raw_data,
+                    std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
     stream.open(output_file);
@@ -262,9 +227,7 @@ void write_raw_data(const RawData::RawData &raw_data, std::string &file_name) {
     }
 }
 
-RawData::RawData read_raw_data(std::string &file_name) {
-    std::filesystem::path input_file = file_name;
-
+RawData::RawData read_raw_data(std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
     stream.open(input_file);
@@ -284,9 +247,7 @@ RawData::RawData read_raw_data(std::string &file_name) {
     return raw_data;
 }
 
-void write_mesh(const Grid::Mesh &mesh, std::string &file_name) {
-    std::filesystem::path output_file = file_name;
-
+void write_grid(const Grid::Grid &grid, std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
     stream.open(output_file);
@@ -296,17 +257,15 @@ void write_mesh(const Grid::Mesh &mesh, std::string &file_name) {
         throw std::invalid_argument(error_stream.str());
     }
 
-    if (!Grid::Serialize::write_mesh(stream, mesh)) {
+    if (!Grid::Serialize::write_grid(stream, grid)) {
         std::ostringstream error_stream;
-        error_stream << "error: couldn't write the mesh into the output file"
+        error_stream << "error: couldn't write the grid into the output file"
                      << output_file;
         throw std::invalid_argument(error_stream.str());
     }
 }
 
-Grid::Mesh read_mesh(std::string &file_name) {
-    std::filesystem::path input_file = file_name;
-
+Grid::Grid read_grid(std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
     stream.open(input_file);
@@ -316,20 +275,18 @@ Grid::Mesh read_mesh(std::string &file_name) {
         throw std::invalid_argument(error_stream.str());
     }
 
-    Grid::Mesh mesh;
-    if (!Grid::Serialize::read_mesh(stream, &mesh)) {
+    Grid::Grid grid;
+    if (!Grid::Serialize::read_grid(stream, &grid)) {
         std::ostringstream error_stream;
-        error_stream << "error: couldn't write the mesh into the input file"
+        error_stream << "error: couldn't write the grid into the input file"
                      << input_file;
         throw std::invalid_argument(error_stream.str());
     }
-    return mesh;
+    return grid;
 }
 
 void write_peaks(const std::vector<Centroid::Peak> &peaks,
-                 std::string &file_name) {
-    std::filesystem::path output_file = file_name;
-
+                 std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
     stream.open(output_file);
@@ -347,9 +304,7 @@ void write_peaks(const std::vector<Centroid::Peak> &peaks,
     }
 }
 
-std::vector<Centroid::Peak> read_peaks(std::string &file_name) {
-    std::filesystem::path input_file = file_name;
-
+std::vector<Centroid::Peak> read_peaks(std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
     stream.open(input_file);
@@ -370,9 +325,7 @@ std::vector<Centroid::Peak> read_peaks(std::string &file_name) {
 }
 
 void write_ident_data(const IdentData::IdentData &ident_data,
-                      std::string &file_name) {
-    std::filesystem::path output_file = file_name;
-
+                      std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
     stream.open(output_file);
@@ -391,9 +344,7 @@ void write_ident_data(const IdentData::IdentData &ident_data,
     }
 }
 
-IdentData::IdentData read_ident_data(std::string &file_name) {
-    std::filesystem::path input_file = file_name;
-
+IdentData::IdentData read_ident_data(std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
     stream.open(input_file);
@@ -416,9 +367,7 @@ IdentData::IdentData read_ident_data(std::string &file_name) {
 
 void write_metamatch_clusters(
     const std::vector<MetaMatch::Cluster> &metamatch_clusters,
-    std::string &file_name) {
-    std::filesystem::path output_file = file_name;
-
+    std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
     stream.open(output_file);
@@ -438,9 +387,7 @@ void write_metamatch_clusters(
 }
 
 std::vector<MetaMatch::Cluster> read_metamatch_clusters(
-    std::string &file_name) {
-    std::filesystem::path input_file = file_name;
-
+    std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
     stream.open(input_file);
@@ -462,9 +409,7 @@ std::vector<MetaMatch::Cluster> read_metamatch_clusters(
 }
 
 void write_metamatch_peaks(const std::vector<MetaMatch::Peak> &metamatch_peaks,
-                           std::string &file_name) {
-    std::filesystem::path output_file = file_name;
-
+                           std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
     stream.open(output_file);
@@ -483,9 +428,7 @@ void write_metamatch_peaks(const std::vector<MetaMatch::Peak> &metamatch_peaks,
     }
 }
 
-std::vector<MetaMatch::Peak> read_metamatch_peaks(std::string &file_name) {
-    std::filesystem::path input_file = file_name;
-
+std::vector<MetaMatch::Peak> read_metamatch_peaks(std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
     stream.open(input_file);
@@ -506,10 +449,8 @@ std::vector<MetaMatch::Peak> read_metamatch_peaks(std::string &file_name) {
     return metamatch_peaks;
 }
 
-void write_linked_msms(const std::vector<LinkedMsms> &linked_msms,
-                       std::string &file_name) {
-    std::filesystem::path output_file = file_name;
-
+void write_linked_msms(const std::vector<Link::LinkedMsms> &linked_msms,
+                       std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
     stream.open(output_file);
@@ -519,7 +460,7 @@ void write_linked_msms(const std::vector<LinkedMsms> &linked_msms,
         throw std::invalid_argument(error_stream.str());
     }
 
-    if (!_write_linked_msms_table(stream, linked_msms)) {
+    if (!Link::Serialize::write_linked_msms_table(stream, linked_msms)) {
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the linked_msms into the output file"
@@ -528,9 +469,7 @@ void write_linked_msms(const std::vector<LinkedMsms> &linked_msms,
     }
 }
 
-std::vector<LinkedMsms> read_linked_msms(std::string &file_name) {
-    std::filesystem::path input_file = file_name;
-
+std::vector<Link::LinkedMsms> read_linked_msms(std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
     stream.open(input_file);
@@ -540,8 +479,8 @@ std::vector<LinkedMsms> read_linked_msms(std::string &file_name) {
         throw std::invalid_argument(error_stream.str());
     }
 
-    std::vector<LinkedMsms> linked_msms;
-    if (!_read_linked_msms_table(stream, &linked_msms)) {
+    std::vector<Link::LinkedMsms> linked_msms;
+    if (!Link::Serialize::read_linked_msms_table(stream, &linked_msms)) {
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the linked_msms into the input file"
@@ -551,22 +490,7 @@ std::vector<LinkedMsms> read_linked_msms(std::string &file_name) {
     return linked_msms;
 }
 
-IdentData::IdentData read_mzidentml(std::string &file_name) {
-    std::filesystem::path input_file = file_name;
-
-    // Check for proper file extension.
-    std::string extension = input_file.extension();
-    std::string lowercase_extension = extension;
-    for (auto &ch : lowercase_extension) {
-        ch = std::tolower(ch);
-    }
-    if (lowercase_extension != ".mzid") {
-        std::ostringstream error_stream;
-        error_stream << "invalid file type: expected 'mzid' but given '"
-                     << extension << "'";
-        throw std::invalid_argument(error_stream.str());
-    }
-
+IdentData::IdentData read_mzidentml(std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
     stream.open(input_file);
@@ -585,14 +509,14 @@ struct MetaMatchResults {
 
 MetaMatchResults perform_metamatch(
     // NOTE: [(class_0, peaks_0),...(class_i, peaks_i)]
-    std::vector<std::tuple<size_t, std::vector<Centroid::Peak>>> input,
+    std::vector<std::tuple<uint32_t, std::vector<Centroid::Peak>>> input,
     double radius_mz, double radius_rt, double fraction) {
     MetaMatchResults results;
 
     // Create the ClassMaps.
     std::vector<MetaMatch::ClassMap> class_maps;
     std::vector<MetaMatch::Peak> metapeaks;
-    size_t file_id = 0;
+    uint32_t file_id = 0;
     for (const auto &[class_id, peaks] : input) {
         bool found = false;
         for (auto &class_map : class_maps) {
@@ -704,15 +628,15 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("max_mz"), py::arg("min_rt"), py::arg("max_rt"),
              py::arg("method") = "sum");
 
-    py::class_<Grid::Mesh>(m, "Mesh")
-        .def_readonly("n", &Grid::Mesh::n)
-        .def_readonly("m", &Grid::Mesh::m)
-        .def_readonly("data", &Grid::Mesh::data)
-        .def_readonly("bins_mz", &Grid::Mesh::bins_mz)
-        .def_readonly("bins_rt", &Grid::Mesh::bins_rt)
-        .def("dump", &PythonAPI::write_mesh)
-        .def("__repr__", [](const Grid::Mesh &s) {
-            return "Mesh <n: " + std::to_string(s.n) +
+    py::class_<Grid::Grid>(m, "Grid")
+        .def_readonly("n", &Grid::Grid::n)
+        .def_readonly("m", &Grid::Grid::m)
+        .def_readonly("data", &Grid::Grid::data)
+        .def_readonly("bins_mz", &Grid::Grid::bins_mz)
+        .def_readonly("bins_rt", &Grid::Grid::bins_rt)
+        .def("dump", &PythonAPI::write_grid)
+        .def("__repr__", [](const Grid::Grid &s) {
+            return "Grid <n: " + std::to_string(s.n) +
                    ", m: " + std::to_string(s.m) +
                    ", k: " + std::to_string(s.k) +
                    ", t: " + std::to_string(s.t) +
@@ -864,54 +788,17 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("protein_hypotheses",
                       &IdentData::IdentData::protein_hypotheses);
 
-    py::class_<PythonAPI::LinkedPeptide>(m, "LinkedPeptide")
-        .def_readonly("sequence", &PythonAPI::LinkedPeptide::sequence)
-        .def_readonly("psm_id", &PythonAPI::LinkedPeptide::psm_id)
-        .def_readonly("charge_state", &PythonAPI::LinkedPeptide::charge_state)
-        .def_readonly("ident_rt", &PythonAPI::LinkedPeptide::ident_rt)
-        .def_readonly("ident_mz", &PythonAPI::LinkedPeptide::ident_mz)
-        .def_readonly("theoretical_isotopes_mz",
-                      &PythonAPI::LinkedPeptide::theoretical_isotopes_mz)
-        .def_readonly("theoretical_isotopes_perc",
-                      &PythonAPI::LinkedPeptide::theoretical_isotopes_perc)
-        .def_readonly("linked_isotopes",
-                      &PythonAPI::LinkedPeptide::linked_isotopes)
+    py::class_<FeatureDetection::Feature>(m, "Feature")
+        .def_readonly("id", &FeatureDetection::Feature::id)
+        .def_readonly("rt", &FeatureDetection::Feature::rt)
+        .def_readonly("monoisotopic_mz",
+                      &FeatureDetection::Feature::monoisotopic_mz)
         .def_readonly("monoisotopic_height",
-                      &PythonAPI::LinkedPeptide::monoisotopic_height)
-        .def_readonly("monoisotopic_intensity",
-                      &PythonAPI::LinkedPeptide::monoisotopic_intensity)
-        .def_readonly("total_height", &PythonAPI::LinkedPeptide::total_height)
-        .def_readonly("total_intensity",
-                      &PythonAPI::LinkedPeptide::total_intensity)
-        .def_readonly("weighted_error",
-                      &PythonAPI::LinkedPeptide::weighted_error)
-        .def("__repr__", [](const PythonAPI::LinkedPeptide &s) {
-            return s.sequence + "_" + std::to_string(s.charge_state);
-        });
-
-    py::class_<PythonAPI::Isotope>(m, "Isotope")
-        .def_readonly("id", &PythonAPI::Isotope::id)
-        .def_readonly("mz", &PythonAPI::Isotope::mz)
-        .def_readonly("rt", &PythonAPI::Isotope::rt)
-        .def_readonly("height", &PythonAPI::Isotope::height)
-        .def_readonly("intensity", &PythonAPI::Isotope::intensity)
-        .def_readonly("normalized_height",
-                      &PythonAPI::Isotope::normalized_height)
-        .def_readonly("expected_normalized_height",
-                      &PythonAPI::Isotope::expected_normalized_height)
-        .def("__repr__",
-             [](const PythonAPI::Isotope &s) { return std::to_string(s.id); });
-
-    py::class_<PythonAPI::Feature>(m, "Feature")
-        .def_readonly("id", &PythonAPI::Feature::id)
-        .def_readonly("rt", &PythonAPI::Feature::rt)
-        .def_readonly("monoisotopic_mz", &PythonAPI::Feature::monoisotopic_mz)
-        .def_readonly("monoisotopic_height",
-                      &PythonAPI::Feature::monoisotopic_height)
-        .def_readonly("average_mz", &PythonAPI::Feature::average_mz)
-        .def_readonly("total_height", &PythonAPI::Feature::total_height)
-        .def_readonly("peak_ids", &PythonAPI::Feature::peak_ids)
-        .def("__repr__", [](const PythonAPI::Feature &f) {
+                      &FeatureDetection::Feature::monoisotopic_height)
+        .def_readonly("average_mz", &FeatureDetection::Feature::average_mz)
+        .def_readonly("total_height", &FeatureDetection::Feature::total_height)
+        .def_readonly("peak_ids", &FeatureDetection::Feature::peak_ids)
+        .def("__repr__", [](const FeatureDetection::Feature &f) {
             return "Feature <id: " + std::to_string(f.id) +
                    ", rt: " + std::to_string(f.rt) +
                    ", monoisotopic_mz: " + std::to_string(f.monoisotopic_mz) +
@@ -954,11 +841,11 @@ PYBIND11_MODULE(tapp, m) {
                    ", class_id: " + std::to_string(p.class_id) + ">";
         });
 
-    py::class_<PythonAPI::LinkedMsms>(m, "LinkedMsms")
-        .def_readonly("entity_id", &PythonAPI::LinkedMsms::entity_id)
-        .def_readonly("msms_id", &PythonAPI::LinkedMsms::msms_id)
-        .def_readonly("distance", &PythonAPI::LinkedMsms::distance)
-        .def("__repr__", [](const PythonAPI::LinkedMsms &p) {
+    py::class_<Link::LinkedMsms>(m, "LinkedMsms")
+        .def_readonly("entity_id", &Link::LinkedMsms::entity_id)
+        .def_readonly("msms_id", &Link::LinkedMsms::msms_id)
+        .def_readonly("distance", &Link::LinkedMsms::distance)
+        .def("__repr__", [](const Link::LinkedMsms &p) {
             return "LinkedMsms <entity_id: " + std::to_string(p.entity_id) +
                    ", scan_index: " + std::to_string(p.scan_index) +
                    ", msms_id: " + std::to_string(p.msms_id) +
@@ -986,9 +873,10 @@ PYBIND11_MODULE(tapp, m) {
              "Save the fitted peaks as a bpks file", py::arg("raw_data"),
              py::arg("min_mz"), py::arg("max_mz"), py::arg("min_rt"),
              py::arg("max_rt"))
-        .def("find_peaks", &Centroid::Runners::Parallel::run,
-             "Find all peaks in the given mesh", py::arg("raw_data"),
-             py::arg("mesh"), py::arg("max_peaks") = 0)
+        .def("find_peaks", &Centroid::find_peaks_parallel,
+             "Find all peaks in the given grid", py::arg("raw_data"),
+             py::arg("grid"), py::arg("max_peaks") = 0,
+             py::arg("max_threads") = std::thread::hardware_concurrency())
         .def("warp_peaks", &PythonAPI::warp_peaks,
              "Warp peak lists to maximize the similarity with the given "
              "reference",
@@ -1010,9 +898,6 @@ PYBIND11_MODULE(tapp, m) {
         .def("write_linked_msms", &PythonAPI::write_linked_msms,
              "Write the linked_msms to disk in a binary format",
              py::arg("linked_msms"), py::arg("file_name"))
-        .def("to_csv", &PythonAPI::to_csv,
-             "Write the peaks to disk in csv format (compatibility)",
-             py::arg("peaks"), py::arg("file_name"))
         .def("read_peaks", &PythonAPI::read_peaks,
              "Read the peaks from the binary peaks file", py::arg("file_name"))
         .def("read_metamatch_clusters", &PythonAPI::read_metamatch_clusters,
@@ -1025,13 +910,13 @@ PYBIND11_MODULE(tapp, m) {
         .def("read_raw_data", &PythonAPI::read_raw_data,
              "Read the raw_data from the binary raw_data file",
              py::arg("file_name"))
-        .def("read_mesh", &PythonAPI::read_mesh,
-             "Read the mesh from the binary mesh file", py::arg("file_name"))
+        .def("read_grid", &PythonAPI::read_grid,
+             "Read the grid from the binary grid file", py::arg("file_name"))
         .def("read_linked_msms", &PythonAPI::read_linked_msms,
              "Read the linked_msms from the binary linked_msms file",
              py::arg("file_name"))
         .def("theoretical_isotopes_peptide",
-             &PythonAPI::theoretical_isotopes_peptide,
+             &FeatureDetection::theoretical_isotopes_peptide,
              "Calculate the theoretical isotopic distribution of a peptide",
              py::arg("sequence"), py::arg("charge_state"),
              py::arg("min_perc") = 0.01)
@@ -1047,17 +932,14 @@ PYBIND11_MODULE(tapp, m) {
         .def("perform_metamatch", &PythonAPI::perform_metamatch,
              "Perform metamatch for peak matching", py::arg("input"),
              py::arg("radius_mz"), py::arg("radius_rt"), py::arg("fraction"))
-        .def("link_msms", &PythonAPI::link_msms, "Link msms events to peak ids",
+        .def("link_msms", &Link::link_msms, "Link msms events to peak ids",
              py::arg("peaks"), py::arg("raw_data"))
-        .def("link_idents", &PythonAPI::link_idents,
+        .def("link_idents", &Link::link_idents,
              "Link msms events to spectrum identifications",
              py::arg("ident_data"), py::arg("raw_data"))
-        .def("feature_detection", &PythonAPI::feature_detection,
+        .def("feature_detection", &FeatureDetection::feature_detection,
              "Link peaks as features", py::arg("peaks"),
              py::arg("raw_data_ms2"), py::arg("ident_data"),
              py::arg("link_table_idents"), py::arg("link_table_msms"),
-             py::arg("discrepancy_threshold") = 0.25)
-        .def("link_identified_peptides", &PythonAPI::link_identified_peptides,
-             "DEBUG", py::arg("peaks"), py::arg("identifications"),
-             py::arg("tolerance_rt"), py::arg("minimum_isotope_perc"));
+             py::arg("discrepancy_threshold") = 0.25);
 }
