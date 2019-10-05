@@ -9,9 +9,9 @@
 // into a binary stream.
 namespace Grid::Serialize {
 
-// Grid::Mesh
-bool read_mesh(std::istream &stream, Grid::Mesh *mesh);
-bool write_mesh(std::ostream &stream, const Grid::Mesh &mesh);
+// Grid::Grid
+bool read_grid(std::istream &stream, Grid *grid);
+bool write_grid(std::ostream &stream, const Grid &grid);
 
 }  // namespace Grid::Serialize
 

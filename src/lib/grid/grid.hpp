@@ -8,7 +8,7 @@
 
 namespace Grid {
 
-struct Mesh {
+struct Grid {
     // Represent the grid dimensions in index coordinates:
     //   n: Number of sampling points in mz.
     //   m: Number of sampling points in rt.
@@ -18,7 +18,7 @@ struct Mesh {
     uint64_t m;
     uint64_t k;
     uint64_t t;
-    // The Mesh data is stored as an array, and the mz and rt corresponding to
+    // The Grid data is stored as an array, and the mz and rt corresponding to
     // each bin is memoized for quick indexing when searching.
     // TODO(alex): Not sure that these should be doubles anymore, it uses
     // a significant amount of memory and is storing smoothed data, which
@@ -60,7 +60,7 @@ struct Mesh {
 // Since multiple passes of a Gaussian smoothing is equivalent to a single pass
 // with `sigma = sqrt(2) * sigma_pass`, we adjust the sigmas for each pass
 // accordingly.
-Mesh resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
+Grid resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
               uint64_t num_samples_rt, double smoothing_coef_mz,
               double smoothing_coef_rt);
 

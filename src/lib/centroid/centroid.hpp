@@ -21,7 +21,7 @@ struct Peak {
     uint64_t id;
 
     // Height, mz and rt values for the center of this peak (From the local
-    // maxima coordinates on the mesh).
+    // maxima coordinates on the grid).
     double local_max_mz;
     double local_max_rt;
     double local_max_height;
@@ -63,22 +63,22 @@ struct Peak {
         const RawData::RawData &raw_data, std::string method);
 };
 
-// Find all candidate points on the given mesh by calculating the local maxima
+// Find all candidate points on the given grid by calculating the local maxima
 // at each point of the grid. The local maxima is defined as follows: For the
 // given indexes i and j the point at data[i][j] is greater than the neighbors
 // in all 4 cardinal directions.
-std::vector<LocalMax> find_local_maxima(const Grid::Mesh &mesh);
+std::vector<LocalMax> find_local_maxima(const Grid::Grid &grid);
 
 // Builds a Peak object for the given local_max.
 Peak build_peak(const RawData::RawData &raw_data, const LocalMax &local_max);
 
 // Find the peaks in serial.
 std::vector<Peak> find_peaks_serial(const RawData::RawData &raw_data,
-                                    const Grid::Mesh &mesh, size_t max_peaks);
+                                    const Grid::Grid &grid, size_t max_peaks);
 
 // Find the peaks in parallel.
 std::vector<Peak> find_peaks_parallel(const RawData::RawData &raw_data,
-                                      const Grid::Mesh &mesh, size_t max_peaks,
+                                      const Grid::Grid &grid, size_t max_peaks,
                                       size_t max_threads);
 
 // Calculate the overlaping area between two peaks.

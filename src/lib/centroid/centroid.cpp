@@ -6,16 +6,16 @@
 #include "utils/search.hpp"
 
 std::vector<Centroid::LocalMax> Centroid::find_local_maxima(
-    const Grid::Mesh &mesh) {
+    const Grid::Grid &grid) {
     std::vector<Centroid::LocalMax> points;
     // FIXME: This is performed in O(n^2), but using the divide and conquer
     // strategy we might achieve O(n * log(n)) or lower.
     // FIXME: Also, we should consider the corner case where neighbours are
     // exactly equal, both should be considered a local maxima and the average
     // of mz and rt should be reported.
-    for (size_t j = 1; j < mesh.m - 1; ++j) {
-        for (size_t i = 1; i < mesh.n - 1; ++i) {
-            int64_t index = i + j * mesh.n;
+    for (size_t j = 1; j < grid.m - 1; ++j) {
+        for (size_t i = 1; i < grid.n - 1; ++i) {
+            int64_t index = i + j * grid.n;
 
             // NOTE(alex): The definition of a local maxima in a 2D space might
             // have different interpretations. i.e. We can select the 8
@@ -31,15 +31,15 @@ std::vector<Centroid::LocalMax> Centroid::find_local_maxima(
             // ----------------------------------------------
             // |              | bottom_value |              |
             // ----------------------------------------------
-            double value = mesh.data[index];
-            double right_value = mesh.data[index + 1];
-            double left_value = mesh.data[index - 1];
-            double top_value = mesh.data[index - mesh.n];
-            double bottom_value = mesh.data[index + mesh.n];
+            double value = grid.data[index];
+            double right_value = grid.data[index + 1];
+            double left_value = grid.data[index - 1];
+            double top_value = grid.data[index - grid.n];
+            double bottom_value = grid.data[index + grid.n];
 
             if ((value != 0) && (value > left_value) && (value > right_value) &&
                 (value > top_value) && (value > bottom_value)) {
-                points.push_back({mesh.bins_mz[i], mesh.bins_rt[j], value});
+                points.push_back({grid.bins_mz[i], grid.bins_rt[j], value});
             }
         }
     }
@@ -206,10 +206,10 @@ Centroid::Peak Centroid::build_peak(const RawData::RawData &raw_data,
 }
 
 std::vector<Centroid::Peak> Centroid::find_peaks_serial(
-    const RawData::RawData &raw_data, const Grid::Mesh &mesh,
+    const RawData::RawData &raw_data, const Grid::Grid &grid,
     size_t max_peaks) {
     // Finding local maxima.
-    auto local_max = Centroid::find_local_maxima(mesh);
+    auto local_max = Centroid::find_local_maxima(grid);
 
     // Sort the local_maxima by value.
     auto sort_local_max = [](const Centroid::LocalMax &p1,
@@ -245,10 +245,10 @@ std::vector<Centroid::Peak> Centroid::find_peaks_serial(
 }
 
 std::vector<Centroid::Peak> Centroid::find_peaks_parallel(
-    const RawData::RawData &raw_data, const Grid::Mesh &mesh, size_t max_peaks,
+    const RawData::RawData &raw_data, const Grid::Grid &grid, size_t max_peaks,
     size_t max_threads) {
     // Finding local maxima.
-    auto local_max = Centroid::find_local_maxima(mesh);
+    auto local_max = Centroid::find_local_maxima(grid);
 
     // The number of groups/threads is set to the maximum possible concurrency.
     uint64_t num_threads = std::thread::hardware_concurrency();
@@ -268,7 +268,7 @@ std::vector<Centroid::Peak> Centroid::find_peaks_parallel(
     std::vector<std::vector<Centroid::Peak>> peaks_array(num_threads);
     for (size_t i = 0; i < groups.size(); ++i) {
         threads[i] = std::thread([&groups, &local_max, &peaks_array, &raw_data,
-                                  &mesh, i]() {
+                                  &grid, i]() {
             for (const auto &k : groups[i]) {
                 auto peak = build_peak(raw_data, local_max[k]);
                 // FIXME: Number of raw points within the theoretical sigma
