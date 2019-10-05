@@ -1,9 +1,9 @@
-#ifndef GRID_RAWDATASERIALIZE_HPP
-#define GRID_RAWDATASERIALIZE_HPP
+#ifndef RAWDATA_RAWDATASERIALIZE_HPP
+#define RAWDATA_RAWDATASERIALIZE_HPP
 
 #include <iostream>
 
-#include "raw_data.hpp"
+#include "raw_data/raw_data.hpp"
 
 // This namespace groups the functions used to serialize RawData data structures
 // into a binary stream.
@@ -60,4 +60,4 @@ bool read_ident_data(std::istream &stream, IdentData *ident_data);
 bool write_ident_data(std::ostream &stream, const IdentData &ident_data);
 }  // namespace IdentData::Serialize
 
-#endif /* GRID_RAWDATASERIALIZE_HPP */
+#endif /* RAWDATA_RAWDATASERIALIZE_HPP */

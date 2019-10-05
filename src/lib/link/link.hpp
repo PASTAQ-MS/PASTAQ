@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "centroid/centroid.hpp"
-#include "grid/raw_data.hpp"
+#include "raw_data/raw_data.hpp"
 
 namespace Link {
 // This table can store linkage for both peak-msms and spectrum_id-msms. In
@@ -20,8 +20,6 @@ struct LinkedMsms {
     double distance;
 };
 // TODO(alex): This needs more documentation
-// TODO(alex): The name of this module seems confusing. Maybe link.cpp/link.hpp
-// is better?
 
 // NOTE: This algorithm relies on the peak vector to be sorted by id/height.
 std::vector<LinkedMsms> link_msms(const std::vector<Centroid::Peak> &peaks,

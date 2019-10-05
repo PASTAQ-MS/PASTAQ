@@ -1,4 +1,4 @@
-#include "link/link_msms_serialize.hpp"
+#include "link/link_serialize.hpp"
 #include "utils/serialization.hpp"
 
 bool Link::Serialize::read_linked_msms(std::istream &stream,

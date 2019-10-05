@@ -1,11 +1,10 @@
-#ifndef GRID_XMLREADER_HPP
-#define GRID_XMLREADER_HPP
+#ifndef RAWDATA_XMLREADER_HPP
+#define RAWDATA_XMLREADER_HPP
 
 #include <map>
 #include <optional>
 
-#include "grid/grid.hpp"
-#include "grid/raw_data.hpp"
+#include "raw_data/raw_data.hpp"
 
 // XmlReader handles reading xml tags and the supported xml files. This is not
 // a generic module, it is tailored to read Grid::Point objects to use for
@@ -38,4 +37,4 @@ std::optional<RawData::RawData> read_mzxml(
 IdentData::IdentData read_mzidentml(std::istream &stream);
 }  // namespace XmlReader
 
-#endif /* GRID_XMLREADER_HPP */
+#endif /* RAWDATA_XMLREADER_HPP */

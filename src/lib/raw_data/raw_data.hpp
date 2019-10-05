@@ -1,5 +1,5 @@
-#ifndef GRID_RAWDATA_HPP
-#define GRID_RAWDATA_HPP
+#ifndef RAWDATA_RAWDATA_HPP
+#define RAWDATA_RAWDATA_HPP
 
 #include <cassert>
 #include <cmath>
@@ -172,4 +172,4 @@ struct IdentData {
 };
 }  // namespace IdentData
 
-#endif /* GRID_RAWDATA_HPP */
+#endif /* RAWDATA_RAWDATA_HPP */

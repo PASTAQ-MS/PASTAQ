@@ -1,4 +1,4 @@
-#include "grid/raw_data.hpp"
+#include "raw_data/raw_data.hpp"
 #include "utils/search.hpp"
 
 double RawData::theoretical_fwhm(const RawData &raw_data, double mz) {
@@ -98,9 +98,9 @@ std::tuple<std::vector<double>, std::vector<double>> RawData::RawData::xic(
     return {rt, intensity};
 }
 
-::RawData::RawPoints RawData::find_raw_points(const RawData &raw_data, double min_mz,
-                                   double max_mz, double min_rt,
-                                   double max_rt) {
+::RawData::RawPoints RawData::find_raw_points(const RawData &raw_data,
+                                              double min_mz, double max_mz,
+                                              double min_rt, double max_rt) {
     RawPoints raw_points;
     const auto &scans = raw_data.scans;
     if (scans.size() == 0) {

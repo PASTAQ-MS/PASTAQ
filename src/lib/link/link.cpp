@@ -1,4 +1,4 @@
-#include "link/link_msms.hpp"
+#include "link/link.hpp"
 #include "utils/search.hpp"
 
 std::vector<Link::LinkedMsms> Link::link_msms(
