@@ -20,7 +20,7 @@ endif()
 # Threads
 find_package(Threads REQUIRED)
 # MIDAs
-# add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ext/midas" ${CMAKE_CURRENT_BINARY_DIR}/midas)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/midas" ${CMAKE_CURRENT_BINARY_DIR}/midas)
 # PyBind
 #add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ext/pybind11" ${CMAKE_CURRENT_BINARY_DIR}/pybind11)
 #pybind11_add_module(tapp src/tapp/bindings.cpp)
@@ -28,26 +28,27 @@ find_package(Threads REQUIRED)
 
 # Build TAPPs library.
 add_library(tapplib
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/grid/grid.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/grid/grid_serialize.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/raw_data.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/raw_data_serialize.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/xml_reader.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid_serialize.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/feature_detection/feature_detection.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/grid/grid.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/grid/grid_serialize.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/link/link.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/link/link_serialize.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/metamatch/metamatch.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/metamatch/metamatch_files.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/metamatch/metamatch_serialize.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/link/link.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/link/link_serialize.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/raw_data.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/raw_data_serialize.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/xml_reader.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/base64.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/interpolation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/search.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/serialization.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d.cpp"
     )
 target_include_directories(tapplib PUBLIC src/lib)
-target_link_libraries(tapplib ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(tapplib ${CMAKE_THREAD_LIBS_INIT} midas)
 
 # Include executable target.
 #if (NOT TARGET metamatch)
