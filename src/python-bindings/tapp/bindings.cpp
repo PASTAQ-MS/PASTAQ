@@ -185,6 +185,7 @@ std::vector<std::vector<Centroid::Peak>> warp_peaks(
     return all_warped_peaks;
 }
 
+// TODO: Where should this function go?
 struct SimilarityResults {
     double self_a;
     double self_b;

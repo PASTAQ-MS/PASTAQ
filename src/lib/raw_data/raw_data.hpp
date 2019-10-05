@@ -10,15 +10,30 @@
 
 namespace Instrument {
 
-enum Type : uint8_t { QUAD = 0, TOF = 1, FTICR = 2, ORBITRAP = 3, UNKNOWN = 4 };
+enum Type : uint8_t { UNKNOWN = 0, QUAD = 1, TOF = 2, FTICR = 3, ORBITRAP = 4 };
 
 }  // namespace Instrument
 
 // In this namespace we have access to the data structures for working with raw
 // data.
 namespace RawData {
-enum Polarity : uint8_t { POSITIVE = 0, NEGATIVE = 1, BOTH = 2 };
-enum ActivationMethod : uint8_t { UNKNOWN = 0, CID = 1, HCD = 2 };
+// The ionization polarity of the analysis. It is possible to configure some
+// instruments to acquire data in alternating polarities (+,-,+...). This
+// parameter is meant to be used as a filter of the scans that are going to be
+// read from the raw data.
+enum Polarity : uint8_t {
+    UNKNOWN_POLARITY = 0,
+    POSITIVE = 1,
+    NEGATIVE = 2,
+    BOTH = 3
+};
+
+// This describes the fragmentation method for MS/MS spectra.
+enum ActivationMethod : uint8_t {
+    UNKNOWN_ACTIVATION_METHOD = 0,
+    CID = 1,
+    HCD = 2
+};
 
 // For an MS/MS scan, some information about the precursor scan is saved by the
 // instrument.

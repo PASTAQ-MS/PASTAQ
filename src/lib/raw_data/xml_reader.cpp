@@ -252,11 +252,12 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
                                 RawData::ActivationMethod::HCD;
                         } else {
                             scan.precursor_information.activation_method =
-                                RawData::ActivationMethod::UNKNOWN;
+                                RawData::ActivationMethod::
+                                    UNKNOWN_ACTIVATION_METHOD;
                         }
                     } else {
-                        scan.precursor_information.activation_method =
-                            RawData::ActivationMethod::UNKNOWN;
+                        scan.precursor_information.activation_method = RawData::
+                            ActivationMethod::UNKNOWN_ACTIVATION_METHOD;
                     }
 
                     auto data = XmlReader::read_data(stream);
