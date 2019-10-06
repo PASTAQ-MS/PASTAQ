@@ -75,12 +75,11 @@ double Grid::rt_at(const Grid &grid, uint64_t j) {
 }
 
 Grid::Grid Grid::resample(const RawData::RawData &raw_data,
-                          uint64_t num_samples_mz, uint64_t num_samples_rt,
-                          double smoothing_coef_mz, double smoothing_coef_rt) {
+                          const ResampleParams &params) {
     // Initialize the Grid.
     Grid grid;
-    grid.k = num_samples_mz;
-    grid.t = num_samples_rt;
+    grid.k = params.num_samples_mz;
+    grid.t = params.num_samples_rt;
     grid.reference_mz = raw_data.reference_mz;
     grid.fwhm_mz = raw_data.reference_mz / raw_data.resolution_ms1;
     grid.fwhm_rt = raw_data.fwhm_rt;
@@ -111,12 +110,12 @@ Grid::Grid Grid::resample(const RawData::RawData &raw_data,
 
     // Pre-calculate the smoothing sigma values for all bins of the grid.
     double sigma_rt = RawData::fwhm_to_sigma(raw_data.fwhm_rt) *
-                      smoothing_coef_rt / std::sqrt(2);
+                      params.smoothing_coef_rt / std::sqrt(2);
     auto sigma_mz_vec = std::vector<double>(n);
     for (size_t i = 0; i < n; ++i) {
         sigma_mz_vec[i] = RawData::fwhm_to_sigma(RawData::theoretical_fwhm(
                               raw_data, grid.bins_mz[i])) *
-                          smoothing_coef_mz / std::sqrt(2);
+                          params.smoothing_coef_mz / std::sqrt(2);
     }
 
     // Pre-calculate the kernel half widths for rt and mz.
@@ -125,8 +124,8 @@ Grid::Grid Grid::resample(const RawData::RawData &raw_data,
     // for the entire rt range. The same applies for mz, as we are using a
     // warped grid that keeps the number of sampling points constant across the
     // entire m/z range.
-    double delta_rt = grid.fwhm_rt / num_samples_rt;
-    double delta_mz = grid.fwhm_mz / num_samples_mz;
+    double delta_rt = grid.fwhm_rt / params.num_samples_rt;
+    double delta_mz = grid.fwhm_mz / params.num_samples_mz;
     double sigma_mz_ref = RawData::fwhm_to_sigma(grid.fwhm_mz);
     uint64_t rt_kernel_hw = 3 * sigma_rt / delta_rt;
     uint64_t mz_kernel_hw = 3 * sigma_mz_ref / delta_mz;

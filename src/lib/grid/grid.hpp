@@ -18,11 +18,15 @@ struct Grid {
     uint64_t m;
     uint64_t k;
     uint64_t t;
+
     // The Grid data is stored as an array, and the mz and rt corresponding to
     // each bin is memoized for quick indexing when searching.
     // TODO(alex): Not sure that these should be doubles anymore, it uses
     // a significant amount of memory and is storing smoothed data, which
-    // already alters the precision of the initial measurements.
+    // already alters the precision of the initial measurements. The issue is
+    // that the resampling procedure involves the summation of many numbers on
+    // several grid points, which might significatnly alter results. More
+    // testing is needed.
     std::vector<double> data;
     std::vector<double> bins_mz;
     std::vector<double> bins_rt;
@@ -49,9 +53,13 @@ struct Grid {
 // Since multiple passes of a Gaussian smoothing is equivalent to a single pass
 // with `sigma = sqrt(2) * sigma_pass`, we adjust the sigmas for each pass
 // accordingly.
-Grid resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
-              uint64_t num_samples_rt, double smoothing_coef_mz,
-              double smoothing_coef_rt);
+struct ResampleParams {
+    uint64_t num_samples_mz;
+    uint64_t num_samples_rt;
+    double smoothing_coef_mz;
+    double smoothing_coef_rt;
+};
+Grid resample(const RawData::RawData &raw_data, const ResampleParams &params);
 
 // Calculate the index i/j for the given mz/rt on the grid. This calculation is
 // performed in linear time.

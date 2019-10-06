@@ -115,6 +115,17 @@ RawData::RawData read_mzxml(std::string &input_file, double min_mz,
     return raw_data.value();
 }
 
+Grid::Grid resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
+                    uint64_t num_samples_rt, double smoothing_coef_mz,
+                    double smoothing_coef_rt) {
+    auto params = Grid::ResampleParams{};
+    params.num_samples_mz = num_samples_mz;
+    params.num_samples_rt = num_samples_rt;
+    params.smoothing_coef_mz = smoothing_coef_mz;
+    params.smoothing_coef_rt = smoothing_coef_rt;
+    return Grid::resample(raw_data, params);
+}
+
 std::string to_string(const Instrument::Type &instrument_type) {
     switch (instrument_type) {
         case Instrument::Type::QUAD:
@@ -864,7 +875,7 @@ PYBIND11_MODULE(tapp, m) {
              "Calculate the theoretical width of the peak at the given m/z for "
              "the given raw file",
              py::arg("raw_data"), py::arg("mz"))
-        .def("resample", &Grid::resample,
+        .def("resample", &PythonAPI::resample,
              "Resample the raw data into a smoothed warped grid",
              py::arg("raw_data"), py::arg("num_mz") = 10,
              py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 0.5,
