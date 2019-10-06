@@ -28,8 +28,6 @@ struct Grid {
     std::vector<double> bins_rt;
 
     // Parameters extracted from the raw data.
-    // TODO: Are these necessary to store here? We have memoized the bins in
-    // the respective dimensions, so these might not be used at all.
     Instrument::Type instrument_type;
     double reference_mz;
     double fwhm_mz;
@@ -37,19 +35,10 @@ struct Grid {
 
     // Represent the bounds of this grid in mass-to-charge and retention time
     // coordinates.
-    // TODO: Is storing this necessary? We already have this information from
-    // the bins_mz/bins_rt array.
     double min_mz;
     double max_mz;
     double min_rt;
     double max_rt;
-
-    // TODO: Methods vs functions? The eternal question, but I feel we should
-    // be consistent across all modules.
-    uint64_t x_index(double mz);
-    uint64_t y_index(double rt);
-    double mz_at(uint64_t i);
-    double rt_at(uint64_t j);
 };
 
 // Applies 2D kernel smoothing. The smoothing is performed in two passes.  First
@@ -63,6 +52,16 @@ struct Grid {
 Grid resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
               uint64_t num_samples_rt, double smoothing_coef_mz,
               double smoothing_coef_rt);
+
+// Calculate the index i/j for the given mz/rt on the grid. This calculation is
+// performed in linear time.
+uint64_t x_index(const Grid &grid, double mz);
+uint64_t y_index(const Grid &grid, double rt);
+
+// Calculate the mz/rt at index i/j for a given grid. The calculation is
+// performed in linear time.
+double mz_at(const Grid &grid, uint64_t i);
+double rt_at(const Grid &grid, uint64_t j);
 
 }  // namespace Grid
 
