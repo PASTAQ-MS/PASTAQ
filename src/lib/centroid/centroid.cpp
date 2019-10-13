@@ -319,9 +319,8 @@ std::vector<Centroid::Peak> Centroid::find_peaks_parallel(
     return peaks;
 }
 
-std::tuple<std::vector<double>, std::vector<double>> Centroid::Peak::xic(
-    const RawData::RawData &raw_data, std::string method) {
-    Centroid::Peak &peak = *this;
+std::tuple<std::vector<double>, std::vector<double>> Centroid::xic(
+    const Peak &peak, const RawData::RawData &raw_data, std::string method) {
     return raw_data.xic(peak.roi_min_mz, peak.roi_max_mz,
                         peak.roi_min_rt + peak.warping_delta_rt,
                         peak.roi_max_rt + peak.warping_delta_rt, method);

@@ -53,14 +53,6 @@ struct Peak {
     uint64_t raw_roi_num_scans;
 
     // FIXME: Better commments and documentation.
-    // FIXME: method should take an enum instead of a string.
-    // FIXME: Is is necessary to have this as a virtual method instead of
-    // a function?
-    // Extracted Ion Chromatogram. Can be performed with summation or maxima
-    // (Total Ion Chromatogram/Base Peak Chromatogram). Returns two vectors
-    // (retention_time, aggregated_intensity).
-    std::tuple<std::vector<double>, std::vector<double>> xic(
-        const RawData::RawData &raw_data, std::string method);
 };
 
 // Find all candidate points on the given grid by calculating the local maxima
@@ -88,6 +80,12 @@ double peak_overlap(const Peak &peak_a, const Peak &peak_b);
 double cumulative_overlap(const std::vector<Peak> &set_a,
                           const std::vector<Peak> &set_b);
 
+// FIXME: method should take an enum instead of a string.
+// Extracted Ion Chromatogram. Can be performed with summation or maxima
+// (Total Ion Chromatogram/Base Peak Chromatogram). Returns two vectors
+// (retention_time, aggregated_intensity).
+std::tuple<std::vector<double>, std::vector<double>> xic(
+    const Peak &peak, const RawData::RawData &raw_data, std::string method);
 }  // namespace Centroid
 
 #endif /* CENTROID_CENTROID_HPP */

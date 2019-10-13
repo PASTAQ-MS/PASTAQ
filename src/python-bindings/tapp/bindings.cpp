@@ -688,8 +688,8 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("raw_roi_max_height", &Centroid::Peak::raw_roi_max_height)
         .def_readonly("raw_roi_num_points", &Centroid::Peak::raw_roi_num_points)
         .def_readonly("raw_roi_num_scans", &Centroid::Peak::raw_roi_num_scans)
-        .def("xic", &Centroid::Peak::xic, py::arg("raw_data"),
-             py::arg("method") = "sum")
+        //.def("xic", &Centroid::xic, py::arg("peak"), py::arg("raw_data"),
+             //py::arg("method") = "sum")
         .def("__repr__", [](const Centroid::Peak &p) {
             return "Peak <id: " + std::to_string(p.id) +
                    ", local_max_mz: " + std::to_string(p.local_max_mz) +
