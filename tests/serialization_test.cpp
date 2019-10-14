@@ -1,6 +1,7 @@
 #include "doctest.h"
+#include "mock_stream.hpp"
+#include "test_utils.hpp"
 
-#include "testutils/mock_stream.hpp"
 #include "utils/serialization.hpp"
 
 TEST_CASE("Read/Write double values") {

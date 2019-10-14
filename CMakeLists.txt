@@ -1,6 +1,6 @@
-project(tapp)
-
 cmake_minimum_required(VERSION 3.1)
+
+project(tapp VERSION "0.0.0")
 
 # Set project properties.
 set(CMAKE_CXX_STANDARD 17)
@@ -54,7 +54,7 @@ target_link_libraries(tapp PRIVATE tapplib)
 
 # Include tests if testing library is present.
 # --------------------------------------------
-if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} AND ${ENABLE_TESTS})
+if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} AND (${TAPP_ENABLE_TESTS}))
     unset(DOCTEST_LIBRARY_PATH CACHE)
     find_path(
         DOCTEST_LIBRARY_PATH
@@ -72,8 +72,14 @@ if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} AND ${ENABLE_TESTS})
         # Add tests.
         add_executable(
             tapplib_test
+            tests/centroid_test.cpp
+            tests/grid_test.cpp
             tests/main.cpp
+            tests/metamatch_test.cpp
             tests/mock_stream_test.cpp
+            tests/serialization_test.cpp
+            tests/warp2d_test.cpp
+            tests/xml_reader_test.cpp
             )
         add_test(NAME tapplib_test COMMAND tapplib_test)
         target_link_libraries(tapplib_test stdc++ doctest tapplib)

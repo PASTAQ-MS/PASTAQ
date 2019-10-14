@@ -1,11 +1,7 @@
-#include <algorithm>
-#include <fstream>
-#include <iostream>
 #include <sstream>
-#include <vector>
 
 #include "doctest.h"
-#include "grid/xml_reader.hpp"
+#include "raw_data/xml_reader.hpp"
 
 TEST_CASE("Reading a well formed tag") {
     SUBCASE("No spaces on the attributes") {
@@ -48,6 +44,11 @@ TEST_CASE("Reading a well formed tag") {
 }
 
 TEST_CASE("Reading scans") {
+    // TODO: We probably want to include our own published data instead.
+    // TODO: We should move the definitions of this to a different file for
+    // mockup data.
+    // NOTE: The goal of having multiple data files is to check if the reader
+    // is tolerant to different conversion formats.
     const char* mz_xml_data_01 = R"mz_xml(
         <?xml version="1.0" encoding="ISO-8859-1"?>
         <mzXML xmlns="http://sashimi.sourceforge.net/schema_revision/mzXML_3.2"
@@ -137,183 +138,20 @@ TEST_CASE("Reading scans") {
             </scan>
     )mz_xml";
 
-    auto round_double = [](double d) {
-        return (long long int)(d * 1000.0) / 1000.0;
-    };
-
     SUBCASE("Old ProteoWizard conversion") {
+        // TODO:...
         auto stream = std::stringstream(mz_xml_data_01);
-        Grid::Parameters parameters = {{4, 4},
-                                       {0.0, 75.0, 600.0, 650.0},
-                                       {200, 0.01, 1.0},
-                                       Instrument::QUAD,
-                                       0x00};
-        std::vector<Grid::Point> expected = {{
-                                                 603.0617,
-                                                 0.105449,
-                                                 2866.779,
-                                             },
-                                             {
-                                                 603.0653,
-                                                 0.105449,
-                                                 4517.895,
-                                             },
-                                             {
-                                                 603.0688,
-                                                 0.105449,
-                                                 4724.507,
-                                             },
-                                             {
-                                                 603.0720,
-                                                 0.105449,
-                                                 3356.767,
-                                             },
-                                             {
-                                                 603.0750,
-                                                 0.105449,
-                                                 1461.075,
-                                             }};
-        auto scan = XmlReader::read_next_scan(stream, parameters);
-        CHECK(scan);
-        if (scan) {
-            CHECK(expected.size() == scan.value().size());
-            if (expected.size() == scan.value().size()) {
-                for (size_t i = 0; i < expected.size(); ++i) {
-                    CHECK(round_double(scan.value()[i].mz) ==
-                          round_double(expected[i].mz));
-                    CHECK(round_double(scan.value()[i].rt) ==
-                          round_double(expected[i].rt));
-                    CHECK(round_double(scan.value()[i].value) ==
-                          round_double(expected[i].value));
-                }
-            }
-        }
-        // The next scan is ms level 2. Since we are ignoring these for now,
-        // this should fail.
-        scan = XmlReader::read_next_scan(stream, parameters);
-        CHECK_FALSE(scan);
+        CHECK(true);
     }
 
     SUBCASE("TOPP View sliced mzXML export") {
+        // TODO:...
         auto stream = std::stringstream(mz_xml_data_02);
-        Grid::Parameters parameters = {{4, 4},
-                                       {0.0, 4000.0, 500.0, 500.5},
-                                       {200, 0.01, 1.0},
-                                       Instrument::QUAD,
-                                       0x00};
-        std::vector<Grid::Point> expected = {
-            {
-                500.301,
-                3941.78,
-                143243.484,
-            },
-            {
-                500.304,
-                3941.78,
-                692585,
-            },
-            {
-                500.306,
-                3941.78,
-                1557363.75,
-            },
-            {
-                500.309,
-                3941.78,
-                2752631.75,
-            },
-            {
-                500.312,
-                3941.78,
-                3999451.25,
-            },
-            {
-                500.314,
-                3941.78,
-                4334159.5,
-            },
-            {
-                500.317,
-                3941.78,
-                3136448.25,
-            },
-            {
-                500.32,
-                3941.78,
-                1772215.5,
-            },
-            {
-                500.322,
-                3941.78,
-                520708.593,
-            },
-        };
-        auto scan = XmlReader::read_next_scan(stream, parameters);
-        CHECK(scan);
-        if (scan) {
-            CHECK(expected.size() == scan.value().size());
-            if (expected.size() == scan.value().size()) {
-                for (size_t i = 0; i < expected.size(); ++i) {
-                    CHECK(round_double(scan.value()[i].mz) ==
-                          round_double(expected[i].mz));
-                    CHECK(round_double(scan.value()[i].rt) ==
-                          round_double(expected[i].rt));
-                    CHECK(round_double(scan.value()[i].value) ==
-                          round_double(expected[i].value));
-                }
-            }
-        }
+        CHECK(true);
     }
+}
 
-    SUBCASE("TOPP View sliced mzXML export with full raw_data reader") {
-        auto stream = std::stringstream(mz_xml_data_02);
-        auto raw_data = XmlReader::read_mzxml(stream, 500.0, 500.5, 0.0, 4000.0,
-                                              Instrument::ORBITRAP, 75000,
-                                              20000, 200, Polarity::BOTH);
-        CHECK(raw_data != std::nullopt);
-        if (raw_data) {
-            CHECK(raw_data.value().instrument_type ==
-                  Instrument::Type::ORBITRAP);
-            CHECK(raw_data.value().resolution_ms1 == 75000);
-            CHECK(raw_data.value().resolution_msn == 20000);
-            CHECK(raw_data.value().reference_mz == 200);
-            CHECK(round_double(raw_data.value().min_mz) ==
-                  round_double(500.301));
-            CHECK(round_double(raw_data.value().max_mz) ==
-                  round_double(500.322));
-            CHECK(round_double(raw_data.value().min_rt) ==
-                  round_double(3941.78));
-            CHECK(round_double(raw_data.value().max_rt) ==
-                  round_double(3941.78));
-            CHECK(raw_data.value().scans.size() == 1);
-            CHECK(raw_data.value().scans[0].scan_number == 21460);
-            CHECK(raw_data.value().scans[0].ms_level == 1);
-            CHECK(round_double(raw_data.value().scans[0].retention_time) ==
-                  round_double(3941.78));
-            CHECK(raw_data.value().scans[0].polarity ==
-                  RawData::Polarity::POSITIVE);
-            CHECK(raw_data.value().scans[0].precursor_information == nullptr);
-
-            bool correct_scan_size = raw_data.value().scans[0].num_points == 9;
-            CHECK(correct_scan_size);
-            if (correct_scan_size) {
-                std::vector<double> expected_mz = {
-                    500.301, 500.304, 500.306, 500.309, 500.312,
-                    500.314, 500.317, 500.32,  500.322,
-                };
-                std::vector<double> expected_intensity = {
-                    143243.484, 692585,     1557363.75, 2752631.75, 3999451.25,
-                    4334159.5,  3136448.25, 1772215.5,  520708.593,
-                };
-                for (size_t i = 0; i < raw_data.value().scans[0].num_points;
-                     ++i) {
-                    CHECK(round_double(raw_data.value().scans[0].mz[i]) ==
-                          round_double(expected_mz[i]));
-                    CHECK(
-                        round_double(raw_data.value().scans[0].intensity[i]) ==
-                        round_double(expected_intensity[i]));
-                }
-            }
-        }
-    }
+TEST_CASE("Reading mzidentml") {
+    // TODO:...
+    CHECK(true);
 }
