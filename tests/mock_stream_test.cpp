@@ -1,6 +1,6 @@
 #include "doctest.h"
 
-#include "testutils/mock_stream.hpp"
+#include "mock_stream.hpp"
 
 TEST_CASE("MockStream") {
     SUBCASE("Data access methods <char>(RO)") {

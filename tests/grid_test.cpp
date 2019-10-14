@@ -11,7 +11,7 @@ TEST_CASE("Gaussian splatting") {
     double sigma_mz = 1.0;
     double sigma_rt = 1.0;
 
-    SUBCASE("Splat on the cencer of the mesh") {
+    SUBCASE("Splat on the center of the mesh") {
         Grid::Parameters parameters = {
             {},
             {-3.0 * sigma_rt, 3.0 * sigma_rt, -3.0 * sigma_mz, 3.0 * sigma_mz},

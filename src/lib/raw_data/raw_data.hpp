@@ -96,7 +96,7 @@ struct RawData {
     std::vector<Scan> scans;
     // This information is saved for quick search.
     // TODO: Note that this is unnecessary if our search function is able to
-    // search through the `scansz array.
+    // search through the `scans` array.
     std::vector<double> retention_times;
 };
 

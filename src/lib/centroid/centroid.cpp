@@ -309,9 +309,6 @@ std::vector<Centroid::Peak> Centroid::find_peaks_parallel(
     }
 
     // Return maximum amount of peaks.
-    // TODO: Figure a way of performing max peaks when multiple threads are
-    // in place without having to go through all of them. Perhaps an atomic
-    // operation for increment counter?
     if (peaks.size() > max_peaks) {
         peaks.resize(max_peaks);
     }
