@@ -18,9 +18,9 @@ endif()
 
 # Build the tapplib c++ library.
 # ------------------------------
-# Threads
+# Threads.
 find_package(Threads REQUIRED)
-# MIDAs
+# MIDAs.
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/midas" ${CMAKE_CURRENT_BINARY_DIR}/midas)
 # Build TAPPs library.
 add_library(tapplib
@@ -47,13 +47,14 @@ target_link_libraries(tapplib ${CMAKE_THREAD_LIBS_INIT} midas)
 
 # Build the python bindings.
 # --------------------------
-# PyBind
+# PyBind.
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/pybind11" ${CMAKE_CURRENT_BINARY_DIR}/pybind11)
 pybind11_add_module(tapp src/python-bindings/tapp/bindings.cpp)
 target_link_libraries(tapp PRIVATE tapplib)
 
 # Include tests if testing library is present.
-if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} OR (${ENABLE_TESTS}))
+# --------------------------------------------
+if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} AND ${ENABLE_TESTS})
     unset(DOCTEST_LIBRARY_PATH CACHE)
     find_path(
         DOCTEST_LIBRARY_PATH
@@ -62,14 +63,13 @@ if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} OR (${ENABLE_TESTS})
         PATH_SUFFIX "${CMAKE_CURRENT_SOURCE_DIR}/ext/doctest/doctest"
         )
     if (DOCTEST_LIBRARY_PATH)
-        # TODO: add_subdirectory?
-        if(NOT TARGET doctest)
-            add_library(doctest INTERFACE)
-            target_include_directories(doctest
-                INTERFACE
-                "${CMAKE_CURRENT_SOURCE_DIR}/ext/doctest/doctest")
-        endif()
+        # Add the testing library.
+        add_library(doctest INTERFACE)
+        target_include_directories(doctest
+            INTERFACE
+            "${CMAKE_CURRENT_SOURCE_DIR}/ext/doctest/doctest")
         enable_testing()
+        # Add tests.
         add_executable(
             tapplib_test
             tests/main.cpp
