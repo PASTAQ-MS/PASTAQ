@@ -30,7 +30,7 @@ std::optional<std::string> read_data(std::istream &stream);
 std::optional<RawData::RawData> read_mzxml(
     std::istream &stream, double min_mz, double max_mz, double min_rt,
     double max_rt, Instrument::Type instrument_type, double resolution_ms1,
-    double resolution_msn, double reference_mz, RawData::Polarity polarity,
+    double resolution_msn, double reference_mz, Polarity::Type polarity,
     size_t ms_level);
 
 // Read an entire mzIdentML file into a IdentData::IdentData data structure.

@@ -40,37 +40,37 @@ RawData::RawData read_mzxml(std::string &input_file, double min_mz,
     max_mz = max_mz < 0 ? std::numeric_limits<double>::infinity() : max_mz;
 
     // Parse the instrument type.
-    auto instrument_type = Instrument::Type::UNKNOWN;
+    auto instrument_type = Instrument::UNKNOWN;
     for (auto &ch : instrument_type_str) {
         ch = std::tolower(ch);
     }
     if (instrument_type_str == "orbitrap") {
-        instrument_type = Instrument::Type::ORBITRAP;
+        instrument_type = Instrument::ORBITRAP;
     } else if (instrument_type_str == "tof") {
-        instrument_type = Instrument::Type::TOF;
+        instrument_type = Instrument::TOF;
     } else if (instrument_type_str == "quad") {
-        instrument_type = Instrument::Type::QUAD;
+        instrument_type = Instrument::QUAD;
     } else if (instrument_type_str == "fticr") {
-        instrument_type = Instrument::Type::FTICR;
+        instrument_type = Instrument::FTICR;
     } else {
         std::ostringstream error_stream;
         error_stream << "the given instrument is not supported";
         throw std::invalid_argument(error_stream.str());
     }
     // Parse the polarity.
-    auto polarity = RawData::Polarity::BOTH;
+    auto polarity = Polarity::BOTH;
     for (auto &ch : polarity_str) {
         ch = std::tolower(ch);
     }
     if (polarity_str == "" || polarity_str == "both" || polarity_str == "+-" ||
         polarity_str == "-+") {
-        polarity = RawData::Polarity::BOTH;
+        polarity = Polarity::BOTH;
     } else if (polarity_str == "+" || polarity_str == "pos" ||
                polarity_str == "positive") {
-        polarity = RawData::Polarity::POSITIVE;
+        polarity = Polarity::POSITIVE;
     } else if (polarity_str == "-" || polarity_str == "neg" ||
                polarity_str == "negative") {
-        polarity = RawData::Polarity::NEGATIVE;
+        polarity = Polarity::NEGATIVE;
     } else {
         std::ostringstream error_stream;
         error_stream << "the given polarity is not supported. choose "
@@ -128,29 +128,28 @@ Grid::Grid resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
 
 std::string to_string(const Instrument::Type &instrument_type) {
     switch (instrument_type) {
-        case Instrument::Type::QUAD:
+        case Instrument::QUAD:
             return "QUAD";
-        case Instrument::Type::TOF:
+        case Instrument::TOF:
             return "TOF";
-        case Instrument::Type::FTICR:
+        case Instrument::FTICR:
             return "FTICR";
-        case Instrument::Type::ORBITRAP:
+        case Instrument::ORBITRAP:
             return "ORBITRAP";
-        case Instrument::Type::UNKNOWN:
+        default:
             return "UNKNOWN";
     };
-    return "UNKNOWN";
 }
 
-std::string to_string(const RawData::Polarity &polarity) {
+std::string to_string(const Polarity::Type &polarity) {
     switch (polarity) {
-        case RawData::Polarity::POSITIVE:
+        case Polarity::POSITIVE:
             return "POSITIVE";
-        case RawData::Polarity::NEGATIVE:
+        case Polarity::NEGATIVE:
             return "NEGATIVE";
-        case RawData::Polarity::BOTH:
+        case Polarity::BOTH:
             return "BOTH";
-        case RawData::Polarity::UNKNOWN_POLARITY:
+        default:
             return "UNKNOWN";
     };
 }
@@ -601,8 +600,8 @@ PYBIND11_MODULE(tapp, m) {
             return PythonAPI::to_string(instrument_type);
         });
 
-    py::class_<RawData::Polarity>(m, "Polarity")
-        .def("__repr__", [](const RawData::Polarity &polarity) {
+    py::class_<Polarity::Type>(m, "Polarity")
+        .def("__repr__", [](const Polarity::Type &polarity) {
             return PythonAPI::to_string(polarity);
         });
 

@@ -9,32 +9,25 @@
 #include <vector>
 
 namespace Instrument {
-
 enum Type : uint8_t { UNKNOWN = 0, QUAD = 1, TOF = 2, FTICR = 3, ORBITRAP = 4 };
-
 }  // namespace Instrument
 
-// In this namespace we have access to the data structures for working with raw
-// data.
-namespace RawData {
 // The ionization polarity of the analysis. It is possible to configure some
 // instruments to acquire data in alternating polarities (+,-,+...). This
 // parameter is meant to be used as a filter of the scans that are going to be
 // read from the raw data.
-enum Polarity : uint8_t {
-    UNKNOWN_POLARITY = 0,
-    POSITIVE = 1,
-    NEGATIVE = 2,
-    BOTH = 3
-};
+namespace Polarity {
+enum Type : uint8_t { UNKNOWN = 0, POSITIVE = 1, NEGATIVE = 2, BOTH = 3 };
+}  // namespace Polarity
 
 // This describes the fragmentation method for MS/MS spectra.
-enum ActivationMethod : uint8_t {
-    UNKNOWN_ACTIVATION_METHOD = 0,
-    CID = 1,
-    HCD = 2
-};
+namespace ActivationMethod {
+enum Type : uint8_t { UNKNOWN = 0, CID = 1, HCD = 2 };
+}  // namespace ActivationMethod
 
+// In this namespace we have access to the data structures for working with raw
+// data.
+namespace RawData {
 // For an MS/MS scan, some information about the precursor scan is saved by the
 // instrument.
 struct PrecursorInformation {
@@ -47,7 +40,7 @@ struct PrecursorInformation {
     // Intensity of the precursor event.
     double intensity;
     // The activation method for the fragmentation of the MSn event.
-    ActivationMethod activation_method;
+    ActivationMethod::Type activation_method;
     // The total isolation window selected for fragmentation in m/z units.
     double window_wideness;
 };
@@ -69,7 +62,7 @@ struct Scan {
     double max_intensity;
     double total_intensity;
     // The ionization polarity for this scan.
-    Polarity polarity;
+    Polarity::Type polarity;
     // In case this is a MSn scan, the precursor information will be stored
     // here.
     // TODO(alex): We might want to make this a smart pointer, as this field is

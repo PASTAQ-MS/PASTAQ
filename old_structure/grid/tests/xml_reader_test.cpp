@@ -267,9 +267,9 @@ TEST_CASE("Reading scans") {
 
     SUBCASE("TOPP View sliced mzXML export with full raw_data reader") {
         auto stream = std::stringstream(mz_xml_data_02);
-        auto raw_data = XmlReader::read_mzxml(
-            stream, 500.0, 500.5, 0.0, 4000.0, Instrument::Type::ORBITRAP,
-            75000, 20000, 200, RawData::Polarity::BOTH);
+        auto raw_data = XmlReader::read_mzxml(stream, 500.0, 500.5, 0.0, 4000.0,
+                                              Instrument::ORBITRAP, 75000,
+                                              20000, 200, Polarity::BOTH);
         CHECK(raw_data != std::nullopt);
         if (raw_data) {
             CHECK(raw_data.value().instrument_type ==

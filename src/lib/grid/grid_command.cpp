@@ -484,13 +484,13 @@ int main(int argc, char *argv[]) {
         ch = std::tolower(ch);
     }
     if (instrument == "orbitrap") {
-        parameters.instrument_type = Instrument::Type::ORBITRAP;
+        parameters.instrument_type = Instrument::ORBITRAP;
     } else if (instrument == "quad" || instrument == "iontrap") {
-        parameters.instrument_type = Instrument::Type::QUAD;
+        parameters.instrument_type = Instrument::QUAD;
     } else if (instrument == "tof" || instrument == "qtof") {
-        parameters.instrument_type = Instrument::Type::TOF;
+        parameters.instrument_type = Instrument::TOF;
     } else if (instrument == "fticr") {
-        parameters.instrument_type = Instrument::Type::FTICR;
+        parameters.instrument_type = Instrument::FTICR;
     } else {
         std::cout << "Unknown instrument type: " << instrument << std::endl;
         return -1;

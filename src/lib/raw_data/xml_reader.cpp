@@ -7,7 +7,7 @@
 std::optional<RawData::RawData> XmlReader::read_mzxml(
     std::istream &stream, double min_mz, double max_mz, double min_rt,
     double max_rt, Instrument::Type instrument_type, double resolution_ms1,
-    double resolution_msn, double reference_mz, RawData::Polarity polarity,
+    double resolution_msn, double reference_mz, Polarity::Type polarity,
     size_t ms_level) {
     RawData::RawData raw_data = {};
     raw_data.instrument_type = instrument_type;
@@ -43,14 +43,13 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
             // Find polarity.
             if (scan_attributes.find("polarity") != scan_attributes.end()) {
                 if (scan_attributes["polarity"] == "+") {
-                    scan.polarity = RawData::Polarity::POSITIVE;
+                    scan.polarity = Polarity::POSITIVE;
                 } else if (scan_attributes["polarity"] == "-") {
-                    scan.polarity = RawData::Polarity::NEGATIVE;
+                    scan.polarity = Polarity::NEGATIVE;
                 } else {
-                    scan.polarity = RawData::Polarity::BOTH;
+                    scan.polarity = Polarity::BOTH;
                 }
-                if (polarity != RawData::Polarity::BOTH &&
-                    scan.polarity != polarity) {
+                if (polarity != Polarity::BOTH && scan.polarity != polarity) {
                     continue;
                 }
             }
@@ -245,19 +244,18 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
                         precursor_attributes.end()) {
                         if (precursor_attributes["activationMethod"] == "CID") {
                             scan.precursor_information.activation_method =
-                                RawData::ActivationMethod::CID;
+                                ActivationMethod::CID;
                         } else if (precursor_attributes["activationMethod"] ==
                                    "HCD") {
                             scan.precursor_information.activation_method =
-                                RawData::ActivationMethod::HCD;
+                                ActivationMethod::HCD;
                         } else {
                             scan.precursor_information.activation_method =
-                                RawData::ActivationMethod::
-                                    UNKNOWN_ACTIVATION_METHOD;
+                                ActivationMethod::UNKNOWN;
                         }
                     } else {
-                        scan.precursor_information.activation_method = RawData::
-                            ActivationMethod::UNKNOWN_ACTIVATION_METHOD;
+                        scan.precursor_information.activation_method =
+                            ActivationMethod::UNKNOWN;
                     }
 
                     auto data = XmlReader::read_data(stream);

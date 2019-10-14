@@ -10,7 +10,7 @@ bool RawData::Serialize::read_precursor_info(
     uint8_t activation_method = 0;
     Serialization::read_uint8(stream, &activation_method);
     precursor_info->activation_method =
-        static_cast<ActivationMethod>(activation_method);
+        static_cast<ActivationMethod::Type>(activation_method);
     Serialization::read_double(stream, &precursor_info->window_wideness);
     return stream.good();
 }
@@ -39,7 +39,7 @@ bool RawData::Serialize::read_scan(std::istream &stream, Scan *scan) {
     }
     uint8_t polarity = polarity;
     Serialization::read_uint8(stream, &polarity);
-    scan->polarity = static_cast<Polarity>(polarity);
+    scan->polarity = static_cast<Polarity::Type>(polarity);
     Serialization::read_double(stream, &scan->max_intensity);
     Serialization::read_double(stream, &scan->total_intensity);
     Serialize::read_precursor_info(stream, &scan->precursor_information);
