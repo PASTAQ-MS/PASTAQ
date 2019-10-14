@@ -8,6 +8,7 @@
 #include <tuple>
 #include <vector>
 
+// The instrument in which the data was acquired.
 namespace Instrument {
 enum Type : uint8_t { UNKNOWN = 0, QUAD = 1, TOF = 2, FTICR = 3, ORBITRAP = 4 };
 }  // namespace Instrument
@@ -50,7 +51,7 @@ struct Scan {
     uint64_t scan_number;
     // Type of ms_level of this scan (i.e. MS1/MS2/MSn).
     uint64_t ms_level;
-    // How many mz-intensity pairs are containd in this scan.
+    // How many mz-intensity pairs are contained in this scan.
     uint64_t num_points;
     // Retention time in seconds of this scan;
     double retention_time;
@@ -97,11 +98,6 @@ struct RawData {
     // TODO: Note that this is unnecessary if our search function is able to
     // search through the `scansz array.
     std::vector<double> retention_times;
-
-    // TODO: Sigh... Methdos vs functions?
-    std::tuple<std::vector<double>, std::vector<double>> xic(
-        double min_mz, double max_mz, double min_rt, double max_rt,
-        std::string method) const;
 };
 
 // Raw data points in a struct of arrays format.
@@ -111,6 +107,12 @@ struct RawPoints {
     std::vector<double> mz;
     std::vector<double> intensity;
 };
+
+// Calculate the extracted ion chromatogram for ROI described my the
+// min/max mz/rt on the given raw_data.
+std::tuple<std::vector<double>, std::vector<double>> xic(
+    const RawData &raw_data, double min_mz, double max_mz, double min_rt,
+    double max_rt, std::string method);
 
 // Calculate the theoretical FWHM of the peak for the given mz.
 double theoretical_fwhm(const RawData &raw_data, double mz);

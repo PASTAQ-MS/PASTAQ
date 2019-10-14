@@ -1956,9 +1956,9 @@ def testing_feature_detection():
 
 
 def peak_xic(peak, raw_data, method="sum"):
-    return raw_data.xic(peak.roi_min_mz, peak.roi_max_mz,
-                        peak.roi_min_rt + peak.warping_delta_rt,
-                        peak.roi_max_rt + peak.warping_delta_rt, method)
+    return tapp.xic(raw_data, peak.roi_min_mz, peak.roi_max_mz,
+                    peak.roi_min_rt + peak.warping_delta_rt,
+                    peak.roi_max_rt + peak.warping_delta_rt, method)
 
 
 Peak.xic = peak_xic

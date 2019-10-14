@@ -29,18 +29,18 @@ double RawData::fwhm_to_sigma(double fwhm) {
     return fwhm / (2 * std::sqrt(2 * std::log(2)));
 }
 
-std::tuple<std::vector<double>, std::vector<double>> RawData::RawData::xic(
-    double min_mz, double max_mz, double min_rt, double max_rt,
-    std::string method) const {
+std::tuple<std::vector<double>, std::vector<double>> RawData::xic(
+    const RawData &raw_data, double min_mz, double max_mz, double min_rt,
+    double max_rt, std::string method) {
     std::vector<double> rt;
     std::vector<double> intensity;
-    const auto &scans = this->scans;
+    const auto &scans = raw_data.scans;
     if (scans.size() == 0) {
         return {rt, intensity};
     }
 
     // Find scan indices.
-    size_t min_j = Search::lower_bound(this->retention_times, min_rt);
+    size_t min_j = Search::lower_bound(raw_data.retention_times, min_rt);
     size_t max_j = scans.size();
     if (scans[min_j].retention_time < min_rt) {
         ++min_j;

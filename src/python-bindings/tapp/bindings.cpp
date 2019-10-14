@@ -618,25 +618,18 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("max_rt", &RawData::RawData::max_rt)
         .def("theoretical_fwhm", &RawData::theoretical_fwhm, py::arg("mz"))
         .def("dump", &PythonAPI::write_raw_data)
-        .def("__repr__",
-             [](const RawData::RawData &rd) {
-                 return "RawData:\n> instrument_type: " +
-                        PythonAPI::to_string(rd.instrument_type) +
-                        "\n> resolution_ms1: " +
-                        std::to_string(rd.resolution_ms1) +
-                        "\n> resolution_msn: " +
-                        std::to_string(rd.resolution_msn) +
-                        "\n> reference_mz: " + std::to_string(rd.reference_mz) +
-                        "\n> min_mz: " + std::to_string(rd.min_mz) +
-                        "\n> max_mz: " + std::to_string(rd.max_mz) +
-                        "\n> min_rt: " + std::to_string(rd.min_rt) +
-                        "\n> max_rt: " + std::to_string(rd.max_rt) +
-                        "\n> number of scans: " +
-                        std::to_string(rd.scans.size());
-             })
-        .def("xic", &RawData::RawData::xic, py::arg("min_mz"),
-             py::arg("max_mz"), py::arg("min_rt"), py::arg("max_rt"),
-             py::arg("method") = "sum");
+        .def("__repr__", [](const RawData::RawData &rd) {
+            return "RawData:\n> instrument_type: " +
+                   PythonAPI::to_string(rd.instrument_type) +
+                   "\n> resolution_ms1: " + std::to_string(rd.resolution_ms1) +
+                   "\n> resolution_msn: " + std::to_string(rd.resolution_msn) +
+                   "\n> reference_mz: " + std::to_string(rd.reference_mz) +
+                   "\n> min_mz: " + std::to_string(rd.min_mz) +
+                   "\n> max_mz: " + std::to_string(rd.max_mz) +
+                   "\n> min_rt: " + std::to_string(rd.min_rt) +
+                   "\n> max_rt: " + std::to_string(rd.max_rt) +
+                   "\n> number of scans: " + std::to_string(rd.scans.size());
+        });
 
     py::class_<Grid::Grid>(m, "Grid")
         .def_readonly("n", &Grid::Grid::n)
@@ -946,6 +939,9 @@ PYBIND11_MODULE(tapp, m) {
         .def("link_idents", &Link::link_idents,
              "Link msms events to spectrum identifications",
              py::arg("ident_data"), py::arg("raw_data"))
+        .def("xic", &RawData::xic, py::arg("raw_data"), py::arg("min_mz"),
+             py::arg("max_mz"), py::arg("min_rt"), py::arg("max_rt"),
+             py::arg("method") = "sum")
         .def("feature_detection", &FeatureDetection::feature_detection,
              "Link peaks as features", py::arg("peaks"),
              py::arg("raw_data_ms2"), py::arg("ident_data"),

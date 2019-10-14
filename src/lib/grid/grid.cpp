@@ -27,7 +27,7 @@ uint64_t Grid::x_index(const Grid &grid, double mz) {
             return static_cast<uint64_t>(grid.k * (mz - grid.min_mz) /
                                          grid.fwhm_mz);
         } break;
-        case Instrument::UNKNOWN: {
+        default: {
             assert(false);  // Can't handle unknown instruments.
             return 0;
         } break;
@@ -62,7 +62,7 @@ double Grid::mz_at(const Grid &grid, uint64_t i) {
                 (grid.max_mz - grid.min_mz) / static_cast<double>(grid.n - 1);
             return grid.min_mz + delta_mz * i / grid.k;
         } break;
-        case Instrument::UNKNOWN: {
+        default: {
             assert(false);  // Can't handle unknown instruments.
             return 0;
         } break;
