@@ -196,8 +196,8 @@ SimilarityResults find_similarity(std::vector<Centroid::Peak> &peak_list_a,
                          const Centroid::Peak &p2) -> bool {
         return (p1.local_max_height >= p2.local_max_height);
     };
-    std::stable_sort(peak_list_a.begin(), peak_list_a.end(), sort_peaks);
-    std::stable_sort(peak_list_b.begin(), peak_list_b.end(), sort_peaks);
+    std::sort(peak_list_a.begin(), peak_list_a.end(), sort_peaks);
+    std::sort(peak_list_b.begin(), peak_list_b.end(), sort_peaks);
     if (peak_list_a.size() > n_peaks) {
         peak_list_a.resize(n_peaks);
     }
@@ -689,7 +689,7 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("raw_roi_num_points", &Centroid::Peak::raw_roi_num_points)
         .def_readonly("raw_roi_num_scans", &Centroid::Peak::raw_roi_num_scans)
         //.def("xic", &Centroid::xic, py::arg("peak"), py::arg("raw_data"),
-             //py::arg("method") = "sum")
+        // py::arg("method") = "sum")
         .def("__repr__", [](const Centroid::Peak &p) {
             return "Peak <id: " + std::to_string(p.id) +
                    ", local_max_mz: " + std::to_string(p.local_max_mz) +

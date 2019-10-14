@@ -444,7 +444,7 @@ int main(int argc, char *argv[]) {
                         (p1.raw_roi_total_intensity >
                          p2.raw_roi_total_intensity));
             };
-            std::stable_sort(peaks.begin(), peaks.end(), sort_peaks);
+            std::sort(peaks.begin(), peaks.end(), sort_peaks);
 
             std::cout << "Saving peaks to bpks file..." << std::endl;
             if (!Centroid::Files::Bpks::write_peaks(

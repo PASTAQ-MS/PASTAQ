@@ -72,7 +72,7 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
         return std::nullopt;
     }
     // Sort the peaks in range by mz for a faster search.
-    std::stable_sort(peaks_in_range.begin(), peaks_in_range.end(),
+    std::sort(peaks_in_range.begin(), peaks_in_range.end(),
                      [](const Centroid::Peak &p1, const Centroid::Peak &p2) {
                          return (p1.local_max_mz < p2.local_max_mz);
                      });
@@ -265,7 +265,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
                                    const Search::KeySort<uint64_t> &p2) {
             return (p1.sorting_key < p2.sorting_key);
         };
-        std::stable_sort(idents_msms_key.begin(), idents_msms_key.end(),
+        std::sort(idents_msms_key.begin(), idents_msms_key.end(),
                          sorting_key_func);
     }
     auto peaks_rt_key = std::vector<Search::KeySort<double>>(peaks.size());
@@ -277,7 +277,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
                                    const Search::KeySort<double> &p2) {
             return (p1.sorting_key < p2.sorting_key);
         };
-        std::stable_sort(peaks_rt_key.begin(), peaks_rt_key.end(),
+        std::sort(peaks_rt_key.begin(), peaks_rt_key.end(),
                          sorting_key_func);
     }
     // We use this variable to keep track of the peaks we have already linked.

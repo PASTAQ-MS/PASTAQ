@@ -216,7 +216,7 @@ std::vector<Centroid::Peak> Centroid::find_peaks_serial(
                              const Centroid::LocalMax &p2) -> bool {
         return (p1.value >= p2.value);
     };
-    std::stable_sort(local_max.begin(), local_max.end(), sort_local_max);
+    std::sort(local_max.begin(), local_max.end(), sort_local_max);
 
     std::vector<Centroid::Peak> peaks;
     for (const auto &max : local_max) {
@@ -301,7 +301,7 @@ std::vector<Centroid::Peak> Centroid::find_peaks_parallel(
                          const Centroid::Peak &p2) -> bool {
         return (p1.local_max_height >= p2.local_max_height);
     };
-    std::stable_sort(peaks.begin(), peaks.end(), sort_peaks);
+    std::sort(peaks.begin(), peaks.end(), sort_peaks);
 
     // Update the peak ids.
     for (size_t i = 0; i < peaks.size(); ++i) {

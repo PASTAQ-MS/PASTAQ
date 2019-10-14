@@ -40,7 +40,7 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
                ((p1.local_max_rt == p2.local_max_rt) &&
                 (p1.file_id < p2.file_id));
     };
-    std::stable_sort(peaks.begin(), peaks.end(), sort_peaks);
+    std::sort(peaks.begin(), peaks.end(), sort_peaks);
 
     int cluster_id = 0;
     for (size_t i = 0; i < peaks.size(); ++i) {
@@ -155,7 +155,7 @@ std::vector<MetaMatch::Peak> MetaMatch::extract_orphans(
     auto sort_by_cluster_id = [](auto p1, auto p2) -> bool {
         return p1.cluster_id < p2.cluster_id;
     };
-    std::stable_sort(peaks.begin(), peaks.end(), sort_by_cluster_id);
+    std::sort(peaks.begin(), peaks.end(), sort_by_cluster_id);
 
     for (size_t i = 0; i < peaks.size(); ++i) {
         if (peaks[i].cluster_id != -1) {
@@ -176,7 +176,7 @@ std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
         return p1.cluster_id < p2.cluster_id ||
                (p1.cluster_id == p2.cluster_id && p1.file_id < p2.file_id);
     };
-    std::stable_sort(peaks.begin(), peaks.end(), sort_by_cluster_id);
+    std::sort(peaks.begin(), peaks.end(), sort_by_cluster_id);
     if (peaks.empty()) {
         return clusters;
     }
@@ -210,7 +210,7 @@ std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
     auto sort_by_avg_height = [](auto c1, auto c2) -> bool {
         return c1.avg_height > c2.avg_height;
     };
-    std::stable_sort(clusters.begin(), clusters.end(), sort_by_avg_height);
+    std::sort(clusters.begin(), clusters.end(), sort_by_avg_height);
     size_t i = 0;
     for (auto& cluster : clusters) {
         cluster.id = i;

@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "link/link.hpp"
 #include "utils/search.hpp"
 
@@ -15,10 +17,10 @@ std::vector<Link::LinkedMsms> Link::link_msms(
     }
 
     // Sort mz index by mz.
-    std::stable_sort(indices.begin(), indices.end(),
-                     [](const PeakIndex &a, const PeakIndex &b) -> bool {
-                         return a.mz < b.mz;
-                     });
+    std::sort(indices.begin(), indices.end(),
+              [](const PeakIndex &a, const PeakIndex &b) -> bool {
+                  return a.mz < b.mz;
+              });
 
     // Flatten index into separate arrays.
     auto index_ids = std::vector<size_t>(indices.size());
@@ -83,7 +85,7 @@ std::vector<Link::LinkedMsms> Link::link_msms(
     }
 
     // Sort link_table by entity_id.
-    std::stable_sort(
+    std::sort(
         link_table.begin(), link_table.end(),
         [](const Link::LinkedMsms &a, const Link::LinkedMsms &b) -> bool {
             return (a.entity_id < b.entity_id) ||
@@ -92,7 +94,7 @@ std::vector<Link::LinkedMsms> Link::link_msms(
     return link_table;
 }
 
-std::vector<Link::LinkedMsms> link_idents(
+std::vector<Link::LinkedMsms> Link::link_idents(
     const IdentData::IdentData &ident_data, const RawData::RawData &raw_data) {
     // Index the spectrumid list by m/z.
     struct SpectrumIdIndex {
@@ -106,11 +108,10 @@ std::vector<Link::LinkedMsms> link_idents(
     }
 
     // Sort mz index by mz.
-    std::stable_sort(
-        indices.begin(), indices.end(),
-        [](const SpectrumIdIndex &a, const SpectrumIdIndex &b) -> bool {
-            return a.mz < b.mz;
-        });
+    std::sort(indices.begin(), indices.end(),
+              [](const SpectrumIdIndex &a, const SpectrumIdIndex &b) -> bool {
+                  return a.mz < b.mz;
+              });
 
     // Flatten index into separate arrays.
     auto index_ids = std::vector<size_t>(indices.size());
@@ -160,7 +161,7 @@ std::vector<Link::LinkedMsms> link_idents(
     }
 
     // Sort link_table by entity_id.
-    std::stable_sort(
+    std::sort(
         link_table.begin(), link_table.end(),
         [](const Link::LinkedMsms &a, const Link::LinkedMsms &b) -> bool {
             return (a.entity_id < b.entity_id) ||

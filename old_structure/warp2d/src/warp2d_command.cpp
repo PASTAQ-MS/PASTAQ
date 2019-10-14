@@ -544,7 +544,7 @@ int main(int argc, char *argv[]) {
                         (p1.raw_roi_total_intensity >
                          p2.raw_roi_total_intensity));
             };
-            std::stable_sort(warped_peaks.begin(), warped_peaks.end(),
+            std::sort(warped_peaks.begin(), warped_peaks.end(),
                              sort_peaks);
             if (!Centroid::Files::Csv::write_peaks(csv_outfile_stream,
                                                    warped_peaks)) {

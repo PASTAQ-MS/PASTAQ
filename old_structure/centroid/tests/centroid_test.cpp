@@ -129,7 +129,7 @@ TEST_CASE("Find peak boundaries") {
                               const Centroid::Point &p2) -> bool {
             return (p1.j < p2.j) || ((p1.j == p2.j) && (p1.i < p2.i));
         };
-        std::stable_sort(boundary.begin(), boundary.end(), sort_points);
+        std::sort(boundary.begin(), boundary.end(), sort_points);
         CHECK(boundary.size() == expected_boundary[i].size());
         for (size_t j = 0; j < boundary.size(); ++j) {
             CHECK(boundary[j].i == expected_boundary[i][j].i);
