@@ -1858,7 +1858,8 @@ def dda_pipeline(
     for stem in input_stems:
         # Check if file has already been processed.
         in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
-        in_path_idents = os.path.join(output_dir, 'ident', "{}.ident".format(stem))
+        in_path_idents = os.path.join(
+            output_dir, 'ident', "{}.ident".format(stem))
         out_path = os.path.join(output_dir, 'linking',
                                 "{}.ms2_idents.link".format(stem))
         if os.path.exists(out_path) and not override_existing:
@@ -1940,15 +1941,27 @@ def full_dda_pipeline_test():
 
     dda_pipeline(tapp_parameters, input_files, 'tapp_pipeline_test')
 
+
 def testing_feature_detection():
     peaks = tapp.read_peaks('tapp_pipeline_test/peaks/1_1.bpks')
     ms2_data = tapp.read_raw_data('tapp_pipeline_test/raw/1_1.ms2')
-    link_table_msms = tapp.read_linked_msms('tapp_pipeline_test/linking/1_1.ms2_peaks.link')
-    link_table_idents = tapp.read_linked_msms('tapp_pipeline_test/linking/1_1.ms2_idents.link')
+    link_table_msms = tapp.read_linked_msms(
+        'tapp_pipeline_test/linking/1_1.ms2_peaks.link')
+    link_table_idents = tapp.read_linked_msms(
+        'tapp_pipeline_test/linking/1_1.ms2_idents.link')
     ident_data = tapp.read_ident_data('tapp_pipeline_test/ident/1_1.ident')
-    results = tapp.feature_detection(peaks, ms2_data, ident_data, link_table_msms, link_table_idents)
+    results = tapp.feature_detection(
+        peaks, ms2_data, ident_data, link_table_msms, link_table_idents)
     return (peaks, ms2_data, ident_data, link_table_msms, link_table_idents, results)
 
+
+def peak_xic(peak, raw_data, method="sum"):
+    return raw_data.xic(peak.roi_min_mz, peak.roi_max_mz,
+                        peak.roi_min_rt + peak.warping_delta_rt,
+                        peak.roi_max_rt + peak.warping_delta_rt, method)
+
+
+Peak.xic = peak_xic
 Peak.plot_xic = plot_xic
 Peak.plot_raw_points = plot_raw_points
 Peak.plot_raw_roi_sigma = plot_raw_roi_sigma
