@@ -2,7 +2,7 @@
 
 #include "feature_detection/feature_detection.hpp"
 
-std::tuple<std::vector<double>, std::vector<double>>
+FeatureDetection::TheoreticalIsotopes
 FeatureDetection::theoretical_isotopes_peptide(std::string sequence,
                                                int8_t charge_state,
                                                double min_perc) {
@@ -40,8 +40,10 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
     const std::vector<bool> &peaks_in_use,
     const std::vector<Centroid::Peak> &peaks,
     const std::vector<Search::KeySort<double>> &peaks_rt_key,
-    const std::vector<double> &mzs, const std::vector<double> &perc,
-    double tolerance_rt, double retention_time, double discrepancy_threshold) {
+    const TheoreticalIsotopes &theoretical_isotopes, double tolerance_rt,
+    double retention_time, double discrepancy_threshold) {
+    const auto &mzs = theoretical_isotopes.mzs;
+    const auto &perc = theoretical_isotopes.percs;
     // Basic sanitation.
     if (mzs.size() != perc.size() || mzs.size() == 0) {
         return std::nullopt;
@@ -249,9 +251,9 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
     //         entry on the link_table_idents.
     // [X] 2.- If the entry is found, use it to generate a theoretical isotopic
     //         distribution, otherwise, averagine will be generated.
-    // [ ] 3.- We try to find the proposed peaks from the theoretical
+    // [X] 3.- We try to find the proposed peaks from the theoretical
     //         distribution on the peaks array (Maximum likelihood).
-    // [ ] 4.- The peaks are marked as non available for future use. This means
+    // [X] 4.- The peaks are marked as non available for future use. This means
     //         that this is a greedy algorithm.
 
     // Copy and sort key vectors.
@@ -307,6 +309,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
         // bound on the search array or last index of the array.
         auto index = idents_msms_key[i].index;
         auto ident = link_table_idents[index];
+        TheoreticalIsotopes theoretical_isotopes = {};
         if (linked_msms.msms_id != ident.msms_id) {
             // std::cout << "not found" << std::endl;
             // Generate a theoretical_isotope_distribution based on averagine.
@@ -317,37 +320,42 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
             // TODO: Include modifications? There is probably more to it than
             // just calling midas with a sequence and a charge state.
             auto sequence = ident_data.spectrum_ids[ident.entity_id].sequence;
-            auto [mzs, perc] =
-                theoretical_isotopes_peptide(sequence, charge_state, 0.01);
-            auto &peak = peaks[linked_msms.entity_id];
+            theoretical_isotopes =
+                FeatureDetection::theoretical_isotopes_peptide(
+                    sequence, charge_state, 0.01);
+        }
+        if (theoretical_isotopes.mzs.empty() ||
+            theoretical_isotopes.percs.empty()) {
+            continue;
+        }
+        auto &peak = peaks[linked_msms.entity_id];
 
-            // We use the retention time of the APEX of the matched peak,
-            // not the msms event.
-            double peak_rt = peak.local_max_rt;
-            double peak_rt_sigma = peak.raw_roi_sigma_mz;
-            auto maybe_feature =
-                build_feature(peaks_in_use, peaks, peaks_rt_key, mzs, perc,
-                              peak_rt_sigma, peak_rt, discrepancy_threshold);
-            if (maybe_feature) {
-                auto feature = maybe_feature.value();
-                features.push_back(feature);
-                // Remove used peaks on the feature from the pool.
-                for (const auto &peak_id : feature.peak_ids) {
-                    peaks_in_use[peak_id] = true;
-                }
-                // DEBUG: ...
-                // std::cout << " rt: " << maybe_feature.value().rt
-                //<< " monoisotopic_mz: "
-                //<< maybe_feature.value().monoisotopic_mz
-                //<< " monoisotopic_height: "
-                //<< maybe_feature.value().monoisotopic_height
-                //<< " average_mz: " << maybe_feature.value().average_mz
-                //<< " total_height: "
-                //<< maybe_feature.value().total_height
-                //<< " num_isotopes: "
-                //<< maybe_feature.value().peak_ids.size() << std::endl;
-                // break; // DEBUG: <---
+        // We use the retention time of the APEX of the matched peak,
+        // not the msms event.
+        double peak_rt = peak.local_max_rt;
+        double peak_rt_sigma = peak.raw_roi_sigma_mz;
+        auto maybe_feature = build_feature(peaks_in_use, peaks, peaks_rt_key,
+                                           theoretical_isotopes, peak_rt_sigma,
+                                           peak_rt, discrepancy_threshold);
+        if (maybe_feature) {
+            auto feature = maybe_feature.value();
+            features.push_back(feature);
+            // Remove used peaks on the feature from the pool.
+            for (const auto &peak_id : feature.peak_ids) {
+                peaks_in_use[peak_id] = true;
             }
+            // DEBUG: ...
+            // std::cout << " rt: " << maybe_feature.value().rt
+            //<< " monoisotopic_mz: "
+            //<< maybe_feature.value().monoisotopic_mz
+            //<< " monoisotopic_height: "
+            //<< maybe_feature.value().monoisotopic_height
+            //<< " average_mz: " << maybe_feature.value().average_mz
+            //<< " total_height: "
+            //<< maybe_feature.value().total_height
+            //<< " num_isotopes: "
+            //<< maybe_feature.value().peak_ids.size() << std::endl;
+            // break; // DEBUG: <---
         }
     }
 

@@ -17,9 +17,15 @@ struct Feature {
     std::vector<uint64_t> peak_ids;
 };
 
-std::tuple<std::vector<double>, std::vector<double>>
-theoretical_isotopes_peptide(std::string sequence, int8_t charge_state,
-                             double min_perc);
+// TODO: Expand documentation.
+struct TheoreticalIsotopes {
+    std::vector<double> mzs;
+    std::vector<double> percs;
+};
+
+TheoreticalIsotopes theoretical_isotopes_peptide(std::string sequence,
+                                                 int8_t charge_state,
+                                                 double min_perc);
 
 // TODO: Too many parameters, probably we want to pass a parameters struct
 // instead.
@@ -27,8 +33,8 @@ std::optional<Feature> build_feature(
     const std::vector<bool> &peaks_in_use,
     const std::vector<Centroid::Peak> &peaks,
     const std::vector<Search::KeySort<double>> &peaks_rt_key,
-    const std::vector<double> &mzs, const std::vector<double> &perc,
-    double tolerance_rt, double retention_time, double discrepancy_threshold);
+    const TheoreticalIsotopes &theoretical_isotopes, double tolerance_rt,
+    double retention_time, double discrepancy_threshold);
 
 std::vector<Feature> feature_detection(
     const std::vector<Centroid::Peak> &peaks,
