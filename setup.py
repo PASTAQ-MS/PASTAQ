@@ -69,7 +69,7 @@ setup(
     version='0.1',
     author='Alejandro Sanchez Brotons',
     author_email='a.sanchez.brotons@rug.nl',
-    description='Pre-processing platform for LC/MS-MS data',
+    description='Pre-processing platform for LC-MS/MS data',
     long_description='',
     packages=find_packages('src/python-bindings'),
     package_dir={'':'src/python-bindings'},
