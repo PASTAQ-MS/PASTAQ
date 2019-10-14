@@ -26,6 +26,26 @@ namespace ActivationMethod {
 enum Type : uint8_t { UNKNOWN = 0, CID = 1, HCD = 2 };
 }  // namespace ActivationMethod
 
+// The Xic stores the information for an extracted ion chromatogram.
+namespace Xic {
+// A Xic can be generated using the summation of all points for each scan,
+// or the maximum intensity. When used on the entire dataset, the former is
+// called the Total Ion Chromatogram (TIC) whereas the later is called base peak
+// chromatogram.
+enum Method : uint8_t { UNKNOWN = 0, SUM = 1, MAX = 2 };
+struct Xic {
+    // Resulting data vectors.
+    std::vector<double> retention_time;
+    std::vector<double> intensity;
+    // The parameters used to generate this Xic.
+    Method method;
+    double min_mz;
+    double max_mz;
+    double min_rt;
+    double max_rt;
+};
+}  // namespace Xic
+
 // In this namespace we have access to the data structures for working with raw
 // data.
 namespace RawData {
@@ -108,11 +128,10 @@ struct RawPoints {
     std::vector<double> intensity;
 };
 
-// Calculate the extracted ion chromatogram for ROI described my the
-// min/max mz/rt on the given raw_data.
-std::tuple<std::vector<double>, std::vector<double>> xic(
-    const RawData &raw_data, double min_mz, double max_mz, double min_rt,
-    double max_rt, std::string method);
+// Calculate the extracted ion chromatogram for ROI described by the
+// min/max_mz/rt on the given raw_data.
+Xic::Xic xic(const RawData &raw_data, double min_mz, double max_mz,
+             double min_rt, double max_rt, Xic::Method method);
 
 // Calculate the theoretical FWHM of the peak for the given mz.
 double theoretical_fwhm(const RawData &raw_data, double mz);

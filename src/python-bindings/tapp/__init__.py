@@ -640,7 +640,9 @@ def peak_extraction(file_name, tapp_parameters):
 
 
 def plot_xic(peak, raw_data, figure=None, method="max"):
-    x, y = peak.xic(raw_data, method=method)
+    xic = peak.xic(raw_data, method=method)
+    x = xic.retention_time
+    y = xic.intensity
     plt.style.use('dark_background')
     if not figure:
         figure = plt.figure()
@@ -792,7 +794,9 @@ def plot_raw_points(
             edgecolor=color,
         )
     if rt_plot:
-        x, y = peak.xic(raw_data, method=xic_method)
+        xic = peak.xic(raw_data, method=xic_method)
+        x = xic.retention_time
+        y = xic.intensity
         rt_plot.plot(y, x, color=color)
     if mz_plot:
         sort_idx_mz = np.argsort(mzs)

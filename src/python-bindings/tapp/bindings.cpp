@@ -115,6 +115,25 @@ RawData::RawData read_mzxml(std::string &input_file, double min_mz,
     return raw_data.value();
 }
 
+Xic::Xic xic(const RawData::RawData &raw_data, double min_mz, double max_mz,
+             double min_rt, double max_rt, std::string method_str) {
+    // Parse the instrument type.
+    auto method = Xic::UNKNOWN;
+    for (auto &ch : method_str) {
+        ch = std::tolower(ch);
+    }
+    if (method_str == "max") {
+        method = Xic::MAX;
+    } else if (method_str == "sum") {
+        method = Xic::SUM;
+    } else {
+        std::ostringstream error_stream;
+        error_stream << "the given xic method is not supported";
+        throw std::invalid_argument(error_stream.str());
+    }
+    return RawData::xic(raw_data, min_mz, max_mz, min_rt, max_rt, method);
+}
+
 Grid::Grid resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
                     uint64_t num_samples_rt, double smoothing_coef_mz,
                     double smoothing_coef_rt) {
@@ -149,6 +168,17 @@ std::string to_string(const Polarity::Type &polarity) {
             return "NEGATIVE";
         case Polarity::BOTH:
             return "BOTH";
+        default:
+            return "UNKNOWN";
+    };
+}
+
+std::string to_string(const Xic::Method &method) {
+    switch (method) {
+        case Xic::Method::MAX:
+            return "MAX";
+        case Xic::Method::SUM:
+            return "SUM";
         default:
             return "UNKNOWN";
     };
@@ -654,6 +684,17 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("mz", &RawData::RawPoints::mz)
         .def_readonly("intensity", &RawData::RawPoints::intensity);
 
+    py::class_<Xic::Xic>(m, "Xic")
+        .def_readonly("retention_time", &Xic::Xic::retention_time)
+        .def_readonly("intensity", &Xic::Xic::intensity)
+        .def("__repr__", [](const Xic::Xic &s) {
+            return "Xic <method: " + PythonAPI::to_string(s.method) +
+                   ", min_mz: " + std::to_string(s.min_mz) +
+                   ", max_mz: " + std::to_string(s.max_mz) +
+                   ", min_rt: " + std::to_string(s.min_rt) +
+                   ", max_rt: " + std::to_string(s.max_rt) + ">";
+        });
+
     py::class_<Centroid::Peak>(m, "Peak")
         .def_readonly("id", &Centroid::Peak::id)
         .def_readonly("local_max_mz", &Centroid::Peak::local_max_mz)
@@ -939,7 +980,7 @@ PYBIND11_MODULE(tapp, m) {
         .def("link_idents", &Link::link_idents,
              "Link msms events to spectrum identifications",
              py::arg("ident_data"), py::arg("raw_data"))
-        .def("xic", &RawData::xic, py::arg("raw_data"), py::arg("min_mz"),
+        .def("xic", &PythonAPI::xic, py::arg("raw_data"), py::arg("min_mz"),
              py::arg("max_mz"), py::arg("min_rt"), py::arg("max_rt"),
              py::arg("method") = "sum")
         .def("feature_detection", &FeatureDetection::feature_detection,

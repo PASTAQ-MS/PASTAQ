@@ -29,14 +29,17 @@ double RawData::fwhm_to_sigma(double fwhm) {
     return fwhm / (2 * std::sqrt(2 * std::log(2)));
 }
 
-std::tuple<std::vector<double>, std::vector<double>> RawData::xic(
-    const RawData &raw_data, double min_mz, double max_mz, double min_rt,
-    double max_rt, std::string method) {
-    std::vector<double> rt;
-    std::vector<double> intensity;
+Xic::Xic RawData::xic(const RawData &raw_data, double min_mz, double max_mz,
+                      double min_rt, double max_rt, Xic::Method method) {
+    Xic::Xic result = {};
+    result.min_mz = min_mz;
+    result.max_mz = max_mz;
+    result.min_rt = min_rt;
+    result.max_rt = max_rt;
+    result.method = method;
     const auto &scans = raw_data.scans;
     if (scans.size() == 0) {
-        return {rt, intensity};
+        return result;
     }
 
     // Find scan indices.
@@ -69,33 +72,37 @@ std::tuple<std::vector<double>, std::vector<double>> RawData::xic(
         }
 
         double aggregated_intensity = 0;
-        if (method == "sum") {
-            // Sum all points in the scan.
-            for (size_t i = min_i; i < max_i; ++i) {
-                if (scan.mz[i] > max_mz) {
-                    break;
+        switch (method) {
+            case Xic::SUM: {
+                // Sum all points in the scan.
+                for (size_t i = min_i; i < max_i; ++i) {
+                    if (scan.mz[i] > max_mz) {
+                        break;
+                    }
+                    aggregated_intensity += scan.intensity[i];
                 }
-                aggregated_intensity += scan.intensity[i];
-            }
+            } break;
+            case Xic::MAX: {
+                // Find max point in the scan.
+                for (size_t i = min_i; i < max_i; ++i) {
+                    if (scan.mz[i] > max_mz) {
+                        break;
+                    }
+                    if (scan.intensity[i] > aggregated_intensity) {
+                        aggregated_intensity = scan.intensity[i];
+                    }
+                }
+            } break;
+            default: {
+                result.method = Xic::UNKNOWN;
+                return result;
+            } break;
         }
-        if (method == "max") {
-            // Find max point in the scan.
-            for (size_t i = min_i; i < max_i; ++i) {
-                if (scan.mz[i] > max_mz) {
-                    break;
-                }
-                if (scan.intensity[i] > aggregated_intensity) {
-                    aggregated_intensity = scan.intensity[i];
-                }
-            }
-        }
-        // FIXME: Non exhaustive pattern matching. Should we use a string here
-        // or an enum?
 
-        rt.push_back(scan.retention_time);
-        intensity.push_back(aggregated_intensity);
+        result.retention_time.push_back(scan.retention_time);
+        result.intensity.push_back(aggregated_intensity);
     }
-    return {rt, intensity};
+    return result;
 }
 
 ::RawData::RawPoints RawData::find_raw_points(const RawData &raw_data,
