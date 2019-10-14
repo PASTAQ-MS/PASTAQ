@@ -73,9 +73,9 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
     }
     // Sort the peaks in range by mz for a faster search.
     std::sort(peaks_in_range.begin(), peaks_in_range.end(),
-                     [](const Centroid::Peak &p1, const Centroid::Peak &p2) {
-                         return (p1.local_max_mz < p2.local_max_mz);
-                     });
+              [](const Centroid::Peak &p1, const Centroid::Peak &p2) {
+                  return (p1.local_max_mz < p2.local_max_mz);
+              });
 
     // Find the reference node and the list of candidates for each node.
     size_t reference_node_index = 0;
@@ -266,7 +266,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
             return (p1.sorting_key < p2.sorting_key);
         };
         std::sort(idents_msms_key.begin(), idents_msms_key.end(),
-                         sorting_key_func);
+                  sorting_key_func);
     }
     auto peaks_rt_key = std::vector<Search::KeySort<double>>(peaks.size());
     for (size_t i = 0; i < peaks.size(); ++i) {
@@ -277,8 +277,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
                                    const Search::KeySort<double> &p2) {
             return (p1.sorting_key < p2.sorting_key);
         };
-        std::sort(peaks_rt_key.begin(), peaks_rt_key.end(),
-                         sorting_key_func);
+        std::sort(peaks_rt_key.begin(), peaks_rt_key.end(), sorting_key_func);
     }
     // We use this variable to keep track of the peaks we have already linked.
     auto peaks_in_use = std::vector<bool>(peaks.size());
@@ -351,6 +350,14 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
             }
         }
     }
-    // TODO: Sort features by height and assign feature ids.
+
+    // Sort features by height and assign feature ids.
+    std::sort(features.begin(), features.end(), [](auto &a, auto &b) {
+        return (a.total_height > b.total_height);
+    });
+    for (size_t i = 0; i < features.size(); ++i) {
+        features[i].id = i;
+    }
+
     return features;
 }
