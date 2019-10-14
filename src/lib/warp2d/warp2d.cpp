@@ -292,6 +292,12 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks_parallel(
         }
     }
 
+    // Sort the resulting peaks by id.
+    std::sort(warped_peaks.begin(), warped_peaks.end(),
+              [](const Centroid::Peak& p1, const Centroid::Peak& p2) -> bool {
+                  return (p1.id < p2.id);
+              });
+
     return warped_peaks;
 }
 

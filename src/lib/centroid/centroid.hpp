@@ -2,20 +2,22 @@
 #define CENTROID_CENTROID_HPP
 
 #include <cstdint>
-#include <optional>
-#include <tuple>
 #include <vector>
 
 #include "grid/grid.hpp"
 
+// In this namespace we can find the necessary functions to detect, quantify
+// and manipulate peaks.
 namespace Centroid {
-
+// A LocalMax is defined as a point in the smoothed grid where the adjacent
+// neighbours have a lower value than the current one.
 struct LocalMax {
     double mz;
     double rt;
     double value;
 };
 
+// The detected Peak.
 struct Peak {
     // ID of this peak. Should be kept for futher processing.
     uint64_t id;
@@ -51,8 +53,6 @@ struct Peak {
     uint64_t raw_roi_num_points;
     uint64_t raw_roi_num_points_within_sigma;
     uint64_t raw_roi_num_scans;
-
-    // FIXME: Better commments and documentation.
 };
 
 // Find all candidate points on the given grid by calculating the local maxima

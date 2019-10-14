@@ -17,7 +17,7 @@ std::vector<Centroid::LocalMax> Centroid::find_local_maxima(
         for (size_t i = 1; i < grid.n - 1; ++i) {
             int64_t index = i + j * grid.n;
 
-            // NOTE(alex): The definition of a local maxima in a 2D space might
+            // The definition of a local maxima in a 2D space might
             // have different interpretations. i.e. We can select the 8
             // neighbours and the local maxima will be marked if all points are
             // below the central value. Alternatively, only a number N of
