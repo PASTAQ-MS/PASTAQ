@@ -128,7 +128,7 @@ bool IdentData::Serialize::write_spectrum_id(std::ostream &stream,
     Serialization::write_bool(stream, spectrum_id.modifications);
     Serialization::write_string(stream, spectrum_id.sequence);
     Serialization::write_string(stream, spectrum_id.peptide_id);
-    Serialization::write_uint64(stream, spectrum_id.charge_state);
+    Serialization::write_uint8(stream, spectrum_id.charge_state);
     Serialization::write_double(stream, spectrum_id.theoretical_mz);
     Serialization::write_double(stream, spectrum_id.experimental_mz);
     Serialization::write_double(stream, spectrum_id.retention_time);

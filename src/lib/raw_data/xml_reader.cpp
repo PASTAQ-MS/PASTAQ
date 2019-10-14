@@ -466,6 +466,8 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream) {
             if (tag.value().name == "cvParam" &&
                 attributes["accession"] == "MS:1000894") {
                 spectrum_id.retention_time = std::stod(attributes["value"]);
+                // FIXME(alex): What happens if we don't have the retention
+                // time?
             }
 
             // Identification item.
