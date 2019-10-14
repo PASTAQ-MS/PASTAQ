@@ -25,7 +25,7 @@ struct Grid {
     // a significant amount of memory and is storing smoothed data, which
     // already alters the precision of the initial measurements. The issue is
     // that the resampling procedure involves the summation of many numbers on
-    // several grid points, which might significatnly alter results. More
+    // several grid points, which might significantly alter results. More
     // testing is needed.
     std::vector<double> data;
     std::vector<double> bins_mz;

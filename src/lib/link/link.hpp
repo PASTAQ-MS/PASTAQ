@@ -22,8 +22,8 @@ struct LinkedMsms {
 // TODO(alex): This needs more documentation
 
 // NOTE: This algorithm relies on the peak vector to be sorted by id/height.
-std::vector<LinkedMsms> link_msms(const std::vector<Centroid::Peak> &peaks,
-                                  const RawData::RawData &raw_data);
+std::vector<LinkedMsms> link_peaks(const std::vector<Centroid::Peak> &peaks,
+                                   const RawData::RawData &raw_data);
 std::vector<LinkedMsms> link_idents(const IdentData::IdentData &ident_data,
                                     const RawData::RawData &raw_data);
 

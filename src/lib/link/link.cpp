@@ -3,7 +3,7 @@
 #include "link/link.hpp"
 #include "utils/search.hpp"
 
-std::vector<Link::LinkedMsms> Link::link_msms(
+std::vector<Link::LinkedMsms> Link::link_peaks(
     const std::vector<Centroid::Peak> &peaks,
     const RawData::RawData &raw_data) {
     // Index the peak list by m/z.

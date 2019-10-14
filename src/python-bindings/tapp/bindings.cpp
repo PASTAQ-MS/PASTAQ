@@ -934,7 +934,7 @@ PYBIND11_MODULE(tapp, m) {
         .def("perform_metamatch", &PythonAPI::perform_metamatch,
              "Perform metamatch for peak matching", py::arg("input"),
              py::arg("radius_mz"), py::arg("radius_rt"), py::arg("fraction"))
-        .def("link_msms", &Link::link_msms, "Link msms events to peak ids",
+        .def("link_peaks", &Link::link_peaks, "Link msms events to peak ids",
              py::arg("peaks"), py::arg("raw_data"))
         .def("link_idents", &Link::link_idents,
              "Link msms events to spectrum identifications",

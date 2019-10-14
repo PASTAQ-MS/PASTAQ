@@ -1829,7 +1829,7 @@ def dda_pipeline(
         peaks = tapp.read_peaks(in_path_peaks)
 
         logger.info("Performing linkage: {}".format(stem))
-        linked_msms = tapp.link_msms(peaks, raw_data)
+        linked_msms = tapp.link_peaks(peaks, raw_data)
         logger.info('Writing linked_msms: {}'.format(out_path))
         tapp.write_linked_msms(linked_msms, out_path)
     logger.info('Finished peaks/msms linkage in {}'.format(
