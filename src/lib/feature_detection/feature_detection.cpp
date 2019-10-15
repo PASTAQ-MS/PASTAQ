@@ -42,6 +42,10 @@ FeatureDetection::theoretical_isotopes_peptide(std::string sequence,
     return normalize_isotopic_distribution(isotopes, charge_state, min_perc);
 }
 
+// FIXME: This is not entirely accurate. The algorithm is affected by the way
+// we do the rounding. For example, MS-Isotope seems to round to the closest
+// element instead of the lowest, and then adjusts the number of Hydrogens
+// up/down, instead of only up.
 struct Element {
     std::string name;
     double proportion;
@@ -56,11 +60,11 @@ FeatureDetection::TheoreticalIsotopes theoretical_isotopes_formula(
     const std::vector<Element> &average_molecular_composition, double mz,
     int8_t charge_state, double min_perc) {
     // Identify the number of whole atoms that we need. Since there is
-    // rounding, we need to adjust by adding hidrogen atoms to be
+    // rounding, we need to adjust by adding hydrogen atoms to be
     // at the same mass. Since we are always rounding down, we will only have
     // mass deficit, not surplus.
     std::vector<Element> num_atoms;
-    int32_t hidrogen_index = -1;
+    int32_t hydrogen_index = -1;
     double cumulative_mw = 0.0;
     for (size_t i = 0; i < average_molecular_composition.size(); ++i) {
         const auto &atom = average_molecular_composition[i];
@@ -69,25 +73,26 @@ FeatureDetection::TheoreticalIsotopes theoretical_isotopes_formula(
         if (rounded_atoms == 0) {
             continue;
         }
-        num_atoms.push_back({atom.name, static_cast<double>(rounded_atoms), atom.mw});
+        num_atoms.push_back(
+            {atom.name, static_cast<double>(rounded_atoms), atom.mw});
         // Calculate the total molecular weight after the rounding.
         // TODO: Should this lookup be done on a hash table instead of carrying
         // it around in the Element object?
         cumulative_mw += rounded_atoms * atom.mw;
-        // Find the index for Hidrogen if we have it.
+        // Find the index for Hydrogen if we have it.
         if (atom.name == "H") {
-            hidrogen_index = i;
+            hydrogen_index = i;
         }
     }
     // Calculate the difference between the molecular weight after rounding and
     // the expected mass. The number is calculated in whole units, as this is
-    // the number of hidrogens we are going to add to our table.
-    uint64_t extra_hidrogens = mz * charge_state - cumulative_mw;
-    if (hidrogen_index == -1) {
+    // the number of Hydrogens we are going to add to our table.
+    uint64_t extra_hydrogens = mz * charge_state - cumulative_mw;
+    if (hydrogen_index == -1) {
         num_atoms.push_back({"H", 0.0, 1.008});
-        hidrogen_index = num_atoms.size() - 1;
+        hydrogen_index = num_atoms.size() - 1;
     }
-    num_atoms[hidrogen_index].proportion += extra_hidrogens;
+    num_atoms[hydrogen_index].proportion += extra_hydrogens;
 
     // Build the chemical formula for the given mz and charge_state.
     std::string formula = "";
@@ -95,10 +100,7 @@ FeatureDetection::TheoreticalIsotopes theoretical_isotopes_formula(
         uint64_t num_atoms = atom.proportion;
         formula += atom.name + std::to_string(num_atoms);
     }
-    std::cout << "FORMULA: " << formula << std::endl;
     auto midas = MIDAs(charge_state = charge_state);
-    // auto midas = MIDAs(charge_state, 0.01, 1.0,1e-150,1);
-    midas.Initialize_Elemental_Composition(formula, "", "H", "OH", 2);
     auto isotopes = midas.Coarse_Grained_Isotopic_Distribution();
     return normalize_isotopic_distribution(isotopes, charge_state, min_perc);
 }
@@ -376,46 +378,30 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
         // bound on the search array or last index of the array.
         auto index = idents_msms_key[i].index;
         auto ident = link_table_idents[index];
-        auto &peak = peaks[linked_msms.entity_id];
+        const auto &peak = peaks[linked_msms.entity_id];
         TheoreticalIsotopes theoretical_isotopes = {};
-        // if (linked_msms.msms_id != ident.msms_id) {
-        if (linked_msms.msms_id == ident.msms_id) {  // DEBUG:...
+        if (linked_msms.msms_id != ident.msms_id) {
             // Generate a theoretical_isotope_distribution based on averagine.
+            // FIXME: This needs to be checked. For now we are ignoring the
+            // msms events without identifications to get initial measurements
+            // with our data.
             // theoretical_isotopes = theoretical_isotopes_formula(
             // averagine, peak.local_max_mz, charge_state, 0.01);
-            theoretical_isotopes =
-                theoretical_isotopes_formula(averagine, 400, 3, 0.01);
-            // DEBUG:...
-            for (size_t i = 0; i < theoretical_isotopes.mzs.size(); ++i) {
-                std::cout << "mz: " << theoretical_isotopes.mzs[i];
-                std::cout << " perc: " << theoretical_isotopes.percs[i];
-                std::cout << std::endl;
-            }
-            // DEBUG:^^^
         } else {
             // Generate a theoretical_isotope_distribution based on the
             // given sequence.
-            // TODO: Include modifications? There is probably more to it
-            // than just calling midas with a sequence and a charge
-            // state.
+            // FIXME: This algorithm WILL be affected by modifications. If we
+            // don't consider them, the m/z results will not match the peaks in
+            // our peak list.
             auto sequence = ident_data.spectrum_ids[ident.entity_id].sequence;
             theoretical_isotopes =
                 FeatureDetection::theoretical_isotopes_peptide(
                     sequence, charge_state, 0.01);
-            // DEBUG:...
-            std::cout << sequence << std::endl;
-            for (size_t i = 0; i < theoretical_isotopes.mzs.size(); ++i) {
-                std::cout << "mz: " << theoretical_isotopes.mzs[i];
-                std::cout << " perc: " << theoretical_isotopes.percs[i];
-                std::cout << std::endl;
-            }
-            // DEBUG:^^^
         }
         if (theoretical_isotopes.mzs.empty() ||
             theoretical_isotopes.percs.empty()) {
             continue;
         }
-        break;
 
         // We use the retention time of the APEX of the matched peak,
         // not the msms event.
@@ -431,18 +417,6 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
             for (const auto &peak_id : feature.peak_ids) {
                 peaks_in_use[peak_id] = true;
             }
-            // DEBUG: ...
-            // std::cout << " rt: " << maybe_feature.value().rt
-            //<< " monoisotopic_mz: "
-            //<< maybe_feature.value().monoisotopic_mz
-            //<< " monoisotopic_height: "
-            //<< maybe_feature.value().monoisotopic_height
-            //<< " average_mz: " << maybe_feature.value().average_mz
-            //<< " total_height: "
-            //<< maybe_feature.value().total_height
-            //<< " num_isotopes: "
-            //<< maybe_feature.value().peak_ids.size() << std::endl;
-            // break; // DEBUG: <---
         }
     }
 
