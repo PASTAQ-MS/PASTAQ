@@ -59,16 +59,17 @@ FeatureDetection::TheoreticalIsotopes theoretical_isotopes_formula(
     // rounding, we need to adjust by adding hidrogen atoms to be
     // at the same mass. Since we are always rounding down, we will only have
     // mass deficit, not surplus.
-    auto num_atoms = std::vector<Element>(average_molecular_composition.size());
+    std::vector<Element> num_atoms;
     int32_t hidrogen_index = -1;
     double cumulative_mw = 0.0;
     for (size_t i = 0; i < average_molecular_composition.size(); ++i) {
         const auto &atom = average_molecular_composition[i];
         // Round the number of atoms for this element.
         uint64_t rounded_atoms = atom.proportion * mz * charge_state;
-        num_atoms[i].name = atom.name;
-        num_atoms[i].proportion = rounded_atoms;
-        num_atoms[i].mw = atom.mw;
+        if (rounded_atoms == 0) {
+            continue;
+        }
+        num_atoms.push_back({atom.name, static_cast<double>(rounded_atoms), atom.mw});
         // Calculate the total molecular weight after the rounding.
         // TODO: Should this lookup be done on a hash table instead of carrying
         // it around in the Element object?
@@ -83,7 +84,7 @@ FeatureDetection::TheoreticalIsotopes theoretical_isotopes_formula(
     // the number of hidrogens we are going to add to our table.
     uint64_t extra_hidrogens = mz * charge_state - cumulative_mw;
     if (hidrogen_index == -1) {
-        num_atoms.push_back({"H", 0, 1.008});
+        num_atoms.push_back({"H", 0.0, 1.008});
         hidrogen_index = num_atoms.size() - 1;
     }
     num_atoms[hidrogen_index].proportion += extra_hidrogens;
@@ -95,10 +96,10 @@ FeatureDetection::TheoreticalIsotopes theoretical_isotopes_formula(
         formula += atom.name + std::to_string(num_atoms);
     }
     std::cout << "FORMULA: " << formula << std::endl;
-    //auto midas = MIDAs(charge_state = charge_state, flag_method = 2);
-    auto midas = MIDAs(charge_state, 0.01, 1.0,1e-150,1);
+    auto midas = MIDAs(charge_state = charge_state);
+    // auto midas = MIDAs(charge_state, 0.01, 1.0,1e-150,1);
     midas.Initialize_Elemental_Composition(formula, "", "H", "OH", 2);
-    auto isotopes = midas.Fine_Grained_Isotopic_Distribution();
+    auto isotopes = midas.Coarse_Grained_Isotopic_Distribution();
     return normalize_isotopic_distribution(isotopes, charge_state, min_perc);
 }
 
@@ -383,7 +384,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
             // theoretical_isotopes = theoretical_isotopes_formula(
             // averagine, peak.local_max_mz, charge_state, 0.01);
             theoretical_isotopes =
-                theoretical_isotopes_formula(averagine, 400, 1, 0.01);
+                theoretical_isotopes_formula(averagine, 400, 3, 0.01);
             // DEBUG:...
             for (size_t i = 0; i < theoretical_isotopes.mzs.size(); ++i) {
                 std::cout << "mz: " << theoretical_isotopes.mzs[i];
