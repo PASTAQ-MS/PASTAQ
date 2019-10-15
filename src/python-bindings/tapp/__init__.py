@@ -1873,17 +1873,56 @@ def dda_pipeline(
         raw_data = tapp.read_raw_data(in_path_raw)
 
         logger.info("Reading ident from disk: {}".format(stem))
-        idents = tapp.read_ident_data(in_path_idents)
+        ident_data = tapp.read_ident_data(in_path_idents)
 
         logger.info("Performing linkage: {}".format(stem))
-        linked_idents = tapp.link_idents(idents, raw_data)
+        linked_idents = tapp.link_idents(ident_data, raw_data)
         logger.info('Writing linked_msms: {}'.format(out_path))
         tapp.write_linked_msms(linked_idents, out_path)
     logger.info('Finished ident/msms linkage in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
-    # TODO: Perform feature detection using averagine or linked identification
+    # Perform feature detection using averagine or linked identification
     # if available in ms2 linked peaks.
+    logger.info('Starting feature detection')
+    time_start = time.time()
+    for stem in input_stems:
+        # Check if file has already been processed.
+        in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
+        in_path_idents = os.path.join(
+            output_dir, 'ident', "{}.ident".format(stem))
+        in_path_ident_link = os.path.join(output_dir, 'linking',
+                                          "{}.ms2_idents.link".format(stem))
+        in_path_peaks_link = os.path.join(output_dir, 'linking',
+                                          "{}.ms2_peaks.link".format(stem))
+        out_path = os.path.join(output_dir, 'features',
+                                "{}.features".format(stem))
+        if os.path.exists(out_path) and not override_existing:
+            continue
+
+        logger.info("Reading raw_data from disk (MS2): {}".format(stem))
+        raw_data = tapp.read_raw_data(in_path_raw)
+
+        logger.info("Reading peaks from disk: {}".format(stem))
+        peaks = tapp.read_peaks('tapp_pipeline_test/peaks/1_1.bpks')
+
+        logger.info("Reading ident_data from disk: {}".format(stem))
+        ident_data = tapp.read_ident_data(in_path_idents)
+
+        logger.info("Reading linked peaks from disk: {}".format(stem))
+        linked_peaks = tapp.read_linked_msms(in_path_peaks_link)
+
+        logger.info("Reading linked idents from disk: {}".format(stem))
+        linked_idents = tapp.read_linked_msms(in_path_ident_link)
+
+        logger.info("Performing feature_detection: {}".format(stem))
+        features = tapp.feature_detection(
+            peaks, raw_data, ident_data, linked_peaks, linked_idents)
+        logger.info('Writing features: {}'.format(out_path))
+        tapp.write_features(features, out_path)
+    logger.info('Finished feature detection in {}'.format(
+        datetime.timedelta(seconds=time.time()-time_start)))
+
     # TODO: Link metamatch clusters and corresponding peaks with identification
     # information of peptides and proteins.
     # TODO: Use maximum likelihood to resolve conflicts among replicates and
@@ -1949,14 +1988,14 @@ def full_dda_pipeline_test():
 def testing_feature_detection():
     peaks = tapp.read_peaks('tapp_pipeline_test/peaks/1_1.bpks')
     ms2_data = tapp.read_raw_data('tapp_pipeline_test/raw/1_1.ms2')
-    link_table_msms = tapp.read_linked_msms(
+    linked_peaks = tapp.read_linked_msms(
         'tapp_pipeline_test/linking/1_1.ms2_peaks.link')
-    link_table_idents = tapp.read_linked_msms(
+    linked_idents = tapp.read_linked_msms(
         'tapp_pipeline_test/linking/1_1.ms2_idents.link')
     ident_data = tapp.read_ident_data('tapp_pipeline_test/ident/1_1.ident')
     results = tapp.feature_detection(
-        peaks, ms2_data, ident_data, link_table_msms, link_table_idents)
-    return (peaks, ms2_data, ident_data, link_table_msms, link_table_idents, results)
+        peaks, ms2_data, ident_data, linked_peaks, linked_idents)
+    return (peaks, ms2_data, ident_data, linked_peaks, linked_idents, results)
 
 
 def peak_xic(peak, raw_data, method="sum"):
