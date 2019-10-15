@@ -78,6 +78,16 @@ bool write_vector(std::ostream &stream, const std::vector<T> &value,
     }
     return stream.good();
 }
+template <typename T>
+bool write_vector(std::ostream &stream, const std::vector<T> &value,
+                  bool(f)(std::ostream &, T)) {
+    uint64_t num_elements = value.size();
+    write_uint64(stream, num_elements);
+    for (size_t i = 0; i < num_elements; ++i) {
+        f(stream, value[i]);
+    }
+    return stream.good();
+}
 
 }  // namespace Serialization
 

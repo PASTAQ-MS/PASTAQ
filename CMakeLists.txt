@@ -27,6 +27,7 @@ add_library(tapplib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid_serialize.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/feature_detection/feature_detection.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/feature_detection/feature_detection_serialize.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/grid/grid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/grid/grid_serialize.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/link/link.cpp"

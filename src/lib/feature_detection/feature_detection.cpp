@@ -310,20 +310,20 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
     std::vector<Feature> features;
 
     // The proposed algorithm goes as follows:
-    // [X] 0.- Copy and sort the necessary vectors for the use of binary search
-    //         (link_table_idents is sorted by msms, as that is the key being
-    //         used for searching). The peaks array and link_table_msms array
-    //         should have already been sorted by peak_id, which is what we
-    //         want, as we are going to start matching peaks from highest
-    //         intensity to lowest.
-    // [X] 1.- For each linked peak on the link_table_msms, find it's associated
-    //         entry on the link_table_idents.
-    // [X] 2.- If the entry is found, use it to generate a theoretical isotopic
-    //         distribution, otherwise, averagine will be generated.
-    // [X] 3.- We try to find the proposed peaks from the theoretical
-    //         distribution on the peaks array (Maximum likelihood).
-    // [X] 4.- The peaks are marked as non available for future use. This means
-    //         that this is a greedy algorithm.
+    // 0.- Copy and sort the necessary vectors for the use of binary search
+    //     (link_table_idents is sorted by msms, as that is the key being
+    //     used for searching). The peaks array and link_table_msms array
+    //     should have already been sorted by peak_id, which is what we
+    //     want, as we are going to start matching peaks from highest
+    //     intensity to lowest.
+    // 1.- For each linked peak on the link_table_msms, find it's associated
+    //     entry on the link_table_idents.
+    // 2.- If the entry is found, use it to generate a theoretical isotopic
+    //     distribution, otherwise, averagine will be generated.
+    // 3.- We try to find the proposed peaks from the theoretical
+    //     distribution on the peaks array (Maximum likelihood).
+    // 4.- The peaks are marked as non available for future use. This is
+    //     a greedy algorithm.
 
     // Copy and sort key vectors.
     auto idents_msms_key =
@@ -354,7 +354,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
     auto peaks_in_use = std::vector<bool>(peaks.size());
 
     // TODO: We should probably prioritize the MSMS events that HAVE an
-    // identification, instead of just being intensity based only.
+    // identification, instead of being intensity based only.
     // TODO: We are linking msms events independently, but we know that
     // multiple msms events can be linked to any given peak. If the selected
     // identification is the same there is no problem, and if there is
@@ -365,7 +365,6 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
     // list of consensus candidates.
     for (const auto &linked_msms : link_table_msms) {
         // Find lower bound on the idents_msms_key.
-        // auto i = lower_bound(idents_msms_key, 99999);
         auto i = lower_bound(idents_msms_key, linked_msms.msms_id);
         auto charge_state = raw_data_ms2.scans[linked_msms.scan_index]
                                 .precursor_information.charge;
