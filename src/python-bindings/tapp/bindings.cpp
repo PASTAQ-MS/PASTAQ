@@ -11,6 +11,7 @@
 #include "centroid/centroid.hpp"
 #include "centroid/centroid_serialize.hpp"
 #include "feature_detection/feature_detection.hpp"
+#include "feature_detection/feature_detection_serialize.hpp"
 #include "grid/grid.hpp"
 #include "grid/grid_serialize.hpp"
 #include "link/link.hpp"
@@ -362,6 +363,46 @@ std::vector<Centroid::Peak> read_peaks(std::string &input_file) {
         throw std::invalid_argument(error_stream.str());
     }
     return peaks;
+}
+
+void write_features(const std::vector<FeatureDetection::Feature> &features,
+                    std::string &output_file) {
+    // Open file stream.
+    std::ofstream stream;
+    stream.open(output_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open output file" << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    if (!FeatureDetection::Serialize::write_features(stream, features)) {
+        std::ostringstream error_stream;
+        error_stream
+            << "error: couldn't write the features into the output file"
+            << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+}
+
+std::vector<FeatureDetection::Feature> read_features(std::string &input_file) {
+    // Open file stream.
+    std::ifstream stream;
+    stream.open(input_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open input file" << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    std::vector<FeatureDetection::Feature> features;
+    if (!FeatureDetection::Serialize::read_features(stream, &features)) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't write the features into the input file"
+                     << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+    return features;
 }
 
 void write_ident_data(const IdentData::IdentData &ident_data,
@@ -972,6 +1013,12 @@ PYBIND11_MODULE(tapp, m) {
         .def("write_ident_data", &PythonAPI::write_ident_data,
              "Write the ident_data to disk in a binary format",
              py::arg("ident_data"), py::arg("file_name"))
+        .def("read_features", &PythonAPI::read_features,
+             "Read the feature from the binary feature file",
+             py::arg("file_name"))
+        .def("write_features", &PythonAPI::write_features,
+             "Write the feature to disk in a binary format", py::arg("feature"),
+             py::arg("file_name"))
         .def("perform_metamatch", &PythonAPI::perform_metamatch,
              "Perform metamatch for peak matching", py::arg("input"),
              py::arg("radius_mz"), py::arg("radius_rt"), py::arg("fraction"))

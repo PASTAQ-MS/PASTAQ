@@ -26,3 +26,15 @@ bool FeatureDetection::Serialize::write_feature(std::ostream &stream,
                                           Serialization::write_uint64);
     return stream.good();
 }
+
+bool FeatureDetection::Serialize::read_features(
+    std::istream &stream, std::vector<Feature> *features) {
+    return Serialization::read_vector<Feature>(
+        stream, features, FeatureDetection::Serialize::read_feature);
+}
+
+bool FeatureDetection::Serialize::write_features(
+    std::ostream &stream, const std::vector<Feature> &features) {
+    return Serialization::write_vector<Feature>(
+        stream, features, FeatureDetection::Serialize::write_feature);
+}
