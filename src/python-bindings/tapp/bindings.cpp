@@ -764,16 +764,24 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("raw_roi_num_points", &Centroid::Peak::raw_roi_num_points)
         .def_readonly("raw_roi_num_scans", &Centroid::Peak::raw_roi_num_scans)
         .def("__repr__", [](const Centroid::Peak &p) {
-            return "Peak <id: " + std::to_string(p.id) +
-                   ", local_max_mz: " + std::to_string(p.local_max_mz) +
-                   ", local_max_rt: " + std::to_string(p.local_max_rt) +
-                   ", local_max_height: " + std::to_string(p.local_max_height) +
-                   ", raw_roi_sigma_mz: " + std::to_string(p.raw_roi_sigma_mz) +
-                   ", raw_roi_sigma_rt: " + std::to_string(p.raw_roi_sigma_rt) +
-                   ", raw_roi_num_points: " +
-                   std::to_string(p.raw_roi_num_points) +
-                   ", raw_roi_num_scans: " +
-                   std::to_string(p.raw_roi_num_scans) + ">";
+            std::string ret = "";
+            ret += "Peak <id: " + std::to_string(p.id);
+            ret += ", local_max_mz: " + std::to_string(p.local_max_mz);
+            ret += ", local_max_rt: " + std::to_string(p.local_max_rt);
+            if (p.warping_delta_rt != 0) {
+                ret += ", warped_rt: " +
+                       std::to_string(p.local_max_rt + p.warping_delta_rt);
+                ret += " (" + std::to_string(p.warping_delta_rt) + ")";
+            }
+            ret += ", local_max_height: " + std::to_string(p.local_max_height);
+            ret += ", raw_roi_sigma_mz: " + std::to_string(p.raw_roi_sigma_mz);
+            ret += ", raw_roi_sigma_rt: " + std::to_string(p.raw_roi_sigma_rt);
+            ret +=
+                ", raw_roi_num_points: " + std::to_string(p.raw_roi_num_points);
+            ret +=
+                ", raw_roi_num_scans: " + std::to_string(p.raw_roi_num_scans);
+            ret += ">";
+            return ret;
         });
 
     py::class_<PythonAPI::SimilarityResults>(m, "Similarity")

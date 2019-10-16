@@ -10,8 +10,10 @@ void calculate_cluster_pos(double& cluster_mz, double& cluster_rt,
     double y_sum = 0;
     double height_sum = 0;
     for (const auto& index : metapeak_indexes) {
-        x_sum += peaks[index].local_max_mz * peaks[index].local_max_height;
-        y_sum += peaks[index].local_max_rt * peaks[index].local_max_height;
+        double mz = peaks[index].local_max_mz;
+        double rt = peaks[index].local_max_rt + peaks[index].warping_delta_rt;
+        x_sum += mz * peaks[index].local_max_height;
+        y_sum += rt * peaks[index].local_max_height;
         height_sum += peaks[index].local_max_height;
 
         // NOTE(alex): This is a weighted average, it might cause problems if
@@ -34,11 +36,12 @@ void calculate_cluster_pos(double& cluster_mz, double& cluster_rt,
 void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
                               const MetaMatch::Parameters& parameters) {
     auto sort_peaks = [](auto p1, auto p2) -> bool {
-        return (p1.local_max_mz < p2.local_max_mz) ||
-               ((p1.local_max_mz == p2.local_max_mz) &&
-                (p1.local_max_rt < p2.local_max_rt)) ||
-               ((p1.local_max_rt == p2.local_max_rt) &&
-                (p1.file_id < p2.file_id));
+        double p1_mz = p1.local_max_mz;
+        double p2_mz = p2.local_max_mz;
+        double p1_rt = p1.local_max_rt + p1.warping_delta_rt;
+        double p2_rt = p2.local_max_rt + p2.warping_delta_rt;
+        return (p1_mz < p2_mz) || ((p1_mz == p2_mz) && (p1_rt < p2_rt)) ||
+               ((p1_rt == p2_rt) && (p1.file_id < p2.file_id));
     };
     std::sort(peaks.begin(), peaks.end(), sort_peaks);
 
@@ -63,9 +66,11 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
             if (peaks[j].local_max_mz > cluster_mz + parameters.radius_mz) {
                 break;
             }
+            double peak_mz = peaks[j].local_max_mz;
+            double peak_rt = peaks[j].local_max_rt + peaks[j].warping_delta_rt;
             if (peaks[j].cluster_id == -1 &&
-                (peaks[j].local_max_mz < cluster_mz + parameters.radius_mz &&
-                 peaks[j].local_max_rt < cluster_rt + parameters.radius_rt)) {
+                (peak_mz < cluster_mz + parameters.radius_mz &&
+                 peak_rt < cluster_rt + parameters.radius_rt)) {
                 // If the cluster already contains a peak from the same file as
                 // peaks[j], check if height of said peak is greater than
                 // peaks[j].local_max_height, if it is, swap the index,
@@ -95,14 +100,13 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
                 // Cull far peaks.
                 for (int k = metapeak_indexes.size() - 1; k >= 0; --k) {
                     auto& index = metapeak_indexes[k];
-                    if (peaks[index].local_max_mz >
-                            cluster_mz + parameters.radius_mz ||
-                        peaks[index].local_max_mz <
-                            cluster_mz - parameters.radius_mz ||
-                        peaks[index].local_max_rt >
-                            cluster_rt + parameters.radius_rt ||
-                        peaks[index].local_max_rt <
-                            cluster_rt - parameters.radius_rt) {
+                    double peak_mz = peaks[index].local_max_mz;
+                    double peak_rt = peaks[index].local_max_rt +
+                                     peaks[index].warping_delta_rt;
+                    if (peak_mz > cluster_mz + parameters.radius_mz ||
+                        peak_mz < cluster_mz - parameters.radius_mz ||
+                        peak_rt > cluster_rt + parameters.radius_rt ||
+                        peak_rt < cluster_rt - parameters.radius_rt) {
                         peaks[index].cluster_id = -1;
                         metapeak_indexes.erase(metapeak_indexes.begin() + k);
                         calculate_cluster_pos(cluster_mz, cluster_rt, peaks,

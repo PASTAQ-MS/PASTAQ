@@ -97,11 +97,11 @@ std::vector<Centroid::Peak> Warp2D::interpolate_peaks(
         Warp2D::peaks_in_rt_range(source_peaks, source_rt_start, source_rt_end);
 
     for (auto& peak : warped_peaks) {
-        double x = (peak.local_max_rt - source_rt_start) /
-                   (source_rt_end - source_rt_start);
         double previous_rt = peak.local_max_rt;
-        peak.local_max_rt = Interpolation::lerp(ref_rt_start, ref_rt_end, x);
-        peak.warping_delta_rt = previous_rt - peak.local_max_rt;
+        double x =
+            (previous_rt - source_rt_start) / (source_rt_end - source_rt_start);
+        double new_rt = Interpolation::lerp(ref_rt_start, ref_rt_end, x);
+        peak.warping_delta_rt = new_rt - previous_rt;
     }
     return warped_peaks;
 }

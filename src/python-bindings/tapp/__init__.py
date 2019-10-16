@@ -1820,7 +1820,7 @@ def dda_pipeline(
         # Check if file has already been processed.
         in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
         in_path_peaks = os.path.join(
-            output_dir, 'peaks', "{}.bpks".format(stem))
+            output_dir, 'warped_peaks', "{}.bpks".format(stem))
         out_path = os.path.join(output_dir, 'linking',
                                 "{}.ms2_peaks.link".format(stem))
         if os.path.exists(out_path) and not override_existing:
@@ -1890,7 +1890,7 @@ def dda_pipeline(
         # Check if file has already been processed.
         in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
         in_path_peaks = os.path.join(
-            output_dir, 'peaks', "{}.bpks".format(stem))
+            output_dir, 'warped_peaks', "{}.bpks".format(stem))
         in_path_idents = os.path.join(
             output_dir, 'ident', "{}.ident".format(stem))
         in_path_ident_link = os.path.join(output_dir, 'linking',
