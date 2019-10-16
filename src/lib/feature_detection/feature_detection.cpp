@@ -405,10 +405,10 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
         // We use the retention time of the APEX of the matched peak,
         // not the msms event.
         double peak_rt = peak.local_max_rt;
-        double peak_rt_sigma = peak.raw_roi_sigma_mz;
-        auto maybe_feature = build_feature(peaks_in_use, peaks, peaks_rt_key,
-                                           theoretical_isotopes, peak_rt_sigma,
-                                           peak_rt, discrepancy_threshold);
+        double peak_rt_sigma = peak.raw_roi_sigma_rt;
+        auto maybe_feature = build_feature(
+            peaks_in_use, peaks, peaks_rt_key, theoretical_isotopes,
+            peak_rt_sigma * 2, peak_rt, discrepancy_threshold);
         if (maybe_feature) {
             auto feature = maybe_feature.value();
             features.push_back(feature);

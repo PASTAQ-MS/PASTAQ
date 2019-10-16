@@ -1889,6 +1889,8 @@ def dda_pipeline(
     for stem in input_stems:
         # Check if file has already been processed.
         in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
+        in_path_peaks = os.path.join(
+            output_dir, 'peaks', "{}.bpks".format(stem))
         in_path_idents = os.path.join(
             output_dir, 'ident', "{}.ident".format(stem))
         in_path_ident_link = os.path.join(output_dir, 'linking',
@@ -1904,7 +1906,7 @@ def dda_pipeline(
         raw_data = tapp.read_raw_data(in_path_raw)
 
         logger.info("Reading peaks from disk: {}".format(stem))
-        peaks = tapp.read_peaks('tapp_pipeline_test/peaks/1_1.bpks')
+        peaks = tapp.read_peaks(in_path_peaks)
 
         logger.info("Reading ident_data from disk: {}".format(stem))
         ident_data = tapp.read_ident_data(in_path_idents)
@@ -1986,13 +1988,13 @@ def full_dda_pipeline_test():
 
 
 def testing_feature_detection():
-    peaks = tapp.read_peaks('tapp_pipeline_test/peaks/1_1.bpks')
-    ms2_data = tapp.read_raw_data('tapp_pipeline_test/raw/1_1.ms2')
+    peaks = tapp.read_peaks('tapp_pipeline_test/peaks/1_3.bpks')
+    ms2_data = tapp.read_raw_data('tapp_pipeline_test/raw/1_3.ms2')
     linked_peaks = tapp.read_linked_msms(
-        'tapp_pipeline_test/linking/1_1.ms2_peaks.link')
+        'tapp_pipeline_test/linking/1_3.ms2_peaks.link')
     linked_idents = tapp.read_linked_msms(
-        'tapp_pipeline_test/linking/1_1.ms2_idents.link')
-    ident_data = tapp.read_ident_data('tapp_pipeline_test/ident/1_1.ident')
+        'tapp_pipeline_test/linking/1_3.ms2_idents.link')
+    ident_data = tapp.read_ident_data('tapp_pipeline_test/ident/1_3.ident')
     results = tapp.feature_detection(
         peaks, ms2_data, ident_data, linked_peaks, linked_idents)
     return (peaks, ms2_data, ident_data, linked_peaks, linked_idents, results)
