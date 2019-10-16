@@ -11,7 +11,9 @@ struct Feature {
     uint64_t id;
     double average_rt;
     double average_rt_delta;
+    double average_rt_sigma;
     double average_mz;
+    double average_mz_sigma;
     double total_height;
     double monoisotopic_mz;
     double monoisotopic_height;

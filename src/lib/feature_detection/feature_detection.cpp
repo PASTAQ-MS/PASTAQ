@@ -286,13 +286,17 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
     feature.total_height = 0.0;
     feature.average_rt = 0.0;
     feature.average_rt_delta = 0.0;
+    feature.average_rt_sigma = 0.0;
+    feature.average_mz_sigma = 0.0;
     for (size_t i = 0; i < selected_candidates.size(); ++i) {
         auto candidate = selected_candidates[i];
         feature.total_height += candidate->local_max_height;
         feature.average_mz +=
             candidate->local_max_height * candidate->local_max_mz;
-        feature.average_rt += candidate->local_max_mz;
+        feature.average_rt += candidate->local_max_rt;
         feature.average_rt_delta += candidate->rt_delta;
+        feature.average_rt_sigma += candidate->raw_roi_sigma_rt;
+        feature.average_mz_sigma += candidate->raw_roi_sigma_mz;
         feature.peak_ids.push_back(candidate->id);
     }
     if (feature.total_height == 0) {
@@ -301,6 +305,8 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
     feature.average_mz /= feature.total_height;
     feature.average_rt /= selected_candidates.size();
     feature.average_rt_delta /= selected_candidates.size();
+    feature.average_rt_sigma /= selected_candidates.size();
+    feature.average_mz_sigma /= selected_candidates.size();
     return feature;
 }
 
