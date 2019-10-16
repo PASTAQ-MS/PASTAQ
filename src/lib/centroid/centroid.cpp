@@ -320,8 +320,8 @@ double Centroid::peak_overlap(const Centroid::Peak &peak_a,
                               const Centroid::Peak &peak_b) {
     double peak_a_mz = peak_a.local_max_mz;
     double peak_b_mz = peak_b.local_max_mz;
-    double peak_a_rt = peak_a.local_max_rt + peak_a.warping_delta_rt;
-    double peak_b_rt = peak_b.local_max_rt + peak_b.warping_delta_rt;
+    double peak_a_rt = peak_a.local_max_rt + peak_a.rt_delta;
+    double peak_b_rt = peak_b.local_max_rt + peak_b.rt_delta;
     // Early return if the peaks do not intersect in the +/-3 * sigma_mz/rt
     {
         double min_rt_a = peak_a_rt - 3 * peak_a.raw_roi_sigma_rt;

@@ -11,7 +11,7 @@ void calculate_cluster_pos(double& cluster_mz, double& cluster_rt,
     double height_sum = 0;
     for (const auto& index : metapeak_indexes) {
         double mz = peaks[index].local_max_mz;
-        double rt = peaks[index].local_max_rt + peaks[index].warping_delta_rt;
+        double rt = peaks[index].local_max_rt + peaks[index].rt_delta;
         x_sum += mz * peaks[index].local_max_height;
         y_sum += rt * peaks[index].local_max_height;
         height_sum += peaks[index].local_max_height;
@@ -38,8 +38,8 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
     auto sort_peaks = [](auto p1, auto p2) -> bool {
         double p1_mz = p1.local_max_mz;
         double p2_mz = p2.local_max_mz;
-        double p1_rt = p1.local_max_rt + p1.warping_delta_rt;
-        double p2_rt = p2.local_max_rt + p2.warping_delta_rt;
+        double p1_rt = p1.local_max_rt + p1.rt_delta;
+        double p2_rt = p2.local_max_rt + p2.rt_delta;
         return (p1_mz < p2_mz) || ((p1_mz == p2_mz) && (p1_rt < p2_rt)) ||
                ((p1_rt == p2_rt) && (p1.file_id < p2.file_id));
     };
@@ -67,7 +67,7 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
                 break;
             }
             double peak_mz = peaks[j].local_max_mz;
-            double peak_rt = peaks[j].local_max_rt + peaks[j].warping_delta_rt;
+            double peak_rt = peaks[j].local_max_rt + peaks[j].rt_delta;
             if (peaks[j].cluster_id == -1 &&
                 (peak_mz < cluster_mz + parameters.radius_mz &&
                  peak_rt < cluster_rt + parameters.radius_rt)) {
@@ -101,8 +101,8 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
                 for (int k = metapeak_indexes.size() - 1; k >= 0; --k) {
                     auto& index = metapeak_indexes[k];
                     double peak_mz = peaks[index].local_max_mz;
-                    double peak_rt = peaks[index].local_max_rt +
-                                     peaks[index].warping_delta_rt;
+                    double peak_rt =
+                        peaks[index].local_max_rt + peaks[index].rt_delta;
                     if (peak_mz > cluster_mz + parameters.radius_mz ||
                         peak_mz < cluster_mz - parameters.radius_mz ||
                         peak_rt > cluster_rt + parameters.radius_rt ||

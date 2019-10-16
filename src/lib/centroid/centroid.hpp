@@ -29,8 +29,8 @@ struct Peak {
     double local_max_height;
 
     // If the peak has been warped for retention time alignment, by adding the
-    // following delta we can recover its original retention time.
-    double warping_delta_rt;
+    // following delta we can obtain the aligned retention time.
+    double rt_delta;
 
     // Region of interest for this peak.
     double roi_min_mz;

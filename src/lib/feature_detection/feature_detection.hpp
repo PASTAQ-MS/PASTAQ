@@ -9,11 +9,12 @@ namespace FeatureDetection {
 // TODO: Expand documentation.
 struct Feature {
     uint64_t id;
-    double rt;
-    double monoisotopic_mz;
-    double monoisotopic_height;
+    double average_rt;
+    double average_rt_delta;
     double average_mz;
     double total_height;
+    double monoisotopic_mz;
+    double monoisotopic_height;
     std::vector<uint64_t> peak_ids;
 };
 

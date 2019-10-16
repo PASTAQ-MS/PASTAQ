@@ -274,7 +274,6 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
 
     // Build the actual feature data.
     Feature feature = {};
-    feature.rt = retention_time;
     // FIXME: Currently assuming that the minimum detected isotope is the
     // monoisotopic peak, but THIS MIGHT NOT BE THE CASE. For simplicity and to
     // keep the flow going I'll leave this for now, but must go back and FIX
@@ -285,18 +284,23 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
     // isotopes.
     feature.average_mz = 0.0;
     feature.total_height = 0.0;
+    feature.average_rt = 0.0;
+    feature.average_rt_delta = 0.0;
     for (size_t i = 0; i < selected_candidates.size(); ++i) {
         auto candidate = selected_candidates[i];
         feature.total_height += candidate->local_max_height;
         feature.average_mz +=
             candidate->local_max_height * candidate->local_max_mz;
+        feature.average_rt += candidate->local_max_mz;
+        feature.average_rt_delta += candidate->rt_delta;
         feature.peak_ids.push_back(candidate->id);
     }
     if (feature.total_height == 0) {
         return std::nullopt;
     }
     feature.average_mz /= feature.total_height;
-    feature.average_mz = feature.average_mz;
+    feature.average_rt /= selected_candidates.size();
+    feature.average_rt_delta /= selected_candidates.size();
     return feature;
 }
 

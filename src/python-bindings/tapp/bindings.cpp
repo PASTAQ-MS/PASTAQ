@@ -741,7 +741,7 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("local_max_mz", &Centroid::Peak::local_max_mz)
         .def_readonly("local_max_rt", &Centroid::Peak::local_max_rt)
         .def_readonly("local_max_height", &Centroid::Peak::local_max_height)
-        .def_readonly("warping_delta_rt", &Centroid::Peak::warping_delta_rt)
+        .def_readonly("rt_delta", &Centroid::Peak::rt_delta)
         .def_readonly("roi_min_mz", &Centroid::Peak::roi_min_mz)
         .def_readonly("roi_max_mz", &Centroid::Peak::roi_max_mz)
         .def_readonly("roi_min_rt", &Centroid::Peak::roi_min_rt)
@@ -768,10 +768,10 @@ PYBIND11_MODULE(tapp, m) {
             ret += "Peak <id: " + std::to_string(p.id);
             ret += ", local_max_mz: " + std::to_string(p.local_max_mz);
             ret += ", local_max_rt: " + std::to_string(p.local_max_rt);
-            if (p.warping_delta_rt != 0) {
+            if (p.rt_delta != 0) {
                 ret += ", warped_rt: " +
-                       std::to_string(p.local_max_rt + p.warping_delta_rt);
-                ret += " (" + std::to_string(p.warping_delta_rt) + ")";
+                       std::to_string(p.local_max_rt + p.rt_delta);
+                ret += " (" + std::to_string(p.rt_delta) + ")";
             }
             ret += ", local_max_height: " + std::to_string(p.local_max_height);
             ret += ", raw_roi_sigma_mz: " + std::to_string(p.raw_roi_sigma_mz);
@@ -882,23 +882,33 @@ PYBIND11_MODULE(tapp, m) {
 
     py::class_<FeatureDetection::Feature>(m, "Feature")
         .def_readonly("id", &FeatureDetection::Feature::id)
-        .def_readonly("rt", &FeatureDetection::Feature::rt)
+        .def_readonly("average_rt", &FeatureDetection::Feature::average_rt)
+        .def_readonly("average_rt_delta",
+                      &FeatureDetection::Feature::average_rt_delta)
+        .def_readonly("average_mz", &FeatureDetection::Feature::average_mz)
+        .def_readonly("total_height", &FeatureDetection::Feature::total_height)
         .def_readonly("monoisotopic_mz",
                       &FeatureDetection::Feature::monoisotopic_mz)
         .def_readonly("monoisotopic_height",
                       &FeatureDetection::Feature::monoisotopic_height)
-        .def_readonly("average_mz", &FeatureDetection::Feature::average_mz)
-        .def_readonly("total_height", &FeatureDetection::Feature::total_height)
         .def_readonly("peak_ids", &FeatureDetection::Feature::peak_ids)
         .def("__repr__", [](const FeatureDetection::Feature &f) {
-            return "Feature <id: " + std::to_string(f.id) +
-                   ", rt: " + std::to_string(f.rt) +
-                   ", monoisotopic_mz: " + std::to_string(f.monoisotopic_mz) +
-                   ", monoisotopic_height: " +
-                   std::to_string(f.monoisotopic_height) +
-                   ", average_mz: " + std::to_string(f.average_mz) +
-                   ", total_height: " + std::to_string(f.total_height) +
-                   ", n_isotopes: " + std::to_string(f.peak_ids.size()) + ">";
+            std::string ret = "";
+            ret += "Feature <id: " + std::to_string(f.id);
+            ret += ", average_rt: " + std::to_string(f.average_rt);
+            if (f.average_rt_delta != 0) {
+                ret += ", average_warped_rt: " +
+                       std::to_string(f.average_rt + f.average_rt_delta);
+                ret += " (" + std::to_string(f.average_rt_delta) + ")";
+            }
+            ret += ", average_mz: " + std::to_string(f.average_mz);
+            ret += ", total_height: " + std::to_string(f.total_height);
+            ret += ", monoisotopic_mz: " + std::to_string(f.monoisotopic_mz);
+            ret += ", monoisotopic_height: " +
+                   std::to_string(f.monoisotopic_height);
+            ret += ", n_isotopes: " + std::to_string(f.peak_ids.size());
+            ret += ">";
+            return ret;
         });
 
     py::class_<PythonAPI::MetaMatchResults>(m, "MetaMatchResults")

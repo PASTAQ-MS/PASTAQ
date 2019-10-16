@@ -1988,7 +1988,7 @@ def full_dda_pipeline_test():
 
 
 def testing_feature_detection():
-    peaks = tapp.read_peaks('tapp_pipeline_test/peaks/1_3.bpks')
+    peaks = tapp.read_peaks('tapp_pipeline_test/warped_peaks/1_3.bpks')
     ms2_data = tapp.read_raw_data('tapp_pipeline_test/raw/1_3.ms2')
     linked_peaks = tapp.read_linked_msms(
         'tapp_pipeline_test/linking/1_3.ms2_peaks.link')
