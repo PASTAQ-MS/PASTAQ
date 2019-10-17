@@ -67,11 +67,10 @@ struct FeatureCluster {
     std::vector<std::vector<uint64_t>> feature_ids;
 };
 
-// NOTE: The memory will never be owned by this class.
 struct InputSetFeatures {
     uint64_t group_id;
-    std::vector<Centroid::Peak>* peaks;
-    std::vector<FeatureDetection::Feature>* features;
+    std::vector<Centroid::Peak>& peaks;
+    std::vector<FeatureDetection::Feature>& features;
 };
 std::vector<FeatureCluster> find_feature_clusters(
     std::vector<InputSetFeatures>& input_sets);

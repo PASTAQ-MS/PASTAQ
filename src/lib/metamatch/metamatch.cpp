@@ -242,10 +242,7 @@ std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
     // Find the total number of features.
     uint64_t num_features = 0;
     for (const auto& input_set : input_sets) {
-        if (input_set.features == nullptr) {
-            continue;
-        }
-        num_features += input_set.features->size();
+        num_features += input_set.features.size();
     }
 
     // We need to index the features to sort by descending intensity and check
@@ -259,11 +256,7 @@ std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
     auto feature_index = std::vector<Index>(num_features);
     size_t k = 0;
     for (size_t i = 0; i < input_sets.size(); ++i) {
-        const auto& input_set = input_sets[i];
-        if (input_set.features == nullptr) {
-            continue;
-        }
-        const auto& features = *input_sets[i].features;
+        const auto& features = input_sets[i].features;
         for (size_t j = 0; j < features.size(); ++j, ++k) {
             feature_index[k].file_id = i;
             feature_index[k].feature_id = j;
@@ -275,13 +268,50 @@ std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
               [](auto a, auto b) -> bool {
                   return a.total_intensity > b.total_intensity;
               });
-    for (const auto& idx : feature_index) {
-        std::cout << "file_id: " << idx.file_id << std::endl;
-        std::cout << "feature_id: " << idx.feature_id << std::endl;
-        std::cout << "total_intensity: " << idx.total_intensity << std::endl;
-        std::cout << "available: " << idx.available << std::endl;
-    }
 
+    for (const auto& index : feature_index) {
+        if (!index.available) {
+            continue;
+        }
+        const auto& ref = input_sets[index.file_id].features[index.feature_id];
+        double ref_mz = ref.average_mz;
+        double ref_rt = ref.average_rt + ref.average_rt_delta;
+
+        // Calculate ROI.
+        double min_mz = ref_mz - 3 * ref.average_mz_sigma;
+        double max_mz = ref_mz + 3 * ref.average_mz_sigma;
+        double min_rt = ref_rt - 3 * ref.average_rt_sigma;
+        double max_rt = ref_rt + 3 * ref.average_rt_sigma;
+
+        // Find the maximally similar feature in the rest of the files within
+        // the ROI.
+        std::vector<FeatureDetection::Feature*> clustered_features(
+            input_sets.size());
+        for (size_t i = 0; i < input_sets.size(); ++i) {
+            if (index.file_id == i) {
+                clustered_features[i] =
+                    &input_sets[index.file_id].features[index.feature_id];
+                continue;
+            }
+            const auto& input_set = input_sets[i];
+            // TODO: Find features ROI.
+            // TODO: If feature maximizes overlap, keep.
+        }
+
+        // DEBUG:...
+        for (const auto& feature : clustered_features) {
+            if (feature == nullptr) {
+                continue;
+            }
+            std::cout << feature->id << std::endl;
+            std::cout << feature->average_mz << std::endl;
+        }
+        std::cout << min_mz << " ";
+        std::cout << max_mz << " ";
+        std::cout << min_rt << " ";
+        std::cout << max_rt << " ";
+        std::cout << std::endl;
+    }
     // NOTE: Do we want a flat search structure?
     //// This stores the features that are currently in use (Those features
     //// already assigned to a cluster).
