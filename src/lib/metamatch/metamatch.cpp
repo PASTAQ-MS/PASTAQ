@@ -223,3 +223,96 @@ std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
 
     return clusters;
 }
+
+std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
+    std::vector<MetaMatch::InputSetFeatures>& input_sets) {
+    std::vector<MetaMatch::FeatureCluster> clusters;
+    // TODO: Do noise discrimination based on desired % per group.
+    // 1.- Create an indexed set of the highest intensity peaks in descending
+    //     order.
+    // 2.- Find the highest intensity feature to start the algorithm.
+    // 3.- Find the features within the region of interest ROI of the selected
+    //     feature in each file.
+    // 4.- Per file, select the candidate feature that maximizes the
+    //     optimization metric (i.e. Maximum cumulative overlap).
+    // 5.- Mark the selected candidates as taken and build the cluster object.
+    // 6.- GOTO 2
+    // 7.- Once done, go back to peak lists to find undetected features.
+
+    // Find the total number of features.
+    uint64_t num_features = 0;
+    for (const auto& input_set : input_sets) {
+        if (input_set.features == nullptr) {
+            continue;
+        }
+        num_features += input_set.features->size();
+    }
+
+    // We need to index the features to sort by descending intensity and check
+    // if said feature has already been used before.
+    struct Index {
+        uint64_t file_id;
+        uint64_t feature_id;
+        double total_intensity;
+        bool available;
+    };
+    auto feature_index = std::vector<Index>(num_features);
+    size_t k = 0;
+    for (size_t i = 0; i < input_sets.size(); ++i) {
+        const auto& input_set = input_sets[i];
+        if (input_set.features == nullptr) {
+            continue;
+        }
+        const auto& features = *input_sets[i].features;
+        for (size_t j = 0; j < features.size(); ++j, ++k) {
+            feature_index[k].file_id = i;
+            feature_index[k].feature_id = j;
+            feature_index[k].total_intensity = features[j].total_height;
+            feature_index[k].available = true;
+        }
+    }
+    std::sort(feature_index.begin(), feature_index.end(),
+              [](auto a, auto b) -> bool {
+                  return a.total_intensity > b.total_intensity;
+              });
+    for (const auto& idx : feature_index) {
+        std::cout << "file_id: " << idx.file_id << std::endl;
+        std::cout << "feature_id: " << idx.feature_id << std::endl;
+        std::cout << "total_intensity: " << idx.total_intensity << std::endl;
+        std::cout << "available: " << idx.available << std::endl;
+    }
+
+    // NOTE: Do we want a flat search structure?
+    //// This stores the features that are currently in use (Those features
+    //// already assigned to a cluster).
+    // auto availability_index =
+    // std::vector<std::vector<bool>>(input_sets.size());
+    //// Create an indexed set of the highest intensity features in descending
+    //// order.
+    // auto total_intensity_index =
+    // std::vector<std::vector<Search::KeySort<double>>>(input_sets.size());
+    //// Create an indexed set of the features sorted in ascending retention
+    /// time / order.
+    // auto retention_time_index =
+    // std::vector<std::vector<Search::KeySort<double>>>(input_sets.size());
+    // for (size_t i = 0; i < input_sets.size(); ++i) {
+    // if (input_sets[i].features == nullptr) {
+    // continue;
+    //}
+    // const auto& features = *input_sets[i].features;
+    // availability_index[i].reserve(features.size());
+    // total_intensity_index[i].reserve(features.size());
+    // retention_time_index[i].reserve(features.size());
+    // for (size_t j = 0; j < features.size(); ++j) {
+    // total_intensity_index[i][j] = {j, features[j].total_height};
+    // retention_time_index[i][j] = {
+    // j, features[j].average_rt + features[j].average_rt_delta};
+    // availability_index[i][j] = false;
+    //}
+    //}
+    // while (true) {
+    //// Find....
+    //}
+
+    return clusters;
+}

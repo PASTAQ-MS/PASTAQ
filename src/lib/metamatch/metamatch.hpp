@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "centroid/centroid.hpp"
+#include "feature_detection/feature_detection.hpp"
 
 namespace MetaMatch {
 
@@ -55,6 +56,25 @@ struct Cluster {
     std::vector<double> file_heights;
     double avg_height;
 };
+
+struct FeatureCluster {
+    uint64_t id;
+    double mz;
+    double rt;
+
+    // The feature ids on each file associated with this cluster.
+    // NOTE: Should we make this a relational model?
+    std::vector<std::vector<uint64_t>> feature_ids;
+};
+
+// NOTE: The memory will never be owned by this class.
+struct InputSetFeatures {
+    uint64_t group_id;
+    std::vector<Centroid::Peak>* peaks;
+    std::vector<FeatureDetection::Feature>* features;
+};
+std::vector<FeatureCluster> find_feature_clusters(
+    std::vector<InputSetFeatures>& input_sets);
 
 // Performs a centroid based clustering algorithm. This algorithm modifies the
 // given peaks array in place, changing the order and the clustering
