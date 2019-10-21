@@ -245,104 +245,157 @@ std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
         num_features += input_set.features.size();
     }
 
-    // We need to index the features to sort by descending intensity and check
-    // if said feature has already been used before.
+    // Create an index of the features in each file sorted by retention time in
+    // ascending order.
+    auto retention_time_index =
+        std::vector<std::vector<Search::KeySort<double>>>(input_sets.size());
+
+    // Keep track of which features are available, i.e. features that have not
+    // been assigned a cluster yet.
+    //     true: feature has been used
+    //     false: feature have not been used
+    auto availability_index = std::vector<std::vector<bool>>(input_sets.size());
+
+    // We need to index the features to sort by descending intensity to
+    // prioritize the next initial candidate.
+    // FIXME: The name `file_id` might be confusing. Maybe `sample_id` is more
+    // clear.
     struct Index {
         uint64_t file_id;
         uint64_t feature_id;
         double total_intensity;
-        bool available;
     };
-    auto feature_index = std::vector<Index>(num_features);
+    auto feature_indexes = std::vector<Index>(num_features);
+
+    // Build the index objects.
     size_t k = 0;
     for (size_t i = 0; i < input_sets.size(); ++i) {
         const auto& features = input_sets[i].features;
+        retention_time_index[i] =
+            std::vector<Search::KeySort<double>>(features.size());
+        availability_index[i] = std::vector<bool>(features.size());
         for (size_t j = 0; j < features.size(); ++j, ++k) {
-            feature_index[k].file_id = i;
-            feature_index[k].feature_id = j;
-            feature_index[k].total_intensity = features[j].total_height;
-            feature_index[k].available = true;
+            feature_indexes[k].file_id = i;
+            feature_indexes[k].feature_id = j;
+            feature_indexes[k].total_intensity = features[j].total_height;
+            retention_time_index[i][j] = {
+                j, features[j].average_rt + features[j].average_rt_delta};
         }
+        std::sort(retention_time_index[i].begin(),
+                  retention_time_index[i].end(),
+                  [](auto a, auto b) { return a.sorting_key < b.sorting_key; });
     }
-    std::sort(feature_index.begin(), feature_index.end(),
+    std::sort(feature_indexes.begin(), feature_indexes.end(),
               [](auto a, auto b) -> bool {
                   return a.total_intensity > b.total_intensity;
               });
 
-    for (const auto& index : feature_index) {
-        if (!index.available) {
+    for (const auto& index : feature_indexes) {
+        // Find the next available reference feature.
+        size_t ref_file_id = index.file_id;
+        size_t ref_feature_id = index.feature_id;
+        if (availability_index[ref_file_id][ref_feature_id]) {
             continue;
         }
-        const auto& ref = input_sets[index.file_id].features[index.feature_id];
-        double ref_mz = ref.average_mz;
-        double ref_rt = ref.average_rt + ref.average_rt_delta;
+        const auto& ref = input_sets[ref_file_id].features[ref_feature_id];
+
+        // Get the peaks corresponding with the reference feature.
+        std::vector<Centroid::Peak> ref_peaks;
+        for (const auto& peak_id : ref.peak_ids) {
+            ref_peaks.push_back(input_sets[ref_file_id].peaks[peak_id]);
+        }
 
         // Calculate ROI.
-        double min_mz = ref_mz - 3 * ref.average_mz_sigma;
-        double max_mz = ref_mz + 3 * ref.average_mz_sigma;
-        double min_rt = ref_rt - 3 * ref.average_rt_sigma;
-        double max_rt = ref_rt + 3 * ref.average_rt_sigma;
+        double min_mz = ref_peaks[0].local_max_mz - 3 * ref.average_mz_sigma;
+        double max_mz = ref_peaks[ref_peaks.size() - 1].local_max_mz +
+                        3 * ref.average_mz_sigma;
+        double min_rt = ref_peaks[0].local_max_rt - 3 * ref.average_rt_sigma;
+        double max_rt = ref_peaks[ref_peaks.size() - 1].local_max_rt +
+                        3 * ref.average_rt_sigma;
 
         // Find the maximally similar feature in the rest of the files within
         // the ROI.
         std::vector<FeatureDetection::Feature*> clustered_features(
             input_sets.size());
-        for (size_t i = 0; i < input_sets.size(); ++i) {
-            if (index.file_id == i) {
-                clustered_features[i] =
-                    &input_sets[index.file_id].features[index.feature_id];
+        for (size_t file_id = 0; file_id < input_sets.size(); ++file_id) {
+            if (ref_file_id == file_id) {
+                clustered_features[file_id] =
+                    &input_sets[ref_file_id].features[ref_feature_id];
                 continue;
             }
-            const auto& input_set = input_sets[i];
-            // TODO: Find features ROI.
-            // TODO: If feature maximizes overlap, keep.
+            const auto& input_set = input_sets[file_id];
+            auto& features = input_set.features;
+            size_t min_j =
+                Search::lower_bound(retention_time_index[file_id], min_rt);
+            size_t max_j = retention_time_index[file_id].size();
+            double prev_cum_overlap = 0;
+            for (size_t j = min_j; j < max_j; ++j) {
+                auto feature_id = retention_time_index[file_id][j].index;
+                if (retention_time_index[file_id][j].sorting_key > max_rt) {
+                    break;
+                }
+                if (availability_index[file_id][feature_id]) {
+                    continue;
+                }
+                auto& feature = features[feature_id];
+                double mz = feature.average_mz;
+                double sigma_mz = feature.average_mz_sigma;
+
+                if ((mz + sigma_mz * 3) < min_mz ||
+                    (mz - sigma_mz * 3) > max_mz) {
+                    continue;
+                }
+
+                // Feature is within ROI. Calculate gaussian overlap of the
+                // peaks from this feature with the reference feature. We will
+                // keep the feature that maximizes the overlap with the
+                // reference.
+                std::vector<Centroid::Peak> feature_peaks;
+                for (const auto& peak_id : feature.peak_ids) {
+                    auto peak = input_sets[file_id].peaks[peak_id];
+                    feature_peaks.push_back(peak);
+                }
+                double cum_overlap =
+                    Centroid::cumulative_overlap(ref_peaks, feature_peaks);
+                if (cum_overlap > prev_cum_overlap) {
+                    prev_cum_overlap = cum_overlap;
+                    clustered_features[file_id] = &feature;
+                }
+            }
         }
 
-        // DEBUG:...
-        for (const auto& feature : clustered_features) {
+        MetaMatch::FeatureCluster cluster = {};
+        cluster.mz = 0;
+        cluster.rt = 0;
+        for (size_t file_id = 0; file_id < clustered_features.size();
+             ++file_id) {
+            const auto& feature = clustered_features[file_id];
             if (feature == nullptr) {
                 continue;
             }
-            std::cout << feature->id << std::endl;
-            std::cout << feature->average_mz << std::endl;
+            // FIXME: feature->id is UB if indices are not sequencial starting
+            // at 0.
+            // Mark the selected features as not available.
+            availability_index[file_id][feature->id] = true;
+            // Build cluster object.
+            cluster.mz += feature->average_mz;
+            cluster.rt += feature->average_rt;
+            cluster.feature_ids.push_back({file_id, feature->id});
         }
-        std::cout << min_mz << " ";
-        std::cout << max_mz << " ";
-        std::cout << min_rt << " ";
-        std::cout << max_rt << " ";
-        std::cout << std::endl;
+        if (cluster.feature_ids.size() <= 1) {
+            continue;
+        }
+        cluster.mz /= cluster.feature_ids.size();
+        cluster.rt /= cluster.feature_ids.size();
+        if (cluster.mz != 0 && cluster.rt != 0) {
+            clusters.push_back(cluster);
+        }
     }
-    // NOTE: Do we want a flat search structure?
-    //// This stores the features that are currently in use (Those features
-    //// already assigned to a cluster).
-    // auto availability_index =
-    // std::vector<std::vector<bool>>(input_sets.size());
-    //// Create an indexed set of the highest intensity features in descending
-    //// order.
-    // auto total_intensity_index =
-    // std::vector<std::vector<Search::KeySort<double>>>(input_sets.size());
-    //// Create an indexed set of the features sorted in ascending retention
-    /// time / order.
-    // auto retention_time_index =
-    // std::vector<std::vector<Search::KeySort<double>>>(input_sets.size());
-    // for (size_t i = 0; i < input_sets.size(); ++i) {
-    // if (input_sets[i].features == nullptr) {
-    // continue;
-    //}
-    // const auto& features = *input_sets[i].features;
-    // availability_index[i].reserve(features.size());
-    // total_intensity_index[i].reserve(features.size());
-    // retention_time_index[i].reserve(features.size());
-    // for (size_t j = 0; j < features.size(); ++j) {
-    // total_intensity_index[i][j] = {j, features[j].total_height};
-    // retention_time_index[i][j] = {
-    // j, features[j].average_rt + features[j].average_rt_delta};
-    // availability_index[i][j] = false;
-    //}
-    //}
-    // while (true) {
-    //// Find....
-    //}
+
+    // Assign ids to clusters.
+    for (size_t i = 0; i < clusters.size(); ++i) {
+        clusters[i].id = i;
+    }
 
     return clusters;
 }

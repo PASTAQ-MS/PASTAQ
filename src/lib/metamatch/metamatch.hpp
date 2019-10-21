@@ -57,6 +57,10 @@ struct Cluster {
     double avg_height;
 };
 
+struct FeatureId {
+    size_t file_id;
+    size_t feature_id;
+};
 struct FeatureCluster {
     uint64_t id;
     double mz;
@@ -64,7 +68,7 @@ struct FeatureCluster {
 
     // The feature ids on each file associated with this cluster.
     // NOTE: Should we make this a relational model?
-    std::vector<std::vector<uint64_t>> feature_ids;
+    std::vector<FeatureId> feature_ids;
 };
 
 struct InputSetFeatures {

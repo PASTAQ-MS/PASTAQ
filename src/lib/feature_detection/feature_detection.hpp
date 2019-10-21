@@ -17,6 +17,7 @@ struct Feature {
     double total_height;
     double monoisotopic_mz;
     double monoisotopic_height;
+    // FIXME: Use the peak index instead of the peak_id? Tradeoffs?
     std::vector<uint64_t> peak_ids;
 };
 

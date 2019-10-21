@@ -77,8 +77,15 @@ TEST_CASE("Clustering features lists") {
         mock_gaussian_peak(2, 30.0, 402.0, 2002.0, 0.001, 10),
         mock_gaussian_peak(3, 11.0, 403.0, 2002.0, 0.001, 10),
     };
+    std::vector<Centroid::Peak> peaks_c = {
+        mock_gaussian_peak(4, 0.100, 400.0, 2000.0, 0.001, 10),
+        mock_gaussian_peak(5, 0.75, 401.0, 2000.0, 0.001, 10),
+        mock_gaussian_peak(6, 0.20, 402.0, 2000.0, 0.001, 10),
+        mock_gaussian_peak(7, 0.1, 403.0, 2000.0, 0.001, 10),
+    };
     std::vector<FeatureDetection::Feature> features_a = {
         mock_feature(0, peaks_a),
+        mock_feature(1, peaks_c),
     };
     std::vector<FeatureDetection::Feature> features_b = {
         mock_feature(0, peaks_b),
@@ -88,6 +95,12 @@ TEST_CASE("Clustering features lists") {
         {0, peaks_b, features_b},
     };
     auto clusters = MetaMatch::find_feature_clusters(input_sets);
+    for (const auto &cluster : clusters) {
+        std::cout << cluster.id << std::endl;
+        std::cout << cluster.mz << std::endl;
+        std::cout << cluster.rt << std::endl;
+        std::cout << cluster.feature_ids.size() << std::endl;
+    }
 
     // CHECK(true);
     CHECK(false);
