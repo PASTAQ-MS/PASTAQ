@@ -1925,6 +1925,32 @@ def dda_pipeline(
     logger.info('Finished feature detection in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
+    # Perform metamatch on detected features.
+    logger.info('Starting metamatch on features')
+    time_start = time.time()
+    out_path = os.path.join(output_dir, 'metamatch')
+    out_path_features_clusters = os.path.join(out_path, "features.clusters")
+    if (not os.path.exists(out_path_features_clusters) or override_existing):
+        logger.info("Reading features from disk")
+        features = [
+            tapp.read_features(
+                "tapp_pipeline_test/features/{}.features".format(input_stem))
+            for input_stem in input_stems]
+
+        logger.info("Reading peaks from disk")
+        peaks = [
+            tapp.read_peaks(
+                "tapp_pipeline_test/warped_peaks/{}.bpks".format(input_stem))
+            for input_stem in input_stems]
+
+        logger.info("Finding feature clusters")
+        feature_clusters = tapp.find_feature_clusters(groups, peaks, features)
+
+        # TODO: ...
+        # logger.info("Writing feature clusters to disk")
+    logger.info('Finished metamatch on features in {}'.format(
+        datetime.timedelta(seconds=time.time()-time_start)))
+
     # TODO: Link metamatch clusters and corresponding peaks with identification
     # information of peptides and proteins.
     # TODO: Use maximum likelihood to resolve conflicts among replicates and
@@ -1956,6 +1982,7 @@ def dda_pipeline(
 
     logger.info('Total time elapsed: {}'.format(
         datetime.timedelta(seconds=time.time()-time_pipeline_start)))
+
     # Stop logger.
     logger.removeHandler(logger_fh)
     logger_fh.close()
