@@ -30,6 +30,10 @@ bool read_feature_id(std::istream &stream, FeatureId *feature_id);
 bool write_feature_id(std::ostream &stream, const FeatureId &feature_id);
 bool read_feature_cluster(std::istream &stream, FeatureCluster *cluster);
 bool write_feature_cluster(std::ostream &stream, const FeatureCluster &cluster);
+bool read_feature_clusters(std::istream &stream,
+                           std::vector<FeatureCluster> *clusters);
+bool write_feature_clusters(std::ostream &stream,
+                            const std::vector<FeatureCluster> &clusters);
 
 }  // namespace MetaMatch::Serialize
 

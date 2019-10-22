@@ -75,19 +75,19 @@ bool MetaMatch::Serialize::write_feature_cluster(
     return stream.good();
 }
 
-// bool MetaMatch::Serialize::write_feature_cluster(
-// std::ostream &stream, const FeatureCluster &cluster) {
-// Serialization::write_uint64(stream, cluster.id);
-// Serialization::write_double(stream, cluster.mz);
-// Serialization::write_double(stream, cluster.rt);
-// Serialization::write_double(stream, cluster.avg_height);
-// uint64_t num_files = cluster.file_heights.size();
-// Serialization::write_uint64(stream, num_files);
-// for (size_t i = 0; i < num_files; ++i) {
-// Serialization::write_double(stream, cluster.file_heights[i]);
-//}
-// return stream.good();
-//}
+bool MetaMatch::Serialize::read_feature_clusters(
+    std::istream &stream, std::vector<FeatureCluster> *clusters) {
+    Serialization::read_vector<FeatureCluster>(stream, clusters,
+                                               read_feature_cluster);
+    return stream.good();
+}
+
+bool MetaMatch::Serialize::write_feature_clusters(
+    std::ostream &stream, const std::vector<FeatureCluster> &clusters) {
+    Serialization::write_vector<FeatureCluster>(stream, clusters,
+                                                write_feature_cluster);
+    return stream.good();
+}
 
 bool MetaMatch::Serialize::read_clusters(std::istream &stream,
                                          std::vector<Cluster> *clusters) {

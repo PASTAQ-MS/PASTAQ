@@ -365,6 +365,51 @@ std::vector<Centroid::Peak> read_peaks(std::string &input_file) {
     return peaks;
 }
 
+void write_feature_clusters(
+    const std::vector<MetaMatch::FeatureCluster> &feature_clusters,
+    std::string &output_file) {
+    // Open file stream.
+    std::ofstream stream;
+    stream.open(output_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open output file" << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    if (!MetaMatch::Serialize::write_feature_clusters(stream,
+                                                      feature_clusters)) {
+        std::ostringstream error_stream;
+        error_stream
+            << "error: couldn't write the feature_clusters into the output file"
+            << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+}
+
+std::vector<MetaMatch::FeatureCluster> read_feature_clusters(
+    std::string &input_file) {
+    // Open file stream.
+    std::ifstream stream;
+    stream.open(input_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open input file" << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    std::vector<MetaMatch::FeatureCluster> feature_clusters;
+    if (!MetaMatch::Serialize::read_feature_clusters(stream,
+                                                     &feature_clusters)) {
+        std::ostringstream error_stream;
+        error_stream
+            << "error: couldn't write the feature_clusters into the input file"
+            << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+    return feature_clusters;
+}
+
 void write_features(const std::vector<FeatureDetection::Feature> &features,
                     std::string &output_file) {
     // Open file stream.
@@ -1071,6 +1116,12 @@ PYBIND11_MODULE(tapp, m) {
         .def("write_features", &PythonAPI::write_features,
              "Write the feature to disk in a binary format", py::arg("feature"),
              py::arg("file_name"))
+        .def("read_feature_clusters", &PythonAPI::read_feature_clusters,
+             "Read the feature_clusters from the binary feature_clusters file",
+             py::arg("file_name"))
+        .def("write_feature_clusters", &PythonAPI::write_feature_clusters,
+             "Write the feature_clusters to disk in a binary format",
+             py::arg("feature_clusters"), py::arg("file_name"))
         .def("perform_metamatch", &PythonAPI::perform_metamatch,
              "Perform metamatch for peak matching", py::arg("input"),
              py::arg("radius_mz"), py::arg("radius_rt"), py::arg("fraction"))
