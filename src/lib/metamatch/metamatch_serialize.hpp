@@ -25,6 +25,12 @@ bool write_peak(std::ostream &stream, const Peak &peak);
 bool read_peaks(std::istream &stream, std::vector<Peak> *peak);
 bool write_peaks(std::ostream &stream, const std::vector<Peak> &peak);
 
+// MetaMatch::FeatureCluster
+bool read_feature_id(std::istream &stream, FeatureId *feature_id);
+bool write_feature_id(std::ostream &stream, const FeatureId &feature_id);
+bool read_feature_cluster(std::istream &stream, FeatureCluster *cluster);
+bool write_feature_cluster(std::ostream &stream, const FeatureCluster &cluster);
+
 }  // namespace MetaMatch::Serialize
 
 #endif /* METAMATCH_METAMATCHSERIALIZE_HPP */

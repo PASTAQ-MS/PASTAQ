@@ -31,6 +31,64 @@ bool MetaMatch::Serialize::write_cluster(std::ostream &stream,
     return stream.good();
 }
 
+bool MetaMatch::Serialize::read_feature_id(std::istream &stream,
+                                           FeatureId *feature_id) {
+    Serialization::read_uint64(stream, &feature_id->file_id);
+    Serialization::read_uint64(stream, &feature_id->feature_id);
+    return stream.good();
+}
+
+bool MetaMatch::Serialize::write_feature_id(std::ostream &stream,
+                                            const FeatureId &feature_id) {
+    Serialization::write_uint64(stream, feature_id.file_id);
+    Serialization::write_uint64(stream, feature_id.feature_id);
+    return stream.good();
+}
+
+bool MetaMatch::Serialize::read_feature_cluster(std::istream &stream,
+                                                FeatureCluster *cluster) {
+    Serialization::read_uint64(stream, &cluster->id);
+    Serialization::read_double(stream, &cluster->mz);
+    Serialization::read_double(stream, &cluster->rt);
+
+    Serialization::read_vector<FeatureId>(stream, &cluster->feature_ids,
+                                          read_feature_id);
+
+    Serialization::read_double(stream, &cluster->avg_height);
+    Serialization::read_vector<double>(stream, &cluster->file_heights,
+                                       Serialization::read_double);
+    return stream.good();
+}
+
+bool MetaMatch::Serialize::write_feature_cluster(
+    std::ostream &stream, const FeatureCluster &cluster) {
+    Serialization::write_uint64(stream, cluster.id);
+    Serialization::write_double(stream, cluster.mz);
+    Serialization::write_double(stream, cluster.rt);
+
+    Serialization::write_vector<FeatureId>(stream, cluster.feature_ids,
+                                           write_feature_id);
+
+    Serialization::write_double(stream, cluster.avg_height);
+    Serialization::write_vector<double>(stream, cluster.file_heights,
+                                        Serialization::write_double);
+    return stream.good();
+}
+
+// bool MetaMatch::Serialize::write_feature_cluster(
+// std::ostream &stream, const FeatureCluster &cluster) {
+// Serialization::write_uint64(stream, cluster.id);
+// Serialization::write_double(stream, cluster.mz);
+// Serialization::write_double(stream, cluster.rt);
+// Serialization::write_double(stream, cluster.avg_height);
+// uint64_t num_files = cluster.file_heights.size();
+// Serialization::write_uint64(stream, num_files);
+// for (size_t i = 0; i < num_files; ++i) {
+// Serialization::write_double(stream, cluster.file_heights[i]);
+//}
+// return stream.good();
+//}
+
 bool MetaMatch::Serialize::read_clusters(std::istream &stream,
                                          std::vector<Cluster> *clusters) {
     return Serialization::read_vector<Cluster>(stream, clusters, read_cluster);

@@ -61,6 +61,7 @@ struct FeatureId {
     size_t file_id;
     size_t feature_id;
 };
+// TODO: Make this general in order for it to work with features OR peaks.
 struct FeatureCluster {
     uint64_t id;
     double mz;
