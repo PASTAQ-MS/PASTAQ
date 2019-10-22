@@ -630,6 +630,27 @@ MetaMatchResults perform_metamatch(
     return results;
 }
 
+std::vector<MetaMatch::FeatureCluster> find_feature_clusters(
+    std::vector<uint64_t> group_ids,
+    std::vector<std::vector<Centroid::Peak>> peaks,
+    std::vector<std::vector<FeatureDetection::Feature>> features) {
+    if (group_ids.size() != peaks.size() ||
+        group_ids.size() != features.size()) {
+        std::ostringstream error_stream;
+        error_stream
+            << "error: groups, peaks and features have different lengths";
+        throw std::invalid_argument(error_stream.str());
+    }
+    // Create input set.
+    std::vector<MetaMatch::InputSetFeatures> input_sets;
+    for (size_t i = 0; i < group_ids.size(); ++i) {
+        MetaMatch::InputSetFeatures input_set = {group_ids[i], peaks[i],
+                                                 features[i]};
+        input_sets.push_back(input_set);
+    }
+    return MetaMatch::find_feature_clusters(input_sets);
+}
+
 }  // namespace PythonAPI
 
 PYBIND11_MODULE(tapp, m) {
@@ -928,6 +949,19 @@ PYBIND11_MODULE(tapp, m) {
                    ", avg_height: " + std::to_string(c.avg_height) + ">";
         });
 
+    py::class_<MetaMatch::FeatureCluster>(m, "FeatureCluster")
+        .def_readonly("id", &MetaMatch::FeatureCluster::id)
+        .def_readonly("mz", &MetaMatch::FeatureCluster::mz)
+        .def_readonly("rt", &MetaMatch::FeatureCluster::rt)
+        .def_readonly("avg_height", &MetaMatch::FeatureCluster::avg_height)
+        .def_readonly("file_heights", &MetaMatch::FeatureCluster::file_heights)
+        .def("__repr__", [](const MetaMatch::FeatureCluster &c) {
+            return "MetaCluster <id: " + std::to_string(c.id) +
+                   ", mz: " + std::to_string(c.mz) +
+                   ", rt: " + std::to_string(c.rt) +
+                   ", avg_height: " + std::to_string(c.avg_height) + ">";
+        });
+
     py::class_<MetaMatch::Peak>(m, "MetaMatchPeak")
         .def_readonly("file_id", &MetaMatch::Peak::file_id)
         .def_readonly("class_id", &MetaMatch::Peak::class_id)
@@ -1040,6 +1074,9 @@ PYBIND11_MODULE(tapp, m) {
         .def("perform_metamatch", &PythonAPI::perform_metamatch,
              "Perform metamatch for peak matching", py::arg("input"),
              py::arg("radius_mz"), py::arg("radius_rt"), py::arg("fraction"))
+        .def("find_feature_clusters", &PythonAPI::find_feature_clusters,
+             "Perform metamatch for feature matching", py::arg("group_ids"),
+             py::arg("peaks"), py::arg("features"))
         .def("link_peaks", &Link::link_peaks, "Link msms events to peak ids",
              py::arg("peaks"), py::arg("raw_data"))
         .def("link_idents", &Link::link_idents,

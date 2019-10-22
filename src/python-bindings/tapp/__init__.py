@@ -2000,6 +2000,21 @@ def testing_feature_detection():
     return (peaks, ms2_data, ident_data, linked_peaks, linked_idents, results)
 
 
+def testing_feature_matching():
+    file_names = ["1_1", "1_2", "1_3", "1_4",
+                  "1_5", "3_1", "3_2", "3_3", "3_4", "3_5"]
+    features = [
+        tapp.read_features(
+            "tapp_pipeline_test/features/{}.features".format(file_name))
+        for file_name in file_names]
+    peaks = [
+        tapp.read_peaks(
+            "tapp_pipeline_test/warped_peaks/{}.bpks".format(file_name))
+        for file_name in file_names]
+    groups = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
+    return tapp.find_feature_clusters(groups, peaks, features)
+
+
 def peak_xic(peak, raw_data, method="sum"):
     return tapp.xic(raw_data, peak.roi_min_mz, peak.roi_max_mz,
                     peak.roi_min_rt, peak.roi_max_rt, method)

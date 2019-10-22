@@ -232,7 +232,8 @@ std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
     //     order.
     // 2.- Find the highest intensity feature to start the algorithm.
     // 3.- Find the features within the region of interest ROI of the selected
-    //     feature in each file.
+    //     feature in each file. The search relies on another index, this time
+    //     for retention time, sorted in ascending order.
     // 4.- Per file, select the candidate feature that maximizes the
     //     optimization metric (i.e. Maximum cumulative overlap).
     // 5.- Mark the selected candidates as taken and build the cluster object.
@@ -309,9 +310,10 @@ std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
         double min_mz = ref_peaks[0].local_max_mz - 3 * ref.average_mz_sigma;
         double max_mz = ref_peaks[ref_peaks.size() - 1].local_max_mz +
                         3 * ref.average_mz_sigma;
-        double min_rt = ref_peaks[0].local_max_rt - 3 * ref.average_rt_sigma;
-        double max_rt = ref_peaks[ref_peaks.size() - 1].local_max_rt +
-                        3 * ref.average_rt_sigma;
+        double min_rt =
+            ref.average_rt + ref.average_rt_delta - 3 * ref.average_rt_sigma;
+        double max_rt =
+            ref.average_rt + ref.average_rt_delta + 3 * ref.average_rt_sigma;
 
         // Find the maximally similar feature in the rest of the files within
         // the ROI.
@@ -365,8 +367,10 @@ std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
         }
 
         MetaMatch::FeatureCluster cluster = {};
-        cluster.mz = 0;
-        cluster.rt = 0;
+        cluster.mz = 0.0;
+        cluster.rt = 0.0;
+        cluster.avg_height = 0.0;
+        cluster.file_heights = std::vector<double>(clustered_features.size());
         for (size_t file_id = 0; file_id < clustered_features.size();
              ++file_id) {
             const auto& feature = clustered_features[file_id];
@@ -380,6 +384,8 @@ std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
             // Build cluster object.
             cluster.mz += feature->average_mz;
             cluster.rt += feature->average_rt;
+            cluster.file_heights[file_id] = feature->total_height;
+            cluster.avg_height += feature->total_height;
             cluster.feature_ids.push_back({file_id, feature->id});
         }
         if (cluster.feature_ids.size() <= 1) {
@@ -387,6 +393,7 @@ std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
         }
         cluster.mz /= cluster.feature_ids.size();
         cluster.rt /= cluster.feature_ids.size();
+        cluster.avg_height /= cluster.feature_ids.size();
         if (cluster.mz != 0 && cluster.rt != 0) {
             clusters.push_back(cluster);
         }

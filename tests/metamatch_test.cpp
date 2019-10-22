@@ -63,7 +63,6 @@ FeatureDetection::Feature mock_feature(size_t id,
 }
 
 TEST_CASE("Clustering features lists") {
-    // TODO:...
     // Three features with small differences.
     std::vector<Centroid::Peak> peaks_a = {
         mock_gaussian_peak(0, 100.0, 400.0, 2000.0, 0.001, 10),
@@ -96,12 +95,9 @@ TEST_CASE("Clustering features lists") {
     };
     auto clusters = MetaMatch::find_feature_clusters(input_sets);
     for (const auto &cluster : clusters) {
-        std::cout << cluster.id << std::endl;
-        std::cout << cluster.mz << std::endl;
-        std::cout << cluster.rt << std::endl;
-        std::cout << cluster.feature_ids.size() << std::endl;
+        CHECK(cluster.id == 0);
+        CHECK(TestUtils::compare_double(cluster.mz, 400.678, 3));
+        CHECK(TestUtils::compare_double(cluster.rt, 2001));
+        CHECK(cluster.feature_ids.size() == 2);
     }
-
-    // CHECK(true);
-    CHECK(false);
 }
