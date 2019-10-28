@@ -1955,30 +1955,119 @@ def dda_pipeline(
     # information of peptides and proteins.
     # TODO: Use maximum likelihood to resolve conflicts among replicates and
     # generate peptide/protein quantitative tables.
-    # TODO: Create final quantitative tables.
-    # metapeaks = pd.DataFrame({
-    # 'file_id': [peak.file_id for peak in metamatch_results.orphans],
-    # 'class_id': [peak.class_id for peak in metamatch_results.orphans],
-    # 'cluster_id': [peak.cluster_id for peak in metamatch_results.orphans],
-    # 'cluster_mz': [peak.cluster_mz for peak in metamatch_results.orphans],
-    # 'cluster_rt': [peak.cluster_rt for peak in metamatch_results.orphans],
-    # 'height': [peak.height for peak in metamatch_results.orphans],
-    # 'local_max_mz': [peak.local_max_mz for peak in metamatch_results.orphans],
-    # 'local_max_rt': [peak.local_max_rt for peak in metamatch_results.orphans],
-    # })
-    # metaclusters = pd.DataFrame({
-    # 'cluster_id': [cluster.id for cluster in metamatch_results.clusters],
-    # 'cluster_mz': [cluster.mz for cluster in metamatch_results.clusters],
-    # 'cluster_rt': [cluster.rt for cluster in metamatch_results.clusters],
-    # 'avg_height': [cluster.avg_height for cluster in metamatch_results.clusters],
-    # })
 
-    # for file in file_names:
-    # metaclusters[file] = 0.0
+    # Create final quantitative tables.
+    logger.info('Starting creation of quantitative tables')
+    time_start = time.time()
+    for stem in input_stems:
+        # Peaks
+        # =====
+        in_path_peaks = os.path.join(
+            output_dir, 'warped_peaks', "{}.bpks".format(stem))
+        out_path_peaks = os.path.join(output_dir, 'quant',
+                                      "{}_peaks.csv".format(stem))
+        if os.path.exists(out_path_peaks) and not override_existing:
+            continue
 
-    # for j, cluster in enumerate(metamatch_results.clusters):
-    # for i, file in enumerate(file_names):
-    # metaclusters.at[j, file] = cluster.file_heights[i]
+        logger.info("Reading peaks from disk: {}".format(stem))
+        peaks = tapp.read_peaks(in_path_peaks)
+
+        logger.info("Generating peaks quantitative table")
+        peaks_df = pd.DataFrame({
+            'id': [peak.id for peak in peaks],
+            'mz': [peak.local_max_mz for peak in peaks],
+            'rt': [peak.local_max_rt for peak in peaks],
+            'rt_delta': [peak.rt_delta for peak in peaks],
+            'height': [peak.local_max_height for peak in peaks],
+            'total_intensity': [peak.raw_roi_total_intensity for peak in peaks],
+            'roi_min_mz': [peak.roi_min_mz for peak in peaks],
+            'roi_max_mz': [peak.roi_max_mz for peak in peaks],
+            'roi_min_rt': [peak.roi_min_rt for peak in peaks],
+            'roi_max_rt': [peak.roi_max_rt for peak in peaks],
+            'sigma_mz': [peak.raw_roi_sigma_mz for peak in peaks],
+            'sigma_rt': [peak.raw_roi_sigma_rt for peak in peaks],
+            'skewness_mz': [peak.raw_roi_skewness_mz for peak in peaks],
+            'skewness_rt': [peak.raw_roi_skewness_rt for peak in peaks],
+            'kurtosis_mz': [peak.raw_roi_kurtosis_mz for peak in peaks],
+            'kurtosis_rt': [peak.raw_roi_kurtosis_rt for peak in peaks],
+            'num_points': [peak.raw_roi_num_points for peak in peaks],
+            'num_scans': [peak.raw_roi_num_scans for peak in peaks],
+        })
+        peaks_df.to_csv(out_path_peaks, index=False)
+
+    for stem in input_stems:
+        # Features
+        # ========
+        in_path_features = os.path.join(
+            output_dir, 'features', "{}.features".format(stem))
+        out_path_features = os.path.join(output_dir, 'quant',
+                                         "{}_features.csv".format(stem))
+        if os.path.exists(out_path_features) and not override_existing:
+            continue
+
+        logger.info("Reading features from disk: {}".format(stem))
+        features = tapp.read_features(in_path_features)
+
+        logger.info("Generating features quantitative table")
+        features_df = pd.DataFrame({
+            'id': [feature.id for feature in features],
+            'average_mz': [feature.average_mz for feature in features],
+            'average_mz_sigma': [feature.average_mz_sigma for feature in features],
+            'average_rt': [feature.average_rt for feature in features],
+            'average_rt_sigma': [feature.average_rt_sigma for feature in features],
+            'average_rt_delta': [feature.average_rt_delta for feature in features],
+            'total_height': [feature.total_height for feature in features],
+            'monoisotopic_mz': [feature.monoisotopic_mz for feature in features],
+            'monoisotopic_height': [feature.monoisotopic_height for feature in features],
+            'peak_ids': [str(feature.peak_ids) for feature in features],
+        })
+        features_df.to_csv(out_path_features, index=False)
+
+    # Matched Peaks
+    # =============
+    logger.info("Reading peak clusters from disk")
+    in_path_peak_clusters = os.path.join(
+        output_dir, 'metamatch', 'metamatch.clusters')
+    out_path_peak_clusters = os.path.join(output_dir, 'quant',
+                                          "peak_clusters.csv")
+    if (not os.path.exists(out_path_peak_clusters) or override_existing):
+        peak_clusters = tapp.read_metamatch_clusters(in_path_peak_clusters)
+        logger.info("Generating peak clusters quantitative table")
+        peak_clusters_df = pd.DataFrame({
+            'id': [cluster.id for cluster in peak_clusters],
+            'mz': [cluster.mz for cluster in peak_clusters],
+            'rt': [cluster.rt for cluster in peak_clusters],
+            'avg_height': [cluster.avg_height for cluster in peak_clusters],
+        })
+        for i, stem in enumerate(input_stems):
+            peak_clusters_df[stem] = [cluster.file_heights[i]
+                                      for cluster in peak_clusters]
+        peak_clusters_df.to_csv(out_path_peak_clusters, index=False)
+
+    # Matched Features
+    # ================
+    logger.info("Reading feature clusters from disk")
+    in_path_feature_clusters = os.path.join(
+        output_dir, 'metamatch', 'features.clusters')
+    out_path_feature_clusters = os.path.join(output_dir, 'quant',
+                                             "feature_clusters.csv")
+    if (not os.path.exists(out_path_feature_clusters) or override_existing):
+        feature_clusters = tapp.read_feature_clusters(
+            in_path_feature_clusters)
+        logger.info("Generating feature clusters quantitative table")
+        feature_clusters_df = pd.DataFrame({
+            'id': [cluster.id for cluster in feature_clusters],
+            'mz': [cluster.mz for cluster in feature_clusters],
+            'rt': [cluster.rt for cluster in feature_clusters],
+            'avg_height': [cluster.avg_height for cluster in feature_clusters],
+        })
+        for i, stem in enumerate(input_stems):
+            feature_clusters_df[stem] = [cluster.file_heights[i]
+                                         for cluster in feature_clusters]
+        feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
+
+    logger.info('Finished creation of quantitative tables in {}'.format(
+        datetime.timedelta(seconds=time.time()-time_start)))
 
     logger.info('Total time elapsed: {}'.format(
         datetime.timedelta(seconds=time.time()-time_pipeline_start)))

@@ -951,7 +951,11 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("average_rt", &FeatureDetection::Feature::average_rt)
         .def_readonly("average_rt_delta",
                       &FeatureDetection::Feature::average_rt_delta)
+        .def_readonly("average_rt_sigma",
+                      &FeatureDetection::Feature::average_rt_sigma)
         .def_readonly("average_mz", &FeatureDetection::Feature::average_mz)
+        .def_readonly("average_mz_sigma",
+                      &FeatureDetection::Feature::average_mz_sigma)
         .def_readonly("total_height", &FeatureDetection::Feature::total_height)
         .def_readonly("monoisotopic_mz",
                       &FeatureDetection::Feature::monoisotopic_mz)
