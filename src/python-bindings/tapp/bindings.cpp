@@ -18,6 +18,7 @@
 #include "link/link_serialize.hpp"
 #include "metamatch/metamatch.hpp"
 #include "metamatch/metamatch_serialize.hpp"
+#include "protein_inference/protein_inference.hpp"
 #include "raw_data/raw_data.hpp"
 #include "raw_data/raw_data_serialize.hpp"
 #include "raw_data/xml_reader.hpp"
@@ -696,6 +697,15 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters(
     return MetaMatch::find_feature_clusters(input_sets);
 }
 
+void debug(IdentData::IdentData &ident_data) {
+    auto inference_graph = ProteinInference::create_graph(ident_data);
+    ProteinInference::razor(inference_graph);
+    //for (const auto &node : inference_graph.protein_nodes) {
+        //std::cout << node.id << " " << node.type << " " << node.num
+                  //<< std::endl;
+    //}
+}
+
 }  // namespace PythonAPI
 
 PYBIND11_MODULE(tapp, m) {
@@ -1141,6 +1151,7 @@ PYBIND11_MODULE(tapp, m) {
         .def("xic", &PythonAPI::xic, py::arg("raw_data"), py::arg("min_mz"),
              py::arg("max_mz"), py::arg("min_rt"), py::arg("max_rt"),
              py::arg("method") = "sum")
+        .def("debug", &PythonAPI::debug, py::arg("ident_data"))
         .def("feature_detection", &FeatureDetection::feature_detection,
              "Link peaks as features", py::arg("peaks"),
              py::arg("raw_data_ms2"), py::arg("ident_data"),

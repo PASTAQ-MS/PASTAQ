@@ -34,6 +34,7 @@ add_library(tapplib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/link/link_serialize.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/metamatch/metamatch.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/metamatch/metamatch_serialize.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/protein_inference/protein_inference.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/raw_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/raw_data_serialize.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/xml_reader.cpp"
