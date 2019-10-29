@@ -2108,38 +2108,39 @@ def dda_pipeline(
             'charge_state': [linked_spectrum_id.charge_state for linked_spectrum_id in linked_spectrum_ids],
             'retention_time': [linked_spectrum_id.retention_time for linked_spectrum_id in linked_spectrum_ids],
         })
+        print(linked_spectrum_ids_df)
 
-        # FIXME: This is all prototypical. Need to move the code for graph
-        # generation and razor calculation to C++ land.
-        unique_proteins, unique_psm, inc_mat = create_psm_protein_graph(
-            ident_data)
-        selected_psm = np.isin(
-            unique_psm, linked_spectrum_ids_df['psm_id_str'])
-        unique_psm = unique_psm[selected_psm]
-        inc_mat = inc_mat[selected_psm]
-        unique_proteins, unique_psm, inc_mat = razor_proteins(
-            unique_proteins, unique_psm, inc_mat)
-        db_sequences = []
-        for psm_id in linked_spectrum_ids_df['psm_id_str']:
-            unique_psm_index = np.where(psm_id == unique_psm)[0]
-            if len(unique_psm_index) == 0:
-                db_sequences += [""]
-            else:
-                unique_psm_index = unique_psm_index[0]
-                db_sequence_id = unique_proteins[inc_mat[unique_psm_index, :] == 1][0]
-                db_sequences += [db_sequence_id]
-        # FIXME: This is INCORRECT, the order matters.
-        # db_sequences_df = pd.DataFrame(
-            # {
-                # "protein_id":
-                    # [db_sequence.id for db_sequence in ident_data.db_sequences],
-                # "protein_name":
-                    # [db_sequence.value for db_sequence in ident_data.db_sequences],
-            # })
-        # db_sequences = pd.DataFrame({"protein_id": db_sequences})
-        # db_sequences_df = pd.merge(db_sequences, db_sequences_df, how='left')
-        # db_sequences_df['psm_id'] = [psm.id for psm in ident_data.spectrum_ids]
-        print(db_sequences_df)
+        # # FIXME: This is all prototypical. Need to move the code for graph
+        # # generation and razor calculation to C++ land.
+        # unique_proteins, unique_psm, inc_mat = create_psm_protein_graph(
+            # ident_data)
+        # selected_psm = np.isin(
+            # unique_psm, linked_spectrum_ids_df['psm_id_str'])
+        # unique_psm = unique_psm[selected_psm]
+        # inc_mat = inc_mat[selected_psm]
+        # unique_proteins, unique_psm, inc_mat = razor_proteins(
+            # unique_proteins, unique_psm, inc_mat)
+        # db_sequences = []
+        # for psm_id in linked_spectrum_ids_df['psm_id_str']:
+            # unique_psm_index = np.where(psm_id == unique_psm)[0]
+            # if len(unique_psm_index) == 0:
+                # db_sequences += [""]
+            # else:
+                # unique_psm_index = unique_psm_index[0]
+                # db_sequence_id = unique_proteins[inc_mat[unique_psm_index, :] == 1][0]
+                # db_sequences += [db_sequence_id]
+        # # FIXME: This is INCORRECT, the order matters.
+        # # db_sequences_df = pd.DataFrame(
+            # # {
+                # # "protein_id":
+                    # # [db_sequence.id for db_sequence in ident_data.db_sequences],
+                # # "protein_name":
+                    # # [db_sequence.value for db_sequence in ident_data.db_sequences],
+            # # })
+        # # db_sequences = pd.DataFrame({"protein_id": db_sequences})
+        # # db_sequences_df = pd.merge(db_sequences, db_sequences_df, how='left')
+        # # db_sequences_df['psm_id'] = [psm.id for psm in ident_data.spectrum_ids]
+        # print(db_sequences_df)
 
     logger.info('Total time elapsed: {}'.format(
         datetime.timedelta(seconds=time.time()-time_pipeline_start)))

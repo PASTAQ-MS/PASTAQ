@@ -42,6 +42,14 @@ struct Graph {
     std::vector<Node> psm_nodes;
 };
 
+// TODO: Is this really the best way of associating PSM with Proteins? Should
+// we reference the index of the ident files?
+// TODO: Add documentation for this.
+struct InferredProtein {
+    std::string protein_id;
+    std::string psm_id;
+};
+
 // Initializes the initial graph. The returning vector corresponds to the
 // protein nodes, which contain links to their respective PSMs.
 Graph create_graph(const IdentData::IdentData &ident_data);
@@ -49,7 +57,7 @@ Graph create_graph(const IdentData::IdentData &ident_data);
 // Performs Occam's razor protein inference, where we select the minimum number
 // of proteins that explain the observed PSM in the graph. Note that the graph
 // will be modified in place.
-void razor(Graph &graph);
+std::vector<InferredProtein> razor(const IdentData::IdentData &ident_data);
 
 }  // namespace ProteinInference
 

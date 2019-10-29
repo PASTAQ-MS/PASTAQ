@@ -70,7 +70,11 @@ ProteinInference::Graph ProteinInference::create_graph(
     return graph;
 }
 
-void ProteinInference::razor(ProteinInference::Graph &graph) {
+std::vector<ProteinInference::InferredProtein> ProteinInference::razor(
+    const IdentData::IdentData &ident_data) {
+    // Initialize the base inference graph.
+    auto graph = ProteinInference::create_graph(ident_data);
+
     // Sort the protein nodes in descending number of PSM contained in it. We
     // can't modify the graph directly, as this would change the indexes
     // referenced in the adjacency lists.
@@ -125,4 +129,17 @@ void ProteinInference::razor(ProteinInference::Graph &graph) {
         std::stable_sort(protein_nodes.begin() + i, protein_nodes.end(),
                          sort_protein_nodes);
     }
+
+    // Fill up the result table.
+    std::vector<InferredProtein> inferred_proteins;
+    for (auto &protein : protein_nodes) {
+        for (const auto &psm_index : protein->nodes) {
+            if (!psm_index) {
+                continue;
+            }
+            const auto &psm = graph.psm_nodes[psm_index.value()];
+            inferred_proteins.push_back({protein->id, psm.id});
+        }
+    }
+    return inferred_proteins;
 }

@@ -697,11 +697,6 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters(
     return MetaMatch::find_feature_clusters(input_sets);
 }
 
-void debug(IdentData::IdentData &ident_data) {
-    auto inference_graph = ProteinInference::create_graph(ident_data);
-    ProteinInference::razor(inference_graph);
-}
-
 }  // namespace PythonAPI
 
 PYBIND11_MODULE(tapp, m) {
@@ -1044,6 +1039,15 @@ PYBIND11_MODULE(tapp, m) {
                    ", distance: " + std::to_string(p.distance) + ">";
         });
 
+    py::class_<ProteinInference::InferredProtein>(m, "InferredProtein")
+        .def_readonly("protein_id",
+                      &ProteinInference::InferredProtein::protein_id)
+        .def_readonly("psm_id", &ProteinInference::InferredProtein::psm_id)
+        .def("__repr__", [](const ProteinInference::InferredProtein &p) {
+            return "InferredProtein <protein_id: " + p.protein_id +
+                   ", psm_id: " + p.psm_id + ">";
+        });
+
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,
           "Read raw data from the given mzXML file ", py::arg("file_name"),
@@ -1147,7 +1151,8 @@ PYBIND11_MODULE(tapp, m) {
         .def("xic", &PythonAPI::xic, py::arg("raw_data"), py::arg("min_mz"),
              py::arg("max_mz"), py::arg("min_rt"), py::arg("max_rt"),
              py::arg("method") = "sum")
-        .def("debug", &PythonAPI::debug, py::arg("ident_data"))
+        .def("perform_protein_inference", &ProteinInference::razor,
+             py::arg("ident_data"))
         .def("feature_detection", &FeatureDetection::feature_detection,
              "Link peaks as features", py::arg("peaks"),
              py::arg("raw_data_ms2"), py::arg("ident_data"),
