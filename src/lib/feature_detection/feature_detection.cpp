@@ -274,6 +274,7 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
 
     // Build the actual feature data.
     Feature feature = {};
+    feature.msms_id = -1;
     // FIXME: Currently assuming that the minimum detected isotope is the
     // monoisotopic peak, but THIS MIGHT NOT BE THE CASE. For simplicity and to
     // keep the flow going I'll leave this for now, but must go back and FIX
@@ -421,6 +422,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
             peak_rt_sigma * 2, peak_rt, discrepancy_threshold);
         if (maybe_feature) {
             auto feature = maybe_feature.value();
+            feature.msms_id = linked_msms.msms_id;
             features.push_back(feature);
             // Remove used peaks on the feature from the pool.
             for (const auto &peak_id : feature.peak_ids) {

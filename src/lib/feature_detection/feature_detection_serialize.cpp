@@ -4,6 +4,7 @@
 bool FeatureDetection::Serialize::read_feature(std::istream &stream,
                                                Feature *feature) {
     Serialization::read_uint64(stream, &feature->id);
+    Serialization::read_int64(stream, &feature->msms_id);
     Serialization::read_double(stream, &feature->average_rt);
     Serialization::read_double(stream, &feature->average_rt_delta);
     Serialization::read_double(stream, &feature->average_rt_sigma);
@@ -20,6 +21,7 @@ bool FeatureDetection::Serialize::read_feature(std::istream &stream,
 bool FeatureDetection::Serialize::write_feature(std::ostream &stream,
                                                 const Feature &feature) {
     Serialization::write_uint64(stream, feature.id);
+    Serialization::write_int64(stream, feature.msms_id);
     Serialization::write_double(stream, feature.average_rt);
     Serialization::write_double(stream, feature.average_rt_delta);
     Serialization::write_double(stream, feature.average_rt_sigma);

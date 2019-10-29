@@ -9,6 +9,10 @@ namespace FeatureDetection {
 // TODO: Expand documentation.
 struct Feature {
     uint64_t id;
+    int64_t msms_id;  // (Optional, might not exist if value is < 0)
+                      // TODO: Should we make this an std::optional type?
+                      // TODO: Should we create a 'link table' for features to
+                      // not pollute the feature namespace?
     double average_rt;
     double average_rt_delta;
     double average_rt_sigma;

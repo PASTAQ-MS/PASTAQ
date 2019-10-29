@@ -948,6 +948,7 @@ PYBIND11_MODULE(tapp, m) {
 
     py::class_<FeatureDetection::Feature>(m, "Feature")
         .def_readonly("id", &FeatureDetection::Feature::id)
+        .def_readonly("msms_id", &FeatureDetection::Feature::msms_id)
         .def_readonly("average_rt", &FeatureDetection::Feature::average_rt)
         .def_readonly("average_rt_delta",
                       &FeatureDetection::Feature::average_rt_delta)
