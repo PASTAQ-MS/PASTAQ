@@ -3,9 +3,6 @@
 #include <algorithm>
 #include <map>
 
-// DEBUG:...
-#include <iostream>
-
 ProteinInference::Graph ProteinInference::create_graph(
     const IdentData::IdentData &ident_data) {
     std::map<std::string, uint64_t> protein_map;
@@ -48,44 +45,33 @@ ProteinInference::Graph ProteinInference::create_graph(
         for (const auto &psm : protein_hypothesis.spectrum_ids) {
             auto psm_index = psm_map.at(psm);
 
-            // Update nodes.
+            // Update nodes. We need to make sure that the node was not
+            // included already on the adjacency list.
+            auto ptr_in_node_list = [](Node *ptr,
+                                       std::vector<Node *> &node_list) {
+                for (const auto &node : node_list) {
+                    if (node->id == ptr->id) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+
             Node *psm_ptr = &graph.psm_nodes[psm_index];
-            graph.protein_nodes[protein_index].nodes.push_back(psm_ptr);
-            ++graph.protein_nodes[protein_index].num;
+            if (!ptr_in_node_list(psm_ptr,
+                                  graph.protein_nodes[protein_index].nodes)) {
+                graph.protein_nodes[protein_index].nodes.push_back(psm_ptr);
+                ++graph.protein_nodes[protein_index].num;
+            }
 
             Node *protein_ptr = &graph.protein_nodes[protein_index];
-            graph.psm_nodes[psm_index].nodes.push_back(protein_ptr);
-            ++graph.psm_nodes[psm_index].num;
+            if (!ptr_in_node_list(protein_ptr,
+                                  graph.psm_nodes[psm_index].nodes)) {
+                graph.psm_nodes[psm_index].nodes.push_back(protein_ptr);
+                ++graph.psm_nodes[psm_index].num;
+            }
         }
     }
-    // std::cout << "PROTEINS" << std::endl;
-    // for (const auto &node : graph.protein_nodes) {
-    // std::cout << "======" << std::endl;
-    // std::cout << node.id << " ";
-    // std::cout << node.type << " ";
-    // std::cout << node.num << " ";
-    // std::cout << node.nodes.size() << " ";
-    // std::cout << std::endl;
-    // std::cout << "------" << std::endl;
-    // for (size_t i = 0; i < node.nodes.size(); ++i) {
-    // std::cout << node.nodes[i]->id << std::endl;
-    //}
-    // std::cout << std::endl;
-    //}
-    // std::cout << "PSM" << std::endl;
-    // for (const auto &node : graph.psm_nodes) {
-    // std::cout << "======" << std::endl;
-    // std::cout << node.id << " ";
-    // std::cout << node.type << " ";
-    // std::cout << node.num << " ";
-    // std::cout << node.nodes.size() << " ";
-    // std::cout << std::endl;
-    // std::cout << "------" << std::endl;
-    // for (size_t i = 0; i < node.nodes.size(); ++i) {
-    // std::cout << node.nodes[i]->id << std::endl;
-    //}
-    // std::cout << std::endl;
-    //}
     return graph;
 }
 
@@ -114,27 +100,25 @@ void ProteinInference::razor(ProteinInference::Graph &graph) {
             // Visit the other proteins linked to this PSM to remove it's
             // reference.
             for (auto &protein_node_ptr : reference_protein_psm_ptr->nodes) {
-                if (protein_node_ptr->id == reference_protein_node->id) {
+                if (protein_node_ptr == nullptr ||
+                    protein_node_ptr == reference_protein_node) {
                     continue;
                 }
                 for (auto &psm_node_ptr : protein_node_ptr->nodes) {
-                    if (psm_node_ptr == nullptr) {
+                    if (psm_node_ptr == nullptr ||
+                        psm_node_ptr != reference_protein_psm_ptr) {
                         continue;
                     }
-                    if (psm_node_ptr->id == reference_protein_psm_ptr->id) {
-                        psm_node_ptr = nullptr;
-                        --protein_node_ptr->num;
-                        break;
-                    }
+                    --protein_node_ptr->num;
+                    --psm_node_ptr->num;
+                    protein_node_ptr = nullptr;
+                    psm_node_ptr = nullptr;
+                    break;
                 }
             }
         }
         // Sort reminder protein nodes.
         std::stable_sort(protein_nodes.begin() + i, protein_nodes.end(),
                          sort_protein_nodes);
-    }
-    for (const auto &node : protein_nodes) {
-        std::cout << node->id << " " << node->type << " " << node->num
-                  << std::endl;
     }
 }
