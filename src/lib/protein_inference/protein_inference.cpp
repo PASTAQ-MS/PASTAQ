@@ -11,8 +11,6 @@ ProteinInference::Graph ProteinInference::create_graph(
     // Initialize nodes.
     for (size_t i = 0; i < ident_data.protein_hypotheses.size(); ++i) {
         const auto &protein_hypothesis = ident_data.protein_hypotheses[i];
-
-        // Check if protein already in the graph.
         if (protein_map.count(protein_hypothesis.db_sequence_id) == 0) {
             ProteinInference::Node node = {};
             node.type = ProteinInference::PROTEIN;
@@ -35,7 +33,7 @@ ProteinInference::Graph ProteinInference::create_graph(
             }
         }
     }
-    // Create graph by assigning pointer to references
+    // Create graph by assigning edges to the adjacency list of each node.
     for (size_t i = 0; i < ident_data.protein_hypotheses.size(); ++i) {
         const auto &protein_hypothesis = ident_data.protein_hypotheses[i];
 
@@ -74,11 +72,11 @@ ProteinInference::Graph ProteinInference::create_graph(
 
 void ProteinInference::razor(ProteinInference::Graph &graph) {
     // Sort the protein nodes in descending number of PSM contained in it. We
-    // can't modify the graph directly, as this would change the memory pointed
-    // by the Node::nodes (Node *).
+    // can't modify the graph directly, as this would change the indexes
+    // referenced in the adjacency lists.
     //
-    // We create a new vector of Node * that we
-    // are able to sort while preserving the original order on the graph.
+    // We create a new vector of Node pointers that we are able to sort while
+    // preserving the original order on the graph.
     std::vector<Node *> protein_nodes(graph.protein_nodes.size());
     for (size_t i = 0; i < graph.protein_nodes.size(); ++i) {
         protein_nodes[i] = &graph.protein_nodes[i];
@@ -88,6 +86,8 @@ void ProteinInference::razor(ProteinInference::Graph &graph) {
                      sort_protein_nodes);
 
     for (size_t i = 0; i < protein_nodes.size(); ++i) {
+        // This is the protein at the top of the list, i.e., the protein that
+        // is associated with the most peptides.
         auto &ref_protein_ptr = protein_nodes[i];
         for (auto &ref_psm_index : ref_protein_ptr->nodes) {
             if (!ref_psm_index) {
@@ -95,8 +95,8 @@ void ProteinInference::razor(ProteinInference::Graph &graph) {
             }
             auto &ref_psm = graph.psm_nodes[ref_psm_index.value()];
 
-            // Visit the other proteins linked to this PSM to remove it's
-            // reference.
+            // Visit the other proteins linked to this PSM to sever the links
+            // from the adjacency lists.
             for (auto &cur_protein_index : ref_psm.nodes) {
                 if (!cur_protein_index) {
                     continue;
