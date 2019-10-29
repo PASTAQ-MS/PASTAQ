@@ -47,27 +47,24 @@ ProteinInference::Graph ProteinInference::create_graph(
 
             // Update nodes. We need to make sure that the node was not
             // included already on the adjacency list.
-            auto ptr_in_node_list = [](Node *ptr,
-                                       std::vector<Node *> &node_list) {
-                for (const auto &node : node_list) {
-                    if (node->id == ptr->id) {
-                        return true;
+            auto ptr_in_node_list =
+                [](uint64_t target_node,
+                   std::vector<std::optional<uint64_t>> &node_list) {
+                    for (const auto &node : node_list) {
+                        if (node == target_node) {
+                            return true;
+                        }
                     }
-                }
-                return false;
-            };
-
-            Node *psm_ptr = &graph.psm_nodes[psm_index];
-            if (!ptr_in_node_list(psm_ptr,
+                    return false;
+                };
+            if (!ptr_in_node_list(psm_index,
                                   graph.protein_nodes[protein_index].nodes)) {
-                graph.protein_nodes[protein_index].nodes.push_back(psm_ptr);
+                graph.protein_nodes[protein_index].nodes.push_back(psm_index);
                 ++graph.protein_nodes[protein_index].num;
             }
-
-            Node *protein_ptr = &graph.protein_nodes[protein_index];
-            if (!ptr_in_node_list(protein_ptr,
+            if (!ptr_in_node_list(protein_index,
                                   graph.psm_nodes[psm_index].nodes)) {
-                graph.psm_nodes[psm_index].nodes.push_back(protein_ptr);
+                graph.psm_nodes[psm_index].nodes.push_back(protein_index);
                 ++graph.psm_nodes[psm_index].num;
             }
         }
@@ -91,29 +88,36 @@ void ProteinInference::razor(ProteinInference::Graph &graph) {
                      sort_protein_nodes);
 
     for (size_t i = 0; i < protein_nodes.size(); ++i) {
-        auto &reference_protein_node = protein_nodes[i];
-        for (auto &reference_protein_psm_ptr : reference_protein_node->nodes) {
-            if (reference_protein_psm_ptr == nullptr) {
+        auto &ref_protein_ptr = protein_nodes[i];
+        for (auto &ref_psm_index : ref_protein_ptr->nodes) {
+            if (!ref_psm_index) {
                 continue;
             }
+            auto &ref_psm = graph.psm_nodes[ref_psm_index.value()];
 
             // Visit the other proteins linked to this PSM to remove it's
             // reference.
-            for (auto &protein_node_ptr : reference_protein_psm_ptr->nodes) {
-                if (protein_node_ptr == nullptr ||
-                    protein_node_ptr == reference_protein_node) {
+            for (auto &cur_protein_index : ref_psm.nodes) {
+                if (!cur_protein_index) {
                     continue;
                 }
-                for (auto &psm_node_ptr : protein_node_ptr->nodes) {
-                    if (psm_node_ptr == nullptr ||
-                        psm_node_ptr != reference_protein_psm_ptr) {
+                auto &cur_protein =
+                    graph.protein_nodes[cur_protein_index.value()];
+                if (&cur_protein == ref_protein_ptr) {
+                    continue;
+                }
+                for (auto &cur_psm_index : cur_protein.nodes) {
+                    if (!cur_psm_index) {
                         continue;
                     }
-                    --protein_node_ptr->num;
-                    --psm_node_ptr->num;
-                    protein_node_ptr = nullptr;
-                    psm_node_ptr = nullptr;
-                    break;
+                    auto &cur_psm = graph.psm_nodes[cur_psm_index.value()];
+                    if (&cur_psm == &ref_psm) {
+                        --cur_protein.num;
+                        --cur_psm.num;
+                        cur_psm_index = std::nullopt;
+                        cur_protein_index = std::nullopt;
+                        break;
+                    }
                 }
             }
         }

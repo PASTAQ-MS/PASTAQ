@@ -700,10 +700,6 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters(
 void debug(IdentData::IdentData &ident_data) {
     auto inference_graph = ProteinInference::create_graph(ident_data);
     ProteinInference::razor(inference_graph);
-    //for (const auto &node : inference_graph.protein_nodes) {
-        //std::cout << node.id << " " << node.type << " " << node.num
-                  //<< std::endl;
-    //}
 }
 
 }  // namespace PythonAPI

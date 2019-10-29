@@ -1,7 +1,7 @@
 #ifndef PROTEININFERENCE_PROTEININFERENCE_HPP
 #define PROTEININFERENCE_PROTEININFERENCE_HPP
 
-#include <memory>
+#include <optional>
 
 #include "raw_data/raw_data.hpp"
 
@@ -14,7 +14,7 @@ struct Node {
     NodeType type;
     uint64_t num;
     std::string id;
-    std::vector<Node *> nodes;
+    std::vector<std::optional<uint64_t>> nodes;
 };
 
 struct Graph {
