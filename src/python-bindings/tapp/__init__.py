@@ -2084,14 +2084,13 @@ def dda_pipeline(
                                          for cluster in feature_clusters]
         feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
 
-    logger.info('Finished creation of quantitative tables in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
-
     # TODO: Link metamatch clusters and corresponding peaks with identification
     # information of peptides and proteins.
     # TODO: Use maximum likelihood to resolve conflicts among replicates and
     # generate peptide/protein quantitative tables.
 
+    # Find protein information for the identified features.
+    logger.info("Finding protein information on identified features")
     for stem in input_stems:
         in_path_features = os.path.join(
             output_dir, 'features', "{}.features".format(stem))
@@ -2099,70 +2098,65 @@ def dda_pipeline(
                                           "{}.ms2_idents.link".format(stem))
         in_path_ident_data = os.path.join(
             output_dir, 'ident', "{}.ident".format(stem))
-        # out_path_features = os.path.join(output_dir, 'quant',
-        # "{}_features.csv".format(stem))
-        # if os.path.exists(out_path_features) and not override_existing:
-        # continue
+        in_path_inferred_proteins = os.path.join(
+            output_dir, 'ident', "{}.inferred_proteins".format(stem))
+        out_path_identified_features = os.path.join(
+            output_dir, 'quant', "{}_identified_features.csv".format(stem))
+        if os.path.exists(out_path_identified_features) and not override_existing:
+            continue
 
         logger.info("Reading features from disk: {}".format(stem))
         features = tapp.read_features(in_path_features)
         features_df = pd.DataFrame({
-            'id': [feature.id for feature in features],
-            'msms_id': [feature.msms_id for feature in features],
+            'feature_id': [feature.id for feature in features],
+            'msms_index': [feature.msms_id for feature in features],
         })
 
         logger.info("Reading ident_data from disk: {}".format(stem))
         ident_data = tapp.read_ident_data(in_path_ident_data)
 
+        logger.info("Reading inferred_proteins from disk: {}".format(stem))
+        inferred_proteins = tapp.read_inferred_proteins(
+            in_path_inferred_proteins)
+        inferred_proteins_df = pd.DataFrame({
+            'protein_id': [inferred_protein.protein_id for inferred_protein in inferred_proteins],
+            'psm_id': [inferred_protein.psm_id for inferred_protein in inferred_proteins],
+        })
+
         logger.info("Reading linked idents from disk: {}".format(stem))
         linked_idents = tapp.read_linked_msms(in_path_ident_link)
         linked_idents_df = pd.DataFrame({
-            'psm_id': [linked_ident.entity_id for linked_ident in linked_idents],
-            'msms_id': [linked_ident.msms_id for linked_ident in linked_idents],
+            'psm_index': [linked_ident.entity_id for linked_ident in linked_idents],
+            'msms_index': [linked_ident.msms_id for linked_ident in linked_idents],
         })
 
-        linked_features_df = pd.merge(features_df, linked_idents_df)
+        logger.info("Creating linked psm protein table: {}".format(stem))
+        linked_features_df = pd.merge(
+            features_df, linked_idents_df, on="msms_index", how="left")
         linked_spectrum_ids = [ident_data.spectrum_ids[i]
-                               for i in linked_features_df['psm_id']]
+                               for i in linked_features_df['psm_index']]
         linked_spectrum_ids_df = pd.DataFrame({
-            'psm_id_str': [linked_spectrum_id.id for linked_spectrum_id in linked_spectrum_ids],
+            'psm_id': [linked_spectrum_id.id for linked_spectrum_id in linked_spectrum_ids],
             'sequence': [linked_spectrum_id.sequence for linked_spectrum_id in linked_spectrum_ids],
             'charge_state': [linked_spectrum_id.charge_state for linked_spectrum_id in linked_spectrum_ids],
             'retention_time': [linked_spectrum_id.retention_time for linked_spectrum_id in linked_spectrum_ids],
         })
-        print(linked_spectrum_ids_df)
+        linked_spectrum_ids_df = pd.merge(
+            linked_spectrum_ids_df, inferred_proteins_df, on="psm_id", how="left")
 
-        # # FIXME: This is all prototypical. Need to move the code for graph
-        # # generation and razor calculation to C++ land.
-        # unique_proteins, unique_psm, inc_mat = create_psm_protein_graph(
-        # ident_data)
-        # selected_psm = np.isin(
-        # unique_psm, linked_spectrum_ids_df['psm_id_str'])
-        # unique_psm = unique_psm[selected_psm]
-        # inc_mat = inc_mat[selected_psm]
-        # unique_proteins, unique_psm, inc_mat = razor_proteins(
-        # unique_proteins, unique_psm, inc_mat)
-        # db_sequences = []
-        # for psm_id in linked_spectrum_ids_df['psm_id_str']:
-        # unique_psm_index = np.where(psm_id == unique_psm)[0]
-        # if len(unique_psm_index) == 0:
-        # db_sequences += [""]
-        # else:
-        # unique_psm_index = unique_psm_index[0]
-        # db_sequence_id = unique_proteins[inc_mat[unique_psm_index, :] == 1][0]
-        # db_sequences += [db_sequence_id]
-        # # FIXME: This is INCORRECT, the order matters.
-        # # db_sequences_df = pd.DataFrame(
-        # # {
-        # # "protein_id":
-        # # [db_sequence.id for db_sequence in ident_data.db_sequences],
-        # # "protein_name":
-        # # [db_sequence.value for db_sequence in ident_data.db_sequences],
-        # # })
-        # # db_sequences = pd.DataFrame({"protein_id": db_sequences})
-        # # db_sequences_df = pd.merge(db_sequences, db_sequences_df, how='left')
-        # # db_sequences_df['psm_id'] = [psm.id for psm in ident_data.spectrum_ids]
-        # print(db_sequences_df)
+        protein_names_df = pd.DataFrame({
+            'protein_id': [db_seq.id for db_seq in ident_data.db_sequences],
+            'protein_name': [db_seq.value for db_seq in ident_data.db_sequences],
+        })
+        linked_spectrum_ids_df = pd.merge(
+            linked_spectrum_ids_df, protein_names_df, on="protein_id", how="left")
+
+        linked_features_df = pd.concat(
+            [linked_features_df, linked_spectrum_ids_df], axis=1)
+        linked_features_df.to_csv(out_path_identified_features, index=False)
+
+    logger.info('Finished creation of quantitative tables in {}'.format(
+        datetime.timedelta(seconds=time.time()-time_start)))
 
     logger.info('Total time elapsed: {}'.format(
         datetime.timedelta(seconds=time.time()-time_pipeline_start)))
