@@ -2084,11 +2084,6 @@ def dda_pipeline(
                                          for cluster in feature_clusters]
         feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
 
-    # TODO: Link metamatch clusters and corresponding peaks with identification
-    # information of peptides and proteins.
-    # TODO: Use maximum likelihood to resolve conflicts among replicates and
-    # generate peptide/protein quantitative tables.
-
     # Find protein information for the identified features.
     logger.info("Finding protein information on identified features")
     for stem in input_stems:
@@ -2154,6 +2149,68 @@ def dda_pipeline(
         linked_features_df = pd.concat(
             [linked_features_df, linked_spectrum_ids_df], axis=1)
         linked_features_df.to_csv(out_path_identified_features, index=False)
+
+    # Link metamatch clusters and corresponding features with identification
+    # information of peptides and proteins.
+    in_path_feature_clusters = os.path.join(
+        output_dir, 'metamatch', 'features.clusters')
+    out_path_feature_clusters_info_feature_ids = os.path.join(output_dir, 'quant',
+                                                              "feature_clusters_info_feature_ids.csv")
+    out_path_feature_clusters_info_sequence = os.path.join(output_dir, 'quant',
+                                                           "feature_clusters_info_sequence.csv")
+    out_path_feature_clusters_info_protein_id = os.path.join(output_dir, 'quant',
+                                                             "feature_clusters_info_protein_id.csv")
+    out_path_feature_clusters_info_protein_name = os.path.join(output_dir, 'quant',
+                                                               "feature_clusters_info_protein_name.csv")
+    if (not os.path.exists(out_path_feature_clusters_info_feature_ids) or override_existing):
+        logger.info("Reading feature clusters from disk")
+        feature_clusters = tapp.read_feature_clusters(
+            in_path_feature_clusters)
+
+        logger.info("Generating feature clusters identification table")
+        peptide_sequence_df = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in feature_clusters],
+        })
+        protein_id_df = peptide_sequence_df.copy()
+        protein_name_df = peptide_sequence_df.copy()
+
+        logger.info("Generating cluster to feature_id table")
+        cluster_features_df = []
+        for cluster in feature_clusters:
+            row = np.full(len(input_stems), np.nan)
+            for feature_id in cluster.feature_ids:
+                row[feature_id.file_id] = feature_id.feature_id
+            cluster_features_df += [row]
+        cluster_features_df = pd.DataFrame(cluster_features_df, dtype='Int64')
+        cluster_features_df.columns = input_stems
+        cluster_features_df = pd.concat(
+            [peptide_sequence_df.copy(), cluster_features_df], axis=1)
+
+        for i, stem in enumerate(input_stems):
+            logger.info(
+                "Reading identified_features from disk: {}".format(stem))
+            in_path_identified_features = os.path.join(
+                output_dir, 'quant', "{}_identified_features.csv".format(stem))
+            identified_features = pd.read_csv(in_path_identified_features)
+            identified_features['feature_id'] = identified_features['feature_id'].astype(
+                'Int64')
+            cluster_features_info = pd.merge(
+                pd.DataFrame({'feature_id': cluster_features_df[stem]}),
+                identified_features,
+                how='left'
+            )
+            peptide_sequence_df[stem] = cluster_features_info['sequence']
+            protein_id_df[stem] = cluster_features_info['protein_id']
+            protein_name_df[stem] = cluster_features_info['protein_name']
+
+        peptide_sequence_df.to_csv(
+            out_path_feature_clusters_info_sequence, index=False)
+        protein_id_df.to_csv(
+            out_path_feature_clusters_info_protein_id, index=False)
+        protein_name_df.to_csv(
+            out_path_feature_clusters_info_protein_name, index=False)
+        cluster_features_df.to_csv(
+            out_path_feature_clusters_info_feature_ids, index=False)
 
     logger.info('Finished creation of quantitative tables in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))

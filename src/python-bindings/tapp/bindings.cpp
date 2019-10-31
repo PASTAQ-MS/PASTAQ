@@ -1046,12 +1046,21 @@ PYBIND11_MODULE(tapp, m) {
                    ", avg_height: " + std::to_string(c.avg_height) + ">";
         });
 
+    py::class_<MetaMatch::FeatureId>(m, "FeatureId")
+        .def_readonly("file_id", &MetaMatch::FeatureId::file_id)
+        .def_readonly("feature_id", &MetaMatch::FeatureId::feature_id)
+        .def("__repr__", [](const MetaMatch::FeatureId &c) {
+            return "MetaClusterFileId <file_id: " + std::to_string(c.file_id) +
+                   ", feature_id: " + std::to_string(c.feature_id) + ">";
+        });
+
     py::class_<MetaMatch::FeatureCluster>(m, "FeatureCluster")
         .def_readonly("id", &MetaMatch::FeatureCluster::id)
         .def_readonly("mz", &MetaMatch::FeatureCluster::mz)
         .def_readonly("rt", &MetaMatch::FeatureCluster::rt)
         .def_readonly("avg_height", &MetaMatch::FeatureCluster::avg_height)
         .def_readonly("file_heights", &MetaMatch::FeatureCluster::file_heights)
+        .def_readonly("feature_ids", &MetaMatch::FeatureCluster::feature_ids)
         .def("__repr__", [](const MetaMatch::FeatureCluster &c) {
             return "MetaCluster <id: " + std::to_string(c.id) +
                    ", mz: " + std::to_string(c.mz) +
