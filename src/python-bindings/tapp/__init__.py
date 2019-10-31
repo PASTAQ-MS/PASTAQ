@@ -1857,6 +1857,28 @@ def dda_pipeline(
     logger.info('Finished mzIdentML parsing in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
+    # Perform protein inference
+    logger.info('Starting protein inference')
+    time_start = time.time()
+    for stem in input_stems:
+        # Check if file has already been processed.
+        in_path_idents = os.path.join(
+            output_dir, 'ident', "{}.ident".format(stem))
+        out_path = os.path.join(output_dir, 'ident',
+                                "{}.inferred_proteins".format(stem))
+        if os.path.exists(out_path) and not override_existing:
+            continue
+
+        logger.info("Reading ident from disk: {}".format(stem))
+        ident_data = tapp.read_ident_data(in_path_idents)
+
+        logger.info("Performing inference: {}".format(stem))
+        inferred_proteins = tapp.perform_protein_inference(ident_data)
+        logger.info('Writing inferred_proteins: {}'.format(out_path))
+        tapp.write_inferred_proteins(inferred_proteins, out_path)
+    logger.info('Finished protein inference in {}'.format(
+        datetime.timedelta(seconds=time.time()-time_start)))
+
     # Link ms2 events with ident information.
     logger.info('Starting ident/msms linkage')
     time_start = time.time()
@@ -2113,30 +2135,30 @@ def dda_pipeline(
         # # FIXME: This is all prototypical. Need to move the code for graph
         # # generation and razor calculation to C++ land.
         # unique_proteins, unique_psm, inc_mat = create_psm_protein_graph(
-            # ident_data)
+        # ident_data)
         # selected_psm = np.isin(
-            # unique_psm, linked_spectrum_ids_df['psm_id_str'])
+        # unique_psm, linked_spectrum_ids_df['psm_id_str'])
         # unique_psm = unique_psm[selected_psm]
         # inc_mat = inc_mat[selected_psm]
         # unique_proteins, unique_psm, inc_mat = razor_proteins(
-            # unique_proteins, unique_psm, inc_mat)
+        # unique_proteins, unique_psm, inc_mat)
         # db_sequences = []
         # for psm_id in linked_spectrum_ids_df['psm_id_str']:
-            # unique_psm_index = np.where(psm_id == unique_psm)[0]
-            # if len(unique_psm_index) == 0:
-                # db_sequences += [""]
-            # else:
-                # unique_psm_index = unique_psm_index[0]
-                # db_sequence_id = unique_proteins[inc_mat[unique_psm_index, :] == 1][0]
-                # db_sequences += [db_sequence_id]
+        # unique_psm_index = np.where(psm_id == unique_psm)[0]
+        # if len(unique_psm_index) == 0:
+        # db_sequences += [""]
+        # else:
+        # unique_psm_index = unique_psm_index[0]
+        # db_sequence_id = unique_proteins[inc_mat[unique_psm_index, :] == 1][0]
+        # db_sequences += [db_sequence_id]
         # # FIXME: This is INCORRECT, the order matters.
         # # db_sequences_df = pd.DataFrame(
-            # # {
-                # # "protein_id":
-                    # # [db_sequence.id for db_sequence in ident_data.db_sequences],
-                # # "protein_name":
-                    # # [db_sequence.value for db_sequence in ident_data.db_sequences],
-            # # })
+        # # {
+        # # "protein_id":
+        # # [db_sequence.id for db_sequence in ident_data.db_sequences],
+        # # "protein_name":
+        # # [db_sequence.value for db_sequence in ident_data.db_sequences],
+        # # })
         # # db_sequences = pd.DataFrame({"protein_id": db_sequences})
         # # db_sequences_df = pd.merge(db_sequences, db_sequences_df, how='left')
         # # db_sequences_df['psm_id'] = [psm.id for psm in ident_data.spectrum_ids]

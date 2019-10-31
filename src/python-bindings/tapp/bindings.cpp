@@ -19,6 +19,7 @@
 #include "metamatch/metamatch.hpp"
 #include "metamatch/metamatch_serialize.hpp"
 #include "protein_inference/protein_inference.hpp"
+#include "protein_inference/protein_inference_serialize.hpp"
 #include "raw_data/raw_data.hpp"
 #include "raw_data/raw_data_serialize.hpp"
 #include "raw_data/xml_reader.hpp"
@@ -364,6 +365,51 @@ std::vector<Centroid::Peak> read_peaks(std::string &input_file) {
         throw std::invalid_argument(error_stream.str());
     }
     return peaks;
+}
+
+std::vector<ProteinInference::InferredProtein> read_inferred_proteins(
+    std::string &input_file) {
+    // Open file stream.
+    std::ifstream stream;
+    stream.open(input_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open input file" << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    std::vector<ProteinInference::InferredProtein> inferred_proteins;
+    if (!ProteinInference::Serialize::read_inferred_proteins(
+            stream, &inferred_proteins)) {
+        std::ostringstream error_stream;
+        error_stream
+            << "error: couldn't write the inferred_proteins into the input file"
+            << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+    return inferred_proteins;
+}
+
+void write_inferred_proteins(
+    const std::vector<ProteinInference::InferredProtein> &inferred_proteins,
+    std::string &output_file) {
+    // Open file stream.
+    std::ofstream stream;
+    stream.open(output_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open output file" << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    if (!ProteinInference::Serialize::write_inferred_proteins(
+            stream, inferred_proteins)) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't write the inferred_proteins into the "
+                        "output file"
+                     << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
 }
 
 void write_feature_clusters(
@@ -1125,6 +1171,13 @@ PYBIND11_MODULE(tapp, m) {
         .def("write_ident_data", &PythonAPI::write_ident_data,
              "Write the ident_data to disk in a binary format",
              py::arg("ident_data"), py::arg("file_name"))
+        .def(
+            "read_inferred_proteins", &PythonAPI::read_inferred_proteins,
+            "Read the inferred_proteins from the binary inferred_proteins file",
+            py::arg("file_name"))
+        .def("write_inferred_proteins", &PythonAPI::write_inferred_proteins,
+             "Write the inferred_proteins to disk in a binary format",
+             py::arg("inferred_proteins"), py::arg("file_name"))
         .def("read_features", &PythonAPI::read_features,
              "Read the feature from the binary feature file",
              py::arg("file_name"))

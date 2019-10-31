@@ -5,7 +5,7 @@
 
 #include "link/link.hpp"
 
-// This namespace groups the functions used to serialize Grid data structures
+// This namespace groups the functions used to serialize Link data structures
 // into a binary stream.
 namespace Link::Serialize {
 // TODO(alex): This needs more documentation
