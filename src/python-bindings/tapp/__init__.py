@@ -1992,7 +1992,7 @@ def dda_pipeline(
 
         logger.info("Generating peaks quantitative table")
         peaks_df = pd.DataFrame({
-            'id': [peak.id for peak in peaks],
+            'peak_id': [peak.id for peak in peaks],
             'mz': [peak.local_max_mz for peak in peaks],
             'rt': [peak.local_max_rt for peak in peaks],
             'rt_delta': [peak.rt_delta for peak in peaks],
@@ -2028,7 +2028,7 @@ def dda_pipeline(
 
         logger.info("Generating features quantitative table")
         features_df = pd.DataFrame({
-            'id': [feature.id for feature in features],
+            'feature_id': [feature.id for feature in features],
             'average_mz': [feature.average_mz for feature in features],
             'average_mz_sigma': [feature.average_mz_sigma for feature in features],
             'average_rt': [feature.average_rt for feature in features],
@@ -2052,7 +2052,7 @@ def dda_pipeline(
         peak_clusters = tapp.read_metamatch_clusters(in_path_peak_clusters)
         logger.info("Generating peak clusters quantitative table")
         peak_clusters_df = pd.DataFrame({
-            'id': [cluster.id for cluster in peak_clusters],
+            'cluster_id': [cluster.id for cluster in peak_clusters],
             'mz': [cluster.mz for cluster in peak_clusters],
             'rt': [cluster.rt for cluster in peak_clusters],
             'avg_height': [cluster.avg_height for cluster in peak_clusters],
@@ -2074,7 +2074,7 @@ def dda_pipeline(
             in_path_feature_clusters)
         logger.info("Generating feature clusters quantitative table")
         feature_clusters_df = pd.DataFrame({
-            'id': [cluster.id for cluster in feature_clusters],
+            'cluster_id': [cluster.id for cluster in feature_clusters],
             'mz': [cluster.mz for cluster in feature_clusters],
             'rt': [cluster.rt for cluster in feature_clusters],
             'avg_height': [cluster.avg_height for cluster in feature_clusters],
