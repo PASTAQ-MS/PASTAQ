@@ -368,6 +368,9 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream) {
             peptide.id = attributes["id"];
             while (stream.good()) {
                 auto tag = XmlReader::read_tag(stream);
+                if (!tag) {
+                    continue;
+                }
                 if (tag.value().name == "Peptide" && tag.value().closed) {
                     peptides.push_back(peptide);
                     break;
@@ -405,6 +408,9 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream) {
                     // Find CVParams for this modification..
                     while (stream.good()) {
                         auto tag = XmlReader::read_tag(stream);
+                        if (!tag) {
+                            continue;
+                        }
                         if (tag.value().name == "cvParam") {
                             auto cv_param = IdentData::CVParam{};
                             auto attributes = tag.value().attributes;
@@ -431,6 +437,9 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream) {
             db_sequence.id = attributes["id"];
             while (stream.good()) {
                 auto tag = XmlReader::read_tag(stream);
+                if (!tag) {
+                    continue;
+                }
                 if (tag.value().name == "DBSequence" && tag.value().closed) {
                     db_sequences.push_back(db_sequence);
                     break;
@@ -460,6 +469,9 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream) {
         bool identification_item_found = false;
         while (stream.good()) {
             tag = XmlReader::read_tag(stream);
+            if (!tag) {
+                continue;
+            }
             auto attributes = tag.value().attributes;
 
             // Retention time.
@@ -492,7 +504,9 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream) {
 
             if (tag.value().name == "SpectrumIdentificationResult" &&
                 tag.value().closed) {
-                spectrum_ids.push_back(spectrum_id);
+                if (spectrum_id.pass_threshold) {
+                    spectrum_ids.push_back(spectrum_id);
+                }
                 break;
             }
         }
@@ -515,9 +529,14 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream) {
                 attributes["passThreshold"] == "true";
             while (stream.good()) {
                 tag = XmlReader::read_tag(stream);
+                if (!tag) {
+                    continue;
+                }
                 if (tag.value().name == "ProteinDetectionHypothesis" &&
                     tag.value().closed) {
-                    protein_hypotheses.push_back(protein_hypothesis);
+                    if (protein_hypothesis.pass_threshold) {
+                        protein_hypotheses.push_back(protein_hypothesis);
+                    }
                     break;
                 }
                 if (tag.value().name == "SpectrumIdentificationItemRef") {

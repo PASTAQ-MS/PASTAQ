@@ -1951,18 +1951,20 @@ def dda_pipeline(
     # Perform metamatch on detected features.
     logger.info('Starting metamatch on features')
     time_start = time.time()
+    in_path_features = os.path.join(output_dir, 'features')
+    in_path_peaks = os.path.join(output_dir, 'warped_peaks')
     out_path = os.path.join(output_dir, 'metamatch', "features.clusters")
     if (not os.path.exists(out_path) or override_existing):
         logger.info("Reading features from disk")
         features = [
             tapp.read_features(
-                "tapp_pipeline_test/features/{}.features".format(input_stem))
+                os.path.join(in_path_features, "{}.features".format(input_stem)))
             for input_stem in input_stems]
 
         logger.info("Reading peaks from disk")
         peaks = [
             tapp.read_peaks(
-                "tapp_pipeline_test/warped_peaks/{}.bpks".format(input_stem))
+                os.path.join(in_path_peaks, "{}.bpks".format(input_stem)))
             for input_stem in input_stems]
 
         logger.info("Finding feature clusters")
