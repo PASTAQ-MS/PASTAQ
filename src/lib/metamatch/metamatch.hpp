@@ -72,6 +72,7 @@ struct FeatureCluster {
     std::vector<FeatureId> feature_ids;
 
     double avg_height;
+    int8_t charge_state;
     std::vector<double> file_heights;
 };
 

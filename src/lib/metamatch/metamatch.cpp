@@ -394,6 +394,7 @@ std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
         cluster.mz /= cluster.feature_ids.size();
         cluster.rt /= cluster.feature_ids.size();
         cluster.avg_height /= cluster.feature_ids.size();
+        cluster.charge_state = ref.charge_state;
         if (cluster.mz != 0 && cluster.rt != 0) {
             clusters.push_back(cluster);
         }

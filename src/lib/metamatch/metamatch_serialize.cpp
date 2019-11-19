@@ -55,6 +55,7 @@ bool MetaMatch::Serialize::read_feature_cluster(std::istream &stream,
                                           read_feature_id);
 
     Serialization::read_double(stream, &cluster->avg_height);
+    Serialization::read_int8(stream, &cluster->charge_state);
     Serialization::read_vector<double>(stream, &cluster->file_heights,
                                        Serialization::read_double);
     return stream.good();
@@ -70,6 +71,7 @@ bool MetaMatch::Serialize::write_feature_cluster(
                                            write_feature_id);
 
     Serialization::write_double(stream, cluster.avg_height);
+    Serialization::write_int8(stream, cluster.charge_state);
     Serialization::write_vector<double>(stream, cluster.file_heights,
                                         Serialization::write_double);
     return stream.good();
