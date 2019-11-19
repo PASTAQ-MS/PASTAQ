@@ -1840,8 +1840,7 @@ def dda_pipeline(
     logger.info('Finished peaks/msms linkage in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
-    # TODO: (If there is ident information)
-    # TODO:     - Perform Occam's razor protein inference in linked peptides.
+    # TODO: (Only if there is ident information)
     # Read mzidentdata and save binary data to disk.
     logger.info('Starting mzIdentML parsing')
     time_start = time.time()
@@ -2129,7 +2128,7 @@ def dda_pipeline(
 
         logger.info("Creating linked psm protein table: {}".format(stem))
         linked_features_df = pd.merge(
-            features_df, linked_idents_df, on="msms_index", how="left")
+            features_df, linked_idents_df, on="msms_index")
         linked_spectrum_ids = [ident_data.spectrum_ids[i]
                                for i in linked_features_df['psm_index']]
         linked_spectrum_ids_df = pd.DataFrame({

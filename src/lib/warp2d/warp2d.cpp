@@ -138,6 +138,8 @@ std::vector<int64_t> Warp2D::find_optimal_warping(std::vector<Level>& levels) {
     for (int64_t k = N - 1; k >= 0; --k) {
         auto& current_level = levels[k];
         const auto& next_level = levels[k + 1];
+        // TODO: If all nodes within the posibilities for this anchor have
+        // the same performance (Below a given threshold), DO NOT MOVE THE ANCHOR.
         for (const auto& warping : current_level.potential_warpings) {
             auto& node_i = current_level.nodes[warping.i];
             const auto& node_j = next_level.nodes[warping.j];

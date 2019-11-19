@@ -21,6 +21,7 @@ struct Feature {
     double total_height;
     double monoisotopic_mz;
     double monoisotopic_height;
+    int8_t charge_state;
     // FIXME: Use the peak index instead of the peak_id? Tradeoffs?
     std::vector<uint64_t> peak_ids;
 };
@@ -42,7 +43,7 @@ std::optional<Feature> build_feature(
     const std::vector<Centroid::Peak> &peaks,
     const std::vector<Search::KeySort<double>> &peaks_rt_key,
     const TheoreticalIsotopes &theoretical_isotopes, double tolerance_rt,
-    double retention_time, double discrepancy_threshold);
+    double retention_time, double discrepancy_threshold, int8_t charge_state);
 
 std::vector<Feature> feature_detection(
     const std::vector<Centroid::Peak> &peaks,

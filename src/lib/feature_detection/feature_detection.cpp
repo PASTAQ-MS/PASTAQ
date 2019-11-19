@@ -110,7 +110,7 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
     const std::vector<Centroid::Peak> &peaks,
     const std::vector<Search::KeySort<double>> &peaks_rt_key,
     const TheoreticalIsotopes &theoretical_isotopes, double tolerance_rt,
-    double retention_time, double discrepancy_threshold) {
+    double retention_time, double discrepancy_threshold, int8_t charge_state) {
     const auto &mzs = theoretical_isotopes.mzs;
     const auto &perc = theoretical_isotopes.percs;
     // Basic sanitation.
@@ -308,6 +308,7 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
     feature.average_rt_delta /= selected_candidates.size();
     feature.average_rt_sigma /= selected_candidates.size();
     feature.average_mz_sigma /= selected_candidates.size();
+    feature.charge_state = charge_state;
     return feature;
 }
 
@@ -419,7 +420,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
         double peak_rt_sigma = peak.raw_roi_sigma_rt;
         auto maybe_feature = build_feature(
             peaks_in_use, peaks, peaks_rt_key, theoretical_isotopes,
-            peak_rt_sigma * 2, peak_rt, discrepancy_threshold);
+            peak_rt_sigma * 2, peak_rt, discrepancy_threshold, charge_state);
         if (maybe_feature) {
             auto feature = maybe_feature.value();
             feature.msms_id = linked_msms.msms_id;

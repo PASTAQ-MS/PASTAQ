@@ -1009,6 +1009,7 @@ PYBIND11_MODULE(tapp, m) {
                       &FeatureDetection::Feature::monoisotopic_mz)
         .def_readonly("monoisotopic_height",
                       &FeatureDetection::Feature::monoisotopic_height)
+        .def_readonly("charge_state", &FeatureDetection::Feature::charge_state)
         .def_readonly("peak_ids", &FeatureDetection::Feature::peak_ids)
         .def("__repr__", [](const FeatureDetection::Feature &f) {
             std::string ret = "";
@@ -1024,6 +1025,7 @@ PYBIND11_MODULE(tapp, m) {
             ret += ", monoisotopic_mz: " + std::to_string(f.monoisotopic_mz);
             ret += ", monoisotopic_height: " +
                    std::to_string(f.monoisotopic_height);
+            ret += ", charge_state: " + std::to_string(f.charge_state);
             ret += ", n_isotopes: " + std::to_string(f.peak_ids.size());
             ret += ">";
             return ret;
