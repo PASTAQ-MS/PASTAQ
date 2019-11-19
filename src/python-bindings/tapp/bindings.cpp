@@ -1061,6 +1061,7 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("mz", &MetaMatch::FeatureCluster::mz)
         .def_readonly("rt", &MetaMatch::FeatureCluster::rt)
         .def_readonly("avg_height", &MetaMatch::FeatureCluster::avg_height)
+        .def_readonly("charge_state", &MetaMatch::FeatureCluster::charge_state)
         .def_readonly("file_heights", &MetaMatch::FeatureCluster::file_heights)
         .def_readonly("feature_ids", &MetaMatch::FeatureCluster::feature_ids)
         .def("__repr__", [](const MetaMatch::FeatureCluster &c) {

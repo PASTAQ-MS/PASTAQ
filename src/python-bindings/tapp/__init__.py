@@ -2038,6 +2038,7 @@ def dda_pipeline(
             'total_height': [feature.total_height for feature in features],
             'monoisotopic_mz': [feature.monoisotopic_mz for feature in features],
             'monoisotopic_height': [feature.monoisotopic_height for feature in features],
+            'charge_state': [feature.charge_state for feature in features],
             'peak_ids': [str(feature.peak_ids) for feature in features],
         })
         features_df.to_csv(out_path_features, index=False)
@@ -2079,6 +2080,7 @@ def dda_pipeline(
             'mz': [cluster.mz for cluster in feature_clusters],
             'rt': [cluster.rt for cluster in feature_clusters],
             'avg_height': [cluster.avg_height for cluster in feature_clusters],
+            'charge_state': [cluster.charge_state for cluster in feature_clusters],
         })
         for i, stem in enumerate(input_stems):
             feature_clusters_df[stem] = [cluster.file_heights[i]
