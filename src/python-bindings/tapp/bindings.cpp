@@ -1041,6 +1041,7 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("rt", &MetaMatch::Cluster::rt)
         .def_readonly("file_heights", &MetaMatch::Cluster::file_heights)
         .def_readonly("avg_height", &MetaMatch::Cluster::avg_height)
+        .def_readonly("peak_ids", &MetaMatch::Cluster::peak_ids)
         .def("__repr__", [](const MetaMatch::Cluster &c) {
             return "MetaCluster <id: " + std::to_string(c.id) +
                    ", mz: " + std::to_string(c.mz) +

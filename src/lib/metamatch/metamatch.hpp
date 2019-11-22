@@ -45,6 +45,11 @@ struct Peak : Centroid::Peak {
 };
 
 // The aggregate information for the peaks of a given cluster.
+struct FeatureId {
+    uint64_t file_id;
+    uint64_t feature_id;
+};
+// TODO: Make this general in order for it to work with features OR peaks.
 struct Cluster {
     // FIXME: We are sacrificing half of our address space just so that we can
     // put a -1 if the cluster is not linked yet, perhaps it's better to keep
@@ -55,13 +60,13 @@ struct Cluster {
     // TODO(alex): Other stats here...
     std::vector<double> file_heights;
     double avg_height;
+
+    // The feature ids on each file associated with this cluster.
+    // NOTE: Should we make this a relational model?
+    // FIXME: Naming peak_ids/feature_ids!
+    std::vector<FeatureId> peak_ids;
 };
 
-struct FeatureId {
-    size_t file_id;
-    size_t feature_id;
-};
-// TODO: Make this general in order for it to work with features OR peaks.
 struct FeatureCluster {
     uint64_t id;
     double mz;

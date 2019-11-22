@@ -201,6 +201,7 @@ std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
                 cluster.file_heights[file_id] = peaks[j].local_max_height;
                 sum_height += peaks[j].local_max_height;
                 hits++;
+                cluster.peak_ids.push_back({file_id, peaks[j].id});
             }
             cluster.avg_height = sum_height / hits;
             clusters.push_back(cluster);

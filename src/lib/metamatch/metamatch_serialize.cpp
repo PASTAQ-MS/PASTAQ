@@ -14,6 +14,8 @@ bool MetaMatch::Serialize::read_cluster(std::istream &stream,
     for (size_t i = 0; i < num_files; ++i) {
         Serialization::read_double(stream, &cluster->file_heights[i]);
     }
+    Serialization::read_vector<FeatureId>(stream, &cluster->peak_ids,
+                                          read_feature_id);
     return stream.good();
 }
 
@@ -28,6 +30,8 @@ bool MetaMatch::Serialize::write_cluster(std::ostream &stream,
     for (size_t i = 0; i < num_files; ++i) {
         Serialization::write_double(stream, cluster.file_heights[i]);
     }
+    Serialization::write_vector<FeatureId>(stream, cluster.peak_ids,
+                                           write_feature_id);
     return stream.good();
 }
 
