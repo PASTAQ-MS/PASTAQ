@@ -1660,14 +1660,14 @@ def dda_pipeline(
                 peaks_b = tapp.read_peaks(os.path.join(
                     output_dir, 'peaks', '{}.bpks'.format(stem_b)))
                 logger.info("Warping {} peaks to {}".format(stem_b, stem_a))
-                peaks_b = tapp.warp_peaks(
-                    [peaks_a, peaks_b],
-                    0,
+                time_map = tapp.calculate_time_map(
+                    peaks_a, peaks_b,
                     tapp_parameters['warp2d_slack'],
                     tapp_parameters['warp2d_window_size'],
                     tapp_parameters['warp2d_num_points'],
                     tapp_parameters['warp2d_rt_expand_factor'],
-                    tapp_parameters['warp2d_peaks_per_window'])[1]
+                    tapp_parameters['warp2d_peaks_per_window'])
+                peaks_b = tapp.warp_peaks(peaks_b, time_map)
                 logger.info(
                     "Calculating similarity of {} vs {} (warped)".format(
                         stem_a, stem_b))
@@ -1724,14 +1724,14 @@ def dda_pipeline(
         else:
             logger.info("Reading peaks from disk: {}".format(stem))
             peaks = tapp.read_peaks(in_path)
-            peaks = tapp.warp_peaks(
-                [reference_peaks, peaks],
-                0,
+            time_map = tapp.calculate_time_map(
+                reference_peaks, peaks,
                 tapp_parameters['warp2d_slack'],
                 tapp_parameters['warp2d_window_size'],
                 tapp_parameters['warp2d_num_points'],
                 tapp_parameters['warp2d_rt_expand_factor'],
-                tapp_parameters['warp2d_peaks_per_window'])[1]
+                tapp_parameters['warp2d_peaks_per_window'])
+            peaks = tapp.warp_peaks(peaks, time_map)
             tapp.write_peaks(peaks, out_path)
     logger.info('Finished peak warping to reference ({}) in {}'.format(
         reference_stem, datetime.timedelta(seconds=time.time()-time_start)))

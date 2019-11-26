@@ -318,12 +318,3 @@ Warp2D::TimeMap Warp2D::calculate_time_map(
 
     return time_map;
 }
-
-std::vector<Centroid::Peak> Warp2D::warp_peaks_parallel(
-    const std::vector<Centroid::Peak>& ref_peaks,
-    const std::vector<Centroid::Peak>& source_peaks,
-    const Warp2D::Parameters& parameters, uint64_t max_threads) {
-    auto time_map =
-        calculate_time_map(ref_peaks, source_peaks, parameters, max_threads);
-    return warp_peaks(source_peaks, time_map);
-}

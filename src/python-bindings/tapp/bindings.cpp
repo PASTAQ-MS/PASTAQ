@@ -187,30 +187,19 @@ std::string to_string(const Xic::Method &method) {
     };
 }
 
-std::vector<std::vector<Centroid::Peak>> warp_peaks(
-    const std::vector<std::vector<Centroid::Peak>> &all_peaks,
-    size_t reference_index, int64_t slack, int64_t window_size,
-    int64_t num_points, double rt_expand_factor, int64_t peaks_per_window) {
+Warp2D::TimeMap calculate_time_map(
+    const std::vector<Centroid::Peak> &ref_peaks,
+    const std::vector<Centroid::Peak> &source_peaks, int64_t slack,
+    int64_t window_size, int64_t num_points, double rt_expand_factor,
+    int64_t peaks_per_window) {
     // TODO(alex): Validate the parameters and throw an error if
     // appropriate.
     Warp2D::Parameters parameters = {slack, window_size, num_points,
                                      peaks_per_window, rt_expand_factor};
-    auto reference_peaks = all_peaks[reference_index];
-
-    std::vector<std::vector<Centroid::Peak>> all_warped_peaks;
-    for (size_t i = 0; i < all_peaks.size(); ++i) {
-        if (i == reference_index) {
-            all_warped_peaks.push_back(all_peaks[i]);
-            continue;
-        }
-        auto peaks = all_peaks[i];
-        std::vector<Centroid::Peak> warped_peaks;
-        warped_peaks =
-            Warp2D::warp_peaks_parallel(reference_peaks, peaks, parameters,
-                                        std::thread::hardware_concurrency());
-        all_warped_peaks.push_back(warped_peaks);
-    }
-    return all_warped_peaks;
+    auto time_map =
+        Warp2D::calculate_time_map(ref_peaks, source_peaks, parameters,
+                                   std::thread::hardware_concurrency());
+    return time_map;
 }
 
 // TODO: Where should this function go?
@@ -897,6 +886,13 @@ PYBIND11_MODULE(tapp, m) {
             return ret;
         });
 
+    py::class_<Warp2D::TimeMap>(m, "TimeMap")
+        .def_readonly("num_segments", &Warp2D::TimeMap::num_segments)
+        .def_readonly("rt_start", &Warp2D::TimeMap::rt_start)
+        .def_readonly("rt_end", &Warp2D::TimeMap::rt_end)
+        .def_readonly("sample_rt_start", &Warp2D::TimeMap::sample_rt_start)
+        .def_readonly("sample_rt_end", &Warp2D::TimeMap::sample_rt_end);
+
     py::class_<PythonAPI::SimilarityResults>(m, "Similarity")
         .def_readonly("self_a", &PythonAPI::SimilarityResults::self_a)
         .def_readonly("self_b", &PythonAPI::SimilarityResults::self_b)
@@ -1132,12 +1128,15 @@ PYBIND11_MODULE(tapp, m) {
              "Find all peaks in the given grid", py::arg("raw_data"),
              py::arg("grid"), py::arg("max_peaks") = 0,
              py::arg("max_threads") = std::thread::hardware_concurrency())
-        .def("warp_peaks", &PythonAPI::warp_peaks,
-             "Warp peak lists to maximize the similarity with the given "
-             "reference",
-             py::arg("all_peaks"), py::arg("reference_index"), py::arg("slack"),
+        .def("calculate_time_map", &PythonAPI::calculate_time_map,
+             "Calculate a warping time_map to maximize the similarity of "
+             "ref_peaks and source_peaks",
+             py::arg("ref_peaks"), py::arg("source_peaks"), py::arg("slack"),
              py::arg("window_size"), py::arg("num_points"),
              py::arg("rt_expand_factor"), py::arg("peaks_per_window"))
+        .def("warp_peaks", &Warp2D::warp_peaks,
+             "Warp the peak list using the given time map", py::arg("peaks"),
+             py::arg("time_map"))
         .def("find_similarity", &PythonAPI::find_similarity,
              "Find the similarity between two peak lists",
              py::arg("peak_list_a"), py::arg("peak_list_b"), py::arg("n_peaks"))
