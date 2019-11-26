@@ -108,10 +108,10 @@ std::vector<Centroid::Peak> Warp2D::interpolate_peaks(
 
 void Warp2D::compute_warped_similarities(
     Warp2D::Level& level, double rt_start, double rt_end, double rt_min,
-    double delta_rt, const std::vector<Centroid::Peak>& target_peaks,
+    double delta_rt, const std::vector<Centroid::Peak>& ref_peaks,
     const std::vector<Centroid::Peak>& source_peaks) {
-    auto target_peaks_segment =
-        Warp2D::peaks_in_rt_range(target_peaks, rt_start, rt_end);
+    auto ref_peaks_segment =
+        Warp2D::peaks_in_rt_range(ref_peaks, rt_start, rt_end);
 
     for (auto& warping : level.potential_warpings) {
         int64_t src_start = warping.src_start;
@@ -124,7 +124,7 @@ void Warp2D::compute_warped_similarities(
         auto source_peaks_warped = Warp2D::interpolate_peaks(
             source_peaks, sample_rt_start, sample_rt_end, rt_start, rt_end);
 
-        double similarity = Centroid::cumulative_overlap(target_peaks_segment,
+        double similarity = Centroid::cumulative_overlap(ref_peaks_segment,
                                                          source_peaks_warped);
         warping.warped_similarity = similarity;
     }
@@ -139,7 +139,8 @@ std::vector<int64_t> Warp2D::find_optimal_warping(std::vector<Level>& levels) {
         auto& current_level = levels[k];
         const auto& next_level = levels[k + 1];
         // TODO: If all nodes within the posibilities for this anchor have
-        // the same performance (Below a given threshold), DO NOT MOVE THE ANCHOR.
+        // the same performance (Below a given threshold), DO NOT MOVE THE
+        // ANCHOR.
         for (const auto& warping : current_level.potential_warpings) {
             auto& node_i = current_level.nodes[warping.i];
             const auto& node_j = next_level.nodes[warping.j];
@@ -162,8 +163,31 @@ std::vector<int64_t> Warp2D::find_optimal_warping(std::vector<Level>& levels) {
     return warp_by;
 }
 
-std::vector<Centroid::Peak> Warp2D::warp_peaks_parallel(
-    const std::vector<Centroid::Peak>& target_peaks,
+std::vector<Centroid::Peak> Warp2D::warp_peaks(
+    const std::vector<Centroid::Peak>& source_peaks,
+    const Warp2D::TimeMap& time_map) {
+    std::vector<Centroid::Peak> warped_peaks;
+    warped_peaks.reserve(source_peaks.size());
+    for (size_t i = 0; i < time_map.num_segments; ++i) {
+        double rt_start = time_map.rt_start[i];
+        double rt_end = time_map.rt_end[i];
+        double sample_rt_start = time_map.sample_rt_start[i];
+        double sample_rt_end = time_map.sample_rt_end[i];
+        auto warped_peaks_segment = Warp2D::interpolate_peaks(
+            source_peaks, sample_rt_start, sample_rt_end, rt_start, rt_end);
+        for (const auto& peak : warped_peaks_segment) {
+            warped_peaks.push_back(peak);
+        }
+    }
+    std::sort(warped_peaks.begin(), warped_peaks.end(),
+              [](const Centroid::Peak& p1, const Centroid::Peak& p2) -> bool {
+                  return (p1.id < p2.id);
+              });
+    return warped_peaks;
+}
+
+Warp2D::TimeMap Warp2D::calculate_time_map(
+    const std::vector<Centroid::Peak>& ref_peaks,
     const std::vector<Centroid::Peak>& source_peaks,
     const Warp2D::Parameters& parameters, uint64_t max_threads) {
     // Initialize parameters.
@@ -178,7 +202,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks_parallel(
     // Find min/max retention times.
     double rt_min = std::numeric_limits<double>::infinity();
     double rt_max = -std::numeric_limits<double>::infinity();
-    for (const auto& peak : target_peaks) {
+    for (const auto& peak : ref_peaks) {
         if (peak.local_max_rt < rt_min) {
             rt_min = peak.local_max_rt;
         }
@@ -203,19 +227,18 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks_parallel(
     double segment_rt_width = delta_rt * m;
 
     // Filter the peaks in each segment.
-    std::vector<Centroid::Peak> target_peaks_filtered;
+    std::vector<Centroid::Peak> ref_peaks_filtered;
     std::vector<Centroid::Peak> source_peaks_filtered;
     for (int i = 0; i < N; ++i) {
         double rt_start = rt_min + i * segment_rt_width;
         double rt_end = rt_start + segment_rt_width;
         // Filter reference peaks.
         {
-            auto peaks =
-                Warp2D::peaks_in_rt_range(target_peaks, rt_start, rt_end);
+            auto peaks = Warp2D::peaks_in_rt_range(ref_peaks, rt_start, rt_end);
             auto filtered_peaks = filter_peaks(peaks, n_peaks_per_segment);
-            target_peaks_filtered.insert(end(target_peaks_filtered),
-                                         begin(filtered_peaks),
-                                         end(filtered_peaks));
+            ref_peaks_filtered.insert(end(ref_peaks_filtered),
+                                      begin(filtered_peaks),
+                                      end(filtered_peaks));
         }
         // Filter source peaks.
         {
@@ -255,7 +278,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks_parallel(
     std::vector<std::thread> threads(groups.size());
     for (size_t i = 0; i < groups.size(); ++i) {
         threads[i] = std::thread([i, &groups, &levels, rt_min, delta_rt,
-                                  segment_rt_width, &target_peaks_filtered,
+                                  segment_rt_width, &ref_peaks_filtered,
                                   &source_peaks_filtered]() {
             for (const auto& k : groups[i]) {
                 auto& current_level = levels[k];
@@ -263,7 +286,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks_parallel(
                 double rt_end = rt_start + segment_rt_width;
                 Warp2D::compute_warped_similarities(
                     current_level, rt_start, rt_end, rt_min, delta_rt,
-                    target_peaks_filtered, source_peaks_filtered);
+                    ref_peaks_filtered, source_peaks_filtered);
             }
         });
     }
@@ -273,9 +296,9 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks_parallel(
 
     auto warp_by = Warp2D::find_optimal_warping(levels);
 
-    // Warp the sample peaks based on the optimal path.
-    std::vector<Centroid::Peak> warped_peaks;
-    warped_peaks.reserve(source_peaks.size());
+    // Build the TimeMap.
+    TimeMap time_map = {};
+    time_map.num_segments = N;
     for (int i = 0; i < N; ++i) {
         double rt_start = rt_min + i * segment_rt_width;
         double rt_end = rt_start + segment_rt_width;
@@ -287,24 +310,26 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks_parallel(
         double sample_rt_width = (x_end - x_start) * delta_rt;
         double sample_rt_end = sample_rt_start + sample_rt_width;
 
-        auto warped_peaks_segment = Warp2D::interpolate_peaks(
-            source_peaks, sample_rt_start, sample_rt_end, rt_start, rt_end);
-        for (const auto& peak : warped_peaks_segment) {
-            warped_peaks.push_back(peak);
-        }
+        time_map.rt_start.push_back(rt_start);
+        time_map.rt_end.push_back(rt_end);
+        time_map.sample_rt_start.push_back(sample_rt_start);
+        time_map.sample_rt_end.push_back(sample_rt_end);
     }
 
-    // Sort the resulting peaks by id.
-    std::sort(warped_peaks.begin(), warped_peaks.end(),
-              [](const Centroid::Peak& p1, const Centroid::Peak& p2) -> bool {
-                  return (p1.id < p2.id);
-              });
+    return time_map;
+}
 
-    return warped_peaks;
+std::vector<Centroid::Peak> Warp2D::warp_peaks_parallel(
+    const std::vector<Centroid::Peak>& ref_peaks,
+    const std::vector<Centroid::Peak>& source_peaks,
+    const Warp2D::Parameters& parameters, uint64_t max_threads) {
+    auto time_map =
+        calculate_time_map(ref_peaks, source_peaks, parameters, max_threads);
+    return warp_peaks(ref_peaks, time_map);
 }
 
 std::vector<Centroid::Peak> Warp2D::warp_peaks_serial(
-    const std::vector<Centroid::Peak>& target_peaks,
+    const std::vector<Centroid::Peak>& ref_peaks,
     const std::vector<Centroid::Peak>& source_peaks,
     const Warp2D::Parameters& parameters) {
     // Initialize parameters.
@@ -319,7 +344,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks_serial(
     // Find min/max retention times.
     double rt_min = std::numeric_limits<double>::infinity();
     double rt_max = -std::numeric_limits<double>::infinity();
-    for (const auto& peak : target_peaks) {
+    for (const auto& peak : ref_peaks) {
         if (peak.local_max_rt < rt_min) {
             rt_min = peak.local_max_rt;
         }
@@ -344,19 +369,18 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks_serial(
     double segment_rt_width = delta_rt * m;
 
     // Filter the peaks in each segment.
-    std::vector<Centroid::Peak> target_peaks_filtered;
+    std::vector<Centroid::Peak> ref_peaks_filtered;
     std::vector<Centroid::Peak> source_peaks_filtered;
     for (int i = 0; i < N; ++i) {
         double rt_start = rt_min + i * segment_rt_width;
         double rt_end = rt_start + segment_rt_width;
         // Filter reference peaks.
         {
-            auto peaks =
-                Warp2D::peaks_in_rt_range(target_peaks, rt_start, rt_end);
+            auto peaks = Warp2D::peaks_in_rt_range(ref_peaks, rt_start, rt_end);
             auto filtered_peaks = filter_peaks(peaks, n_peaks_per_segment);
-            target_peaks_filtered.insert(end(target_peaks_filtered),
-                                         begin(filtered_peaks),
-                                         end(filtered_peaks));
+            ref_peaks_filtered.insert(end(ref_peaks_filtered),
+                                      begin(filtered_peaks),
+                                      end(filtered_peaks));
         }
         // Filter source peaks.
         {
@@ -378,7 +402,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks_serial(
         double rt_end = rt_start + segment_rt_width;
         Warp2D::compute_warped_similarities(
             current_level, rt_start, rt_end, rt_min, delta_rt,
-            target_peaks_filtered, source_peaks_filtered);
+            ref_peaks_filtered, source_peaks_filtered);
     }
 
     auto warp_by = Warp2D::find_optimal_warping(levels);
@@ -386,6 +410,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks_serial(
     // Warp the sample peaks based on the optimal path.
     std::vector<Centroid::Peak> warped_peaks;
     warped_peaks.reserve(source_peaks.size());
+    TimeMap time_map = {};
     for (int i = 0; i < N; ++i) {
         double rt_start = rt_min + i * segment_rt_width;
         double rt_end = rt_start + segment_rt_width;
@@ -402,7 +427,13 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks_serial(
         for (const auto& peak : warped_peaks_segment) {
             warped_peaks.push_back(peak);
         }
+
+        time_map.rt_start.push_back(rt_start);
+        time_map.rt_end.push_back(rt_end);
+        time_map.sample_rt_start.push_back(sample_rt_start);
+        time_map.sample_rt_end.push_back(sample_rt_end);
     }
 
+    // TODO: Return a Warp2DResults...
     return warped_peaks;
 }

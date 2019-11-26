@@ -146,6 +146,19 @@ struct Level {
     std::vector<PotentialWarping> potential_warpings;
 };
 
+struct TimeMap {
+    uint64_t num_segments;
+    std::vector<double> rt_start;
+    std::vector<double> rt_end;
+    std::vector<double> sample_rt_start;
+    std::vector<double> sample_rt_end;
+};
+
+struct Warp2DResults {
+    std::vector<Centroid::Peak>& warped_peaks;
+    TimeMap time_map;
+};
+
 // Warp the peaks by linearly interpolating their retention time to the given
 // reference time. Note that we are just performing linear displacement of the
 // center of the peaks, we do not deform the peak shape by adjusting the sigmas.
@@ -173,7 +186,7 @@ std::vector<Level> initialize_levels(int64_t num_sectors, int64_t window_size,
 // level.warped_similarities.
 void compute_warped_similarities(
     Warp2D::Level& level, double rt_start, double rt_end, double rt_min,
-    double delta_rt, const std::vector<Centroid::Peak>& target_peaks,
+    double delta_rt, const std::vector<Centroid::Peak>& ref_peaks,
     const std::vector<Centroid::Peak>& source_peaks);
 
 // Calculates the optimal set of warping points using the computed warped
@@ -183,19 +196,25 @@ void compute_warped_similarities(
 std::vector<int64_t> find_optimal_warping(std::vector<Level>& levels);
 
 // Perform Warp2D in serial by trying to find optimal warping set to maximize
-// similarity between the reference_peaks and the source_peaks.
+// similarity between the ref_peaks and the source_peaks.
 std::vector<Centroid::Peak> warp_peaks_serial(
-    const std::vector<Centroid::Peak>& reference_peaks,
+    const std::vector<Centroid::Peak>& ref_peaks,
     const std::vector<Centroid::Peak>& source_peaks,
     const Parameters& parameters);
 
-// Perform Warp2D in parallel by trying to find optimal warping set to maximize
-// similarity between the reference_peaks and the source_peaks.
+// Perform Warp2D in parallel to find the optimal TimeMap for peak warping.
+TimeMap calculate_time_map(const std::vector<Centroid::Peak>& ref_peaks,
+                           const std::vector<Centroid::Peak>& source_peaks,
+                           const Parameters& parameters, uint64_t max_threads);
+
 std::vector<Centroid::Peak> warp_peaks_parallel(
-    const std::vector<Centroid::Peak>& reference_peaks,
+    const std::vector<Centroid::Peak>& ref_peaks,
     const std::vector<Centroid::Peak>& source_peaks,
     const Parameters& parameters, uint64_t max_threads);
 
+// TODO: doc...
+std::vector<Centroid::Peak> warp_peaks(
+    const std::vector<Centroid::Peak>& source_peaks, const TimeMap& time_map);
 }  // namespace Warp2D
 
 #endif /* WARP2D_WARP2D_HPP */
