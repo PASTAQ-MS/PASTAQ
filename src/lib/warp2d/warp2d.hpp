@@ -195,14 +195,8 @@ void compute_warped_similarities(
 // the FU nodes to find the optimal warping path.
 std::vector<int64_t> find_optimal_warping(std::vector<Level>& levels);
 
-// Perform Warp2D in serial by trying to find optimal warping set to maximize
-// similarity between the ref_peaks and the source_peaks.
-std::vector<Centroid::Peak> warp_peaks_serial(
-    const std::vector<Centroid::Peak>& ref_peaks,
-    const std::vector<Centroid::Peak>& source_peaks,
-    const Parameters& parameters);
-
-// Perform Warp2D in parallel to find the optimal TimeMap for peak warping.
+// Perform the Warp2D algorithm in parallel to find the optimal TimeMap for
+// peak warping.
 TimeMap calculate_time_map(const std::vector<Centroid::Peak>& ref_peaks,
                            const std::vector<Centroid::Peak>& source_peaks,
                            const Parameters& parameters, uint64_t max_threads);
@@ -212,7 +206,8 @@ std::vector<Centroid::Peak> warp_peaks_parallel(
     const std::vector<Centroid::Peak>& source_peaks,
     const Parameters& parameters, uint64_t max_threads);
 
-// TODO: doc...
+// Use the given TimeMap to interpolate the source_peaks for retention time
+// alignment.
 std::vector<Centroid::Peak> warp_peaks(
     const std::vector<Centroid::Peak>& source_peaks, const TimeMap& time_map);
 }  // namespace Warp2D
