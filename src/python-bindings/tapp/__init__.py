@@ -1725,6 +1725,14 @@ def dda_pipeline(
         logger.info("Warping peaks: {}".format(stem))
         if stem == reference_stem:
             tapp.write_peaks(reference_peaks, out_path)
+            time_map = tapp.calculate_time_map(
+                reference_peaks, reference_peaks,
+                tapp_parameters['warp2d_slack'],
+                tapp_parameters['warp2d_window_size'],
+                tapp_parameters['warp2d_num_points'],
+                tapp_parameters['warp2d_rt_expand_factor'],
+                tapp_parameters['warp2d_peaks_per_window'])
+            tapp.write_time_map(time_map, out_path_tmap)
         else:
             logger.info("Reading peaks from disk: {}".format(stem))
             peaks = tapp.read_peaks(in_path)

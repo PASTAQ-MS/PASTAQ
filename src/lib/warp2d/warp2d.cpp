@@ -320,3 +320,22 @@ Warp2D::TimeMap Warp2D::calculate_time_map(
 
     return time_map;
 }
+
+double Warp2D::warp(const Warp2D::TimeMap& time_map, double rt) {
+    // Find the segment that contains the given rt.
+    uint64_t segment = 0;
+    for (size_t i = 0; i < time_map.num_segments; ++i) {
+        if (rt >= time_map.sample_rt_start[i] &&
+            rt < time_map.sample_rt_end[i]) {
+            segment = i;
+            break;
+        }
+    }
+    // Interpolate.
+    double rt_start = time_map.rt_start[segment];  // After warping
+    double rt_end = time_map.rt_end[segment];      // After warping
+    double sample_rt_start = time_map.sample_rt_start[segment];  // Original
+    double sample_rt_end = time_map.sample_rt_end[segment];      // Original
+    double x = (rt - sample_rt_start) / (sample_rt_end - sample_rt_start);
+    return Interpolation::lerp(rt_start, rt_end, x);
+}

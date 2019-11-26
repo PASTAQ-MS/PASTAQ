@@ -156,11 +156,6 @@ struct TimeMap {
     std::vector<double> sample_rt_end;
 };
 
-struct Warp2DResults {
-    std::vector<Centroid::Peak>& warped_peaks;
-    TimeMap time_map;
-};
-
 // Warp the peaks by linearly interpolating their retention time to the given
 // reference time. Note that we are just performing linear displacement of the
 // center of the peaks, we do not deform the peak shape by adjusting the sigmas.
@@ -206,6 +201,9 @@ TimeMap calculate_time_map(const std::vector<Centroid::Peak>& ref_peaks,
 // alignment.
 std::vector<Centroid::Peak> warp_peaks(
     const std::vector<Centroid::Peak>& source_peaks, const TimeMap& time_map);
+
+// Use a TimeMap to interpolate a given retention time.
+double warp(const TimeMap& time_map, double rt);
 
 }  // namespace Warp2D
 

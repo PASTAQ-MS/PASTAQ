@@ -931,7 +931,12 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("rt_start", &Warp2D::TimeMap::rt_start)
         .def_readonly("rt_end", &Warp2D::TimeMap::rt_end)
         .def_readonly("sample_rt_start", &Warp2D::TimeMap::sample_rt_start)
-        .def_readonly("sample_rt_end", &Warp2D::TimeMap::sample_rt_end);
+        .def_readonly("sample_rt_end", &Warp2D::TimeMap::sample_rt_end)
+        .def("warp", &Warp2D::warp, py::arg("rt"))
+        .def("__repr__", [](const Warp2D::TimeMap &m) {
+            return "TimeMap <rt_min: " + std::to_string(m.rt_min) +
+                   ", rt_max: " + std::to_string(m.rt_max) + ">";
+        });
 
     py::class_<PythonAPI::SimilarityResults>(m, "Similarity")
         .def_readonly("self_a", &PythonAPI::SimilarityResults::self_a)
