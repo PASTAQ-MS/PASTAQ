@@ -44,6 +44,7 @@ add_library(tapplib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/search.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/serialization.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d_serialize.cpp"
     )
 target_include_directories(tapplib PUBLIC src/lib)
 target_link_libraries(tapplib ${CMAKE_THREAD_LIBS_INIT} midas)

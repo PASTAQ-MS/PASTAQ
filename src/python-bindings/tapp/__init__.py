@@ -1455,6 +1455,8 @@ def dda_pipeline(
         os.makedirs(os.path.join(output_dir, 'mesh'))
     if not os.path.exists(os.path.join(output_dir, 'peaks')):
         os.makedirs(os.path.join(output_dir, 'peaks'))
+    if not os.path.exists(os.path.join(output_dir, 'time_map')):
+        os.makedirs(os.path.join(output_dir, 'time_map'))
     if not os.path.exists(os.path.join(output_dir, 'warped_peaks')):
         os.makedirs(os.path.join(output_dir, 'warped_peaks'))
     if not os.path.exists(os.path.join(output_dir, 'metamatch')):
@@ -1715,6 +1717,8 @@ def dda_pipeline(
         in_path = os.path.join(output_dir, 'peaks', "{}.bpks".format(stem))
         out_path = os.path.join(output_dir, 'warped_peaks',
                                 "{}.bpks".format(stem))
+        out_path_tmap = os.path.join(output_dir, 'time_map',
+                                     "{}.tmap".format(stem))
         if os.path.exists(out_path) and not override_existing:
             continue
 
@@ -1733,6 +1737,7 @@ def dda_pipeline(
                 tapp_parameters['warp2d_peaks_per_window'])
             peaks = tapp.warp_peaks(peaks, time_map)
             tapp.write_peaks(peaks, out_path)
+            tapp.write_time_map(time_map, out_path_tmap)
     logger.info('Finished peak warping to reference ({}) in {}'.format(
         reference_stem, datetime.timedelta(seconds=time.time()-time_start)))
 

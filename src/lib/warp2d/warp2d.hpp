@@ -148,6 +148,8 @@ struct Level {
 
 struct TimeMap {
     uint64_t num_segments;
+    double rt_min;
+    double rt_max;
     std::vector<double> rt_start;
     std::vector<double> rt_end;
     std::vector<double> sample_rt_start;

@@ -298,6 +298,8 @@ Warp2D::TimeMap Warp2D::calculate_time_map(
 
     // Build the TimeMap.
     TimeMap time_map = {};
+    time_map.rt_min = rt_min;
+    time_map.rt_max = rt_max;
     time_map.num_segments = N;
     for (int i = 0; i < N; ++i) {
         double rt_start = rt_min + i * segment_rt_width;

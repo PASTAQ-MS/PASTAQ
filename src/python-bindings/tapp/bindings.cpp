@@ -26,6 +26,7 @@
 #include "utils/search.hpp"
 #include "utils/serialization.hpp"
 #include "warp2d/warp2d.hpp"
+#include "warp2d/warp2d_serialize.hpp"
 
 namespace py = pybind11;
 
@@ -315,6 +316,45 @@ Grid::Grid read_grid(std::string &input_file) {
         throw std::invalid_argument(error_stream.str());
     }
     return grid;
+}
+
+void write_time_map(const Warp2D::TimeMap &time_map, std::string &output_file) {
+    // Open file stream.
+    std::ofstream stream;
+    stream.open(output_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open output file" << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    if (!Warp2D::Serialize::write_time_map(stream, time_map)) {
+        std::ostringstream error_stream;
+        error_stream
+            << "error: couldn't write the time_map into the output file"
+            << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+}
+
+Warp2D::TimeMap read_time_map(std::string &input_file) {
+    // Open file stream.
+    std::ifstream stream;
+    stream.open(input_file);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open input file" << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    Warp2D::TimeMap time_map;
+    if (!Warp2D::Serialize::read_time_map(stream, &time_map)) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't write the time_map into the input file"
+                     << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+    return time_map;
 }
 
 void write_peaks(const std::vector<Centroid::Peak> &peaks,
@@ -1169,6 +1209,12 @@ PYBIND11_MODULE(tapp, m) {
         .def("read_linked_msms", &PythonAPI::read_linked_msms,
              "Read the linked_msms from the binary linked_msms file",
              py::arg("file_name"))
+        .def("read_time_map", &PythonAPI::read_time_map,
+             "Read the time_map from the binary time_map file",
+             py::arg("file_name"))
+        .def("write_time_map", &PythonAPI::write_time_map,
+             "Write the time_map to disk in a binary format",
+             py::arg("time_map"), py::arg("file_name"))
         .def("theoretical_isotopes_peptide",
              &FeatureDetection::theoretical_isotopes_peptide,
              "Calculate the theoretical isotopic distribution of a peptide",
