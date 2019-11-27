@@ -89,17 +89,26 @@ def plot_mesh(mesh, transform='sqrt', figure=None):
     })
 
 
-def gaus(x, a, x0, sigma):
-    return a * np.exp(-(x - x0)**2 / (2 * sigma**2))
+def gauss(x, a, mu, sigma):
+    return a * np.exp(-(x - mu)**2 / (2 * sigma**2))
 
 
 def gaus2d(X, a, x_0, sigma_x, y_0, sigma_y):
     x = X[0]
     y = X[1]
     b = np.exp(-0.5 * ((x - x_0) / sigma_x) ** 2)
-    c = np.exp(-0.5 * ((y - y_0)/sigma_y) ** 2)
+    c = np.exp(-0.5 * ((y - y_0) / sigma_y) ** 2)
     return a * b * c
 
+def fit_gauss(x, y, a0=None, mu0=None, sigma0=None):
+    if not a0:
+        a0 = np.max(y)
+    if not mu0:
+        mu0 = np.mean(x)
+    if not sigma0:
+        sigma0 = np.std(x)
+    fit, cov = curve_fit(gauss, x, y, p0=[a0, mu0, sigma0])
+    return fit
 
 def fit_curvefit(mzs, intensities, rts):
     X = np.array([mzs, rts])
@@ -120,6 +129,8 @@ def fit_inle(x, y):
 
 
 def fit_caruana(x, y):
+    x = np.array(x)
+    y = np.array(y)
     x_mean = x.mean()
     x = x - x_mean
     X = np.array(
@@ -142,6 +153,8 @@ def fit_caruana(x, y):
 
 
 def fit_guos(x, y):
+    x = np.array(x)
+    y = np.array(y)
     x_mean = x.mean()
     x = x - x_mean
     X = np.array(
@@ -524,7 +537,7 @@ def plot_peak_fit(raw_data, peak, fig_mz, fig_rt):
 
     # MZ fit plot.
     sort_idx_mz = np.argsort(mzs)
-    fitted_intensity_2d_mz = gaus(
+    fitted_intensity_2d_mz = gauss(
         np.array(mzs)[sort_idx_mz],
         peak['fitted_height'],
         peak['fitted_mz'],
@@ -550,7 +563,7 @@ def plot_peak_fit(raw_data, peak, fig_mz, fig_rt):
     # for x,y in zip(rts, intensities):
     # pass
     sort_idx_rt = np.argsort(xic_x)
-    fitted_intensity_2d_rt = gaus(
+    fitted_intensity_2d_rt = gauss(
         np.array(xic_x)[sort_idx_rt],
         peak['fitted_height'],
         peak['fitted_rt'],
@@ -939,7 +952,7 @@ def plot_sigma(
         img_plot.set_ylim([lim_min_rt, lim_max_rt])
         rt_plot.set_ylim([lim_min_rt, lim_max_rt])
         x = np.linspace(min_rt, max_rt, 100)
-        y = gaus(x, height, rt, sigma_rt)
+        y = gauss(x, height, rt, sigma_rt)
         rt_plot.plot(
             y, x,
             linestyle=linestyle,
@@ -954,7 +967,7 @@ def plot_sigma(
             lim_max_mz = max_mz
         mz_plot.set_xlim([lim_min_mz, lim_max_mz])
         x = np.linspace(min_mz, max_mz, 100)
-        y = gaus(x, height, mz, sigma_mz)
+        y = gauss(x, height, mz, sigma_mz)
         mz_plot.plot(
             x, y,
             linestyle=linestyle,
