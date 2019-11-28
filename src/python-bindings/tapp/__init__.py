@@ -1,6 +1,6 @@
 # TODO(alex): Write documentation.
 
-from scipy.special import erfc
+from scipy.special import erfc, erfcx
 import math
 import os
 # TODO: Use pathlib instead of os?
@@ -93,22 +93,121 @@ def gauss(x, a, mu, sigma):
     return a * np.exp(-(x - mu)**2 / (2 * sigma**2))
 
 
-def gaus2d(X, a, x_0, sigma_x, y_0, sigma_y):
+def gauss2d(X, a, x_0, sigma_x, y_0, sigma_y):
     x = X[0]
     y = X[1]
     b = np.exp(-0.5 * ((x - x_0) / sigma_x) ** 2)
     c = np.exp(-0.5 * ((y - y_0) / sigma_y) ** 2)
     return a * b * c
 
-def fit_gauss(x, y, a0=None, mu0=None, sigma0=None):
-    if not a0:
-        a0 = np.max(y)
-    if not mu0:
-        mu0 = np.mean(x)
-    if not sigma0:
-        sigma0 = np.std(x)
-    fit, cov = curve_fit(gauss, x, y, p0=[a0, mu0, sigma0])
-    return fit
+
+def emg(x, h, mu, sigma, tau):
+    # To avoid overflow on computation of the formula, we can use three
+    # different formulas: doi:10.1002/cem.1343
+    z_arr = 1/np.sqrt(2) * (sigma/tau - (x - mu)/sigma)
+    a = sigma/tau * np.sqrt(np.pi/2)
+
+    def calculate(x, z):
+        if z < 0:
+            b = 1/2 * (sigma/tau) ** 2 - (x - mu)/tau
+            return h * a * np.exp(b) * erfc(z)
+        elif z < 6.71 * 1e7:
+            b = -1/2 * ((x - mu)/sigma)**2
+            return h * a * np.exp(b) * erfcx(z)
+        b = -1/2 * ((x - mu)/sigma)**2
+        c = 1 + (x - mu) * tau/(sigma**2)
+        return h * np.exp(b)/c
+    ret = np.zeros(len(z_arr))
+    for i, z in enumerate(z_arr):
+        ret[i] = calculate(x[i], z)
+    # print(z_arr)
+    # # print(calculate(z_arr))
+    # print("DING")
+    # print(ret)
+    # print("DONG")
+    return ret
+
+
+def gauss_mz_emg_rt(X, h, mz_0, sigma_mz, rt_0, sigma_rt, tau):
+    mz = X[0]
+    rt = X[1]
+    a = 1/(2 * tau)
+    b = 1/2 * np.power(sigma_rt/tau, 2) - (rt - rt_0)/tau
+    z = 1 / np.sqrt(2) * ((rt - rt_0)/sigma_rt - sigma_rt/tau)
+    c = erfc(-z)
+    d = np.exp(-0.5 * np.power((mz - mz_0) / sigma_mz, 2))
+    return h * a * np.exp(b) * c * d
+
+
+def fit_gauss(x, y, rt_mean, weights=None):
+    # Use the method of moments to estimate initial parameteres.
+    rt_m2 = 0
+    weight_sum = 0
+    for i in range(0, len(x)):
+        weight_sum += y[i]
+        rt_delta = rt_mean - x[i]
+        rt_m2 += y[i] * (rt_delta**2)
+    rt_m2 /= weight_sum
+    rt_std = np.sqrt(rt_m2)
+    a0 = np.max(y)
+    mu0 = rt_mean
+    sigma0 = rt_std
+    fit, cov = curve_fit(gauss, x, y, p0=[a0, mu0, sigma0], sigma=weights)
+    fit, cov = curve_fit(
+        gauss, x, y, 
+        p0=[a0, mu0, sigma0],
+        sigma=weights,
+        bounds=(
+            [0, 0, 0], 
+            [np.inf, np.inf, np.inf], 
+        )
+    )
+    fitted_curve = gauss(x, *fit)
+    residuals = (y - gauss(x, *fit))/weights
+    ss_res = np.sum(residuals ** 2)
+    ss_tot = np.sum((y - rt_mean) ** 2)
+    r2 = 1 - ss_res/ss_tot
+    return fit, fitted_curve, residuals, r2
+
+
+def fit_emg(x, y, rt_mean, weights=None):
+    # Use the method of moments to estimate initial parameteres.
+    rt_m2 = 0
+    rt_m3 = 0
+    weight_sum = 0
+    for i in range(0, len(x)):
+        weight_sum += y[i]
+        rt_delta = rt_mean - x[i]
+        rt_m2 += y[i] * (rt_delta**2)
+        rt_m3 += y[i] * (rt_delta**3)
+    rt_m2 /= weight_sum
+    rt_m3 /= weight_sum
+    rt_std = np.sqrt(rt_m2)
+    gamma = np.max([rt_m3/(rt_std ** 3), 0])
+    # print("moments:", [rt_mean, rt_m2, rt_m3, rt_std, gamma, weight_sum])
+    h0 = np.max(y)
+    mu0 = rt_mean - rt_std * (gamma/2)**(1/3)
+    sigma0 = rt_std * np.sqrt(np.max([1 - (gamma/2)**(2/3), 0])) 
+    tau0 = rt_std * (gamma/2)**(1/3)
+    # Perform curve fit.
+    # print("estimated:", [h0, mu0, sigma0, tau0])
+    fit, cov = curve_fit(
+        emg, x, y, 
+        p0=[h0, mu0, sigma0, tau0], 
+        sigma=weights,
+        bounds=(
+            [0, 0, 0, 0], 
+            [np.inf, np.inf, np.inf, np.inf], 
+        )
+    )
+    # print("fitted:", fit)
+    fitted_curve = emg(x, *fit)
+    residuals = (y - emg(x, *fit))/weights
+    ss_res = np.sum(residuals ** 2)
+    ss_tot = np.sum((y - rt_mean) ** 2)
+    r2 = 1 - ss_res/ss_tot
+    return fit, fitted_curve, residuals, r2
+
 
 def fit_curvefit(mzs, intensities, rts):
     X = np.array([mzs, rts])
@@ -116,7 +215,7 @@ def fit_curvefit(mzs, intensities, rts):
     sigma_x = np.sqrt(sum(intensities * (X[0] - mean_x)**2) / sum(intensities))
     mean_y = sum(X[1] * intensities) / sum(intensities)
     sigma_y = np.sqrt(sum(intensities * (X[1] - mean_y)**2) / sum(intensities))
-    fitted_parameters, pcov_2d = curve_fit(gaus2d, X, intensities, p0=[
+    fitted_parameters, pcov_2d = curve_fit(gauss2d, X, intensities, p0=[
         max(intensities), mean_x, sigma_x, mean_y, sigma_y])
     return fitted_parameters
 
@@ -297,7 +396,7 @@ def fit_weighted_guos_2d(x, y, z, x_center, y_center, sig_mz, sig_rt):
     for i, intensity in enumerate(z):
         mz = x[i]
         rt = y[i]
-        w = gaus2d([mz, rt], 1, 0, sig_mz, 0, sig_rt)
+        w = gauss2d([mz, rt], 1, 0, sig_mz, 0, sig_rt)
         w_2 = w * w
 
         a_0_0 += w_2
@@ -415,7 +514,7 @@ def fit_weighted_guos_2d_const(x, y, z, x_center, y_center, sig_mz, sig_rt):
     for i, intensity in enumerate(z):
         mz = x[i]
         rt = y[i]
-        w = gaus2d([mz, rt], 1, 0, sig_mz, 0, sig_rt)
+        w = gauss2d([mz, rt], 1, 0, sig_mz, 0, sig_rt)
         w_2 = w * w
 
         a_0_0 += w_2
@@ -1011,7 +1110,7 @@ def plot_raw_roi_fitted_sigma(
     rts = np.array(data_points.rt)
     intensities = np.array(data_points.intensity)
     X = np.array([mzs, rts])
-    def f(x, h, mz, sigma_mz, rt, sigma_rt): return gaus2d(
+    def f(x, h, mz, sigma_mz, rt, sigma_rt): return gauss2d(
         x, h, peak.local_max_mz, sigma_mz, peak.local_max_rt, sigma_rt)
     fitted_parameters, pcov_2d = curve_fit(
         f, X, intensities, p0=[
@@ -1153,32 +1252,13 @@ def testing_different_sigmas(peaks, raw_data, i=0):
     return plots
 
 
-def emg(t, h, tg, sigma, tau):
-    a = 1/(2 * tau)
-    b = 1/2 * np.power(sigma/tau, 2) - (t - tg)/tau
-    z = 1 / np.sqrt(2) * ((t - tg)/sigma - sigma/tau)
-    c = erfc(-z)
-    return h * a * np.exp(b) * c
-
-
-def gauss_mz_emg_rt(X, h, mz_0, sigma_mz, rt_0, sigma_rt, tau):
-    mz = X[0]
-    rt = X[1]
-    a = 1/(2 * tau)
-    b = 1/2 * np.power(sigma_rt/tau, 2) - (rt - rt_0)/tau
-    z = 1 / np.sqrt(2) * ((rt - rt_0)/sigma_rt - sigma_rt/tau)
-    c = erfc(-z)
-    d = np.exp(-0.5 * np.power((mz - mz_0) / sigma_mz, 2))
-    return h * a * np.exp(b) * c * d
-
-
 def calculate_r2(x, y, z, h, mz, sigma_mz, rt, sigma_rt):
     x = np.array(x)
     y = np.array(y)
     z = np.array(z)
     ss_tot = (np.power(z - z.mean(), 2)).sum()
-    ss_res = (np.power(z - gaus2d([x, y], h, mz,
-                                  sigma_mz, rt, sigma_rt), 2)).sum()
+    ss_res = (np.power(z - gauss2d([x, y], h, mz,
+                                   sigma_mz, rt, sigma_rt), 2)).sum()
     r2 = 1 - ss_res / ss_tot
     return r2
 
