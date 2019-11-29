@@ -162,7 +162,7 @@ def fast_gauss(x, y, rt_mean, rt_sig):
     c_4 = 0
     for i, intensity in enumerate(y):
         rt = x[i]
-        w = gauss(rt, 1, 0, rt_sig)
+        w = gauss(rt, 1, 0, rt_sig) * intensity
         w_2 = w * w
 
         a_0_0 += w_2
@@ -271,6 +271,11 @@ def fit_fast_gauss(x, y, rt_mean, rt_sig):
     mu0 = rt_mean
     sigma0 = rt_std
     fit = fast_gauss(x, y, rt_mean, rt_sig)
+    h, mu, sig = fit
+    # Does the fit meets the quality metrics?
+    # TODO: Min weighted r2?
+    if h < 0 or mu < rt_mean - 2 * rt_sig or mu > rt_mean + 2 * rt_sig or sig > rt_sig * 2:
+        fit = np.array([np.nan, np.nan, np.nan])
     fitted_curve = gauss(x, *fit)
     residuals = (y - gauss(x, *fit))
     ss_res = np.sum(residuals ** 2)
