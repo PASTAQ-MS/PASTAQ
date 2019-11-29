@@ -127,6 +127,95 @@ def emg(x, h, mu, sigma, tau):
     # print("DONG")
     return ret
 
+def fast_gauss(x, y, rt_mean, rt_sig):
+    x = x - rt_mean
+
+    a_0_0 = 0
+    a_0_1 = 0
+    a_0_2 = 0
+    a_0_3 = 0
+    a_0_4 = 0
+    a_1_0 = 0
+    a_1_1 = 0
+    a_1_2 = 0
+    a_1_3 = 0
+    a_1_4 = 0
+    a_2_0 = 0
+    a_2_1 = 0
+    a_2_2 = 0
+    a_2_3 = 0
+    a_2_4 = 0
+    a_3_0 = 0
+    a_3_1 = 0
+    a_3_2 = 0
+    a_3_3 = 0
+    a_3_4 = 0
+    a_4_0 = 0
+    a_4_1 = 0
+    a_4_2 = 0
+    a_4_3 = 0
+    a_4_4 = 0
+    c_0 = 0
+    c_1 = 0
+    c_2 = 0
+    c_3 = 0
+    c_4 = 0
+    for i, intensity in enumerate(y):
+        rt = x[i]
+        w = gauss(rt, 1, 0, rt_sig)
+        w_2 = w * w
+
+        a_0_0 += w_2
+        a_0_3 += w_2 * rt
+        a_0_4 += w_2 * rt * rt
+
+        a_3_0 += w_2 * rt
+        a_3_3 += w_2 * rt * rt
+        a_3_4 += w_2 * rt * rt * rt
+
+        a_4_0 += w_2 * rt * rt
+        a_4_3 += w_2 * rt * rt * rt
+        a_4_4 += w_2 * rt * rt * rt * rt
+
+        c_0 += w_2 * np.log(intensity)
+        c_3 += w_2 * np.log(intensity) * rt
+        c_4 += w_2 * np.log(intensity) * rt * rt
+
+    X = np.array(
+        [
+            [
+                a_0_0,
+                a_0_3,
+                a_0_4,
+            ],
+            [
+                a_3_0,
+                a_3_3,
+                a_3_4,
+            ],
+            [
+                a_4_0,
+                a_4_3,
+                a_4_4,
+            ],
+        ],
+    )
+    Y = np.array([
+        c_0,
+        c_3,
+        c_4,
+    ])
+    a, d, e = np.linalg.lstsq(X, Y, rcond=1)[0]
+
+    if e >= 0:
+        return np.array([np.nan, np.nan, np.nan])
+
+    sigma_rt = np.sqrt(1/(-2 * e))
+    rt = d / (-2 * e) + rt_mean
+    height = np.exp(a - ((d ** 2) / (4 * e)))
+
+    return np.array([height, rt, sigma_rt])
+
 
 def gauss_mz_emg_rt(X, h, mz_0, sigma_mz, rt_0, sigma_rt, tau):
     mz = X[0]
@@ -169,6 +258,26 @@ def fit_gauss(x, y, rt_mean, weights=None):
     r2 = 1 - ss_res/ss_tot
     return fit, fitted_curve, residuals, r2
 
+def fit_fast_gauss(x, y, rt_mean, rt_sig):
+    # Use the method of moments to estimate initial parameteres.
+    rt_m2 = 0
+    weight_sum = 0
+    for i in range(0, len(x)):
+        weight_sum += y[i]
+        rt_delta = rt_mean - x[i]
+        rt_m2 += y[i] * (rt_delta**2)
+    rt_m2 /= weight_sum
+    rt_std = np.sqrt(rt_m2)
+    mu0 = rt_mean
+    sigma0 = rt_std
+    fit = fast_gauss(x, y, rt_mean, rt_sig)
+    fitted_curve = gauss(x, *fit)
+    residuals = (y - gauss(x, *fit))
+    ss_res = np.sum(residuals ** 2)
+    ss_tot = np.sum((y - rt_mean) ** 2)
+    r2 = 1 - ss_res/ss_tot
+    return fit, fitted_curve, residuals, r2
+
 
 def fit_emg(x, y, rt_mean, weights=None):
     # Use the method of moments to estimate initial parameteres.
@@ -180,17 +289,16 @@ def fit_emg(x, y, rt_mean, weights=None):
         rt_delta = rt_mean - x[i]
         rt_m2 += y[i] * (rt_delta**2)
         rt_m3 += y[i] * (rt_delta**3)
+    # TODO: Possible division by 0.
     rt_m2 /= weight_sum
     rt_m3 /= weight_sum
     rt_std = np.sqrt(rt_m2)
     gamma = np.max([rt_m3/(rt_std ** 3), 0])
-    # print("moments:", [rt_mean, rt_m2, rt_m3, rt_std, gamma, weight_sum])
     h0 = np.max(y)
     mu0 = rt_mean - rt_std * (gamma/2)**(1/3)
     sigma0 = rt_std * np.sqrt(np.max([1 - (gamma/2)**(2/3), 0])) 
     tau0 = rt_std * (gamma/2)**(1/3)
     # Perform curve fit.
-    # print("estimated:", [h0, mu0, sigma0, tau0])
     fit, cov = curve_fit(
         emg, x, y, 
         p0=[h0, mu0, sigma0, tau0], 
@@ -200,7 +308,6 @@ def fit_emg(x, y, rt_mean, weights=None):
             [np.inf, np.inf, np.inf, np.inf], 
         )
     )
-    # print("fitted:", fit)
     fitted_curve = emg(x, *fit)
     residuals = (y - emg(x, *fit))/weights
     ss_res = np.sum(residuals ** 2)
