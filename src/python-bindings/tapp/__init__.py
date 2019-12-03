@@ -274,7 +274,7 @@ def fit_fast_gauss(x, y, rt_mean, rt_sig):
     h, mu, sig = fit
     # Does the fit meets the quality metrics?
     # TODO: Min weighted r2?
-    if h < 0 or mu < rt_mean - 2 * rt_sig or mu > rt_mean + 2 * rt_sig or sig > rt_sig * 2:
+    if h < 0 or mu < rt_mean - 2 * rt_sig or mu > rt_mean + 2 * rt_sig or sig > rt_sig * 3:
         fit = np.array([np.nan, np.nan, np.nan])
     fitted_curve = gauss(x, *fit)
     residuals = (y - gauss(x, *fit))
