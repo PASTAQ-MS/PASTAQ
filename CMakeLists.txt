@@ -22,6 +22,8 @@ endif()
 find_package(Threads REQUIRED)
 # MIDAs.
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/midas" ${CMAKE_CURRENT_BINARY_DIR}/midas)
+# Eigen
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/eigen" ${CMAKE_CURRENT_BINARY_DIR}/eigen)
 # Build TAPPs library.
 add_library(tapplib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid.cpp"
@@ -47,7 +49,7 @@ add_library(tapplib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d_serialize.cpp"
     )
 target_include_directories(tapplib PUBLIC src/lib)
-target_link_libraries(tapplib ${CMAKE_THREAD_LIBS_INIT} midas)
+target_link_libraries(tapplib ${CMAKE_THREAD_LIBS_INIT} midas eigen)
 
 # Build the python bindings.
 # --------------------------
