@@ -479,8 +479,7 @@ def plot_raw_points(
         rt_plot=None,
         mz_plot=None,
         xic_method="max"):
-    data_points = tapp.find_raw_points(
-        raw_data,
+    data_points = raw_data.raw_points(
         peak.roi_min_mz,
         peak.roi_max_mz,
         peak.roi_min_rt,

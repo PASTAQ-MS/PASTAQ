@@ -831,6 +831,11 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("max_rt", &RawData::RawData::max_rt)
         .def("theoretical_fwhm", &RawData::theoretical_fwhm, py::arg("mz"))
         .def("dump", &PythonAPI::write_raw_data)
+        .def("raw_points", &RawData::raw_points,
+             "Get the raw data points on the square region defined by "
+             "min/max_mz/rt",
+             py::arg("min_mz"), py::arg("max_mz"), py::arg("min_rt"),
+             py::arg("max_rt"))
         .def("__repr__", [](const RawData::RawData &rd) {
             return "RawData:\n> instrument_type: " +
                    PythonAPI::to_string(rd.instrument_type) +
@@ -1165,10 +1170,6 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("raw_data"), py::arg("num_mz") = 10,
              py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 0.5,
              py::arg("smoothing_coef_rt") = 0.5)
-        .def("find_raw_points", &RawData::find_raw_points,
-             "Save the fitted peaks as a bpks file", py::arg("raw_data"),
-             py::arg("min_mz"), py::arg("max_mz"), py::arg("min_rt"),
-             py::arg("max_rt"))
         .def("find_peaks", &Centroid::find_peaks_parallel,
              "Find all peaks in the given grid", py::arg("raw_data"),
              py::arg("grid"), py::arg("max_peaks") = 0,

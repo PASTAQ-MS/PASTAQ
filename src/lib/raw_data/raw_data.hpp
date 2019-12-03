@@ -140,8 +140,8 @@ double theoretical_fwhm(const RawData &raw_data, double mz);
 double fwhm_to_sigma(double fwhm);
 
 // Find the raw data points within the square region defined by min/max_mz/rt.
-RawPoints find_raw_points(const RawData &raw_data, double min_mz, double max_mz,
-                          double min_rt, double max_rt);
+RawPoints raw_points(const RawData &raw_data, double min_mz, double max_mz,
+                     double min_rt, double max_rt);
 }  // namespace RawData
 
 // In this namespace we have access to the data structures for working with
