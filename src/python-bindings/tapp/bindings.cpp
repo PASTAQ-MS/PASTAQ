@@ -910,6 +910,17 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("raw_roi_max_height", &Centroid::Peak::raw_roi_max_height)
         .def_readonly("raw_roi_num_points", &Centroid::Peak::raw_roi_num_points)
         .def_readonly("raw_roi_num_scans", &Centroid::Peak::raw_roi_num_scans)
+        .def(
+            "xic",
+            [](const Centroid::Peak &peak, const RawData::RawData &raw_data,
+               std::string method) {
+                return PythonAPI::xic(raw_data, peak.roi_min_mz,
+                                      peak.roi_max_mz, peak.roi_min_rt,
+                                      peak.roi_max_rt, method);
+            },
+            "Get the raw data points on the square region defined by "
+            "min/max_mz/rt",
+            py::arg("raw_data"), py::arg("method") = "sum")
         .def("__repr__", [](const Centroid::Peak &p) {
             std::string ret = "";
             ret += "Peak <id: " + std::to_string(p.id);

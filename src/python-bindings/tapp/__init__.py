@@ -242,12 +242,12 @@ def fit_gauss(x, y, rt_mean, weights=None):
     mu0 = rt_mean
     sigma0 = rt_std
     fit, cov = curve_fit(
-        gauss, x, y, 
+        gauss, x, y,
         p0=[a0, mu0, sigma0],
         sigma=weights,
         bounds=(
-            [0, 0, 0], 
-            [np.inf, np.inf, np.inf], 
+            [0, 0, 0],
+            [np.inf, np.inf, np.inf],
         )
     )
     fitted_curve = gauss(x, *fit)
@@ -300,16 +300,16 @@ def fit_emg(x, y, rt_mean, weights=None):
     gamma = np.max([rt_m3/(rt_std ** 3), 0])
     h0 = np.max(y)
     mu0 = rt_mean - rt_std * (gamma/2)**(1/3)
-    sigma0 = rt_std * np.sqrt(np.max([1 - (gamma/2)**(2/3), 0])) 
+    sigma0 = rt_std * np.sqrt(np.max([1 - (gamma/2)**(2/3), 0]))
     tau0 = rt_std * (gamma/2)**(1/3)
     # Perform curve fit.
     fit, cov = curve_fit(
-        emg, x, y, 
-        p0=[h0, mu0, sigma0, tau0], 
+        emg, x, y,
+        p0=[h0, mu0, sigma0, tau0],
         sigma=weights,
         bounds=(
-            [0, 0, 0, 0], 
-            [np.inf, np.inf, np.inf, np.inf], 
+            [0, 0, 0, 0],
+            [np.inf, np.inf, np.inf, np.inf],
         )
     )
     fitted_curve = emg(x, *fit)
@@ -471,13 +471,14 @@ def plot_xic(peak, raw_data, figure=None, method="max"):
 
     return figure
 
+Peak.plot_xic = plot_xic
 
 def plot_raw_points(
-        peak,
-        raw_data,
-        img_plot=None,
-        rt_plot=None,
-        mz_plot=None,
+    peak,
+    raw_data,
+    img_plot=None,
+    rt_plot=None,
+    mz_plot=None,
         xic_method="max"):
     data_points = raw_data.raw_points(
         peak.roi_min_mz,
@@ -605,11 +606,12 @@ def default_parameters(instrument, avg_fwhm_rt):
 
 
 def dda_pipeline(
-        tapp_parameters,
-        input_files,
-        output_dir="TAPP",
-        override_existing=False,
-        save_mesh=False):
+    tapp_parameters,
+    input_files,
+    output_dir="TAPP",
+    override_existing=False,
+    save_mesh=False,
+):
     # TODO: Logger should have different levels and user can configure the
     # verbosity of output.
     # TODO: Sanitize parameters.
@@ -1619,12 +1621,3 @@ def testing_feature_matching():
         for file_name in file_names]
     groups = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
     return tapp.find_feature_clusters(groups, peaks, features)
-
-
-def peak_xic(peak, raw_data, method="sum"):
-    return tapp.xic(raw_data, peak.roi_min_mz, peak.roi_max_mz,
-                    peak.roi_min_rt, peak.roi_max_rt, method)
-
-
-Peak.xic = peak_xic
-Peak.plot_xic = plot_xic
