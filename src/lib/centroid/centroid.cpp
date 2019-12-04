@@ -70,22 +70,15 @@ Centroid::Peak Centroid::build_peak(const RawData::RawData &raw_data,
     }
 
     {
-        const auto &scans = raw_data.scans;
-        if (scans.size() == 0) {
+        auto raw_points =
+            RawData::raw_points(raw_data, peak.roi_min_mz, peak.roi_max_mz,
+                                peak.roi_min_rt, peak.roi_max_rt);
+        if (raw_points.num_points == 0) {
             return {};
-        }
-
-        size_t min_j =
-            Search::lower_bound(raw_data.retention_times, peak.roi_min_rt);
-        size_t max_j = scans.size();
-        if (scans[min_j].retention_time < peak.roi_min_rt) {
-            ++min_j;
         }
 
         // Calculate the first 4 central moments for both mz/rt on the raw
         // data points using a 2 pass algorithm.
-        size_t num_scans = 0;
-        size_t num_points = 0;
         double max_value = 0;
         double mz_mean = 0;
         double mz_m2 = 0;
@@ -97,87 +90,44 @@ Centroid::Peak Centroid::build_peak(const RawData::RawData &raw_data,
         double rt_m4 = 0;
         double weight_sum = 0;
         // First pass.
-        for (size_t j = min_j; j < max_j; ++j) {
-            const auto &scan = scans[j];
-            if (scan.retention_time > peak.roi_max_rt) {
-                break;
+        for (size_t i = 0; i < raw_points.num_points; ++i) {
+            double mz = raw_points.mz[i];
+            double rt = raw_points.rt[i];
+            double value = raw_points.intensity[i];
+            if (value > max_value) {
+                max_value = value;
             }
-            if (scan.num_points == 0) {
-                continue;
+            if ((mz > peak.local_max_mz - theoretical_sigma_mz) &&
+                (mz < peak.local_max_mz + theoretical_sigma_mz) &&
+                (rt > peak.local_max_rt - theoretical_sigma_rt) &&
+                (rt < peak.local_max_rt + theoretical_sigma_rt)) {
+                peak.raw_roi_num_points_within_sigma++;
             }
 
-            size_t min_i = Search::lower_bound(scan.mz, peak.roi_min_mz);
-            size_t max_i = scan.num_points;
-            if (scan.mz[min_i] < peak.roi_min_mz) {
-                ++min_i;
-            }
-            bool scan_not_empty = false;
-            for (size_t i = min_i; i < max_i; ++i) {
-                if (scan.mz[i] > peak.roi_max_mz) {
-                    break;
-                }
-                double mz = scan.mz[i];
-                double rt = scan.retention_time;
-                double value = scan.intensity[i];
-                if (value > max_value) {
-                    max_value = value;
-                }
-                scan_not_empty = true;
-                ++num_points;
-                if ((mz > peak.local_max_mz - theoretical_sigma_mz) &&
-                    (mz < peak.local_max_mz + theoretical_sigma_mz) &&
-                    (rt > peak.local_max_rt - theoretical_sigma_rt) &&
-                    (rt < peak.local_max_rt + theoretical_sigma_rt)) {
-                    peak.raw_roi_num_points_within_sigma++;
-                }
-
-                weight_sum += value;
-                mz_mean += value * mz;
-                rt_mean += value * rt;
-            }
-            if (scan_not_empty) {
-                ++num_scans;
-            }
+            weight_sum += value;
+            mz_mean += value * mz;
+            rt_mean += value * rt;
         }
         if (weight_sum == 0) {
             return {};
         }
         mz_mean /= weight_sum;
         rt_mean /= weight_sum;
-
         // Second pass.
-        for (size_t j = min_j; j < max_j; ++j) {
-            const auto &scan = scans[j];
-            if (scan.retention_time > peak.roi_max_rt) {
-                break;
-            }
-            if (scan.num_points == 0) {
-                continue;
-            }
+        for (size_t i = 0; i < raw_points.num_points; ++i) {
+            double mz = raw_points.mz[i];
+            double rt = raw_points.rt[i];
+            double value = raw_points.intensity[i];
 
-            size_t min_i = Search::lower_bound(scan.mz, peak.roi_min_mz);
-            size_t max_i = scan.num_points;
-            if (scan.mz[min_i] < peak.roi_min_mz) {
-                ++min_i;
-            }
-            for (size_t i = min_i; i < max_i; ++i) {
-                if (scan.mz[i] > peak.roi_max_mz) {
-                    break;
-                }
-                double mz = scan.mz[i];
-                double rt = scan.retention_time;
-                double value = scan.intensity[i];
+            double mz_delta = mz - mz_mean;
+            mz_m2 += value * std::pow(mz_delta, 2);
+            mz_m3 += value * std::pow(mz_delta, 3);
+            mz_m4 += value * std::pow(mz_delta, 4);
 
-                double mz_delta = mz - mz_mean;
-                mz_m2 += value * std::pow(mz_delta, 2);
-                mz_m3 += value * std::pow(mz_delta, 3);
-                mz_m4 += value * std::pow(mz_delta, 4);
-
-                double rt_delta = rt - rt_mean;
-                rt_m2 += value * std::pow(rt_delta, 2);
-                rt_m3 += value * std::pow(rt_delta, 3);
-                rt_m4 += value * std::pow(rt_delta, 4);
-            }
+            double rt_delta = rt - rt_mean;
+            rt_m2 += value * std::pow(rt_delta, 2);
+            rt_m3 += value * std::pow(rt_delta, 3);
+            rt_m4 += value * std::pow(rt_delta, 4);
         }
         mz_m2 /= weight_sum;
         mz_m3 /= weight_sum;
@@ -197,11 +147,10 @@ Centroid::Peak Centroid::build_peak(const RawData::RawData &raw_data,
         peak.raw_roi_kurtosis_rt = rt_m4 / std::pow(rt_m2, 2);
         peak.raw_roi_max_height = max_value;
         peak.raw_roi_total_intensity = weight_sum;
-        peak.raw_roi_num_points = num_points;
-        peak.raw_roi_num_scans = num_scans;
+        peak.raw_roi_num_points = raw_points.num_points;
+        peak.raw_roi_num_scans = raw_points.num_scans;
         peak.raw_roi_total_intensity = weight_sum;
     }
-
     return peak;
 }
 

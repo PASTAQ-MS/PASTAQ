@@ -123,6 +123,7 @@ struct RawData {
 // Raw data points in a struct of arrays format.
 struct RawPoints {
     uint64_t num_points;
+    uint64_t num_scans;
     std::vector<double> rt;
     std::vector<double> mz;
     std::vector<double> intensity;

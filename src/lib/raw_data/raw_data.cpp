@@ -108,7 +108,7 @@ Xic::Xic RawData::xic(const RawData &raw_data, double min_mz, double max_mz,
 RawData::RawPoints RawData::raw_points(const RawData &raw_data, double min_mz,
                                        double max_mz, double min_rt,
                                        double max_rt) {
-    RawPoints raw_points;
+    RawPoints raw_points = {};
     const auto &scans = raw_data.scans;
     if (scans.size() == 0) {
         return raw_points;
@@ -134,15 +134,19 @@ RawData::RawPoints RawData::raw_points(const RawData &raw_data, double min_mz,
         if (scan.mz[min_i] < min_mz) {
             ++min_i;
         }
+        bool scan_not_empty = false;
         for (size_t i = min_i; i < max_i; ++i) {
             if (scan.mz[i] > max_mz) {
                 break;
             }
-
+            scan_not_empty = true;
             raw_points.rt.push_back(scan.retention_time);
             raw_points.mz.push_back(scan.mz[i]);
             raw_points.intensity.push_back(scan.intensity[i]);
             ++raw_points.num_points;
+        }
+        if (scan_not_empty) {
+            ++raw_points.num_scans;
         }
     }
 
