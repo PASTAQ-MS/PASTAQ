@@ -55,28 +55,24 @@ std::optional<Centroid::Peak> Centroid::build_peak(
     peak.local_max_rt = local_max.rt;
     peak.local_max_height = local_max.value;
 
+    // Calculate the ROI for a given local max.
     double theoretical_sigma_mz = RawData::fwhm_to_sigma(
         RawData::theoretical_fwhm(raw_data, local_max.mz));
     double theoretical_sigma_rt = RawData::fwhm_to_sigma(raw_data.fwhm_rt);
-    {
-        // Calculate the ROI for a given local max.
-        double mz = peak.local_max_mz;
-        double rt = peak.local_max_rt;
+    peak.roi_min_mz = peak.local_max_mz - 3 * theoretical_sigma_mz;
+    peak.roi_max_mz = peak.local_max_mz + 3 * theoretical_sigma_mz;
+    peak.roi_min_rt = peak.local_max_rt - 3 * theoretical_sigma_rt;
+    peak.roi_max_rt = peak.local_max_rt + 3 * theoretical_sigma_rt;
 
-        peak.roi_min_mz = mz - 3 * theoretical_sigma_mz;
-        peak.roi_max_mz = mz + 3 * theoretical_sigma_mz;
-        peak.roi_min_rt = rt - 3 * theoretical_sigma_rt;
-        peak.roi_max_rt = rt + 3 * theoretical_sigma_rt;
+    // Extract the raw data points for the ROI.
+    auto raw_points =
+        RawData::raw_points(raw_data, peak.roi_min_mz, peak.roi_max_mz,
+                            peak.roi_min_rt, peak.roi_max_rt);
+    if (raw_points.num_points == 0) {
+        return std::nullopt;
     }
 
     {
-        auto raw_points =
-            RawData::raw_points(raw_data, peak.roi_min_mz, peak.roi_max_mz,
-                                peak.roi_min_rt, peak.roi_max_rt);
-        if (raw_points.num_points == 0) {
-            return std::nullopt;
-        }
-
         // Calculate the first 4 central moments for both mz/rt on the raw
         // data points using a 2 pass algorithm.
         double max_value = 0;
@@ -151,13 +147,16 @@ std::optional<Centroid::Peak> Centroid::build_peak(
         peak.raw_roi_num_scans = raw_points.num_scans;
         peak.raw_roi_total_intensity = weight_sum;
     }
+
     // FIXME: Number of raw points within the theoretical sigma
     // should be set by the user, with a sensible default. Same
     // with the minimum number of rt scans per peak.
     // Ensure peak quality.
     if (peak.raw_roi_num_points_within_sigma < 5 ||
-        peak.raw_roi_num_scans < 3 || peak.raw_roi_sigma_mz == 0 ||
-        peak.raw_roi_sigma_rt == 0) {
+        peak.raw_roi_num_scans < 3 || peak.raw_roi_sigma_mz <= 0 ||
+        peak.raw_roi_sigma_rt <= 0 ||
+        peak.raw_roi_sigma_mz >= 3 * theoretical_sigma_mz ||
+        peak.raw_roi_sigma_rt >= 3 * theoretical_sigma_rt) {
         return std::nullopt;
     }
     return peak;
