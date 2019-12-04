@@ -1588,9 +1588,10 @@ def full_dda_pipeline_test():
     tapp_parameters['polarity'] = 'pos'
     # TODO: Can we optimize the default parameters for warp2d based on
     # avg_fwhm_rt and min/max rt?
+    tapp_parameters['warp2d_num_points'] = 500
     tapp_parameters['warp2d_slack'] = 100
     tapp_parameters['warp2d_window_size'] = 100
-    tapp_parameters['warp2d_peaks_per_window'] = 50
+    tapp_parameters['warp2d_peaks_per_window'] = 20
 
     dda_pipeline(tapp_parameters, input_files, 'tapp_pipeline_test')
 

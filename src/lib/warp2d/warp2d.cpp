@@ -47,7 +47,10 @@ std::vector<Centroid::Peak> Warp2D::filter_peaks(
 std::vector<Warp2D::Level> Warp2D::initialize_levels(int64_t N, int64_t m,
                                                      int64_t t, int64_t nP) {
     std::vector<Level> levels(N + 1);
-    for (int64_t i = 0; i < N; ++i) {
+    levels[N].start = nP;
+    levels[N].end = nP;
+    levels[N].nodes.push_back({0.0, 0});
+    for (int64_t i = (N - 1); i >= 0; --i) {
         int64_t start = std::max((i * (m - t)), (nP - (N - i) * (m + t)));
         int64_t end = std::min((i * (m + t)), (nP - (N - i) * (m - t)));
         int64_t length = end - start + 1;
@@ -55,13 +58,11 @@ std::vector<Warp2D::Level> Warp2D::initialize_levels(int64_t N, int64_t m,
         levels[i].end = end;
         levels[i].nodes = std::vector<Node>(length);
         for (int64_t j = 0; j < length; ++j) {
-            levels[i].nodes[j].f = -std::numeric_limits<double>::infinity();
-            levels[i].nodes[j].u = 0;
+            levels[i].nodes[j].f = 0;
+            levels[i].nodes[j].u =
+                (levels[i + 1].end - levels[i + 1].start) / 2;
         }
     }
-    levels[N].start = nP;
-    levels[N].end = nP;
-    levels[N].nodes.push_back({0.0, 0});
 
     // Calculate potential warpings on each level.
     for (int64_t k = 0; k < N; ++k) {
