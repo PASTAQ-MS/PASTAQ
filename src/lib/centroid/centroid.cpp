@@ -47,8 +47,8 @@ std::vector<Centroid::LocalMax> Centroid::find_local_maxima(
     return points;
 }
 
-Centroid::Peak Centroid::build_peak(const RawData::RawData &raw_data,
-                                    const LocalMax &local_max) {
+std::optional<Centroid::Peak> Centroid::build_peak(
+    const RawData::RawData &raw_data, const LocalMax &local_max) {
     Centroid::Peak peak = {};
     peak.id = 0;
     peak.local_max_mz = local_max.mz;
@@ -74,7 +74,7 @@ Centroid::Peak Centroid::build_peak(const RawData::RawData &raw_data,
             RawData::raw_points(raw_data, peak.roi_min_mz, peak.roi_max_mz,
                                 peak.roi_min_rt, peak.roi_max_rt);
         if (raw_points.num_points == 0) {
-            return {};
+            return std::nullopt;
         }
 
         // Calculate the first 4 central moments for both mz/rt on the raw
@@ -109,7 +109,7 @@ Centroid::Peak Centroid::build_peak(const RawData::RawData &raw_data,
             rt_mean += value * rt;
         }
         if (weight_sum == 0) {
-            return {};
+            return std::nullopt;
         }
         mz_mean /= weight_sum;
         rt_mean /= weight_sum;
@@ -151,6 +151,15 @@ Centroid::Peak Centroid::build_peak(const RawData::RawData &raw_data,
         peak.raw_roi_num_scans = raw_points.num_scans;
         peak.raw_roi_total_intensity = weight_sum;
     }
+    // FIXME: Number of raw points within the theoretical sigma
+    // should be set by the user, with a sensible default. Same
+    // with the minimum number of rt scans per peak.
+    // Ensure peak quality.
+    if (peak.raw_roi_num_points_within_sigma < 5 ||
+        peak.raw_roi_num_scans < 3 || peak.raw_roi_sigma_mz == 0 ||
+        peak.raw_roi_sigma_rt == 0) {
+        return std::nullopt;
+    }
     return peak;
 }
 
@@ -173,16 +182,9 @@ std::vector<Centroid::Peak> Centroid::find_peaks_serial(
             break;
         }
         auto peak = build_peak(raw_data, max);
-        // FIXME: Number of raw points within the theoretical sigma
-        // should be set by the user, with a sensible default. Same
-        // with the minimum number of rt scans per peak.
-        // Ensure peak quality.
-        if (peak.raw_roi_num_points_within_sigma < 5 ||
-            peak.raw_roi_num_scans < 3 || peak.raw_roi_sigma_mz == 0 ||
-            peak.raw_roi_sigma_rt == 0) {
-            continue;
+        if (peak) {
+            peaks.push_back(peak.value());
         }
-        peaks.push_back(peak);
     }
 
     // Update the peak ids.
@@ -216,22 +218,15 @@ std::vector<Centroid::Peak> Centroid::find_peaks_parallel(
     std::vector<std::thread> threads(num_threads);
     std::vector<std::vector<Centroid::Peak>> peaks_array(num_threads);
     for (size_t i = 0; i < groups.size(); ++i) {
-        threads[i] = std::thread([&groups, &local_max, &peaks_array, &raw_data,
-                                  &grid, i]() {
-            for (const auto &k : groups[i]) {
-                auto peak = build_peak(raw_data, local_max[k]);
-                // FIXME: Number of raw points within the theoretical sigma
-                // should be set by the user, with a sensible default. Same
-                // with the minimum number of rt scans per peak.
-                // Ensure peak quality.
-                if (peak.raw_roi_num_points_within_sigma < 5 ||
-                    peak.raw_roi_num_scans < 3 || peak.raw_roi_sigma_mz == 0 ||
-                    peak.raw_roi_sigma_rt == 0) {
-                    continue;
+        threads[i] = std::thread(
+            [&groups, &local_max, &peaks_array, &raw_data, &grid, i]() {
+                for (const auto &k : groups[i]) {
+                    auto peak = build_peak(raw_data, local_max[k]);
+                    if (peak) {
+                        peaks_array[i].push_back(peak.value());
+                    }
                 }
-                peaks_array[i].push_back(peak);
-            }
-        });
+            });
     }
 
     // Wait for the threads to finish.

@@ -2,6 +2,7 @@
 #define CENTROID_CENTROID_HPP
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 #include "grid/grid.hpp"
@@ -62,7 +63,8 @@ struct Peak {
 std::vector<LocalMax> find_local_maxima(const Grid::Grid &grid);
 
 // Builds a Peak object for the given local_max.
-Peak build_peak(const RawData::RawData &raw_data, const LocalMax &local_max);
+std::optional<Peak> build_peak(const RawData::RawData &raw_data,
+                               const LocalMax &local_max);
 
 // Find the peaks in serial.
 std::vector<Peak> find_peaks_serial(const RawData::RawData &raw_data,
