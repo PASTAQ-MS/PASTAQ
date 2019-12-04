@@ -122,11 +122,11 @@ RawData::RawPoints RawData::raw_points(const RawData &raw_data, double min_mz,
 
     for (size_t j = min_j; j < max_j; ++j) {
         const auto &scan = scans[j];
-        if (scan.num_points == 0) {
-            continue;
-        }
         if (scan.retention_time > max_rt) {
             break;
+        }
+        if (scan.num_points == 0) {
+            continue;
         }
 
         size_t min_i = Search::lower_bound(scan.mz, min_mz);
