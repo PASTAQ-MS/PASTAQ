@@ -2,6 +2,8 @@
 #include <cmath>
 #include <thread>
 
+#include "Eigen/Dense"
+
 #include "centroid/centroid.hpp"
 #include "utils/search.hpp"
 
@@ -146,6 +148,93 @@ std::optional<Centroid::Peak> Centroid::build_peak(
         peak.raw_roi_num_points = raw_points.num_points;
         peak.raw_roi_num_scans = raw_points.num_scans;
         peak.raw_roi_total_intensity = weight_sum;
+    }
+
+    {
+        // Solve the linearized 2D gaussian fitting problem `A * beta = c` with
+        // weighted residuals.
+        Eigen::MatrixXd A(5, 5);
+        Eigen::VectorXd c(5);
+        A = Eigen::MatrixXd::Zero(5, 5);
+        c = Eigen::VectorXd::Zero(5);
+        for (size_t i = 0; i < raw_points.num_points; ++i) {
+            double mz = raw_points.mz[i] - local_max.mz;
+            double rt = raw_points.rt[i] - local_max.rt;
+            double intensity = raw_points.intensity[i];
+            if (intensity <= 0) {
+                continue;
+            }
+
+            double a = mz / theoretical_sigma_mz;
+            double b = rt / theoretical_sigma_rt;
+            double weight = intensity * std::exp(-0.5 * (a * a + b * b));
+            double w_2 = weight * weight;
+
+            A(0, 0) += w_2;
+            A(0, 1) += w_2 * mz;
+            A(0, 2) += w_2 * mz * mz;
+            A(0, 3) += w_2 * rt;
+            A(0, 4) += w_2 * rt * rt;
+
+            A(1, 0) += w_2 * mz;
+            A(1, 1) += w_2 * mz * mz;
+            A(1, 2) += w_2 * mz * mz * mz;
+            A(1, 3) += w_2 * rt * mz;
+            A(1, 4) += w_2 * rt * rt * mz;
+
+            A(2, 0) += w_2 * mz * mz;
+            A(2, 1) += w_2 * mz * mz * mz;
+            A(2, 2) += w_2 * mz * mz * mz * mz;
+            A(2, 3) += w_2 * rt * mz * mz;
+            A(2, 4) += w_2 * rt * rt * mz * mz;
+
+            A(3, 0) += w_2 * rt;
+            A(3, 1) += w_2 * mz * rt;
+            A(3, 2) += w_2 * mz * mz * rt;
+            A(3, 3) += w_2 * rt * rt;
+            A(3, 4) += w_2 * rt * rt * rt;
+
+            A(4, 0) += w_2 * rt * rt;
+            A(4, 1) += w_2 * mz * rt * rt;
+            A(4, 2) += w_2 * mz * mz * rt * rt;
+            A(4, 3) += w_2 * rt * rt * rt;
+            A(4, 4) += w_2 * rt * rt * rt * rt;
+
+            c(0) += w_2 * std::log(intensity);
+            c(1) += w_2 * std::log(intensity) * mz;
+            c(2) += w_2 * std::log(intensity) * mz * mz;
+            c(3) += w_2 * std::log(intensity) * rt;
+            c(4) += w_2 * std::log(intensity) * rt * rt;
+        }
+        Eigen::VectorXd beta(5);
+        beta = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(c);
+        {
+            double a = beta(0);
+            double b = beta(1);
+            double c = beta(2);
+            double d = beta(3);
+            double e = beta(4);
+            if (std::isnan(a) || std::isnan(b) || std::isnan(c) ||
+                std::isnan(d) || std::isnan(e) || std::isinf(a) ||
+                std::isinf(b) || std::isinf(c) || std::isinf(d) ||
+                std::isinf(e) || c >= 0 || e >= 0) {
+                return std::nullopt;
+            }
+            double sigma_mz = std::sqrt(1 / (-2 * c));
+            double mz = b / (-2 * c) + local_max.mz;
+            double sigma_rt = std::sqrt(1 / (-2 * e));
+            double rt = d / (-2 * e) + local_max.rt;
+            double height =
+                std::exp(a - ((b * b) / (4 * c)) - ((d * d) / (4 * e)));
+
+            if (std::isnan(height) || std::isnan(mz) || std::isnan(sigma_mz) ||
+                std::isnan(rt) || std::isnan(sigma_rt) || std::isinf(height) ||
+                std::isinf(mz) || std::isinf(sigma_mz) || std::isinf(rt) ||
+                std::isinf(sigma_rt) || height <= 0 || sigma_mz <= 0 ||
+                sigma_rt <= 0 || mz <= 0 || rt <= 0) {
+                return std::nullopt;
+            }
+        }
     }
 
     // FIXME: Number of raw points within the theoretical sigma
