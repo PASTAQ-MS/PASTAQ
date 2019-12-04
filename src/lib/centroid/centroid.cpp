@@ -68,7 +68,7 @@ std::optional<Centroid::Peak> Centroid::build_peak(
     auto raw_points =
         RawData::raw_points(raw_data, peak.roi_min_mz, peak.roi_max_mz,
                             peak.roi_min_rt, peak.roi_max_rt);
-    if (raw_points.num_points == 0) {
+    if (raw_points.num_points == 0 || raw_points.num_scans < 3) {
         return std::nullopt;
     }
 
@@ -153,10 +153,11 @@ std::optional<Centroid::Peak> Centroid::build_peak(
     // with the minimum number of rt scans per peak.
     // Ensure peak quality.
     if (peak.raw_roi_num_points_within_sigma < 5 ||
-        peak.raw_roi_num_scans < 3 || peak.raw_roi_sigma_mz <= 0 ||
-        peak.raw_roi_sigma_rt <= 0 ||
-        peak.raw_roi_sigma_mz >= 3 * theoretical_sigma_mz ||
-        peak.raw_roi_sigma_rt >= 3 * theoretical_sigma_rt) {
+        peak.raw_roi_sigma_mz <= 0 || peak.raw_roi_sigma_rt <= 0 ||
+        peak.raw_roi_sigma_mz <= theoretical_sigma_mz / 3 ||
+        peak.raw_roi_sigma_rt <= theoretical_sigma_rt / 3 ||
+        peak.raw_roi_sigma_mz >= theoretical_sigma_mz * 3 ||
+        peak.raw_roi_sigma_rt >= theoretical_sigma_rt * 3) {
         return std::nullopt;
     }
     return peak;
