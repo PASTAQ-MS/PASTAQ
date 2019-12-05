@@ -634,7 +634,7 @@ def dda_pipeline(
     for stem in input_stems:
         # Check if file has already been processed.
         in_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
-        out_path = os.path.join(output_dir, 'peaks', "{}.bpks".format(stem))
+        out_path = os.path.join(output_dir, 'peaks', "{}.peaks".format(stem))
         if os.path.exists(out_path) and not override_existing:
             continue
 
@@ -674,12 +674,12 @@ def dda_pipeline(
             stem_a = input_stems[i]
             logger.info("Reading peaks_a from disk: {}".format(stem_a))
             peaks_a = tapp.read_peaks(os.path.join(
-                output_dir, 'peaks', '{}.bpks'.format(stem_a)))
+                output_dir, 'peaks', '{}.peaks'.format(stem_a)))
             for j in range(i, len(input_stems)):
                 stem_b = input_stems[j]
                 logger.info("Reading peaks_b from disk: {}".format(stem_b))
                 peaks_b = tapp.read_peaks(os.path.join(
-                    output_dir, 'peaks', '{}.bpks'.format(stem_b)))
+                    output_dir, 'peaks', '{}.peaks'.format(stem_b)))
                 logger.info(
                     "Calculating similarity of {} vs {}".format(
                         stem_a, stem_b))
@@ -724,12 +724,12 @@ def dda_pipeline(
             stem_a = input_stems[i]
             logger.info("Reading peaks_a from disk: {}".format(stem_a))
             peaks_a = tapp.read_peaks(os.path.join(
-                output_dir, 'peaks', '{}.bpks'.format(stem_a)))
+                output_dir, 'peaks', '{}.peaks'.format(stem_a)))
             for j in range(i, len(input_stems)):
                 stem_b = input_stems[j]
                 logger.info("Reading peaks_b from disk: {}".format(stem_b))
                 peaks_b = tapp.read_peaks(os.path.join(
-                    output_dir, 'peaks', '{}.bpks'.format(stem_b)))
+                    output_dir, 'peaks', '{}.peaks'.format(stem_b)))
                 logger.info("Warping {} peaks to {}".format(stem_b, stem_a))
                 time_map = tapp.calculate_time_map(
                     peaks_a, peaks_b,
@@ -780,12 +780,12 @@ def dda_pipeline(
     time_start = time.time()
     logger.info("Reading reference peaks")
     reference_peaks = tapp.read_peaks(os.path.join(
-        output_dir, 'peaks', '{}.bpks'.format(reference_stem)))
+        output_dir, 'peaks', '{}.peaks'.format(reference_stem)))
     for stem in input_stems:
         # Check if file has already been processed.
-        in_path = os.path.join(output_dir, 'peaks', "{}.bpks".format(stem))
+        in_path = os.path.join(output_dir, 'peaks', "{}.peaks".format(stem))
         out_path = os.path.join(output_dir, 'warped_peaks',
-                                "{}.bpks".format(stem))
+                                "{}.peaks".format(stem))
         out_path_tmap = os.path.join(output_dir, 'time_map',
                                      "{}.tmap".format(stem))
         if os.path.exists(out_path) and not override_existing:
@@ -820,20 +820,16 @@ def dda_pipeline(
 
     logger.info("Starting tic/base_peak plotting")
     time_start = time.time()
-    fig, axes = plt.subplots(2, 2)
-    ax1, ax2 = axes[0]
-    ax3, ax4 = axes[1]
     out_path = os.path.join(output_dir, 'quality', 'tic_base_peak.png')
     if not os.path.exists(out_path) or override_existing:
         plt.ioff()
+        fig, axes = plt.subplots(2, 2)
+        ax1, ax2 = axes[0]
+        ax3, ax4 = axes[1]
         for i, stem in enumerate(input_stems):
             # Check if file has already been processed.
             in_path_raw_data = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
             in_path_tmap = os.path.join(output_dir, 'time_map', "{}.tmap".format(stem))
-            # in_path_raw_data = os.path.join('tapp_fitting_works_now', 'raw', "{}.ms1".format(stem))
-            # in_path_tmap = os.path.join('tapp_fitting_works_now', 'time_map', "{}.tmap".format(stem))
-            # in_path_raw_data = os.path.join('tapp_fitting_works_now_weird', 'raw', "{}.ms1".format(stem))
-            # in_path_tmap = os.path.join('tapp_fitting_works_now_weird', 'time_map', "{}.tmap".format(stem))
 
             # Plot the unwarped TIC/Base peak.
             raw_data = tapp.read_raw_data(in_path_raw_data)
@@ -891,7 +887,6 @@ def dda_pipeline(
         fig.set_size_inches(7.5 * 16/9, 7.5)
         plt.savefig("{}.png".format(out_path), dpi=100)
         plt.close(fig)
-        plt.ion()
     logger.info('Finished tic/base_peak plotting in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
@@ -907,12 +902,12 @@ def dda_pipeline(
             stem_a = input_stems[i]
             logger.info("Reading peaks_a from disk: {}".format(stem_a))
             peaks_a = tapp.read_peaks(os.path.join(
-                output_dir, 'warped_peaks', '{}.bpks'.format(stem_a)))
+                output_dir, 'warped_peaks', '{}.peaks'.format(stem_a)))
             for j in range(i, len(input_stems)):
                 stem_b = input_stems[j]
                 logger.info("Reading peaks_b from disk: {}".format(stem_b))
                 peaks_b = tapp.read_peaks(os.path.join(
-                    output_dir, 'warped_peaks', '{}.bpks'.format(stem_b)))
+                    output_dir, 'warped_peaks', '{}.peaks'.format(stem_b)))
                 logger.info(
                     "Calculating similarity of {} vs {}".format(
                         stem_a, stem_b))
@@ -946,12 +941,12 @@ def dda_pipeline(
     logger.info("Starting metamatch")
     time_start = time.time()
     out_path = os.path.join(output_dir, 'metamatch')
-    if (not os.path.exists(os.path.join(out_path, "metamatch.clusters"))
+    if (not os.path.exists(os.path.join(out_path, "peaks.clusters"))
             or override_existing):
         metamatch_input = []
         for i, stem in enumerate(input_stems):
             in_path = os.path.join(
-                output_dir, 'warped_peaks', "{}.bpks".format(stem))
+                output_dir, 'warped_peaks', "{}.peaks".format(stem))
             logger.info("Reading peaks from disk: {}".format(stem))
             metamatch_input += [(groups[i], tapp.read_peaks(in_path))]
 
@@ -965,10 +960,10 @@ def dda_pipeline(
         logger.info("Writing metamatch results to disk")
         tapp.write_metamatch_clusters(
             metamatch_results.clusters,
-            os.path.join(out_path, "metamatch.clusters"))
+            os.path.join(out_path, "peaks.clusters"))
         tapp.write_metamatch_peaks(
             metamatch_results.orphans,
-            os.path.join(out_path, "metamatch.orphans"))
+            os.path.join(out_path, "peaks.orphans"))
 
     logger.info('Finished metamatch in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
@@ -980,7 +975,7 @@ def dda_pipeline(
         # Check if file has already been processed.
         in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
         in_path_peaks = os.path.join(
-            output_dir, 'warped_peaks', "{}.bpks".format(stem))
+            output_dir, 'warped_peaks', "{}.peaks".format(stem))
         out_path = os.path.join(output_dir, 'linking',
                                 "{}.ms2_peaks.link".format(stem))
         if os.path.exists(out_path) and not override_existing:
@@ -1071,7 +1066,7 @@ def dda_pipeline(
         # Check if file has already been processed.
         in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
         in_path_peaks = os.path.join(
-            output_dir, 'warped_peaks', "{}.bpks".format(stem))
+            output_dir, 'warped_peaks', "{}.peaks".format(stem))
         in_path_idents = os.path.join(
             output_dir, 'ident', "{}.ident".format(stem))
         in_path_ident_link = os.path.join(output_dir, 'linking',
@@ -1122,7 +1117,7 @@ def dda_pipeline(
         logger.info("Reading peaks from disk")
         peaks = [
             tapp.read_peaks(
-                os.path.join(in_path_peaks, "{}.bpks".format(input_stem)))
+                os.path.join(in_path_peaks, "{}.peaks".format(input_stem)))
             for input_stem in input_stems]
 
         logger.info("Finding feature clusters")
@@ -1141,7 +1136,7 @@ def dda_pipeline(
         # Peaks
         # =====
         in_path_peaks = os.path.join(
-            output_dir, 'warped_peaks', "{}.bpks".format(stem))
+            output_dir, 'warped_peaks', "{}.peaks".format(stem))
         out_path_peaks = os.path.join(output_dir, 'quant',
                                       "{}_peaks.csv".format(stem))
         if os.path.exists(out_path_peaks) and not override_existing:
@@ -1206,7 +1201,7 @@ def dda_pipeline(
     # =============
     logger.info("Reading peak clusters from disk")
     in_path_peak_clusters = os.path.join(
-        output_dir, 'metamatch', 'metamatch.clusters')
+        output_dir, 'metamatch', 'peaks.clusters')
     out_path_peak_clusters = os.path.join(output_dir, 'quant',
                                           "peak_clusters.csv")
     if (not os.path.exists(out_path_peak_clusters) or override_existing):
@@ -1315,7 +1310,7 @@ def dda_pipeline(
     # Link metamatch clusters and corresponding peaks with identification
     # information of peptides and proteins.
     in_path_peak_clusters = os.path.join(
-        output_dir, 'metamatch', 'metamatch.clusters')
+        output_dir, 'metamatch', 'peaks.clusters')
     out_path_peak_clusters_info_peak_ids = os.path.join(
         output_dir, 'quant', "peak_clusters_info_peak_ids.csv")
     out_path_peak_clusters_info_sequence = os.path.join(
@@ -1540,7 +1535,7 @@ def full_dda_pipeline_test():
 
 
 def testing_feature_detection():
-    peaks = tapp.read_peaks('tapp_pipeline_test/warped_peaks/1_3.bpks')
+    peaks = tapp.read_peaks('tapp_pipeline_test/warped_peaks/1_3.peaks')
     ms2_data = tapp.read_raw_data('tapp_pipeline_test/raw/1_3.ms2')
     linked_peaks = tapp.read_linked_msms(
         'tapp_pipeline_test/linking/1_3.ms2_peaks.link')
@@ -1561,7 +1556,7 @@ def testing_feature_matching():
         for file_name in file_names]
     peaks = [
         tapp.read_peaks(
-            "tapp_pipeline_test/warped_peaks/{}.bpks".format(file_name))
+            "tapp_pipeline_test/warped_peaks/{}.peaks".format(file_name))
         for file_name in file_names]
     groups = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
     return tapp.find_feature_clusters(groups, peaks, features)
