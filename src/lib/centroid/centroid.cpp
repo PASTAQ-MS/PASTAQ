@@ -61,10 +61,10 @@ std::optional<Centroid::Peak> Centroid::build_peak(
     double theoretical_sigma_mz = RawData::fwhm_to_sigma(
         RawData::theoretical_fwhm(raw_data, local_max.mz));
     double theoretical_sigma_rt = RawData::fwhm_to_sigma(raw_data.fwhm_rt);
-    peak.roi_min_mz = peak.local_max_mz - 3 * theoretical_sigma_mz;
-    peak.roi_max_mz = peak.local_max_mz + 3 * theoretical_sigma_mz;
-    peak.roi_min_rt = peak.local_max_rt - 3 * theoretical_sigma_rt;
-    peak.roi_max_rt = peak.local_max_rt + 3 * theoretical_sigma_rt;
+    peak.roi_min_mz = peak.local_max_mz - 2 * theoretical_sigma_mz;
+    peak.roi_max_mz = peak.local_max_mz + 2 * theoretical_sigma_mz;
+    peak.roi_min_rt = peak.local_max_rt - 2 * theoretical_sigma_rt;
+    peak.roi_max_rt = peak.local_max_rt + 2 * theoretical_sigma_rt;
 
     // Extract the raw data points for the ROI.
     auto raw_points =
