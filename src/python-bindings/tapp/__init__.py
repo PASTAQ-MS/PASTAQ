@@ -1562,7 +1562,6 @@ def dda_pipeline(
     # Stop logger.
     logger.removeHandler(logger_fh)
     logger_fh.close()
-    return
 
 
 def full_dda_pipeline_test():
