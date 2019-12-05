@@ -827,7 +827,6 @@ def dda_pipeline(
         ax1, ax2 = axes[0]
         ax3, ax4 = axes[1]
         for i, stem in enumerate(input_stems):
-            # Check if file has already been processed.
             in_path_raw_data = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
             in_path_tmap = os.path.join(output_dir, 'time_map', "{}.tmap".format(stem))
 
@@ -888,6 +887,32 @@ def dda_pipeline(
         plt.savefig("{}.png".format(out_path), dpi=100)
         plt.close(fig)
     logger.info('Finished tic/base_peak plotting in {}'.format(
+        datetime.timedelta(seconds=time.time()-time_start)))
+
+    logger.info("Starting rt vs rt_delta plotting")
+    time_start = time.time()
+    out_path = os.path.join(output_dir, 'quality', 'rt_vs_rt_delta.png')
+    if not os.path.exists(out_path) or override_existing:
+        plt.ioff()
+        fig = plt.figure()
+        for stem in input_stems:
+            in_path_peaks = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
+            logger.info("Reading peaks_a from disk: {}".format(stem))
+            peaks = tapp.read_peaks(in_path_peaks)
+            # TODO: Fitted rt instead?
+            rts = np.array([peak.local_max_rt for peak in peaks])
+            rt_deltas = np.array([peak.rt_delta for peak in peaks])
+            idx = np.argsort(rts)
+            rts = rts[idx]
+            rt_deltas = rt_deltas[idx]
+            plt.plot(rts, rt_deltas, label=stem)
+        plt.xlabel('Retention time (s)')
+        plt.ylabel('Retention time delta (s)')
+        fig.legend(handles, labels, loc='upper right')
+        fig.set_size_inches(7.5 * 16/9, 7.5)
+        plt.savefig("{}.png".format(out_path), dpi=100)
+        plt.close(fig)
+    logger.info('Finished rt vs rt_delta plotting in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
     # Calculate similarity matrix after alignment, generate heatmap and save to
