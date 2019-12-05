@@ -910,6 +910,11 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("raw_roi_max_height", &Centroid::Peak::raw_roi_max_height)
         .def_readonly("raw_roi_num_points", &Centroid::Peak::raw_roi_num_points)
         .def_readonly("raw_roi_num_scans", &Centroid::Peak::raw_roi_num_scans)
+        .def_readonly("fitted_height", &Centroid::Peak::fitted_height)
+        .def_readonly("fitted_mz", &Centroid::Peak::fitted_mz)
+        .def_readonly("fitted_rt", &Centroid::Peak::fitted_rt)
+        .def_readonly("fitted_sigma_mz", &Centroid::Peak::fitted_sigma_mz)
+        .def_readonly("fitted_sigma_rt", &Centroid::Peak::fitted_sigma_rt)
         .def(
             "xic",
             [](const Centroid::Peak &peak, const RawData::RawData &raw_data,
@@ -932,12 +937,11 @@ PYBIND11_MODULE(tapp, m) {
                 ret += " (" + std::to_string(p.rt_delta) + ")";
             }
             ret += ", local_max_height: " + std::to_string(p.local_max_height);
-            ret += ", raw_roi_sigma_mz: " + std::to_string(p.raw_roi_sigma_mz);
-            ret += ", raw_roi_sigma_rt: " + std::to_string(p.raw_roi_sigma_rt);
-            ret +=
-                ", raw_roi_num_points: " + std::to_string(p.raw_roi_num_points);
-            ret +=
-                ", raw_roi_num_scans: " + std::to_string(p.raw_roi_num_scans);
+            ret += ", fitted_height: " + std::to_string(p.fitted_height);
+            ret += ", fitted_mz: " + std::to_string(p.fitted_mz);
+            ret += ", fitted_rt: " + std::to_string(p.fitted_rt);
+            ret += ", fitted_sigma_mz: " + std::to_string(p.fitted_sigma_mz);
+            ret += ", fitted_sigma_rt: " + std::to_string(p.fitted_sigma_rt);
             ret += ">";
             return ret;
         });

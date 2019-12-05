@@ -95,13 +95,6 @@ std::optional<Centroid::Peak> Centroid::build_peak(
             if (value > max_value) {
                 max_value = value;
             }
-            if ((mz > peak.local_max_mz - theoretical_sigma_mz) &&
-                (mz < peak.local_max_mz + theoretical_sigma_mz) &&
-                (rt > peak.local_max_rt - theoretical_sigma_rt) &&
-                (rt < peak.local_max_rt + theoretical_sigma_rt)) {
-                peak.raw_roi_num_points_within_sigma++;
-            }
-
             weight_sum += value;
             mz_mean += value * mz;
             rt_mean += value * rt;
@@ -234,19 +227,25 @@ std::optional<Centroid::Peak> Centroid::build_peak(
                 sigma_rt <= 0 || mz <= 0 || rt <= 0) {
                 return std::nullopt;
             }
+
+            peak.fitted_height = height;
+            peak.fitted_mz = mz;
+            peak.fitted_rt = rt;
+            peak.fitted_sigma_mz = sigma_mz;
+            peak.fitted_sigma_rt = sigma_rt;
         }
     }
 
-    // FIXME: Number of raw points within the theoretical sigma
-    // should be set by the user, with a sensible default. Same
-    // with the minimum number of rt scans per peak.
     // Ensure peak quality.
-    if (peak.raw_roi_num_points_within_sigma < 5 ||
-        peak.raw_roi_sigma_mz <= 0 || peak.raw_roi_sigma_rt <= 0 ||
-        peak.raw_roi_sigma_mz <= theoretical_sigma_mz / 3 ||
-        peak.raw_roi_sigma_rt <= theoretical_sigma_rt / 3 ||
-        peak.raw_roi_sigma_mz >= theoretical_sigma_mz * 3 ||
-        peak.raw_roi_sigma_rt >= theoretical_sigma_rt * 3) {
+    if (peak.raw_roi_sigma_mz <= 0 || peak.raw_roi_sigma_rt <= 0 ||
+        peak.fitted_mz < local_max.mz - 3 * theoretical_sigma_mz ||
+        peak.fitted_mz > local_max.mz + 3 * theoretical_sigma_mz ||
+        peak.fitted_rt < local_max.rt - 3 * theoretical_sigma_rt ||
+        peak.fitted_rt > local_max.rt + 3 * theoretical_sigma_rt ||
+        peak.fitted_sigma_mz <= theoretical_sigma_mz / 3 ||
+        peak.fitted_sigma_rt <= theoretical_sigma_rt / 3 ||
+        peak.fitted_sigma_mz >= theoretical_sigma_mz * 3 ||
+        peak.fitted_sigma_rt >= theoretical_sigma_rt * 3) {
         return std::nullopt;
     }
     return peak;

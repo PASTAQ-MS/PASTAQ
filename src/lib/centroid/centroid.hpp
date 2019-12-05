@@ -52,8 +52,14 @@ struct Peak {
     double raw_roi_max_height;
     double raw_roi_total_intensity;
     uint64_t raw_roi_num_points;
-    uint64_t raw_roi_num_points_within_sigma;
     uint64_t raw_roi_num_scans;
+
+    // Gaussian fitting parameters.
+    double fitted_height;
+    double fitted_mz;
+    double fitted_rt;
+    double fitted_sigma_mz;
+    double fitted_sigma_rt;
 };
 
 // Find all candidate points on the given grid by calculating the local maxima

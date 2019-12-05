@@ -24,6 +24,11 @@ bool Centroid::Serialize::read_peak(std::istream &stream,
     Serialization::read_double(stream, &peak->raw_roi_total_intensity);
     Serialization::read_uint64(stream, &peak->raw_roi_num_points);
     Serialization::read_uint64(stream, &peak->raw_roi_num_scans);
+    Serialization::read_double(stream, &peak->fitted_height);
+    Serialization::read_double(stream, &peak->fitted_mz);
+    Serialization::read_double(stream, &peak->fitted_rt);
+    Serialization::read_double(stream, &peak->fitted_sigma_mz);
+    Serialization::read_double(stream, &peak->fitted_sigma_rt);
     return stream.good();
 }
 
@@ -50,6 +55,11 @@ bool Centroid::Serialize::write_peak(std::ostream &stream,
     Serialization::write_double(stream, peak.raw_roi_total_intensity);
     Serialization::write_uint64(stream, peak.raw_roi_num_points);
     Serialization::write_uint64(stream, peak.raw_roi_num_scans);
+    Serialization::write_double(stream, peak.fitted_height);
+    Serialization::write_double(stream, peak.fitted_mz);
+    Serialization::write_double(stream, peak.fitted_rt);
+    Serialization::write_double(stream, peak.fitted_sigma_mz);
+    Serialization::write_double(stream, peak.fitted_sigma_rt);
     return stream.good();
 }
 
