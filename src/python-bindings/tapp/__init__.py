@@ -319,140 +319,6 @@ def fit_emg(x, y, rt_mean, weights=None):
     r2 = 1 - ss_res/ss_tot
     return fit, fitted_curve, residuals, r2
 
-def fit_weighted_guos_2d(x, y, z, x_center, y_center, sig_mz, sig_rt):
-    x = x - x_center
-    y = y - y_center
-
-    a_0_0 = 0
-    a_0_1 = 0
-    a_0_2 = 0
-    a_0_3 = 0
-    a_0_4 = 0
-    a_1_0 = 0
-    a_1_1 = 0
-    a_1_2 = 0
-    a_1_3 = 0
-    a_1_4 = 0
-    a_2_0 = 0
-    a_2_1 = 0
-    a_2_2 = 0
-    a_2_3 = 0
-    a_2_4 = 0
-    a_3_0 = 0
-    a_3_1 = 0
-    a_3_2 = 0
-    a_3_3 = 0
-    a_3_4 = 0
-    a_4_0 = 0
-    a_4_1 = 0
-    a_4_2 = 0
-    a_4_3 = 0
-    a_4_4 = 0
-    c_0 = 0
-    c_1 = 0
-    c_2 = 0
-    c_3 = 0
-    c_4 = 0
-    for i, intensity in enumerate(z):
-        mz = x[i]
-        rt = y[i]
-        w = gauss2d([mz, rt], 1, 0, sig_mz, 0, sig_rt)
-        w_2 = w * w
-
-        a_0_0 += w_2
-        a_0_1 += w_2 * mz
-        a_0_2 += w_2 * mz * mz
-        a_0_3 += w_2 * rt
-        a_0_4 += w_2 * rt * rt
-
-        a_1_0 += w_2 * mz
-        a_1_1 += w_2 * mz * mz
-        a_1_2 += w_2 * mz * mz * mz
-        a_1_3 += w_2 * rt * mz
-        a_1_4 += w_2 * rt * rt * mz
-
-        a_2_0 += w_2 * mz * mz
-        a_2_1 += w_2 * mz * mz * mz
-        a_2_2 += w_2 * mz * mz * mz * mz
-        a_2_3 += w_2 * rt * mz * mz
-        a_2_4 += w_2 * rt * rt * mz * mz
-
-        a_3_0 += w_2 * rt
-        a_3_1 += w_2 * mz * rt
-        a_3_2 += w_2 * mz * mz * rt
-        a_3_3 += w_2 * rt * rt
-        a_3_4 += w_2 * rt * rt * rt
-
-        a_4_0 += w_2 * rt * rt
-        a_4_1 += w_2 * mz * rt * rt
-        a_4_2 += w_2 * mz * mz * rt * rt
-        a_4_3 += w_2 * rt * rt * rt
-        a_4_4 += w_2 * rt * rt * rt * rt
-
-        c_0 += w_2 * np.log(intensity)
-        c_1 += w_2 * np.log(intensity) * mz
-        c_2 += w_2 * np.log(intensity) * mz * mz
-        c_3 += w_2 * np.log(intensity) * rt
-        c_4 += w_2 * np.log(intensity) * rt * rt
-
-    X = np.array(
-        [
-            [
-                a_0_0,
-                a_0_1,
-                a_0_2,
-                a_0_3,
-                a_0_4,
-            ],
-            [
-                a_1_0,
-                a_1_1,
-                a_1_2,
-                a_1_3,
-                a_1_4,
-            ],
-            [
-                a_2_0,
-                a_2_1,
-                a_2_2,
-                a_2_3,
-                a_2_4,
-            ],
-            [
-                a_3_0,
-                a_3_1,
-                a_3_2,
-                a_3_3,
-                a_3_4,
-            ],
-            [
-                a_4_0,
-                a_4_1,
-                a_4_2,
-                a_4_3,
-                a_4_4,
-            ],
-        ],
-    )
-    Y = np.array([
-        c_0,
-        c_1,
-        c_2,
-        c_3,
-        c_4,
-    ])
-    a, b, c, d, e = np.linalg.lstsq(X, Y, rcond=1)[0]
-
-    if c >= 0 or e >= 0:
-        return np.array([np.nan, np.nan, np.nan, np.nan, np.nan])
-
-    sigma_mz = np.sqrt(1/(-2 * c))
-    mz = b / (-2 * c) + x_center
-    sigma_rt = np.sqrt(1/(-2 * e))
-    rt = d / (-2 * e) + y_center
-    height = np.exp(a - ((b ** 2) / (4 * c)) - ((d ** 2) / (4 * e)))
-
-    return np.array([height, mz, sigma_mz, rt, sigma_rt])
 
 def plot_xic(peak, raw_data, figure=None, method="max"):
     xic = peak.xic(raw_data, method=method)
@@ -951,6 +817,83 @@ def dda_pipeline(
             tapp.write_time_map(time_map, out_path_tmap)
     logger.info('Finished peak warping to reference ({}) in {}'.format(
         reference_stem, datetime.timedelta(seconds=time.time()-time_start)))
+
+    logger.info("Starting tic/base_peak plotting")
+    time_start = time.time()
+    fig, axes = plt.subplots(2, 2)
+    ax1, ax2 = axes[0]
+    ax3, ax4 = axes[1]
+    out_path = os.path.join(output_dir, 'quality', 'tic_base_peak.png')
+    if not os.path.exists(out_path) or override_existing:
+        plt.ioff()
+        for i, stem in enumerate(input_stems):
+            # Check if file has already been processed.
+            in_path_raw_data = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
+            in_path_tmap = os.path.join(output_dir, 'time_map', "{}.tmap".format(stem))
+            # in_path_raw_data = os.path.join('tapp_fitting_works_now', 'raw', "{}.ms1".format(stem))
+            # in_path_tmap = os.path.join('tapp_fitting_works_now', 'time_map', "{}.tmap".format(stem))
+            # in_path_raw_data = os.path.join('tapp_fitting_works_now_weird', 'raw', "{}.ms1".format(stem))
+            # in_path_tmap = os.path.join('tapp_fitting_works_now_weird', 'time_map', "{}.tmap".format(stem))
+
+            # Plot the unwarped TIC/Base peak.
+            raw_data = tapp.read_raw_data(in_path_raw_data)
+            tmap = tapp.read_time_map(in_path_tmap)
+            xic = tapp.xic(
+                raw_data, 
+                raw_data.min_mz, 
+                raw_data.max_mz, 
+                raw_data.min_rt, 
+                raw_data.max_rt,
+                "sum"
+            )
+            x = xic.retention_time
+            y = xic.intensity
+            x_warped = [ tmap.warp(rt) for rt in x ]
+            ax1.plot(x, y, label=stem)
+            ax3.plot(x_warped, y, label=stem)
+
+            # Plot the warped TIC/Base peak.
+            xic = tapp.xic(
+                raw_data, 
+                raw_data.min_mz, 
+                raw_data.max_mz, 
+                raw_data.min_rt, 
+                raw_data.max_rt,
+                "max"
+            )
+            x = xic.retention_time
+            y = xic.intensity
+            x_warped = [ tmap.warp(rt) for rt in x ]
+            ax2.plot(x, y, label=stem)
+            ax4.plot(x_warped, y, label=stem)
+
+            # Plot the warping markers for each window
+            markers_not_warped = tmap.rt_start[1:]
+            markers_warped = tmap.sample_rt_start[1:]
+            ax1.scatter(markers_not_warped, np.repeat(0, len(markers_not_warped)), alpha=0.2, marker='^', edgecolor='none')
+            ax2.scatter(markers_not_warped, np.repeat(0, len(markers_not_warped)), alpha=0.2, marker='^', edgecolor='none')
+            ax3.scatter(markers_warped, np.repeat(0, len(markers_warped)), alpha=0.2, marker='^', edgecolor='none')
+            ax4.scatter(markers_warped, np.repeat(0, len(markers_warped)), alpha=0.2, marker='^', edgecolor='none')
+
+        ax1.set_title('Total Ion Chromatogram (TIC)')
+        ax2.set_title('Base Peak Chromatogram')
+
+        ax2.yaxis.set_label_position("right")
+        ax4.yaxis.set_label_position("right")
+        ax2.set_ylabel('Unwarped', rotation=-90, labelpad=20)
+        ax4.set_ylabel('Warped', rotation=-90, labelpad=20)
+
+        fig.text(0.5, 0.04, 'Retention time (s)', ha='center')
+        fig.text(0.04, 0.5, 'Intensity', va='center', rotation='vertical')
+
+        handles, labels = ax4.get_legend_handles_labels()
+        fig.legend(handles, labels, loc='upper right')
+        fig.set_size_inches(7.5 * 16/9, 7.5)
+        plt.savefig("{}.png".format(out_path), dpi=100)
+        plt.close(fig)
+        plt.ion()
+    logger.info('Finished tic/base_peak plotting in {}'.format(
+        datetime.timedelta(seconds=time.time()-time_start)))
 
     # Calculate similarity matrix after alignment, generate heatmap and save to
     # disk.
