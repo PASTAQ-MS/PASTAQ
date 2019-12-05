@@ -13,7 +13,7 @@ std::vector<Link::LinkedMsms> Link::link_peaks(
     };
     auto indices = std::vector<PeakIndex>(peaks.size());
     for (size_t i = 0; i < peaks.size(); ++i) {
-        indices[i] = {peaks[i].id, peaks[i].local_max_mz};
+        indices[i] = {peaks[i].id, peaks[i].fitted_mz};
     }
 
     // Sort mz index by mz.
@@ -52,11 +52,11 @@ std::vector<Link::LinkedMsms> Link::link_peaks(
         size_t peak_id = 0;
         for (size_t j = min_j; j < index_ids.size(); ++j) {
             size_t i = index_ids[j];
-            if (peaks[i].local_max_mz > max_mz) {
+            if (peaks[i].fitted_mz > max_mz) {
                 break;
             }
-            double a = event_mz - peaks[i].local_max_mz;
-            double b = event_rt - peaks[i].local_max_rt;
+            double a = event_mz - peaks[i].fitted_mz;
+            double b = event_rt - peaks[i].fitted_rt;
             double distance = std::sqrt(a * a + b * b);
             if (distance < min_distance) {
                 min_distance = distance;
@@ -67,13 +67,13 @@ std::vector<Link::LinkedMsms> Link::link_peaks(
         // Check if linked event is within 10 sigma of the minimum distance
         // peak.
         double roi_min_mz =
-            peaks[peak_id].local_max_mz - 10 * peaks[peak_id].raw_roi_sigma_mz;
+            peaks[peak_id].fitted_mz - 10 * peaks[peak_id].fitted_sigma_mz;
         double roi_max_mz =
-            peaks[peak_id].local_max_mz + 10 * peaks[peak_id].raw_roi_sigma_mz;
+            peaks[peak_id].fitted_mz + 10 * peaks[peak_id].fitted_sigma_mz;
         double roi_min_rt =
-            peaks[peak_id].local_max_rt - 10 * peaks[peak_id].raw_roi_sigma_rt;
+            peaks[peak_id].fitted_rt - 10 * peaks[peak_id].fitted_sigma_rt;
         double roi_max_rt =
-            peaks[peak_id].local_max_rt + 10 * peaks[peak_id].raw_roi_sigma_rt;
+            peaks[peak_id].fitted_rt + 10 * peaks[peak_id].fitted_sigma_rt;
         if (event_mz < roi_min_mz || event_mz > roi_max_mz ||
             event_rt < roi_min_rt || event_rt > roi_max_rt) {
             continue;

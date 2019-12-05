@@ -26,6 +26,11 @@ Centroid::Peak mock_gaussian_peak(size_t id, double height, double mz,
     peak.raw_roi_sigma_rt = sigma_rt;
     peak.raw_roi_max_height = height;
     peak.raw_roi_total_intensity = height;
+    peak.fitted_height = height;
+    peak.fitted_mz = mz;
+    peak.fitted_rt = rt;
+    peak.fitted_sigma_mz = sigma_mz;
+    peak.fitted_sigma_rt = sigma_rt;
     return peak;
 }
 
@@ -50,8 +55,8 @@ FeatureDetection::Feature mock_feature(size_t id,
             candidate.local_max_height * candidate.local_max_mz;
         feature.average_rt += candidate.local_max_rt;
         feature.average_rt_delta += candidate.rt_delta;
-        feature.average_rt_sigma += candidate.raw_roi_sigma_rt;
-        feature.average_mz_sigma += candidate.raw_roi_sigma_mz;
+        feature.average_rt_sigma += candidate.fitted_sigma_rt;
+        feature.average_mz_sigma += candidate.fitted_sigma_mz;
         feature.peak_ids.push_back(candidate.id);
     }
     feature.average_mz /= feature.total_height;

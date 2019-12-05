@@ -834,10 +834,10 @@ def dda_pipeline(
             raw_data = tapp.read_raw_data(in_path_raw_data)
             tmap = tapp.read_time_map(in_path_tmap)
             xic = tapp.xic(
-                raw_data, 
-                raw_data.min_mz, 
-                raw_data.max_mz, 
-                raw_data.min_rt, 
+                raw_data,
+                raw_data.min_mz,
+                raw_data.max_mz,
+                raw_data.min_rt,
                 raw_data.max_rt,
                 "sum"
             )
@@ -849,10 +849,10 @@ def dda_pipeline(
 
             # Plot the warped TIC/Base peak.
             xic = tapp.xic(
-                raw_data, 
-                raw_data.min_mz, 
-                raw_data.max_mz, 
-                raw_data.min_rt, 
+                raw_data,
+                raw_data.min_mz,
+                raw_data.max_mz,
+                raw_data.min_rt,
                 raw_data.max_rt,
                 "max"
             )
@@ -899,8 +899,7 @@ def dda_pipeline(
             in_path_peaks = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
             logger.info("Reading peaks_a from disk: {}".format(stem))
             peaks = tapp.read_peaks(in_path_peaks)
-            # TODO: Fitted rt instead?
-            rts = np.array([peak.local_max_rt for peak in peaks])
+            rts = np.array([peak.fitted_rt for peak in peaks])
             rt_deltas = np.array([peak.rt_delta for peak in peaks])
             idx = np.argsort(rts)
             rts = rts[idx]
@@ -1173,21 +1172,28 @@ def dda_pipeline(
         logger.info("Generating peaks quantitative table")
         peaks_df = pd.DataFrame({
             'peak_id': [peak.id for peak in peaks],
-            'mz': [peak.local_max_mz for peak in peaks],
-            'rt': [peak.local_max_rt for peak in peaks],
+            'mz': [peak.fitted_mz for peak in peaks],
+            'rt': [peak.fitted_rt for peak in peaks],
             'rt_delta': [peak.rt_delta for peak in peaks],
-            'height': [peak.local_max_height for peak in peaks],
-            'total_intensity': [peak.raw_roi_total_intensity for peak in peaks],
+            'height': [peak.fitted_height for peak in peaks],
+            'sigma_mz': [peak.fitted_sigma_mz for peak in peaks],
+            'sigma_rt': [peak.fitted_sigma_rt for peak in peaks],
+            'smooth_height': [peak.local_max_height for peak in peaks],
+            'smooth_mz': [peak.local_max_mz for peak in peaks],
+            'smooth_rt': [peak.local_max_rt for peak in peaks],
             'roi_min_mz': [peak.roi_min_mz for peak in peaks],
             'roi_max_mz': [peak.roi_max_mz for peak in peaks],
             'roi_min_rt': [peak.roi_min_rt for peak in peaks],
             'roi_max_rt': [peak.roi_max_rt for peak in peaks],
-            'sigma_mz': [peak.raw_roi_sigma_mz for peak in peaks],
-            'sigma_rt': [peak.raw_roi_sigma_rt for peak in peaks],
-            'skewness_mz': [peak.raw_roi_skewness_mz for peak in peaks],
-            'skewness_rt': [peak.raw_roi_skewness_rt for peak in peaks],
-            'kurtosis_mz': [peak.raw_roi_kurtosis_mz for peak in peaks],
-            'kurtosis_rt': [peak.raw_roi_kurtosis_rt for peak in peaks],
+            'raw_mean_mz': [peak.raw_roi_mean_mz for peak in peaks],
+            'raw_mean_rt': [peak.raw_roi_mean_rt for peak in peaks],
+            'raw_std_mz': [peak.raw_roi_sigma_mz for peak in peaks],
+            'raw_std_rt': [peak.raw_roi_sigma_rt for peak in peaks],
+            'raw_skewness_mz': [peak.raw_roi_skewness_mz for peak in peaks],
+            'raw_skewness_rt': [peak.raw_roi_skewness_rt for peak in peaks],
+            'raw_kurtosis_mz': [peak.raw_roi_kurtosis_mz for peak in peaks],
+            'raw_kurtosis_rt': [peak.raw_roi_kurtosis_rt for peak in peaks],
+            'raw_total_intensity': [peak.raw_roi_total_intensity for peak in peaks],
             'num_points': [peak.raw_roi_num_points for peak in peaks],
             'num_scans': [peak.raw_roi_num_scans for peak in peaks],
         })

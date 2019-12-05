@@ -15,7 +15,7 @@ std::vector<Centroid::Peak> Warp2D::peaks_in_rt_range(
     ret.reserve(source_peaks.size());
     size_t i = 0;
     for (const auto& peak : source_peaks) {
-        if (peak.local_max_rt >= time_start && peak.local_max_rt < time_end) {
+        if (peak.fitted_rt >= time_start && peak.fitted_rt < time_end) {
             ret.push_back(peak);
             ++i;
         }
@@ -34,7 +34,7 @@ std::vector<Centroid::Peak> Warp2D::filter_peaks(
     filtered_peaks.reserve(n_peaks);
     auto sort_by_height = [](const Centroid::Peak& p1,
                              const Centroid::Peak& p2) -> bool {
-        return (p1.local_max_height > p2.local_max_height);
+        return (p1.fitted_height > p2.fitted_height);
     };
     std::sort(peaks.begin(), peaks.end(), sort_by_height);
     for (size_t i = 0; i < n_peaks; ++i) {
@@ -98,7 +98,7 @@ std::vector<Centroid::Peak> Warp2D::interpolate_peaks(
         Warp2D::peaks_in_rt_range(source_peaks, source_rt_start, source_rt_end);
 
     for (auto& peak : warped_peaks) {
-        double previous_rt = peak.local_max_rt;
+        double previous_rt = peak.fitted_rt;
         double x =
             (previous_rt - source_rt_start) / (source_rt_end - source_rt_start);
         double new_rt = Interpolation::lerp(ref_rt_start, ref_rt_end, x);
@@ -204,19 +204,19 @@ Warp2D::TimeMap Warp2D::calculate_time_map(
     double rt_min = std::numeric_limits<double>::infinity();
     double rt_max = -std::numeric_limits<double>::infinity();
     for (const auto& peak : ref_peaks) {
-        if (peak.local_max_rt < rt_min) {
-            rt_min = peak.local_max_rt;
+        if (peak.fitted_rt < rt_min) {
+            rt_min = peak.fitted_rt;
         }
-        if (peak.local_max_rt > rt_max) {
-            rt_max = peak.local_max_rt;
+        if (peak.fitted_rt > rt_max) {
+            rt_max = peak.fitted_rt;
         }
     }
     for (const auto& peak : source_peaks) {
-        if (peak.local_max_rt < rt_min) {
-            rt_min = peak.local_max_rt;
+        if (peak.fitted_rt < rt_min) {
+            rt_min = peak.fitted_rt;
         }
-        if (peak.local_max_rt > rt_max) {
-            rt_max = peak.local_max_rt;
+        if (peak.fitted_rt > rt_max) {
+            rt_max = peak.fitted_rt;
         }
     }
 

@@ -216,7 +216,7 @@ SimilarityResults find_similarity(std::vector<Centroid::Peak> &peak_list_a,
                                   size_t n_peaks) {
     auto sort_peaks = [](const Centroid::Peak &p1,
                          const Centroid::Peak &p2) -> bool {
-        return (p1.local_max_height >= p2.local_max_height);
+        return (p1.fitted_height >= p2.fitted_height);
     };
     std::sort(peak_list_a.begin(), peak_list_a.end(), sort_peaks);
     std::sort(peak_list_b.begin(), peak_list_b.end(), sort_peaks);
@@ -734,8 +734,8 @@ MetaMatchResults perform_metamatch(
             class_maps.push_back({class_id, 1, 0});
         }
         for (const auto &peak : peaks) {
-            metapeaks.push_back({peak, file_id, class_id, -1, peak.local_max_mz,
-                                 peak.local_max_rt});
+            metapeaks.push_back(
+                {peak, file_id, class_id, -1, peak.fitted_mz, peak.fitted_rt});
         }
         ++file_id;
     }

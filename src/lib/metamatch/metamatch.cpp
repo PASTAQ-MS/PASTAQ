@@ -10,11 +10,11 @@ void calculate_cluster_pos(double& cluster_mz, double& cluster_rt,
     double y_sum = 0;
     double height_sum = 0;
     for (const auto& index : metapeak_indexes) {
-        double mz = peaks[index].local_max_mz;
-        double rt = peaks[index].local_max_rt + peaks[index].rt_delta;
-        x_sum += mz * peaks[index].local_max_height;
-        y_sum += rt * peaks[index].local_max_height;
-        height_sum += peaks[index].local_max_height;
+        double mz = peaks[index].fitted_mz;
+        double rt = peaks[index].fitted_rt + peaks[index].rt_delta;
+        x_sum += mz * peaks[index].fitted_height;
+        y_sum += rt * peaks[index].fitted_height;
+        height_sum += peaks[index].fitted_height;
 
         // NOTE(alex): This is a weighted average, it might cause problems if
         // the overall intensity between the files are very different (The
@@ -22,8 +22,8 @@ void calculate_cluster_pos(double& cluster_mz, double& cluster_rt,
         // intensity). If instead of a weighted average we want a density
         // average we could use the following:
         //
-        //     x_sum += peaks[index].local_max_mz;
-        //     y_sum += peaks[index].local_max_rt;
+        //     x_sum += peaks[index].fitted_mz;
+        //     y_sum += peaks[index].fitted_rt;
         //     height_sum += 1;
         //
         // This might have a problem where the noise could have a greater impact
@@ -36,10 +36,10 @@ void calculate_cluster_pos(double& cluster_mz, double& cluster_rt,
 void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
                               const MetaMatch::Parameters& parameters) {
     auto sort_peaks = [](auto p1, auto p2) -> bool {
-        double p1_mz = p1.local_max_mz;
-        double p2_mz = p2.local_max_mz;
-        double p1_rt = p1.local_max_rt + p1.rt_delta;
-        double p2_rt = p2.local_max_rt + p2.rt_delta;
+        double p1_mz = p1.fitted_mz;
+        double p2_mz = p2.fitted_mz;
+        double p1_rt = p1.fitted_rt + p1.rt_delta;
+        double p2_rt = p2.fitted_rt + p2.rt_delta;
         return (p1_mz < p2_mz) || ((p1_mz == p2_mz) && (p1_rt < p2_rt)) ||
                ((p1_rt == p2_rt) && (p1.file_id < p2.file_id));
     };
@@ -61,27 +61,27 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
         for (size_t j = (i + 1); j < peaks.size(); ++j) {
             // Since we know that the peaks are sorted monotonically in mz and
             // then rt, in order to calculate the maximum potential j we only
-            // need to find the point where the peak.local_max_mz is above the
+            // need to find the point where the peak.fitted_mz is above the
             // cluster radius.
-            if (peaks[j].local_max_mz > cluster_mz + parameters.radius_mz) {
+            if (peaks[j].fitted_mz > cluster_mz + parameters.radius_mz) {
                 break;
             }
-            double peak_mz = peaks[j].local_max_mz;
-            double peak_rt = peaks[j].local_max_rt + peaks[j].rt_delta;
+            double peak_mz = peaks[j].fitted_mz;
+            double peak_rt = peaks[j].fitted_rt + peaks[j].rt_delta;
             if (peaks[j].cluster_id == -1 &&
                 (peak_mz < cluster_mz + parameters.radius_mz &&
                  peak_rt < cluster_rt + parameters.radius_rt)) {
                 // If the cluster already contains a peak from the same file as
                 // peaks[j], check if height of said peak is greater than
-                // peaks[j].local_max_height, if it is, swap the index,
+                // peaks[j].fitted_height, if it is, swap the index,
                 // otherwise, continue.
                 bool file_found = false;
                 for (auto& index : metapeak_indexes) {
                     if (peaks[index].file_id == peaks[j].file_id) {
                         file_found = true;
                         if (peaks[index].file_id == peaks[j].file_id &&
-                            peaks[index].local_max_height <
-                                peaks[j].local_max_height) {
+                            peaks[index].fitted_height <
+                                peaks[j].fitted_height) {
                             // Update cluster peaks.
                             peaks[index].cluster_id = -1;
                             index = j;
@@ -100,9 +100,9 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
                 // Cull far peaks.
                 for (int k = metapeak_indexes.size() - 1; k >= 0; --k) {
                     auto& index = metapeak_indexes[k];
-                    double peak_mz = peaks[index].local_max_mz;
+                    double peak_mz = peaks[index].fitted_mz;
                     double peak_rt =
-                        peaks[index].local_max_rt + peaks[index].rt_delta;
+                        peaks[index].fitted_rt + peaks[index].rt_delta;
                     if (peak_mz > cluster_mz + parameters.radius_mz ||
                         peak_mz < cluster_mz - parameters.radius_mz ||
                         peak_rt > cluster_rt + parameters.radius_rt ||
@@ -198,8 +198,8 @@ std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
             size_t hits = 0;
             for (size_t j = k; j < i; ++j) {
                 auto file_id = peaks[j].file_id;
-                cluster.file_heights[file_id] = peaks[j].local_max_height;
-                sum_height += peaks[j].local_max_height;
+                cluster.file_heights[file_id] = peaks[j].fitted_height;
+                sum_height += peaks[j].fitted_height;
                 hits++;
                 cluster.peak_ids.push_back({file_id, peaks[j].id});
             }
@@ -308,8 +308,8 @@ std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
         }
 
         // Calculate ROI.
-        double min_mz = ref_peaks[0].local_max_mz - 3 * ref.average_mz_sigma;
-        double max_mz = ref_peaks[ref_peaks.size() - 1].local_max_mz +
+        double min_mz = ref_peaks[0].fitted_mz - 3 * ref.average_mz_sigma;
+        double max_mz = ref_peaks[ref_peaks.size() - 1].fitted_mz +
                         3 * ref.average_mz_sigma;
         double min_rt =
             ref.average_rt + ref.average_rt_delta - 3 * ref.average_rt_sigma;

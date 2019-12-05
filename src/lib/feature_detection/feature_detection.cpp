@@ -132,8 +132,8 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
         if (peaks_in_use[peak.id]) {
             continue;
         }
-        if ((peak.local_max_mz + peak.raw_roi_sigma_mz * 2) < mzs[0] ||
-            (peak.local_max_mz - peak.raw_roi_sigma_mz * 2) >
+        if ((peak.fitted_mz + peak.fitted_sigma_mz * 2) < mzs[0] ||
+            (peak.fitted_mz - peak.fitted_sigma_mz * 2) >
                 mzs[mzs.size() - 1]) {
             continue;
         }
@@ -145,7 +145,7 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
     // Sort the peaks in range by mz for a faster search.
     std::sort(peaks_in_range.begin(), peaks_in_range.end(),
               [](const Centroid::Peak &p1, const Centroid::Peak &p2) {
-                  return (p1.local_max_mz < p2.local_max_mz);
+                  return (p1.fitted_mz < p2.fitted_mz);
               });
 
     // Find the reference node and the list of candidates for each node.
@@ -160,8 +160,8 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
         double theoretical_mz = mzs[k];
         std::vector<const Centroid::Peak *> candidates_node;
         for (const auto &peak : peaks_in_range) {
-            if ((peak.local_max_mz + peak.raw_roi_sigma_mz) > theoretical_mz &&
-                (peak.local_max_mz - peak.raw_roi_sigma_mz) < theoretical_mz) {
+            if ((peak.fitted_mz + peak.fitted_sigma_mz) > theoretical_mz &&
+                (peak.fitted_mz - peak.fitted_sigma_mz) < theoretical_mz) {
                 candidates_node.push_back(&peak);
             }
         }
@@ -210,10 +210,10 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
             double selected_normalized_height_diff = 0.0;
             for (size_t j = 0; j < candidate_list[k].size(); ++j) {
                 const auto candidate = candidate_list[k][j];
-                double normalized_height = candidate->local_max_height /
-                                           ref_candidate->local_max_height;
-                double a = candidate->local_max_mz - theoretical_mz;
-                double b = candidate->local_max_rt - retention_time;
+                double normalized_height = candidate->fitted_height /
+                                           ref_candidate->fitted_height;
+                double a = candidate->fitted_mz - theoretical_mz;
+                double b = candidate->fitted_rt - retention_time;
                 double c = normalized_height - theoretical_percentage;
                 double distance = std::sqrt(a * a + b * b + c * c);
                 if (distance < min_distance) {
@@ -279,8 +279,8 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
     // monoisotopic peak, but THIS MIGHT NOT BE THE CASE. For simplicity and to
     // keep the flow going I'll leave this for now, but must go back and FIX
     // it.
-    feature.monoisotopic_mz = selected_candidates[0]->local_max_mz;
-    feature.monoisotopic_height = selected_candidates[0]->local_max_height;
+    feature.monoisotopic_mz = selected_candidates[0]->fitted_mz;
+    feature.monoisotopic_height = selected_candidates[0]->fitted_height;
     // Find the weighted average mz and the average height of the selected
     // isotopes.
     feature.average_mz = 0.0;
@@ -291,13 +291,13 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
     feature.average_mz_sigma = 0.0;
     for (size_t i = 0; i < selected_candidates.size(); ++i) {
         auto candidate = selected_candidates[i];
-        feature.total_height += candidate->local_max_height;
+        feature.total_height += candidate->fitted_height;
         feature.average_mz +=
-            candidate->local_max_height * candidate->local_max_mz;
-        feature.average_rt += candidate->local_max_rt;
+            candidate->fitted_height * candidate->fitted_mz;
+        feature.average_rt += candidate->fitted_rt;
         feature.average_rt_delta += candidate->rt_delta;
-        feature.average_rt_sigma += candidate->raw_roi_sigma_rt;
-        feature.average_mz_sigma += candidate->raw_roi_sigma_mz;
+        feature.average_rt_sigma += candidate->fitted_sigma_rt;
+        feature.average_mz_sigma += candidate->fitted_sigma_mz;
         feature.peak_ids.push_back(candidate->id);
     }
     if (feature.total_height == 0) {
@@ -353,7 +353,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
     }
     auto peaks_rt_key = std::vector<Search::KeySort<double>>(peaks.size());
     for (size_t i = 0; i < peaks.size(); ++i) {
-        peaks_rt_key[i] = {i, peaks[i].local_max_rt};
+        peaks_rt_key[i] = {i, peaks[i].fitted_rt};
     }
     {
         auto sorting_key_func = [](const Search::KeySort<double> &p1,
@@ -397,7 +397,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
             // msms events without identifications to get initial measurements
             // with our data.
             // theoretical_isotopes = theoretical_isotopes_formula(
-            // averagine, peak.local_max_mz, charge_state, 0.01);
+            // averagine, peak.fitted_mz, charge_state, 0.01);
         } else {
             // Generate a theoretical_isotope_distribution based on the
             // given sequence.
@@ -416,8 +416,8 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
 
         // We use the retention time of the APEX of the matched peak,
         // not the msms event.
-        double peak_rt = peak.local_max_rt;
-        double peak_rt_sigma = peak.raw_roi_sigma_rt;
+        double peak_rt = peak.fitted_rt;
+        double peak_rt_sigma = peak.fitted_sigma_rt;
         auto maybe_feature = build_feature(
             peaks_in_use, peaks, peaks_rt_key, theoretical_isotopes,
             peak_rt_sigma * 2, peak_rt, discrepancy_threshold, charge_state);

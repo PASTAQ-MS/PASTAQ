@@ -331,7 +331,7 @@ std::vector<Centroid::Peak> Centroid::find_peaks_parallel(
     // Sort the peaks by height.
     auto sort_peaks = [](const Centroid::Peak &p1,
                          const Centroid::Peak &p2) -> bool {
-        return (p1.local_max_height >= p2.local_max_height);
+        return (p1.fitted_height >= p2.fitted_height);
     };
     std::sort(peaks.begin(), peaks.end(), sort_peaks);
 
@@ -350,20 +350,20 @@ std::vector<Centroid::Peak> Centroid::find_peaks_parallel(
 
 double Centroid::peak_overlap(const Centroid::Peak &peak_a,
                               const Centroid::Peak &peak_b) {
-    double peak_a_mz = peak_a.local_max_mz;
-    double peak_b_mz = peak_b.local_max_mz;
-    double peak_a_rt = peak_a.local_max_rt + peak_a.rt_delta;
-    double peak_b_rt = peak_b.local_max_rt + peak_b.rt_delta;
+    double peak_a_mz = peak_a.fitted_mz;
+    double peak_b_mz = peak_b.fitted_mz;
+    double peak_a_rt = peak_a.fitted_rt + peak_a.rt_delta;
+    double peak_b_rt = peak_b.fitted_rt + peak_b.rt_delta;
     // Early return if the peaks do not intersect in the +/-3 * sigma_mz/rt
     {
-        double min_rt_a = peak_a_rt - 3 * peak_a.raw_roi_sigma_rt;
-        double max_rt_a = peak_a_rt + 3 * peak_a.raw_roi_sigma_rt;
-        double min_mz_a = peak_a_mz - 3 * peak_a.raw_roi_sigma_mz;
-        double max_mz_a = peak_a_mz + 3 * peak_a.raw_roi_sigma_mz;
-        double min_rt_b = peak_b_rt - 3 * peak_b.raw_roi_sigma_rt;
-        double max_rt_b = peak_b_rt + 3 * peak_b.raw_roi_sigma_rt;
-        double min_mz_b = peak_b_mz - 3 * peak_b.raw_roi_sigma_mz;
-        double max_mz_b = peak_b_mz + 3 * peak_b.raw_roi_sigma_mz;
+        double min_rt_a = peak_a_rt - 3 * peak_a.fitted_sigma_rt;
+        double max_rt_a = peak_a_rt + 3 * peak_a.fitted_sigma_rt;
+        double min_mz_a = peak_a_mz - 3 * peak_a.fitted_sigma_mz;
+        double max_mz_a = peak_a_mz + 3 * peak_a.fitted_sigma_mz;
+        double min_rt_b = peak_b_rt - 3 * peak_b.fitted_sigma_rt;
+        double max_rt_b = peak_b_rt + 3 * peak_b.fitted_sigma_rt;
+        double min_mz_b = peak_b_mz - 3 * peak_b.fitted_sigma_mz;
+        double max_mz_b = peak_b_mz + 3 * peak_b.fitted_sigma_mz;
 
         if (max_rt_a < min_rt_b || max_rt_b < min_rt_a || max_mz_a < min_mz_b ||
             max_mz_b < min_mz_a) {
@@ -386,12 +386,12 @@ double Centroid::peak_overlap(const Centroid::Peak &peak_a,
     };
 
     auto rt_contrib = gaussian_contribution(
-        peak_a_rt, peak_b_rt, peak_a.raw_roi_sigma_rt, peak_b.raw_roi_sigma_rt);
+        peak_a_rt, peak_b_rt, peak_a.fitted_sigma_rt, peak_b.fitted_sigma_rt);
     auto mz_contrib = gaussian_contribution(
-        peak_a_mz, peak_b_mz, peak_a.raw_roi_sigma_mz, peak_b.raw_roi_sigma_mz);
+        peak_a_mz, peak_b_mz, peak_a.fitted_sigma_mz, peak_b.fitted_sigma_mz);
 
-    return rt_contrib * mz_contrib * peak_a.local_max_height *
-           peak_b.local_max_height;
+    return rt_contrib * mz_contrib * peak_a.fitted_height *
+           peak_b.fitted_height;
 }
 
 double Centroid::cumulative_overlap(const std::vector<Centroid::Peak> &set_a,
