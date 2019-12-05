@@ -961,6 +961,30 @@ def dda_pipeline(
     logger.info('Finished warped similarity matrix calculation in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
+    logger.info("Starting sigma density plotting")
+    time_start = time.time()
+    out_path = os.path.join(output_dir, 'quality', 'density_sigma.png')
+    if not os.path.exists(out_path) or override_existing:
+        plt.ioff()
+        fig, (ax1, ax2) = plt.subplots(1, 2)
+        for stem in input_stems:
+            in_path_peaks = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
+            logger.info("Reading peaks_a from disk: {}".format(stem))
+            peaks = tapp.read_peaks(in_path_peaks)
+            sigma_mzs = np.array([peak.fitted_sigma_mz for peak in peaks])
+            sigma_rts = np.array([peak.fitted_sigma_rt for peak in peaks])
+            sns.distplot(sigma_rts, hist=False, ax=ax1)
+            sns.distplot(sigma_mzs, hist=False, ax=ax2, label=stem)
+        ax1.set_xlabel('$\\sigma_{rt}$')
+        ax2.set_xlabel('$\\sigma_{mz}$')
+        ax1.set_ylabel('Density')
+        fig.set_size_inches(7.5 * 16/9, 7.5)
+        plt.savefig("{}.png".format(out_path), dpi=100)
+        plt.close(fig)
+    logger.info('Finished sigma density plotting in {}'.format(
+        datetime.timedelta(seconds=time.time()-time_start)))
+    return
+
     # Use metamatch to match warped peaks.
     logger.info("Starting metamatch")
     time_start = time.time()
