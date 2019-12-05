@@ -238,6 +238,7 @@ std::optional<Centroid::Peak> Centroid::build_peak(
 
     // Ensure peak quality.
     if (peak.raw_roi_sigma_mz <= 0 || peak.raw_roi_sigma_rt <= 0 ||
+        peak.fitted_height > 2 * peak.raw_roi_max_height ||
         peak.fitted_mz < local_max.mz - 3 * theoretical_sigma_mz ||
         peak.fitted_mz > local_max.mz + 3 * theoretical_sigma_mz ||
         peak.fitted_rt < local_max.rt - 3 * theoretical_sigma_rt ||

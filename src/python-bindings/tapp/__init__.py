@@ -823,7 +823,7 @@ def dda_pipeline(
     out_path = os.path.join(output_dir, 'quality', 'tic_base_peak.png')
     if not os.path.exists(out_path) or override_existing:
         plt.ioff()
-        fig, axes = plt.subplots(2, 2)
+        fig, axes = plt.subplots(2, 2, sharex=True)
         ax1, ax2 = axes[0]
         ax3, ax4 = axes[1]
         for i, stem in enumerate(input_stems):
@@ -865,10 +865,10 @@ def dda_pipeline(
             # Plot the warping markers for each window
             markers_not_warped = tmap.rt_start[1:]
             markers_warped = tmap.sample_rt_start[1:]
-            ax1.scatter(markers_not_warped, np.repeat(0, len(markers_not_warped)), alpha=0.2, marker='^', edgecolor='none')
-            ax2.scatter(markers_not_warped, np.repeat(0, len(markers_not_warped)), alpha=0.2, marker='^', edgecolor='none')
-            ax3.scatter(markers_warped, np.repeat(0, len(markers_warped)), alpha=0.2, marker='^', edgecolor='none')
-            ax4.scatter(markers_warped, np.repeat(0, len(markers_warped)), alpha=0.2, marker='^', edgecolor='none')
+            ax1.scatter(markers_not_warped, np.repeat(0, len(markers_not_warped)), alpha=0.8, marker='^', edgecolor='none')
+            ax2.scatter(markers_not_warped, np.repeat(0, len(markers_not_warped)), alpha=0.8, marker='^', edgecolor='none')
+            ax3.scatter(markers_warped, np.repeat(0, len(markers_warped)), alpha=0.8, marker='^', edgecolor='none')
+            ax4.scatter(markers_warped, np.repeat(0, len(markers_warped)), alpha=0.8, marker='^', edgecolor='none')
 
         ax1.set_title('Total Ion Chromatogram (TIC)')
         ax2.set_title('Base Peak Chromatogram')
@@ -1557,6 +1557,7 @@ def full_dda_pipeline_test():
     tapp_parameters['polarity'] = 'pos'
     # TODO: Can we optimize the default parameters for warp2d based on
     # avg_fwhm_rt and min/max rt?
+    tapp_parameters['warp2d_rt_expand_factor'] = 0.5
     tapp_parameters['warp2d_num_points'] = 500
     tapp_parameters['warp2d_slack'] = 100
     tapp_parameters['warp2d_window_size'] = 100
