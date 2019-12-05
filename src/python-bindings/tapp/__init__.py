@@ -1202,6 +1202,9 @@ def dda_pipeline(
             'height': [peak.fitted_height for peak in peaks],
             'sigma_mz': [peak.fitted_sigma_mz for peak in peaks],
             'sigma_rt': [peak.fitted_sigma_rt for peak in peaks],
+            'volume': [
+                peak.fitted_height * peak.fitted_sigma_mz * peak.fitted_sigma_rt * 2 * np.pi
+                for peak in peaks],
             'smooth_height': [peak.local_max_height for peak in peaks],
             'smooth_mz': [peak.local_max_mz for peak in peaks],
             'smooth_rt': [peak.local_max_rt for peak in peaks],
@@ -1268,6 +1271,7 @@ def dda_pipeline(
             'rt': [cluster.rt for cluster in peak_clusters],
             'avg_height': [cluster.avg_height for cluster in peak_clusters],
         })
+        # TODO: Quantitative table based on volume instead of height?
         for i, stem in enumerate(input_stems):
             peak_clusters_df[stem] = [cluster.file_heights[i]
                                       for cluster in peak_clusters]
