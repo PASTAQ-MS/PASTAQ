@@ -1202,9 +1202,7 @@ def dda_pipeline(
             'height': [peak.fitted_height for peak in peaks],
             'sigma_mz': [peak.fitted_sigma_mz for peak in peaks],
             'sigma_rt': [peak.fitted_sigma_rt for peak in peaks],
-            'volume': [
-                peak.fitted_height * peak.fitted_sigma_mz * peak.fitted_sigma_rt * 2 * np.pi
-                for peak in peaks],
+            'volume': [peak.fitted_volume for peak in peaks],
             'smooth_height': [peak.local_max_height for peak in peaks],
             'smooth_mz': [peak.local_max_mz for peak in peaks],
             'smooth_rt': [peak.local_max_rt for peak in peaks],

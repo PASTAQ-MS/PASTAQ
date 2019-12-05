@@ -915,6 +915,7 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("fitted_rt", &Centroid::Peak::fitted_rt)
         .def_readonly("fitted_sigma_mz", &Centroid::Peak::fitted_sigma_mz)
         .def_readonly("fitted_sigma_rt", &Centroid::Peak::fitted_sigma_rt)
+        .def_readonly("fitted_volume", &Centroid::Peak::fitted_volume)
         .def(
             "xic",
             [](const Centroid::Peak &peak, const RawData::RawData &raw_data,
@@ -942,6 +943,7 @@ PYBIND11_MODULE(tapp, m) {
             ret += ", fitted_rt: " + std::to_string(p.fitted_rt);
             ret += ", fitted_sigma_mz: " + std::to_string(p.fitted_sigma_mz);
             ret += ", fitted_sigma_rt: " + std::to_string(p.fitted_sigma_rt);
+            ret += ", fitted_volume: " + std::to_string(p.fitted_volume);
             ret += ">";
             return ret;
         });

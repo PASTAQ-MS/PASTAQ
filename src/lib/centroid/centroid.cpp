@@ -233,6 +233,7 @@ std::optional<Centroid::Peak> Centroid::build_peak(
             peak.fitted_rt = rt;
             peak.fitted_sigma_mz = sigma_mz;
             peak.fitted_sigma_rt = sigma_rt;
+            peak.fitted_volume = height * sigma_mz * sigma_rt * 2.0 * M_PI;
         }
     }
 

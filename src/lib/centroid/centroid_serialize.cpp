@@ -29,6 +29,7 @@ bool Centroid::Serialize::read_peak(std::istream &stream,
     Serialization::read_double(stream, &peak->fitted_rt);
     Serialization::read_double(stream, &peak->fitted_sigma_mz);
     Serialization::read_double(stream, &peak->fitted_sigma_rt);
+    Serialization::read_double(stream, &peak->fitted_volume);
     return stream.good();
 }
 
@@ -60,6 +61,7 @@ bool Centroid::Serialize::write_peak(std::ostream &stream,
     Serialization::write_double(stream, peak.fitted_rt);
     Serialization::write_double(stream, peak.fitted_sigma_mz);
     Serialization::write_double(stream, peak.fitted_sigma_rt);
+    Serialization::write_double(stream, peak.fitted_volume);
     return stream.good();
 }
 

@@ -60,6 +60,7 @@ struct Peak {
     double fitted_rt;
     double fitted_sigma_mz;
     double fitted_sigma_rt;
+    double fitted_volume;
 };
 
 // Find all candidate points on the given grid by calculating the local maxima
