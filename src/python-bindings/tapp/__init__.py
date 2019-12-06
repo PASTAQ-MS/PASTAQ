@@ -826,6 +826,7 @@ def dda_pipeline(
         fig, axes = plt.subplots(2, 2, sharex=True)
         ax1, ax2 = axes[0]
         ax3, ax4 = axes[1]
+        alpha = 0.5
         for i, stem in enumerate(input_stems):
             in_path_raw_data = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
             in_path_tmap = os.path.join(output_dir, 'time_map', "{}.tmap".format(stem))
@@ -844,8 +845,8 @@ def dda_pipeline(
             x = xic.retention_time
             y = xic.intensity
             x_warped = [ tmap.warp(rt) for rt in x ]
-            ax1.plot(x, y, label=stem)
-            ax3.plot(x_warped, y, label=stem)
+            ax1.plot(x, y, label=stem, alpha=alpha)
+            ax3.plot(x_warped, y, label=stem, alpha=alpha)
 
             # Plot the warped TIC/Base peak.
             xic = tapp.xic(
@@ -859,16 +860,16 @@ def dda_pipeline(
             x = xic.retention_time
             y = xic.intensity
             x_warped = [ tmap.warp(rt) for rt in x ]
-            ax2.plot(x, y, label=stem)
-            ax4.plot(x_warped, y, label=stem)
+            ax2.plot(x, y, label=stem, alpha=alpha)
+            ax4.plot(x_warped, y, label=stem, alpha=alpha)
 
             # Plot the warping markers for each window
             markers_not_warped = tmap.rt_start[1:]
             markers_warped = tmap.sample_rt_start[1:]
-            ax1.scatter(markers_not_warped, np.repeat(0, len(markers_not_warped)), alpha=0.8, marker='^', edgecolor='none')
-            ax2.scatter(markers_not_warped, np.repeat(0, len(markers_not_warped)), alpha=0.8, marker='^', edgecolor='none')
-            ax3.scatter(markers_warped, np.repeat(0, len(markers_warped)), alpha=0.8, marker='^', edgecolor='none')
-            ax4.scatter(markers_warped, np.repeat(0, len(markers_warped)), alpha=0.8, marker='^', edgecolor='none')
+            ax1.scatter(markers_not_warped, np.repeat(0, len(markers_not_warped)), alpha=alpha, marker='^', edgecolor='none')
+            ax2.scatter(markers_not_warped, np.repeat(0, len(markers_not_warped)), alpha=alpha, marker='^', edgecolor='none')
+            ax3.scatter(markers_warped, np.repeat(0, len(markers_warped)), alpha=alpha, marker='^', edgecolor='none')
+            ax4.scatter(markers_warped, np.repeat(0, len(markers_warped)), alpha=alpha, marker='^', edgecolor='none')
 
         ax1.set_title('Total Ion Chromatogram (TIC)')
         ax2.set_title('Base Peak Chromatogram')
@@ -983,7 +984,6 @@ def dda_pipeline(
         plt.close(fig)
     logger.info('Finished sigma density plotting in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
-    return
 
     # Use metamatch to match warped peaks.
     logger.info("Starting metamatch")
