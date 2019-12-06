@@ -818,103 +818,6 @@ def dda_pipeline(
     logger.info('Finished peak warping to reference ({}) in {}'.format(
         reference_stem, datetime.timedelta(seconds=time.time()-time_start)))
 
-    logger.info("Starting tic/base_peak plotting")
-    time_start = time.time()
-    out_path = os.path.join(output_dir, 'quality', 'tic_base_peak.png')
-    if not os.path.exists(out_path) or override_existing:
-        plt.ioff()
-        fig, axes = plt.subplots(2, 2, sharex=True)
-        ax1, ax2 = axes[0]
-        ax3, ax4 = axes[1]
-        alpha = 0.5
-        for i, stem in enumerate(input_stems):
-            in_path_raw_data = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
-            in_path_tmap = os.path.join(output_dir, 'time_map', "{}.tmap".format(stem))
-
-            # Plot the unwarped TIC/Base peak.
-            raw_data = tapp.read_raw_data(in_path_raw_data)
-            tmap = tapp.read_time_map(in_path_tmap)
-            xic = tapp.xic(
-                raw_data,
-                raw_data.min_mz,
-                raw_data.max_mz,
-                raw_data.min_rt,
-                raw_data.max_rt,
-                "sum"
-            )
-            x = xic.retention_time
-            y = xic.intensity
-            x_warped = [ tmap.warp(rt) for rt in x ]
-            ax1.plot(x, y, label=stem, alpha=alpha)
-            ax3.plot(x_warped, y, label=stem, alpha=alpha)
-
-            # Plot the warped TIC/Base peak.
-            xic = tapp.xic(
-                raw_data,
-                raw_data.min_mz,
-                raw_data.max_mz,
-                raw_data.min_rt,
-                raw_data.max_rt,
-                "max"
-            )
-            x = xic.retention_time
-            y = xic.intensity
-            x_warped = [ tmap.warp(rt) for rt in x ]
-            ax2.plot(x, y, label=stem, alpha=alpha)
-            ax4.plot(x_warped, y, label=stem, alpha=alpha)
-
-            # Plot the warping markers for each window
-            markers_not_warped = tmap.rt_start[1:]
-            markers_warped = tmap.sample_rt_start[1:]
-            ax1.scatter(markers_not_warped, np.repeat(0, len(markers_not_warped)), alpha=alpha, marker='^', edgecolor='none')
-            ax2.scatter(markers_not_warped, np.repeat(0, len(markers_not_warped)), alpha=alpha, marker='^', edgecolor='none')
-            ax3.scatter(markers_warped, np.repeat(0, len(markers_warped)), alpha=alpha, marker='^', edgecolor='none')
-            ax4.scatter(markers_warped, np.repeat(0, len(markers_warped)), alpha=alpha, marker='^', edgecolor='none')
-
-        ax1.set_title('Total Ion Chromatogram (TIC)')
-        ax2.set_title('Base Peak Chromatogram')
-
-        ax2.yaxis.set_label_position("right")
-        ax4.yaxis.set_label_position("right")
-        ax2.set_ylabel('Unwarped', rotation=-90, labelpad=20)
-        ax4.set_ylabel('Warped', rotation=-90, labelpad=20)
-
-        fig.text(0.5, 0.04, 'Retention time (s)', ha='center')
-        fig.text(0.04, 0.5, 'Intensity', va='center', rotation='vertical')
-
-        handles, labels = ax4.get_legend_handles_labels()
-        fig.legend(handles, labels, loc='upper right')
-        fig.set_size_inches(7.5 * 16/9, 7.5)
-        plt.savefig("{}.png".format(out_path), dpi=100)
-        plt.close(fig)
-    logger.info('Finished tic/base_peak plotting in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
-
-    logger.info("Starting rt vs rt_delta plotting")
-    time_start = time.time()
-    out_path = os.path.join(output_dir, 'quality', 'rt_vs_rt_delta.png')
-    if not os.path.exists(out_path) or override_existing:
-        plt.ioff()
-        fig = plt.figure()
-        for stem in input_stems:
-            in_path_peaks = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
-            logger.info("Reading peaks_a from disk: {}".format(stem))
-            peaks = tapp.read_peaks(in_path_peaks)
-            rts = np.array([peak.fitted_rt for peak in peaks])
-            rt_deltas = np.array([peak.rt_delta for peak in peaks])
-            idx = np.argsort(rts)
-            rts = rts[idx]
-            rt_deltas = rt_deltas[idx]
-            plt.plot(rts, rt_deltas, label=stem)
-        plt.xlabel('Retention time (s)')
-        plt.ylabel('Retention time delta (s)')
-        fig.legend(handles, labels, loc='upper right')
-        fig.set_size_inches(7.5 * 16/9, 7.5)
-        plt.savefig("{}.png".format(out_path), dpi=100)
-        plt.close(fig)
-    logger.info('Finished rt vs rt_delta plotting in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
-
     # Calculate similarity matrix after alignment, generate heatmap and save to
     # disk.
     out_path = os.path.join(output_dir, 'quality', 'warped_similarity')
@@ -962,28 +865,129 @@ def dda_pipeline(
     logger.info('Finished warped similarity matrix calculation in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
-    logger.info("Starting sigma density plotting")
+
+    logger.info("Starting quality control plotting")
     time_start = time.time()
-    out_path = os.path.join(output_dir, 'quality', 'density_sigma.png')
+    out_path = os.path.join(output_dir, 'quality', 'tic_base_peak.png')
     if not os.path.exists(out_path) or override_existing:
         plt.ioff()
-        fig, (ax1, ax2) = plt.subplots(1, 2)
-        for stem in input_stems:
+
+        fig_tic_bpc, axes = plt.subplots(2, 2, sharex=True)
+        ax1, ax2 = axes[0]
+        ax3, ax4 = axes[1]
+
+        fig_rt_vs_delta, ax5 = plt.subplots(1, 1)
+
+        fig_sigmas_density, (ax6, ax7) = plt.subplots(1, 2)
+
+        alpha = 0.5
+        for i, stem in enumerate(input_stems):
+            in_path_raw_data = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
+            in_path_tmap = os.path.join(output_dir, 'time_map', "{}.tmap".format(stem))
             in_path_peaks = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
-            logger.info("Reading peaks_a from disk: {}".format(stem))
+            logger.info("Reading raw_data from disk: {}".format(stem))
+            raw_data = tapp.read_raw_data(in_path_raw_data)
+            logger.info("Reading tmap from disk: {}".format(stem))
+            tmap = tapp.read_time_map(in_path_tmap)
+            logger.info("Reading peaks from disk: {}".format(stem))
             peaks = tapp.read_peaks(in_path_peaks)
+
+            # Plot the unwarped TIC/Base peak.
+            logger.info("Plotting unwarped TIC/Base peak: {}".format(stem))
+            xic = tapp.xic(
+                raw_data,
+                raw_data.min_mz,
+                raw_data.max_mz,
+                raw_data.min_rt,
+                raw_data.max_rt,
+                "sum"
+            )
+            x = xic.retention_time
+            y = xic.intensity
+            x_warped = [ tmap.warp(rt) for rt in x ]
+            ax1.plot(x, y, label=stem, alpha=alpha)
+            ax3.plot(x_warped, y, label=stem, alpha=alpha)
+
+            # Plot the warped TIC/Base peak.
+            logger.info("Plotting warped TIC/Base peak: {}".format(stem))
+            xic = tapp.xic(
+                raw_data,
+                raw_data.min_mz,
+                raw_data.max_mz,
+                raw_data.min_rt,
+                raw_data.max_rt,
+                "max"
+            )
+            x = xic.retention_time
+            y = xic.intensity
+            x_warped = [ tmap.warp(rt) for rt in x ]
+            ax2.plot(x, y, label=stem, alpha=alpha)
+            ax4.plot(x_warped, y, label=stem, alpha=alpha)
+
+            # Plot the warping markers for each window.
+            logger.info("Plotting warping markers: {}".format(stem))
+            markers_not_warped = tmap.rt_start[1:]
+            markers_warped = tmap.sample_rt_start[1:]
+            ax1.scatter(markers_not_warped, np.repeat(0, len(markers_not_warped)), alpha=alpha, marker='^', edgecolor='none')
+            ax2.scatter(markers_not_warped, np.repeat(0, len(markers_not_warped)), alpha=alpha, marker='^', edgecolor='none')
+            ax3.scatter(markers_warped, np.repeat(0, len(markers_warped)), alpha=alpha, marker='^', edgecolor='none')
+            ax4.scatter(markers_warped, np.repeat(0, len(markers_warped)), alpha=alpha, marker='^', edgecolor='none')
+
+            # Plot rt vs delta.
+            logger.info("Plotting rt vs rt_delta: {}".format(stem))
+            rts = np.array([peak.fitted_rt for peak in peaks])
+            rt_deltas = np.array([peak.rt_delta for peak in peaks])
+            idx = np.argsort(rts)
+            rts = rts[idx]
+            rt_deltas = rt_deltas[idx]
+            ax5.plot(rts, rt_deltas, label=stem, alpha=alpha)
+
+            # Plot sigma mz/rt ditributions.
+            logger.info("Plotting density of sigma_mz/sigma_rt: {}".format(stem))
             sigma_mzs = np.array([peak.fitted_sigma_mz for peak in peaks])
             sigma_rts = np.array([peak.fitted_sigma_rt for peak in peaks])
-            sns.distplot(sigma_rts, hist=False, ax=ax1)
-            sns.distplot(sigma_mzs, hist=False, ax=ax2, label=stem)
-        ax1.set_xlabel('$\\sigma_{rt}$')
-        ax2.set_xlabel('$\\sigma_{mz}$')
-        ax1.set_ylabel('Density')
-        fig.set_size_inches(7.5 * 16/9, 7.5)
+            sns.distplot(sigma_rts, hist=False, ax=ax6, kde_kws={'label': stem, 'alpha': alpha})
+            sns.distplot(sigma_mzs, hist=False, ax=ax7, kde_kws={'label': stem, 'alpha': alpha})
+
+        logger.info("Saving figures to disk")
+
+        # Save TIC/Base peak figure.
+        ax1.set_title('Total Ion Chromatogram (TIC)')
+        ax2.set_title('Base Peak Chromatogram')
+        ax2.yaxis.set_label_position("right")
+        ax4.yaxis.set_label_position("right")
+        ax2.set_ylabel('Unwarped', rotation=-90, labelpad=20)
+        ax4.set_ylabel('Warped', rotation=-90, labelpad=20)
+        fig_tic_bpc.text(0.5, 0.04, 'Retention time (s)', ha='center')
+        fig_tic_bpc.text(0.04, 0.5, 'Intensity', va='center', rotation='vertical')
+        handles, labels = ax4.get_legend_handles_labels()
+        fig_tic_bpc.legend(handles, labels, loc='upper right')
+        fig_tic_bpc.set_size_inches(7.5 * 16/9, 7.5)
+        plt.figure(fig_tic_bpc.number)
         plt.savefig("{}.png".format(out_path), dpi=100)
-        plt.close(fig)
-    logger.info('Finished sigma density plotting in {}'.format(
+        plt.close(fig_tic_bpc)
+
+        # Save rt vs rt_delta figure.
+        ax5.set_xlabel('Retention time (s)')
+        ax5.set_ylabel('Retention time delta (s)')
+        plt.figure(fig_rt_vs_delta.number)
+        fig_rt_vs_delta.legend(handles, labels, loc='upper right')
+        fig_rt_vs_delta.set_size_inches(7.5 * 16/9, 7.5)
+        plt.savefig("{}.png".format(out_path), dpi=100)
+        plt.close(fig_rt_vs_delta)
+
+        # Save sigma density figure.
+        ax6.set_xlabel('$\\sigma_{rt}$')
+        ax7.set_xlabel('$\\sigma_{mz}$')
+        ax6.set_ylabel('Density')
+        plt.figure(fig_sigmas_density.number)
+        fig_sigmas_density.set_size_inches(7.5 * 16/9, 7.5)
+        plt.savefig("{}.png".format(out_path), dpi=100)
+        plt.close(fig_sigmas_density)
+
+    logger.info('Finished quality control plotting in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
+
 
     # Use metamatch to match warped peaks.
     logger.info("Starting metamatch")
