@@ -1271,7 +1271,7 @@ def dda_pipeline(
         })
         # TODO: Quantitative table based on volume instead of height?
         for i, stem in enumerate(input_stems):
-            peak_clusters_df[stem] = [cluster.file_heights[i]
+            peak_clusters_df[stem] = [cluster.file_volumes[i]
                                       for cluster in peak_clusters]
         peak_clusters_df.to_csv(out_path_peak_clusters, index=False)
 

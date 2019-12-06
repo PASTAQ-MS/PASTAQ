@@ -194,11 +194,13 @@ std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
             cluster.mz = peaks[i - 1].cluster_mz;
             cluster.rt = peaks[i - 1].cluster_rt;
             cluster.file_heights = std::vector<double>(n_files);
+            cluster.file_volumes = std::vector<double>(n_files);
             double sum_height = 0.0;
             size_t hits = 0;
             for (size_t j = k; j < i; ++j) {
                 auto file_id = peaks[j].file_id;
                 cluster.file_heights[file_id] = peaks[j].fitted_height;
+                cluster.file_volumes[file_id] = peaks[j].fitted_volume;
                 sum_height += peaks[j].fitted_height;
                 hits++;
                 cluster.peak_ids.push_back({file_id, peaks[j].id});

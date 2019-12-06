@@ -59,6 +59,7 @@ struct Cluster {
     double rt;
     // TODO(alex): Other stats here...
     std::vector<double> file_heights;
+    std::vector<double> file_volumes;
     double avg_height;
 
     // The feature ids on each file associated with this cluster.
