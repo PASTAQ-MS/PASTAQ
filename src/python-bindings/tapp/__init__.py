@@ -664,7 +664,7 @@ def dda_pipeline(
 
     # Calculate similarity matrix before alignment, generate heatmap and save
     # to disk.
-    out_path = os.path.join(output_dir, 'quality', 'unwarped_similarity')
+    out_path = os.path.join(output_dir, 'quality', 'similarity_unwarped')
     logger.info("Starting unwarped similarity matrix calculation")
     time_start = time.time()
     if not os.path.exists("{}.csv".format(out_path)) or override_existing:
@@ -713,7 +713,7 @@ def dda_pipeline(
     # used, otherwise, exhaustive warping will be performed.
     # TODO: Allow usage of reference sample.
     out_path = os.path.join(output_dir, 'quality',
-                            'exhaustive_warping_similarity')
+                            'similarity_exhaustive_warping')
     reference_index = 0
     similarity_matrix = np.zeros(
         len(input_stems) ** 2).reshape(len(input_stems), len(input_stems))
@@ -820,7 +820,7 @@ def dda_pipeline(
 
     # Calculate similarity matrix after alignment, generate heatmap and save to
     # disk.
-    out_path = os.path.join(output_dir, 'quality', 'warped_similarity')
+    out_path = os.path.join(output_dir, 'quality', 'similarity_warped')
     logger.info("Starting warped similarity matrix calculation")
     time_start = time.time()
     if not os.path.exists("{}.csv".format(out_path)) or override_existing:
@@ -868,8 +868,14 @@ def dda_pipeline(
 
     logger.info("Starting quality control plotting")
     time_start = time.time()
-    out_path = os.path.join(output_dir, 'quality', 'tic_base_peak.png')
-    if not os.path.exists(out_path) or override_existing:
+    out_path_tic_bpc = os.path.join(output_dir, 'quality', 'tic_base_peak')
+    out_path_rt_vs_delta = os.path.join(output_dir, 'quality', 'rt_vs_rt_delta')
+    out_path_sigmas_density = os.path.join(output_dir, 'quality', 'density_sigma')
+    if (not os.path.exists(out_path_tic_bpc)
+        or not os.path.exists(out_path_rt_vs_delta)
+        or not os.path.exists(out_path_sigmas_density)
+        or override_existing
+    ):
         plt.ioff()
 
         fig_tic_bpc, axes = plt.subplots(2, 2, sharex=True)
@@ -964,7 +970,7 @@ def dda_pipeline(
         fig_tic_bpc.legend(handles, labels, loc='upper right')
         fig_tic_bpc.set_size_inches(7.5 * 16/9, 7.5)
         plt.figure(fig_tic_bpc.number)
-        plt.savefig("{}.png".format(out_path), dpi=100)
+        plt.savefig("{}.png".format(out_path_tic_bpc), dpi=100)
         plt.close(fig_tic_bpc)
 
         # Save rt vs rt_delta figure.
@@ -973,7 +979,7 @@ def dda_pipeline(
         plt.figure(fig_rt_vs_delta.number)
         fig_rt_vs_delta.legend(handles, labels, loc='upper right')
         fig_rt_vs_delta.set_size_inches(7.5 * 16/9, 7.5)
-        plt.savefig("{}.png".format(out_path), dpi=100)
+        plt.savefig("{}.png".format(out_path_rt_vs_delta), dpi=100)
         plt.close(fig_rt_vs_delta)
 
         # Save sigma density figure.
@@ -982,7 +988,7 @@ def dda_pipeline(
         ax6.set_ylabel('Density')
         plt.figure(fig_sigmas_density.number)
         fig_sigmas_density.set_size_inches(7.5 * 16/9, 7.5)
-        plt.savefig("{}.png".format(out_path), dpi=100)
+        plt.savefig("{}.png".format(out_path_sigmas_density), dpi=100)
         plt.close(fig_sigmas_density)
 
     logger.info('Finished quality control plotting in {}'.format(
@@ -1262,22 +1268,38 @@ def dda_pipeline(
     logger.info("Reading peak clusters from disk")
     in_path_peak_clusters = os.path.join(
         output_dir, 'metamatch', 'peaks.clusters')
-    out_path_peak_clusters = os.path.join(output_dir, 'quant',
-                                          "peak_clusters.csv")
-    if (not os.path.exists(out_path_peak_clusters) or override_existing):
+    out_path_peak_clusters_height = os.path.join(output_dir, 'quant',
+                                          "peak_clusters_height.csv")
+    out_path_peak_clusters_volume = os.path.join(output_dir, 'quant',
+                                          "peak_clusters_volume.csv")
+    out_path_peak_clusters_metadata = os.path.join(output_dir, 'quant',
+                                          "peak_clusters_metadata.csv")
+    if (not os.path.exists(out_path_peak_clusters_metadata) or override_existing):
         peak_clusters = tapp.read_metamatch_clusters(in_path_peak_clusters)
         logger.info("Generating peak clusters quantitative table")
-        peak_clusters_df = pd.DataFrame({
+        peak_clusters_metadata_df = pd.DataFrame({
             'cluster_id': [cluster.id for cluster in peak_clusters],
             'mz': [cluster.mz for cluster in peak_clusters],
             'rt': [cluster.rt for cluster in peak_clusters],
             'avg_height': [cluster.avg_height for cluster in peak_clusters],
         })
-        # TODO: Quantitative table based on volume instead of height?
+        peak_clusters_metadata_df.to_csv(out_path_peak_clusters_metadata, index=False)
+        # Volume.
+        peak_clusters_df = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in peak_clusters],
+        })
         for i, stem in enumerate(input_stems):
             peak_clusters_df[stem] = [cluster.file_volumes[i]
                                       for cluster in peak_clusters]
-        peak_clusters_df.to_csv(out_path_peak_clusters, index=False)
+        peak_clusters_df.to_csv(out_path_peak_clusters_volume, index=False)
+        peak_clusters_df = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in peak_clusters],
+        })
+        # Height.
+        for i, stem in enumerate(input_stems):
+            peak_clusters_df[stem] = [cluster.file_heights[i]
+                                      for cluster in peak_clusters]
+        peak_clusters_df.to_csv(out_path_peak_clusters_height, index=False)
 
     # Matched Features
     # ================
