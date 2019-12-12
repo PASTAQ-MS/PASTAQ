@@ -32,6 +32,16 @@ struct TheoreticalIsotopes {
     std::vector<double> percs;
 };
 
+struct CandidateNode {
+    uint64_t peak_index;
+    uint8_t charge_state;
+    bool visited;
+};
+
+struct CandidateGraph {
+    std::vector<std::vector<CandidateNode>> nodes;
+};
+
 TheoreticalIsotopes theoretical_isotopes_peptide(std::string sequence,
                                                  int8_t charge_state,
                                                  double min_perc);
@@ -52,6 +62,9 @@ std::vector<Feature> feature_detection(
     const std::vector<Link::LinkedMsms> &link_table_msms,
     const std::vector<Link::LinkedMsms> &link_table_idents,
     double discrepancy_threshold);
+
+CandidateGraph find_candidates(const std::vector<Centroid::Peak> &peaks,
+                               const std::vector<uint8_t> &charge_states);
 
 }  // namespace FeatureDetection
 

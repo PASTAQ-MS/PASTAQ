@@ -133,8 +133,7 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
             continue;
         }
         if ((peak.fitted_mz + peak.fitted_sigma_mz * 2) < mzs[0] ||
-            (peak.fitted_mz - peak.fitted_sigma_mz * 2) >
-                mzs[mzs.size() - 1]) {
+            (peak.fitted_mz - peak.fitted_sigma_mz * 2) > mzs[mzs.size() - 1]) {
             continue;
         }
         peaks_in_range.push_back(peak);
@@ -210,8 +209,8 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
             double selected_normalized_height_diff = 0.0;
             for (size_t j = 0; j < candidate_list[k].size(); ++j) {
                 const auto candidate = candidate_list[k][j];
-                double normalized_height = candidate->fitted_height /
-                                           ref_candidate->fitted_height;
+                double normalized_height =
+                    candidate->fitted_height / ref_candidate->fitted_height;
                 double a = candidate->fitted_mz - theoretical_mz;
                 double b = candidate->fitted_rt - retention_time;
                 double c = normalized_height - theoretical_percentage;
@@ -292,8 +291,7 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
     for (size_t i = 0; i < selected_candidates.size(); ++i) {
         auto candidate = selected_candidates[i];
         feature.total_height += candidate->fitted_height;
-        feature.average_mz +=
-            candidate->fitted_height * candidate->fitted_mz;
+        feature.average_mz += candidate->fitted_height * candidate->fitted_mz;
         feature.average_rt += candidate->fitted_rt;
         feature.average_rt_delta += candidate->rt_delta;
         feature.average_rt_sigma += candidate->fitted_sigma_rt;
@@ -441,4 +439,55 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
     }
 
     return features;
+}
+
+FeatureDetection::CandidateGraph FeatureDetection::find_candidates(
+    const std::vector<Centroid::Peak> &peaks,
+    const std::vector<uint8_t> &charge_states) {
+    double carbon_diff = 1.0033;
+    // Sort peaks by mz.
+    auto sorted_peaks = std::vector<Search::KeySort<double>>(peaks.size());
+    for (size_t i = 0; i < peaks.size(); ++i) {
+        sorted_peaks[i] = {i, peaks[i].fitted_mz};
+    }
+    std::stable_sort(
+        sorted_peaks.begin(), sorted_peaks.end(),
+        [](auto &p1, auto &p2) { return (p1.sorting_key < p2.sorting_key); });
+
+    // Initialize graph.
+    FeatureDetection::CandidateGraph graph = {};
+    graph.nodes =
+        std::vector<std::vector<FeatureDetection::CandidateNode>>(peaks.size());
+
+    for (size_t i = 0; i < sorted_peaks.size(); ++i) {
+        auto &ref_peak = peaks[sorted_peaks[i].index];
+        double tol_mz = ref_peak.fitted_sigma_mz;
+        double tol_rt = ref_peak.fitted_sigma_rt;
+        double min_rt = ref_peak.fitted_rt - tol_rt;
+        double max_rt = ref_peak.fitted_rt + tol_rt;
+        for (const auto &charge_state : charge_states) {
+            if (charge_state == 0) {
+                continue;
+            }
+            double mz_diff = carbon_diff / charge_state;
+            double min_mz = (ref_peak.fitted_mz + mz_diff) - tol_mz;
+            double max_mz = (ref_peak.fitted_mz + mz_diff) + tol_mz;
+
+            // Find peaks within tolerance range and add them to the graph.
+            for (size_t j = 0; j < sorted_peaks.size(); ++j) {
+                auto &peak = peaks[sorted_peaks[j].index];
+                if (peak.fitted_mz > max_mz) {
+                    break;
+                }
+                if (peak.fitted_mz > min_mz && peak.fitted_rt > min_rt &&
+                    peak.fitted_rt < max_rt) {
+                    graph.nodes[i].push_back({j, charge_state, false});
+                }
+            }
+        }
+    }
+
+    // Visit nodes to find most likely features.
+
+    return graph;
 }
