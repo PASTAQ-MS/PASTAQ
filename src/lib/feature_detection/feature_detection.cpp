@@ -441,10 +441,42 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
     return features;
 }
 
-FeatureDetection::CandidateGraph FeatureDetection::find_candidates(
+#include <iostream>
+
+void walk_graph(FeatureDetection::CandidateGraph &graph, uint64_t root_node) {
+    std::vector<uint64_t> s;
+    s.push_back(root_node);
+    while (!s.empty()) {
+        auto idx = s.back();
+        auto &root_node = graph[idx];
+        if (root_node.visited) {
+            s.pop_back();
+            continue;
+        }
+        root_node.visited = true;
+        std::cout << "Visiting: " << idx << std::endl;
+        if (root_node.nodes.empty()) {
+            // TODO: Save the stack to return it later.
+            // TODO: Mark the nodes as candidates for future exploration in
+            // a different charge state.
+            std::cout << "END: ";
+            for (const auto &x : s) {
+                std::cout << x << ' ';
+            }
+            std::cout << std::endl;
+        }
+        for (const auto &node : root_node.nodes) {
+            s.push_back(node);
+        }
+        s.pop_back();
+    }
+}
+
+void FeatureDetection::find_candidates(
     const std::vector<Centroid::Peak> &peaks,
     const std::vector<uint8_t> &charge_states) {
-    double carbon_diff = 1.0033;
+    double carbon_diff = 1.0033;  // NOTE: Maxquant uses 1.00286864
+
     // Sort peaks by mz.
     auto sorted_peaks = std::vector<Search::KeySort<double>>(peaks.size());
     for (size_t i = 0; i < peaks.size(); ++i) {
@@ -455,17 +487,19 @@ FeatureDetection::CandidateGraph FeatureDetection::find_candidates(
         [](auto &p1, auto &p2) { return (p1.sorting_key < p2.sorting_key); });
 
     // Initialize graph.
-    FeatureDetection::CandidateGraph graph = {};
-    graph.nodes =
-        std::vector<std::vector<FeatureDetection::CandidateNode>>(peaks.size());
-
+    std::vector<FeatureDetection::CandidateGraph> charge_state_graphs(
+        charge_states.size());
+    for (size_t k = 0; k < charge_states.size(); ++k) {
+        charge_state_graphs[k].reserve(sorted_peaks.size());
+    }
     for (size_t i = 0; i < sorted_peaks.size(); ++i) {
         auto &ref_peak = peaks[sorted_peaks[i].index];
         double tol_mz = ref_peak.fitted_sigma_mz;
         double tol_rt = ref_peak.fitted_sigma_rt;
         double min_rt = ref_peak.fitted_rt - tol_rt;
         double max_rt = ref_peak.fitted_rt + tol_rt;
-        for (const auto &charge_state : charge_states) {
+        for (size_t k = 0; k < charge_states.size(); ++k) {
+            const auto &charge_state = charge_states[k];
             if (charge_state == 0) {
                 continue;
             }
@@ -474,20 +508,27 @@ FeatureDetection::CandidateGraph FeatureDetection::find_candidates(
             double max_mz = (ref_peak.fitted_mz + mz_diff) + tol_mz;
 
             // Find peaks within tolerance range and add them to the graph.
-            for (size_t j = 0; j < sorted_peaks.size(); ++j) {
+            for (size_t j = i + 1; j < sorted_peaks.size(); ++j) {
                 auto &peak = peaks[sorted_peaks[j].index];
                 if (peak.fitted_mz > max_mz) {
                     break;
                 }
                 if (peak.fitted_mz > min_mz && peak.fitted_rt > min_rt &&
                     peak.fitted_rt < max_rt) {
-                    graph.nodes[i].push_back({j, charge_state, false});
+                    charge_state_graphs[k][i].nodes.push_back(j);
                 }
             }
         }
     }
 
     // Visit nodes to find most likely features.
-
-    return graph;
+    std::vector<bool> used(sorted_peaks.size());
+    for (size_t i = 0; i < sorted_peaks.size(); ++i) {
+        if (used[i]) {
+            continue;
+        }
+        for (size_t k = 0; k < charge_states.size(); ++k) {
+            // charge_state_graphs[k][i];
+        }
+    }
 }

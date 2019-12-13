@@ -120,11 +120,6 @@ def emg(x, h, mu, sigma, tau):
     ret = np.zeros(len(z_arr))
     for i, z in enumerate(z_arr):
         ret[i] = calculate(x[i], z)
-    # print(z_arr)
-    # # print(calculate(z_arr))
-    # print("DING")
-    # print(ret)
-    # print("DONG")
     return ret
 
 def fast_gauss(x, y, rt_mean, rt_sig):
