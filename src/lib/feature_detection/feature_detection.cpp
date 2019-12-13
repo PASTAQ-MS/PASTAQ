@@ -446,13 +446,20 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
 void walk_graph(FeatureDetection::CandidateGraph &graph, uint64_t root_node) {
     std::vector<uint64_t> s;
     s.push_back(root_node);
+    std::vector<uint64_t> s2;
     while (!s.empty()) {
+        std::cout << "STACK: ";
+        for (const auto &x : s) {
+            std::cout << graph[x].id << ' ';
+        }
+        std::cout << std::endl;
         auto idx = s.back();
+        s.pop_back();
         auto &root_node = graph[idx];
         if (root_node.visited) {
-            s.pop_back();
             continue;
         }
+        s2.push_back(idx);
         root_node.visited = true;
         std::cout << "Visiting: " << idx << std::endl;
         if (root_node.nodes.empty()) {
@@ -460,15 +467,16 @@ void walk_graph(FeatureDetection::CandidateGraph &graph, uint64_t root_node) {
             // TODO: Mark the nodes as candidates for future exploration in
             // a different charge state.
             std::cout << "END: ";
-            for (const auto &x : s) {
-                std::cout << x << ' ';
+            for (const auto &x : s2) {
+                std::cout << graph[x].id << ' ';
             }
             std::cout << std::endl;
+            s2.pop_back();
         }
         for (const auto &node : root_node.nodes) {
+            std::cout << "node: " << node << std::endl;
             s.push_back(node);
         }
-        s.pop_back();
     }
 }
 
@@ -501,6 +509,7 @@ void FeatureDetection::find_candidates(
         double min_rt = ref_peak.fitted_rt - tol_rt;
         double max_rt = ref_peak.fitted_rt + tol_rt;
         for (size_t k = 0; k < charge_states.size(); ++k) {
+            charge_state_graphs[k][i].id = ref_peak.id;
             auto charge_state = charge_states[k];
             if (charge_state == 0) {
                 continue;
@@ -529,17 +538,17 @@ void FeatureDetection::find_candidates(
         if (used[i]) {
             continue;
         }
-        std::cout << "i: " << i << std::endl;
+        //std::cout << "i: " << i << std::endl;
         for (size_t k = 0; k < charge_states.size(); ++k) {
             // charge_state_graphs[k][i];
-            //walk_graph(charge_state_graphs[k], i);
-            //break;
-            std::cout << "k: " << k << std::endl;
-            for (const auto &node : charge_state_graphs[k][i].nodes) {
-                std::cout << peaks[sorted_peaks[node].index].id << ' ';
-            }
-            std::cout << std::endl;
+            walk_graph(charge_state_graphs[k], i);
+            break;
+            //std::cout << "k: " << k << std::endl;
+            //for (const auto &node : charge_state_graphs[k][i].nodes) {
+                //std::cout << peaks[sorted_peaks[node].index].id << ' ';
+            //}
+            //std::cout << std::endl;
         }
-        //break;
+        break;
     }
 }

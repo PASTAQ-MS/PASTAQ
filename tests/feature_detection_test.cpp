@@ -13,7 +13,7 @@ TEST_CASE("DEBUG") {
         TestUtils::mock_gaussian_peak(5, 75.0, 401.5, 2000.0, 0.001, 10),
         TestUtils::mock_gaussian_peak(6, 20.0, 402.5, 2000.0, 0.001, 10),
     };
-    std::vector<uint8_t> charge_states = {2, 1};
+    std::vector<uint8_t> charge_states = {2};
     FeatureDetection::find_candidates(peaks, charge_states);
     CHECK(false);
 }

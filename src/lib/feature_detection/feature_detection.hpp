@@ -35,6 +35,7 @@ struct TheoreticalIsotopes {
 struct RootNode {
     std::vector<uint64_t> nodes;
     bool visited;
+    uint64_t id;
 };
 
 typedef std::vector<RootNode> CandidateGraph;
