@@ -79,6 +79,7 @@ if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} AND (${TAPP_ENABLE_T
         add_executable(
             tapplib_test
             tests/centroid_test.cpp
+            tests/feature_detection_test.cpp
             tests/grid_test.cpp
             tests/main.cpp
             tests/metamatch_test.cpp

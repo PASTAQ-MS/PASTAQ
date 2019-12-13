@@ -490,16 +490,18 @@ void FeatureDetection::find_candidates(
     std::vector<FeatureDetection::CandidateGraph> charge_state_graphs(
         charge_states.size());
     for (size_t k = 0; k < charge_states.size(); ++k) {
-        charge_state_graphs[k].reserve(sorted_peaks.size());
+        charge_state_graphs[k].resize(sorted_peaks.size());
     }
     for (size_t i = 0; i < sorted_peaks.size(); ++i) {
         auto &ref_peak = peaks[sorted_peaks[i].index];
-        double tol_mz = ref_peak.fitted_sigma_mz;
-        double tol_rt = ref_peak.fitted_sigma_rt;
+        double tol_mz = 0.1;
+        double tol_rt = 0.1;
+        // double tol_mz = ref_peak.fitted_sigma_mz;
+        // double tol_rt = ref_peak.fitted_sigma_rt;
         double min_rt = ref_peak.fitted_rt - tol_rt;
         double max_rt = ref_peak.fitted_rt + tol_rt;
         for (size_t k = 0; k < charge_states.size(); ++k) {
-            const auto &charge_state = charge_states[k];
+            auto charge_state = charge_states[k];
             if (charge_state == 0) {
                 continue;
             }
@@ -527,8 +529,17 @@ void FeatureDetection::find_candidates(
         if (used[i]) {
             continue;
         }
+        std::cout << "i: " << i << std::endl;
         for (size_t k = 0; k < charge_states.size(); ++k) {
             // charge_state_graphs[k][i];
+            //walk_graph(charge_state_graphs[k], i);
+            //break;
+            std::cout << "k: " << k << std::endl;
+            for (const auto &node : charge_state_graphs[k][i].nodes) {
+                std::cout << peaks[sorted_peaks[node].index].id << ' ';
+            }
+            std::cout << std::endl;
         }
+        //break;
     }
 }

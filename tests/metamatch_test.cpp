@@ -8,32 +8,6 @@ TEST_CASE("Clustering of peak lists") {
     CHECK(true);
 }
 
-Centroid::Peak mock_gaussian_peak(size_t id, double height, double mz,
-                                  double rt, double sigma_mz, double sigma_rt) {
-    Centroid::Peak peak = {};
-    peak.id = id;
-    peak.local_max_mz = mz;
-    peak.local_max_rt = rt;
-    peak.local_max_height = height;
-    peak.rt_delta = 0.0;
-    peak.roi_min_mz = mz - 3 * sigma_mz;
-    peak.roi_max_mz = mz + 3 * sigma_mz;
-    peak.roi_min_rt = rt - 3 * sigma_rt;
-    peak.roi_max_rt = rt + 3 * sigma_rt;
-    peak.raw_roi_mean_mz = mz;
-    peak.raw_roi_mean_rt = rt;
-    peak.raw_roi_sigma_mz = sigma_mz;
-    peak.raw_roi_sigma_rt = sigma_rt;
-    peak.raw_roi_max_height = height;
-    peak.raw_roi_total_intensity = height;
-    peak.fitted_height = height;
-    peak.fitted_mz = mz;
-    peak.fitted_rt = rt;
-    peak.fitted_sigma_mz = sigma_mz;
-    peak.fitted_sigma_rt = sigma_rt;
-    return peak;
-}
-
 FeatureDetection::Feature mock_feature(size_t id,
                                        std::vector<Centroid::Peak> &peaks) {
     FeatureDetection::Feature feature = {};
@@ -70,22 +44,22 @@ FeatureDetection::Feature mock_feature(size_t id,
 TEST_CASE("Clustering features lists") {
     // Three features with small differences.
     std::vector<Centroid::Peak> peaks_a = {
-        mock_gaussian_peak(0, 100.0, 400.0, 2000.0, 0.001, 10),
-        mock_gaussian_peak(1, 75.0, 401.0, 2000.0, 0.001, 10),
-        mock_gaussian_peak(2, 20.0, 402.0, 2000.0, 0.001, 10),
-        mock_gaussian_peak(3, 1.0, 403.0, 2000.0, 0.001, 10),
+        TestUtils::mock_gaussian_peak(0, 100.0, 400.0, 2000.0, 0.001, 10),
+        TestUtils::mock_gaussian_peak(1, 75.0, 401.0, 2000.0, 0.001, 10),
+        TestUtils::mock_gaussian_peak(2, 20.0, 402.0, 2000.0, 0.001, 10),
+        TestUtils::mock_gaussian_peak(3, 1.0, 403.0, 2000.0, 0.001, 10),
     };
     std::vector<Centroid::Peak> peaks_b = {
-        mock_gaussian_peak(0, 110.0, 400.0, 2002.0, 0.001, 10),
-        mock_gaussian_peak(1, 85.0, 401.0, 2002.0, 0.001, 10),
-        mock_gaussian_peak(2, 30.0, 402.0, 2002.0, 0.001, 10),
-        mock_gaussian_peak(3, 11.0, 403.0, 2002.0, 0.001, 10),
+        TestUtils::mock_gaussian_peak(0, 110.0, 400.0, 2002.0, 0.001, 10),
+        TestUtils::mock_gaussian_peak(1, 85.0, 401.0, 2002.0, 0.001, 10),
+        TestUtils::mock_gaussian_peak(2, 30.0, 402.0, 2002.0, 0.001, 10),
+        TestUtils::mock_gaussian_peak(3, 11.0, 403.0, 2002.0, 0.001, 10),
     };
     std::vector<Centroid::Peak> peaks_c = {
-        mock_gaussian_peak(4, 0.100, 400.0, 2000.0, 0.001, 10),
-        mock_gaussian_peak(5, 0.75, 401.0, 2000.0, 0.001, 10),
-        mock_gaussian_peak(6, 0.20, 402.0, 2000.0, 0.001, 10),
-        mock_gaussian_peak(7, 0.1, 403.0, 2000.0, 0.001, 10),
+        TestUtils::mock_gaussian_peak(4, 0.100, 400.0, 2000.0, 0.001, 10),
+        TestUtils::mock_gaussian_peak(5, 0.75, 401.0, 2000.0, 0.001, 10),
+        TestUtils::mock_gaussian_peak(6, 0.20, 402.0, 2000.0, 0.001, 10),
+        TestUtils::mock_gaussian_peak(7, 0.1, 403.0, 2000.0, 0.001, 10),
     };
     std::vector<FeatureDetection::Feature> features_a = {
         mock_feature(0, peaks_a),
