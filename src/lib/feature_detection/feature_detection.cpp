@@ -443,41 +443,29 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
 
 #include <iostream>
 
-void walk_graph(FeatureDetection::CandidateGraph &graph, uint64_t root_node) {
-    std::vector<uint64_t> s;
-    s.push_back(root_node);
-    std::vector<uint64_t> s2;
-    while (!s.empty()) {
-        std::cout << "STACK: ";
-        for (const auto &x : s) {
-            std::cout << graph[x].id << ' ';
-        }
-        std::cout << std::endl;
-        auto idx = s.back();
-        s.pop_back();
-        auto &root_node = graph[idx];
-        if (root_node.visited) {
-            continue;
-        }
-        s2.push_back(idx);
-        root_node.visited = true;
-        std::cout << "Visiting: " << idx << std::endl;
+std::vector<std::vector<uint64_t>> find_all_paths(
+    FeatureDetection::CandidateGraph &graph, uint64_t root_node) {
+    std::vector<std::vector<uint64_t>> paths;
+    std::vector<std::vector<uint64_t>> stack;
+    stack.push_back({root_node});
+    while (!stack.empty()) {
+        auto curr_path = stack.back();
+        stack.pop_back();
+        auto last = curr_path[curr_path.size() - 1];
+        auto &root_node = graph[last];
+
         if (root_node.nodes.empty()) {
-            // TODO: Save the stack to return it later.
-            // TODO: Mark the nodes as candidates for future exploration in
-            // a different charge state.
-            std::cout << "END: ";
-            for (const auto &x : s2) {
-                std::cout << graph[x].id << ' ';
+            paths.push_back(curr_path);
+        } else {
+            for (const auto &node : root_node.nodes) {
+                auto new_path = curr_path;
+                new_path.push_back(node);
+                stack.push_back(new_path);
             }
-            std::cout << std::endl;
-            s2.pop_back();
-        }
-        for (const auto &node : root_node.nodes) {
-            std::cout << "node: " << node << std::endl;
-            s.push_back(node);
         }
     }
+
+    return paths;
 }
 
 void FeatureDetection::find_candidates(
@@ -538,16 +526,16 @@ void FeatureDetection::find_candidates(
         if (used[i]) {
             continue;
         }
-        //std::cout << "i: " << i << std::endl;
         for (size_t k = 0; k < charge_states.size(); ++k) {
-            // charge_state_graphs[k][i];
-            walk_graph(charge_state_graphs[k], i);
+            auto paths = find_all_paths(charge_state_graphs[k], i);
+            std::cout << "FOUND " << paths.size() << " PATHS:" << std::endl;
+            for (const auto &path : paths) {
+                for (const auto &x : path) {
+                    std::cout << charge_state_graphs[k][x].id << ' ';
+                }
+                std::cout << std::endl;
+            }
             break;
-            //std::cout << "k: " << k << std::endl;
-            //for (const auto &node : charge_state_graphs[k][i].nodes) {
-                //std::cout << peaks[sorted_peaks[node].index].id << ' ';
-            //}
-            //std::cout << std::endl;
         }
         break;
     }
