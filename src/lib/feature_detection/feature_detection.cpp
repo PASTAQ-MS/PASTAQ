@@ -454,14 +454,18 @@ std::vector<std::vector<uint64_t>> find_all_paths(
         auto last = curr_path[curr_path.size() - 1];
         auto &root_node = graph[last];
 
-        if (root_node.nodes.empty()) {
-            paths.push_back(curr_path);
-        } else {
-            for (const auto &node : root_node.nodes) {
-                auto new_path = curr_path;
-                new_path.push_back(node);
-                stack.push_back(new_path);
+        bool path_finished = true;
+        for (const auto &node : root_node.nodes) {
+            if (graph[node].visited) {
+                continue;
             }
+            path_finished = false;
+            auto new_path = curr_path;
+            new_path.push_back(node);
+            stack.push_back(new_path);
+        }
+        if (path_finished) {
+            paths.push_back(curr_path);
         }
     }
 
@@ -535,7 +539,7 @@ void FeatureDetection::find_candidates(
                 }
                 std::cout << std::endl;
             }
-            break;
+            // break;
         }
         break;
     }
