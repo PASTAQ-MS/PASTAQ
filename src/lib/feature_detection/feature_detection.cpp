@@ -472,6 +472,49 @@ std::vector<std::vector<uint64_t>> find_all_paths(
     return paths;
 }
 
+double cosine_similarity(std::vector<double> &A, std::vector<double> &B) {
+    double norm_a = 0.0;
+    for (size_t i = 0; i < A.size(); ++i) {
+        norm_a += A[i] * A[i];
+    }
+    norm_a = std::sqrt(norm_a);
+    double norm_b = 0.0;
+    for (size_t i = 0; i < B.size(); ++i) {
+        norm_b += B[i] * B[i];
+    }
+    norm_b = std::sqrt(norm_b);
+    double denom = norm_a * norm_b;
+    // Create a left padded version of A.
+    int64_t pad = (int64_t)B.size() - 1;
+    std::vector<double> C = std::vector<double>(pad + A.size(), 0.0);
+    for (size_t i = 0; i < A.size(); ++i) {
+        C[i + pad] = A[i];
+    }
+    // Calculate the dot product for all shifts of A and keep the maximum.
+    double best_dot = 0.0;
+    size_t best_shift = 0;
+    for (size_t k = 0; k < C.size() - 1; ++k) {
+        double dot = 0.0;
+        for (size_t i = 0; i < std::max(A.size(), B.size()); ++i) {
+            double a = 0;
+            double b = 0;
+            if (i + k < C.size()) {
+                a = C[i + k];
+            }
+            if (i < B.size()) {
+                b = B[i];
+            }
+            dot += a * b;
+        }
+        dot = dot / denom;
+        if (dot > best_dot) {
+            best_dot = dot;
+            best_shift = k;
+        }
+    }
+    return best_dot;
+}
+
 void FeatureDetection::find_candidates(
     const std::vector<Centroid::Peak> &peaks,
     const std::vector<uint8_t> &charge_states) {
@@ -534,12 +577,21 @@ void FeatureDetection::find_candidates(
             auto paths = find_all_paths(charge_state_graphs[k], i);
             std::cout << "FOUND " << paths.size() << " PATHS:" << std::endl;
             for (const auto &path : paths) {
+                std::vector<double> path_heights;
                 for (const auto &x : path) {
-                    std::cout << charge_state_graphs[k][x].id << ' ';
+                    std::cout << peaks[sorted_peaks[x].index].id << ' ';
+                    // std::cout << peaks[sorted_peaks[x].index].fitted_height
+                    // << ' ';
+                    path_heights.push_back(
+                        peaks[sorted_peaks[x].index].fitted_height);
                 }
                 std::cout << std::endl;
+                std::vector<double> ref_heights = {100.0, 76.0, 29.9, 0.5, 0.01, 0.0001, 0.000000001};
+                std::cout << "COS SIM: "
+                          << cosine_similarity(path_heights, ref_heights)
+                          << std::endl;
             }
-            // break;
+            break;
         }
         break;
     }
