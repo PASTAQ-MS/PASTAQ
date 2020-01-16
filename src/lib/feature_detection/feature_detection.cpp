@@ -593,21 +593,15 @@ void FeatureDetection::find_candidates(
         for (size_t k = 0; k < charge_states.size(); ++k) {
             int64_t charge_state = charge_states[k];
             auto paths = find_all_paths(charge_state_graphs[k], i);
-            std::cout << "FOUND " << paths.size()
-                      << " CHARGE STATE: " << charge_state << std::endl;
             for (const auto &path : paths) {
                 if (path.size() < 2) {
                     continue;
                 }
                 std::vector<double> path_heights;
                 for (const auto &x : path) {
-                    std::cout << peaks[sorted_peaks[x].index].id << ' ';
-                    // std::cout << peaks[sorted_peaks[x].index].fitted_height
-                    // << ' ';
                     path_heights.push_back(
                         peaks[sorted_peaks[x].index].fitted_height);
                 }
-                std::cout << std::endl;
                 std::vector<double> ref_heights = {
                     0.10, 100.0, 76.0, 29.9, 0.5, 0.01, 0.0001, 0.000000001};
                 auto sim = rolling_cosine_sim(path_heights, ref_heights);
@@ -616,11 +610,7 @@ void FeatureDetection::find_candidates(
                     best_path = path;
                     best_charge_state = charge_state;
                 }
-                // std::cout << "COS SIM: " << sim.best_dot
-                //<< " SHIFT: " << sim.best_shift << " PAD: " << sim.pad
-                //<< std::endl;
             }
-            // break;
         }
         // TODO: Mark peaks as used and build feature.
         if (best_path.empty()) {
