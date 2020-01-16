@@ -472,7 +472,18 @@ std::vector<std::vector<uint64_t>> find_all_paths(
     return paths;
 }
 
-double cosine_similarity(std::vector<double> &A, std::vector<double> &B) {
+struct RollingCosineResults {
+    double best_dot;
+    size_t best_shift;
+    size_t pad;
+};
+RollingCosineResults rolling_cosine_sim(std::vector<double> &A,
+                                        std::vector<double> &B) {
+    // We need at least 2 points to form a feature.
+    if (A.size() < 2 || B.size() < 2) {
+        return {0.0, 0, 0};
+    }
+    // Pre-calculate the norm of A and B.
     double norm_a = 0.0;
     for (size_t i = 0; i < A.size(); ++i) {
         norm_a += A[i] * A[i];
@@ -485,7 +496,7 @@ double cosine_similarity(std::vector<double> &A, std::vector<double> &B) {
     norm_b = std::sqrt(norm_b);
     double denom = norm_a * norm_b;
     // Create a left padded version of A.
-    int64_t pad = (int64_t)B.size() - 1;
+    size_t pad = B.size() - 1;
     std::vector<double> C = std::vector<double>(pad + A.size(), 0.0);
     for (size_t i = 0; i < A.size(); ++i) {
         C[i + pad] = A[i];
@@ -512,7 +523,7 @@ double cosine_similarity(std::vector<double> &A, std::vector<double> &B) {
             best_shift = k;
         }
     }
-    return best_dot;
+    return {best_dot, best_shift, pad};
 }
 
 void FeatureDetection::find_candidates(
@@ -586,12 +597,14 @@ void FeatureDetection::find_candidates(
                         peaks[sorted_peaks[x].index].fitted_height);
                 }
                 std::cout << std::endl;
-                std::vector<double> ref_heights = {100.0, 76.0, 29.9, 0.5, 0.01, 0.0001, 0.000000001};
-                std::cout << "COS SIM: "
-                          << cosine_similarity(path_heights, ref_heights)
+                std::vector<double> ref_heights = {
+                    0.10, 100.0, 76.0, 29.9, 0.5, 0.01, 0.0001, 0.000000001};
+                auto sim = rolling_cosine_sim(path_heights, ref_heights);
+                std::cout << "COS SIM: " << sim.best_dot
+                          << " SHIFT: " << sim.best_shift << " PAD: " << sim.pad
                           << std::endl;
             }
-            break;
+            // break;
         }
         break;
     }
