@@ -529,6 +529,17 @@ RollingCosineResults rolling_cosine_sim(std::vector<double> &A,
     return {best_dot, best_shift, pad};
 }
 
+#include <map>
+std::map<double, std::vector<double>> averagine_table = {
+    {300.17921, {100.00, 16.53, 2.10, 0.20, 0.01}},
+    {400.0, {100.00, 22.68, 3.48, 0.40, 0.04}},
+    {500.29530, {100.00, 27.70, 5.12, 0.71, 0.08, 0.01}},
+    {700.43520, {100.00, 39.22, 9.33, 1.65, 0.24, 0.03}},
+    {800.0, {100.00, 45.17, 12.21, 2.45, 0.40, 0.05, 0.01}},
+    {999.71361, {100.00, 55.58, 17.81, 4.18, 0.79, 0.13, 0.02}},
+    {1999.93307,
+     {89.11, 100.00, 64.45, 30.32, 11.43, 3.62, 1.00, 0.24, 0.05, 0.01}},
+};
 void FeatureDetection::find_candidates(
     const std::vector<Centroid::Peak> &peaks,
     const std::vector<uint8_t> &charge_states) {
@@ -551,6 +562,7 @@ void FeatureDetection::find_candidates(
     }
     for (size_t i = 0; i < sorted_peaks.size(); ++i) {
         auto &ref_peak = peaks[sorted_peaks[i].index];
+        // DEBUG: Change to the commented version when ready.
         double tol_mz = 0.1;
         double tol_rt = 0.1;
         // double tol_mz = ref_peak.fitted_sigma_mz;
@@ -582,17 +594,27 @@ void FeatureDetection::find_candidates(
     }
 
     // Visit nodes to find most likely features.
-    std::vector<bool> used(sorted_peaks.size());
     for (size_t i = 0; i < sorted_peaks.size(); ++i) {
-        if (used[i]) {
-            continue;
-        }
         double best_dot = 0.0;
         std::vector<uint64_t> best_path;
         uint8_t best_charge_state = 0;
         for (size_t k = 0; k < charge_states.size(); ++k) {
             int64_t charge_state = charge_states[k];
             auto paths = find_all_paths(charge_state_graphs[k], i);
+            double ref_mz =
+                peaks[sorted_peaks[i].index].fitted_mz * charge_states[k];
+            auto ref_key_it = averagine_table.lower_bound(ref_mz);
+            if (ref_key_it == averagine_table.end()) {
+                continue;
+            }
+            // Check if the next element is closer to the ref_mz.
+            auto ref_key_it_next = ref_key_it;
+            ref_key_it_next++;
+            if (ref_key_it_next != averagine_table.end() &&
+                ref_mz - ref_key_it->first > ref_key_it_next->first - ref_mz) {
+                ref_key_it++;
+            }
+            std::vector<double> &ref_heights = ref_key_it->second;
             for (const auto &path : paths) {
                 if (path.size() < 2) {
                     continue;
@@ -602,8 +624,6 @@ void FeatureDetection::find_candidates(
                     path_heights.push_back(
                         peaks[sorted_peaks[x].index].fitted_height);
                 }
-                std::vector<double> ref_heights = {
-                    0.10, 100.0, 76.0, 29.9, 0.5, 0.01, 0.0001, 0.000000001};
                 auto sim = rolling_cosine_sim(path_heights, ref_heights);
                 if (sim.best_dot > best_dot) {
                     best_dot = sim.best_dot;
@@ -616,6 +636,7 @@ void FeatureDetection::find_candidates(
         if (best_path.empty()) {
             continue;
         }
+        // TODO: Trim best path to avoid extreme discrepancies.
         std::cout << "BEST DOT: " << best_dot << " for PATH: ";
         for (const auto &x : best_path) {
             std::cout << peaks[sorted_peaks[x].index].id << ' ';
