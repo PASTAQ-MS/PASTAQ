@@ -480,6 +480,8 @@ struct RollingCosineResults {
     size_t best_shift;
     size_t pad;
 };
+// NOTE: The order matters. A should be the path we are exploring, and B the
+// reference theoretical path.
 RollingCosineResults rolling_cosine_sim(std::vector<double> &A,
                                         std::vector<double> &B) {
     // We need at least 2 points to form a feature.
@@ -493,13 +495,21 @@ RollingCosineResults rolling_cosine_sim(std::vector<double> &A,
     }
     norm_a = std::sqrt(norm_a);
     double norm_b = 0.0;
+    double max_b = 0.0;
+    size_t max_b_index = 0;
     for (size_t i = 0; i < B.size(); ++i) {
         norm_b += B[i] * B[i];
+        if (B[i] > max_b) {
+            max_b = B[i];
+            max_b_index = i;
+        }
     }
     norm_b = std::sqrt(norm_b);
     double denom = norm_a * norm_b;
-    // Create a left padded version of A.
-    size_t pad = B.size() - 1;
+    // Create a left padded version of A. This is used to shift B over A for
+    // the calculation of cosine similarity. This shift ensures that the
+    // maximum in sequence B is tested in all positions of A.
+    size_t pad = max_b_index;
     std::vector<double> C = std::vector<double>(pad + A.size(), 0.0);
     for (size_t i = 0; i < A.size(); ++i) {
         C[i + pad] = A[i];
