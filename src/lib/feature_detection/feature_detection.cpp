@@ -516,7 +516,7 @@ RollingCosineResults rolling_cosine_sim(std::vector<double> &A,
     }
     // Calculate the dot product for all shifts of A and keep the maximum.
     double best_dot = 0.0;
-    size_t best_shift = 0;
+    size_t best_shift = 0;  // `shift` tell us where in A we have the max of B.
     for (size_t k = 0; k < C.size() - 1; ++k) {
         double dot = 0.0;
         for (size_t i = 0; i < std::max(A.size(), B.size()); ++i) {
@@ -537,6 +537,61 @@ RollingCosineResults rolling_cosine_sim(std::vector<double> &A,
         }
     }
     return {best_dot, best_shift, pad};
+}
+
+// Trim path A based on the results of rolling cosine similarity.
+std::vector<size_t> trim_path(const std::vector<size_t> &path,
+                              std::vector<double> &A, std::vector<double> &B,
+                              RollingCosineResults &sim) {
+    // std::vector<size_t> path;
+    // std::vector<size_t> trimmed_path;
+    // for (size_t i = 0; i < B.size(); ++i) {
+    //}
+    //
+    // if shift < pad (we are on the left side)...
+    //
+    // x x x x x 0 1 2 3 7 8 x x x x x
+    // x x x x A B C D E F x x x x x x
+    //
+    // ...we can trim right if B.size() + shift  > pad + A.size():
+    //
+    // x x x x x 0 1 2 3 7 x x x x x x
+    // x x x x A B C D E F x x x x x x
+    //
+    // if shift > pad (we are on the right side)...
+    //
+    // x x x x x 0 1 2 3 7 8 x x x x x
+    // x x x x x x x x A B C D E F x x
+    //
+    // ...we can trim left:
+    //
+    // x x x x x x x x 3 7 8 x x x x x
+    // x x x x x x x x A B C D E F x x
+    //
+    // In addition to this, we need to check if there are any discrepancies
+    // larger than a given threshold from the theoretical %.
+    // NOTE: min_i and max_i are given by the trimming from the previous ASCII
+    // scheme.
+    size_t min_i = sim.best_shift - sim.pad;
+    // size_t max_i = std::min(B.size() - min_i, A.size());
+    // size_t min_i = 0;
+    size_t max_i = A.size();
+    std::vector<size_t> trimmed_path;
+    std::cout << "LETS GOOOOOO:" << std::endl;
+    std::cout << "best_dot: " << sim.best_dot << std::endl;
+    std::cout << "best_shift: " << sim.best_shift << std::endl;
+    std::cout << "pad: " << sim.pad << std::endl;
+    // std::cout << "charge_state: " << sim.charge_state << std::endl;
+    for (size_t i = min_i; i < max_i; ++i) {  // TODO: max_i?
+        // Normalize A to the maximum of B (shift).
+        double norm_a = A[i] / A[sim.best_shift];
+        // Check the difference between the theoretical and normalized
+        // intensity.
+        double abs_diff = std::abs(norm_a - B[sim.best_shift - sim.pad + i]);
+        trimmed_path.push_back(path[i]);
+    }
+    // return path;
+    return trimmed_path;
 }
 
 #include <map>
@@ -604,7 +659,8 @@ void FeatureDetection::find_candidates(
     }
 
     // Visit nodes to find most likely features.
-    for (size_t i = 0; i < sorted_peaks.size(); ++i) {
+    size_t i = 0;
+    while (i < sorted_peaks.size()) {
         double best_dot = 0.0;
         std::vector<uint64_t> best_path;
         uint8_t best_charge_state = 0;
@@ -637,20 +693,24 @@ void FeatureDetection::find_candidates(
                 auto sim = rolling_cosine_sim(path_heights, ref_heights);
                 if (sim.best_dot > best_dot) {
                     best_dot = sim.best_dot;
-                    best_path = path;
                     best_charge_state = charge_state;
+                    best_path = trim_path(path, path_heights, ref_heights, sim);
                 }
             }
         }
-        // TODO: Mark peaks as used and build feature.
         if (best_path.empty()) {
+            ++i;
             continue;
         }
-        // TODO: Trim best path to avoid extreme discrepancies.
+        // We found a feature, but the initial reference is not included.
+        if (best_path[0] == i) {
+            ++i;
+        }
         std::cout << "BEST DOT: " << best_dot << " for PATH: ";
         for (const auto &x : best_path) {
             std::cout << peaks[sorted_peaks[x].index].id << ' ';
-            // std::cout << peaks[sorted_peaks[x].index].fitted_height << ' ';
+            // TODO: Build feature.
+            // Mark peaks as used.
             for (size_t k = 0; k < charge_states.size(); ++k) {
                 charge_state_graphs[k][x].visited = true;
             }
