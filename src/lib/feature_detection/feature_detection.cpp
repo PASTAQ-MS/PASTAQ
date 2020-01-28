@@ -538,6 +538,66 @@ RollingCosineResults rolling_cosine_sim(std::vector<double> &A,
     }
     return {best_dot, best_shift, pad};
 }
+// NOTE: The order matters. A should be the path we are exploring, and B the
+// reference theoretical path.
+RollingCosineResults rolling_weighted_cosine_sim(std::vector<double> &A,
+                                                 std::vector<double> &B) {
+    // We need at least 2 points to form a feature.
+    if (A.size() < 2 || B.size() < 2) {
+        return {0.0, 0, 0};
+    }
+    // Pre-calculate the norm of B.
+    double norm_b = 0.0;
+    double max_b = 0.0;
+    size_t max_b_index = 0;
+    for (size_t i = 0; i < B.size(); ++i) {
+        norm_b += B[i] * B[i] * B[i];
+        if (B[i] > max_b) {
+            max_b = B[i];
+            max_b_index = i;
+        }
+    }
+    norm_b = std::sqrt(norm_b);
+    // Create a left padded version of A. This is used to shift B over A for
+    // the calculation of cosine similarity. This shift ensures that the
+    // maximum in sequence B is tested in all positions of A.
+    size_t pad = max_b_index;
+    std::vector<double> C = std::vector<double>(pad + A.size(), 0.0);
+    for (size_t i = 0; i < A.size(); ++i) {
+        C[i + pad] = A[i];
+    }
+    // Calculate the dot product for all shifts of A and keep the maximum.
+    // double norm_a = 0.0;
+    // for (size_t i = 0; i < A.size(); ++i) {
+    // norm_a += A[i] * A[i];
+    //}
+    // norm_a = std::sqrt(norm_a);
+    double best_dot = 0.0;
+    size_t best_shift = 0;  // `shift` tell us where in A we have the max of B.
+    for (size_t k = 0; k < C.size() - 1; ++k) {
+        double dot = 0.0;
+        double norm_a = 0.0;
+        for (size_t i = 0; i < std::max(A.size(), B.size()); ++i) {
+            double a = 0;
+            double b = 0;
+            if (i + k < C.size()) {
+                a = C[i + k];
+            }
+            if (i < B.size()) {
+                b = B[i];
+            }
+            norm_a += a * a * b;
+            dot += a * b * b;
+        }
+        norm_a = std::sqrt(norm_a);
+        dot = dot / (norm_a * norm_b);
+        if (dot > best_dot) {
+            best_dot = dot;
+            best_shift = k;
+        }
+    }
+    return {best_dot, best_shift, pad};
+}
 
 // Trim path A based on the results of rolling cosine similarity.
 std::vector<size_t> trim_path(const std::vector<size_t> &path,
@@ -573,8 +633,9 @@ std::vector<size_t> trim_path(const std::vector<size_t> &path,
     // NOTE: min_i and max_i are given by the trimming from the previous ASCII
     // scheme.
     size_t min_i = sim.best_shift - sim.pad;
+    // size_t min_i = 0; // DEBUG: <-
+    // DEBUG: NOT CORRECT
     // size_t max_i = std::min(B.size() - min_i, A.size());
-    // size_t min_i = 0;
     size_t max_i = A.size();
     std::vector<size_t> trimmed_path;
     std::cout << "LETS GOOOOOO:" << std::endl;
@@ -690,7 +751,9 @@ void FeatureDetection::find_candidates(
                     path_heights.push_back(
                         peaks[sorted_peaks[x].index].fitted_height);
                 }
-                auto sim = rolling_cosine_sim(path_heights, ref_heights);
+                auto sim =
+                    rolling_weighted_cosine_sim(path_heights, ref_heights);
+                // auto sim = rolling_cosine_sim(path_heights, ref_heights);
                 if (sim.best_dot > best_dot) {
                     best_dot = sim.best_dot;
                     best_charge_state = charge_state;
@@ -698,7 +761,7 @@ void FeatureDetection::find_candidates(
                 }
             }
         }
-        if (best_path.empty()) {
+        if (best_path.size() < 2) {
             ++i;
             continue;
         }
