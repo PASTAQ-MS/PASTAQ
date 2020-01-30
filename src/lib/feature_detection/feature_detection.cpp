@@ -475,10 +475,12 @@ std::vector<std::vector<uint64_t>> find_all_paths(
     return paths;
 }
 
+// FIXME: Here be dragons.
 struct RollingCosineResults {
     double best_dot;
     size_t best_shift;
     size_t pad;
+    std::vector<size_t> best_path;
 };
 // NOTE: The order matters. A should be the path we are exploring, and B the
 // reference theoretical path.
@@ -486,7 +488,7 @@ RollingCosineResults rolling_cosine_sim(std::vector<double> &A,
                                         std::vector<double> &B) {
     // We need at least 2 points to form a feature.
     if (A.size() < 2 || B.size() < 2) {
-        return {0.0, 0, 0};
+        return {0.0, 0, 0, {}};
     }
     // Pre-calculate the norm of A and B.
     double norm_a = 0.0;
@@ -536,17 +538,22 @@ RollingCosineResults rolling_cosine_sim(std::vector<double> &A,
             best_shift = k;
         }
     }
-    return {best_dot, best_shift, pad};
+    return {best_dot, best_shift, pad, {}};
 }
 // NOTE: The order matters. A should be the path we are exploring, and B the
 // reference theoretical path.
-RollingCosineResults rolling_weighted_cosine_sim(std::vector<double> &A,
-                                                 std::vector<double> &B) {
+struct OptimalPath {
+    double dot;
+    size_t min_i;
+    size_t max_i;
+};
+OptimalPath rolling_weighted_cosine_sim(std::vector<double> &A,
+                                        std::vector<double> &B) {
     // We need at least 2 points to form a feature.
     if (A.size() < 2 || B.size() < 2) {
         return {0.0, 0, 0};
     }
-    // Pre-calculate the norm of B.
+    // Find the maximum b position.
     double norm_b = 0.0;
     double max_b = 0.0;
     size_t max_b_index = 0;
@@ -558,45 +565,60 @@ RollingCosineResults rolling_weighted_cosine_sim(std::vector<double> &A,
         }
     }
     norm_b = std::sqrt(norm_b);
-    // Create a left padded version of A. This is used to shift B over A for
-    // the calculation of cosine similarity. This shift ensures that the
-    // maximum in sequence B is tested in all positions of A.
-    size_t pad = max_b_index;
-    std::vector<double> C = std::vector<double>(pad + A.size(), 0.0);
-    for (size_t i = 0; i < A.size(); ++i) {
-        C[i + pad] = A[i];
-    }
-    // Calculate the dot product for all shifts of A and keep the maximum.
-    // double norm_a = 0.0;
-    // for (size_t i = 0; i < A.size(); ++i) {
-    // norm_a += A[i] * A[i];
-    //}
-    // norm_a = std::sqrt(norm_a);
+    // We are going to roll the maximum of B (100%) through each position of A,
+    // which means we are to perform k == A.size() cycles.
     double best_dot = 0.0;
-    size_t best_shift = 0;  // `shift` tell us where in A we have the max of B.
-    for (size_t k = 0; k < C.size() - 1; ++k) {
-        double dot = 0.0;
+    size_t best_path_min_i = 0;
+    size_t best_path_max_i = 0;
+    for (size_t k = 0; k < A.size(); ++k) {
+        // Indexes for path A.
+        size_t min_i = k < max_b_index ? 0 : k - max_b_index;
+        size_t max_i = std::min(A.size(), B.size() - max_b_index + k);
+        // Indexes for path B.
+        size_t min_j = k < max_b_index ? max_b_index - k : 0;
+
+        // FIXME: This seems redundant. Ensure working algorithm and remove.
+        // size_t n_iter = std::min(max_i - min_i, max_j - min_j);
+        size_t n_iter = max_i - min_i;
         double norm_a = 0.0;
-        for (size_t i = 0; i < std::max(A.size(), B.size()); ++i) {
-            double a = 0;
-            double b = 0;
-            if (i + k < C.size()) {
-                a = C[i + k];
-            }
-            if (i < B.size()) {
-                b = B[i];
-            }
+        double dot = 0.0;
+        size_t i = 0;
+        for (i = 0; i < n_iter; ++i) {
+            double a = A[min_i + i];
+            double b = B[min_j + i];
+
             norm_a += a * a * b;
             dot += a * b * b;
+
+            // SPLIT!
+            // TODO: Should we be splitting left/right independently?
+            // TODO: To do this, we need a left->right and a right->left loop
+            // from the center point.
+            //// Normalize A to the maximum of B (shift).
+            // double normalized_a = a / A[k];
+            //// Check the difference between the theoretical and normalized
+            //// intensity.
+            // double abs_diff = std::abs(normalized_a - b / 100.0);
+            // if (abs_diff >= 0.35) {
+            // break;
+            //}
         }
         norm_a = std::sqrt(norm_a);
         dot = dot / (norm_a * norm_b);
-        if (dot > best_dot) {
+        if (dot > best_dot && (max_i - min_i) > 1) {
             best_dot = dot;
-            best_shift = k;
+            best_path_min_i = min_i;
+            best_path_max_i = max_i;
         }
     }
-    return {best_dot, best_shift, pad};
+    size_t best_path_size = best_path_max_i - best_path_min_i;
+    if (best_path_size <= 1) {
+        return {0.0, 0, 0};
+    }
+    std::cout << "best_dot: " << best_dot << std::endl;
+    std::cout << "best_path_min_i: " << best_path_min_i << std::endl;
+    std::cout << "best_path_max_i: " << best_path_max_i << std::endl;
+    return {best_dot, best_path_min_i, best_path_max_i};
 }
 
 // Trim path A based on the results of rolling cosine similarity.
@@ -634,9 +656,9 @@ std::vector<size_t> trim_path(const std::vector<size_t> &path,
     // scheme.
     size_t min_i = sim.best_shift - sim.pad;
     // size_t min_i = 0; // DEBUG: <-
-    // DEBUG: NOT CORRECT
-    // size_t max_i = std::min(B.size() - min_i, A.size());
-    size_t max_i = A.size();
+    // DEBUG: NOT CORRECT?
+    size_t max_i = std::min(B.size() - min_i, A.size());
+    // size_t max_i = A.size();
     std::vector<size_t> trimmed_path;
     std::cout << "LETS GOOOOOO:" << std::endl;
     std::cout << "best_dot: " << sim.best_dot << std::endl;
@@ -648,7 +670,11 @@ std::vector<size_t> trim_path(const std::vector<size_t> &path,
         double norm_a = A[i] / A[sim.best_shift];
         // Check the difference between the theoretical and normalized
         // intensity.
-        double abs_diff = std::abs(norm_a - B[sim.best_shift - sim.pad + i]);
+        double abs_diff =
+            std::abs(norm_a - B[sim.best_shift - sim.pad + i] / 100.0);
+        if (abs_diff >= 0.35) {
+            break;
+        }
         trimmed_path.push_back(path[i]);
     }
     // return path;
@@ -751,15 +777,25 @@ void FeatureDetection::find_candidates(
                     path_heights.push_back(
                         peaks[sorted_peaks[x].index].fitted_height);
                 }
+                for (const auto &x : path) {
+                    std::cout << peaks[sorted_peaks[x].index].id << ' ';
+                }
+                std::cout << std::endl;
                 auto sim =
                     rolling_weighted_cosine_sim(path_heights, ref_heights);
-                // auto sim = rolling_cosine_sim(path_heights, ref_heights);
-                if (sim.best_dot > best_dot) {
-                    best_dot = sim.best_dot;
+                // TODO: Which of these is better?
+                // auto sim = rolling_cosine_sim(path_heights, ref_heights); //
+                if (sim.dot > best_dot) {
+                    best_dot = sim.dot;
                     best_charge_state = charge_state;
-                    best_path = trim_path(path, path_heights, ref_heights, sim);
+                    best_path = std::vector<size_t>(sim.max_i - sim.min_i);
+                    size_t k = 0;
+                    for (size_t i = sim.min_i; i < sim.max_i; ++i, ++k) {
+                        best_path[k] = path[i];
+                    }
                 }
             }
+            // break;
         }
         if (best_path.size() < 2) {
             ++i;
