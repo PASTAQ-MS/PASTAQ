@@ -779,6 +779,14 @@ PYBIND11_MODULE(tapp, m) {
     m.doc() = "tapp documentation";
 
     // Structs.
+    py::class_<RawData::PrecursorInformation>(m, "PrecursorInformation")
+        .def_readonly("id", &RawData::PrecursorInformation::scan_number)
+        .def_readonly("charge", &RawData::PrecursorInformation::charge)
+        .def_readonly("mz", &RawData::PrecursorInformation::mz)
+        .def_readonly("intensity", &RawData::PrecursorInformation::intensity)
+        .def_readonly("window_wideness",
+                      &RawData::PrecursorInformation::window_wideness);
+
     py::class_<RawData::Scan>(m, "Scan")
         .def_readonly("scan_number", &RawData::Scan::scan_number)
         .def_readonly("ms_level", &RawData::Scan::ms_level)
@@ -787,6 +795,8 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("mz", &RawData::Scan::mz)
         .def_readonly("intensity", &RawData::Scan::intensity)
         .def_readonly("polarity", &RawData::Scan::polarity)
+        .def_readonly("precursor_information",
+                      &RawData::Scan::precursor_information)
         .def("__repr__", [](const RawData::Scan &s) {
             auto msg = "Scan <id: " + std::to_string(s.scan_number) +
                        ", ms_level: " + std::to_string(s.ms_level) +
