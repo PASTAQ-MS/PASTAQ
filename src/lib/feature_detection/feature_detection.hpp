@@ -9,20 +9,21 @@ namespace FeatureDetection {
 // TODO: Expand documentation.
 struct Feature {
     uint64_t id;
-    int64_t msms_id;  // (Optional, might not exist if value is < 0)
-                      // TODO: Should we make this an std::optional type?
-                      // TODO: Should we create a 'link table' for features to
-                      // not pollute the feature namespace?
+    double score;
     double average_rt;
     double average_rt_delta;
     double average_rt_sigma;
     double average_mz;
     double average_mz_sigma;
     double total_height;
+    double total_volume;
+    double max_height;
+    double max_volume;
     double monoisotopic_mz;
+    double monoisotopic_rt;
     double monoisotopic_height;
-    int8_t charge_state;
-    // FIXME: Use the peak index instead of the peak_id? Tradeoffs?
+    double monoisotopic_volume;
+    int8_t charge_state;  // FIXME: Why int8 instead of uint8?
     std::vector<uint64_t> peak_ids;
 };
 
@@ -61,8 +62,8 @@ std::vector<Feature> feature_detection(
     const std::vector<Link::LinkedMsms> &link_table_idents,
     double discrepancy_threshold);
 
-void find_candidates(const std::vector<Centroid::Peak> &peaks,
-                     const std::vector<uint8_t> &charge_states);
+std::vector<Feature> detect_features(const std::vector<Centroid::Peak> &peaks,
+                                     const std::vector<uint8_t> &charge_states);
 
 }  // namespace FeatureDetection
 

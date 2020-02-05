@@ -1068,7 +1068,7 @@ PYBIND11_MODULE(tapp, m) {
 
     py::class_<FeatureDetection::Feature>(m, "Feature")
         .def_readonly("id", &FeatureDetection::Feature::id)
-        .def_readonly("msms_id", &FeatureDetection::Feature::msms_id)
+        .def_readonly("score", &FeatureDetection::Feature::score)
         .def_readonly("average_rt", &FeatureDetection::Feature::average_rt)
         .def_readonly("average_rt_delta",
                       &FeatureDetection::Feature::average_rt_delta)
@@ -1078,10 +1078,17 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("average_mz_sigma",
                       &FeatureDetection::Feature::average_mz_sigma)
         .def_readonly("total_height", &FeatureDetection::Feature::total_height)
+        .def_readonly("total_volume", &FeatureDetection::Feature::total_volume)
+        .def_readonly("max_height", &FeatureDetection::Feature::max_height)
+        .def_readonly("max_volume", &FeatureDetection::Feature::max_volume)
         .def_readonly("monoisotopic_mz",
                       &FeatureDetection::Feature::monoisotopic_mz)
+        .def_readonly("monoisotopic_rt",
+                      &FeatureDetection::Feature::monoisotopic_rt)
         .def_readonly("monoisotopic_height",
                       &FeatureDetection::Feature::monoisotopic_height)
+        .def_readonly("monoisotopic_volume",
+                      &FeatureDetection::Feature::monoisotopic_volume)
         .def_readonly("charge_state", &FeatureDetection::Feature::charge_state)
         .def_readonly("peak_ids", &FeatureDetection::Feature::peak_ids)
         .def("__repr__", [](const FeatureDetection::Feature &f) {

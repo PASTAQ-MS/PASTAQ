@@ -28,6 +28,7 @@ FeatureDetection::TheoreticalIsotopes normalize_isotopic_distribution(
     return {mzs, perc};
 }
 
+// FIXME: Remove this.
 FeatureDetection::TheoreticalIsotopes
 FeatureDetection::theoretical_isotopes_peptide(std::string sequence,
                                                int8_t charge_state,
@@ -56,6 +57,7 @@ static std::vector<Element> averagine = {
     {"N", 1.3577 / 111.1254, 14.007}, {"O", 1.4773 / 111.1254, 15.999},
     {"S", 0.0417 / 111.1254, 32.066},
 };
+// FIXME: Remove this.
 FeatureDetection::TheoreticalIsotopes theoretical_isotopes_formula(
     const std::vector<Element> &average_molecular_composition, double mz,
     int8_t charge_state, double min_perc) {
@@ -105,6 +107,7 @@ FeatureDetection::TheoreticalIsotopes theoretical_isotopes_formula(
     return normalize_isotopic_distribution(isotopes, charge_state, min_perc);
 }
 
+// FIXME: Remove this.
 std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
     const std::vector<bool> &peaks_in_use,
     const std::vector<Centroid::Peak> &peaks,
@@ -273,7 +276,6 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
 
     // Build the actual feature data.
     Feature feature = {};
-    feature.msms_id = -1;
     // FIXME: Currently assuming that the minimum detected isotope is the
     // monoisotopic peak, but THIS MIGHT NOT BE THE CASE. For simplicity and to
     // keep the flow going I'll leave this for now, but must go back and FIX
@@ -310,6 +312,7 @@ std::optional<FeatureDetection::Feature> FeatureDetection::build_feature(
     return feature;
 }
 
+// FIXME: Remove this.
 std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
     const std::vector<Centroid::Peak> &peaks,
     const RawData::RawData &raw_data_ms2,
@@ -339,7 +342,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
     auto idents_msms_key =
         std::vector<Search::KeySort<uint64_t>>(link_table_idents.size());
     for (size_t i = 0; i < link_table_idents.size(); ++i) {
-        idents_msms_key[i] = {i, link_table_idents[i].msms_id};
+        // idents_msms_key[i] = {i, link_table_idents[i].msms_id};
     }
     {
         auto sorting_key_func = [](const Search::KeySort<uint64_t> &p1,
@@ -421,7 +424,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
             peak_rt_sigma * 2, peak_rt, discrepancy_threshold, charge_state);
         if (maybe_feature) {
             auto feature = maybe_feature.value();
-            feature.msms_id = linked_msms.msms_id;
+            // feature.msms_id = linked_msms.msms_id;
             features.push_back(feature);
             // Remove used peaks on the feature from the pool.
             for (const auto &peak_id : feature.peak_ids) {
@@ -575,7 +578,7 @@ std::map<double, std::vector<double>> averagine_table = {
     {1999.93307,
      {89.11, 100.00, 64.45, 30.32, 11.43, 3.62, 1.00, 0.24, 0.05, 0.01}},
 };
-void FeatureDetection::find_candidates(
+std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
     const std::vector<Centroid::Peak> &peaks,
     const std::vector<uint8_t> &charge_states) {
     double carbon_diff = 1.0033;  // NOTE: Maxquant uses 1.00286864
@@ -597,11 +600,8 @@ void FeatureDetection::find_candidates(
     }
     for (size_t i = 0; i < sorted_peaks.size(); ++i) {
         auto &ref_peak = peaks[sorted_peaks[i].index];
-        // DEBUG: Change to the commented version when ready.
-        double tol_mz = 0.1;
-        double tol_rt = 0.1;
-        // double tol_mz = ref_peak.fitted_sigma_mz;
-        // double tol_rt = ref_peak.fitted_sigma_rt;
+        double tol_mz = ref_peak.fitted_sigma_mz;
+        double tol_rt = ref_peak.fitted_sigma_rt;
         double min_rt = ref_peak.fitted_rt - tol_rt;
         double max_rt = ref_peak.fitted_rt + tol_rt;
         for (size_t k = 0; k < charge_states.size(); ++k) {
@@ -629,6 +629,7 @@ void FeatureDetection::find_candidates(
     }
 
     // Visit nodes to find most likely features.
+    std::vector<FeatureDetection::Feature> features;
     size_t i = 0;
     while (i < sorted_peaks.size()) {
         double best_dot = 0.0;
@@ -681,18 +682,86 @@ void FeatureDetection::find_candidates(
         if (best_path[0] == i) {
             ++i;
         }
-        std::cout << "BEST DOT: " << best_dot << " for PATH: ";
-        for (const auto &x : best_path) {
-            std::cout << peaks[sorted_peaks[x].index].id << ' ';
-            // TODO: Build feature.
+
+        // Build feature.
+        FeatureDetection::Feature feature = {};
+        feature.score = best_dot;
+        feature.charge_state = best_charge_state;
+        feature.average_rt = 0.0;
+        feature.average_rt_sigma = 0.0;
+        feature.average_rt_delta = 0.0;
+        feature.average_mz = 0.0;
+        feature.average_mz_sigma = 0.0;
+        feature.total_height = 0.0;
+        feature.total_volume = 0.0;
+        feature.max_height = 0.0;
+        feature.max_volume = 0.0;
+        feature.peak_ids = std::vector<uint64_t>(best_path.size());
+        for (size_t i = 0; i < best_path.size(); ++i) {
+            const auto &graph_idx = best_path[i];
+            const auto &peak = peaks[sorted_peaks[graph_idx].index];
+
+            feature.peak_ids[i] = peak.id;
+            feature.average_rt += peak.fitted_rt;
+            feature.average_rt_sigma += peak.fitted_sigma_rt;
+            feature.average_rt_delta += peak.rt_delta;
+            feature.average_mz += peak.fitted_mz * peak.fitted_height;
+            feature.average_mz_sigma += peak.fitted_sigma_mz;
+            feature.total_height += peak.fitted_height;
+            feature.total_volume += peak.fitted_volume;
+            if (peak.fitted_height > feature.max_height) {
+                feature.max_height = peak.fitted_height;
+            }
+            if (peak.fitted_volume > feature.max_volume) {
+                feature.max_volume = peak.fitted_volume;
+            }
+            if (i == 0) {
+                feature.monoisotopic_mz = peak.fitted_mz;
+                feature.monoisotopic_rt = peak.fitted_rt;
+                feature.monoisotopic_height = peak.fitted_height;
+                feature.monoisotopic_volume = peak.fitted_volume;
+            }
+
             // Mark peaks as used.
             for (size_t k = 0; k < charge_states.size(); ++k) {
-                charge_state_graphs[k][x].visited = true;
+                charge_state_graphs[k][graph_idx].visited = true;
             }
         }
-        std::cout << " Z: " << (int64_t)best_charge_state << std::endl;
-        std::cout << std::endl;
+        feature.average_rt /= best_path.size();
+        feature.average_rt_delta /= best_path.size();
+        feature.average_rt_sigma /= best_path.size();
+        feature.average_mz /= feature.total_height;
+        feature.average_mz_sigma /= best_path.size();
 
-        // break;
+        features.push_back(feature);
     }
+
+    // Sort features and assign ids.
+    auto sort_features = [](const auto &a, const auto &b) {
+        return (a.total_volume >= b.total_volume);
+    };
+    std::sort(features.begin(), features.end(), sort_features);
+    for (size_t i = 0; i < features.size(); ++i) {
+        auto &feature = features[i];
+        feature.id = i;
+    }
+
+    return features;
+    // DEBUG:...
+    // std::cout << "-----------" << std::endl;
+    // for (const auto &feature : features) {
+    // std::cout << "Feature ID: " << feature.id << std::endl;
+    // std::cout << "average_rt: " << feature.average_rt << std::endl;
+    // std::cout << "average_rt_sigma: " << feature.average_rt_sigma
+    //<< std::endl;
+    // std::cout << "average_rt_delta: " << feature.average_rt_delta
+    //<< std::endl;
+    // std::cout << "average_mz: " << feature.average_mz << std::endl;
+    // std::cout << "average_mz_sigma: " << feature.average_mz_sigma
+    //<< std::endl;
+    // std::cout << "total_height: " << feature.total_height << std::endl;
+    // std::cout << "total_volume: " << feature.total_volume << std::endl;
+    // std::cout << "max_height: " << feature.max_height << std::endl;
+    // std::cout << "max_volume: " << feature.max_volume << std::endl;
+    //}
 }
