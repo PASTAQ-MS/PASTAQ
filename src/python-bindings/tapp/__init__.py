@@ -453,6 +453,8 @@ def default_parameters(instrument, avg_fwhm_rt):
             'metamatch_radius_mz': 0.005,
             'metamatch_radius_rt': avg_fwhm_rt/2,
             'metamatch_fraction': 0.7,
+            # Feature detection.
+            'feature_detection_charge_states': [5, 4, 3, 2, 1],
             # Other
             'max_peaks': 100000,
             'polarity': 'both',
@@ -1137,18 +1139,9 @@ def dda_pipeline(
         logger.info("Reading peaks from disk: {}".format(stem))
         peaks = tapp.read_peaks(in_path_peaks)
 
-        logger.info("Reading ident_data from disk: {}".format(stem))
-        ident_data = tapp.read_ident_data(in_path_idents)
-
-        logger.info("Reading linked peaks from disk: {}".format(stem))
-        linked_peaks = tapp.read_linked_msms(in_path_peaks_link)
-
-        logger.info("Reading linked idents from disk: {}".format(stem))
-        linked_idents = tapp.read_linked_msms(in_path_ident_link)
-
         logger.info("Performing feature_detection: {}".format(stem))
-        features = tapp.feature_detection(
-            peaks, raw_data, ident_data, linked_peaks, linked_idents)
+        features = tapp.detect_features(
+            peaks, tapp_parameters['feature_detection_charge_states'])
         logger.info('Writing features: {}'.format(out_path))
         tapp.write_features(features, out_path)
     logger.info('Finished feature detection in {}'.format(
@@ -1447,70 +1440,71 @@ def dda_pipeline(
             out_path_peak_clusters_info_peak_ids, index=False)
 
     # Find protein information for the identified features.
-    logger.info("Finding protein information on identified features")
-    for stem in input_stems:
-        in_path_features = os.path.join(
-            output_dir, 'features', "{}.features".format(stem))
-        in_path_ident_link = os.path.join(output_dir, 'linking',
-                                          "{}.ms2_idents.link".format(stem))
-        in_path_ident_data = os.path.join(
-            output_dir, 'ident', "{}.ident".format(stem))
-        in_path_inferred_proteins = os.path.join(
-            output_dir, 'ident', "{}.inferred_proteins".format(stem))
-        out_path_identified_features = os.path.join(
-            output_dir, 'quant', "{}_identified_features.csv".format(stem))
-        if os.path.exists(out_path_identified_features) and not override_existing:
-            continue
+    # TODO: Fix this for the new feature detection algorithm.
+    # logger.info("Finding protein information on identified features")
+    # for stem in input_stems:
+        # in_path_features = os.path.join(
+            # output_dir, 'features', "{}.features".format(stem))
+        # in_path_ident_link = os.path.join(output_dir, 'linking',
+                                          # "{}.ms2_idents.link".format(stem))
+        # in_path_ident_data = os.path.join(
+            # output_dir, 'ident', "{}.ident".format(stem))
+        # in_path_inferred_proteins = os.path.join(
+            # output_dir, 'ident', "{}.inferred_proteins".format(stem))
+        # out_path_identified_features = os.path.join(
+            # output_dir, 'quant', "{}_identified_features.csv".format(stem))
+        # if os.path.exists(out_path_identified_features) and not override_existing:
+            # continue
 
-        logger.info("Reading features from disk: {}".format(stem))
-        features = tapp.read_features(in_path_features)
-        features_df = pd.DataFrame({
-            'feature_id': [feature.id for feature in features],
-            'msms_index': [feature.msms_id for feature in features],
-        })
+        # logger.info("Reading features from disk: {}".format(stem))
+        # features = tapp.read_features(in_path_features)
+        # features_df = pd.DataFrame({
+            # 'feature_id': [feature.id for feature in features],
+            # 'msms_index': [feature.msms_id for feature in features],
+        # })
 
-        logger.info("Reading ident_data from disk: {}".format(stem))
-        ident_data = tapp.read_ident_data(in_path_ident_data)
+        # logger.info("Reading ident_data from disk: {}".format(stem))
+        # ident_data = tapp.read_ident_data(in_path_ident_data)
 
-        logger.info("Reading inferred_proteins from disk: {}".format(stem))
-        inferred_proteins = tapp.read_inferred_proteins(
-            in_path_inferred_proteins)
-        inferred_proteins_df = pd.DataFrame({
-            'protein_id': [inferred_protein.protein_id for inferred_protein in inferred_proteins],
-            'psm_id': [inferred_protein.psm_id for inferred_protein in inferred_proteins],
-        })
+        # logger.info("Reading inferred_proteins from disk: {}".format(stem))
+        # inferred_proteins = tapp.read_inferred_proteins(
+            # in_path_inferred_proteins)
+        # inferred_proteins_df = pd.DataFrame({
+            # 'protein_id': [inferred_protein.protein_id for inferred_protein in inferred_proteins],
+            # 'psm_id': [inferred_protein.psm_id for inferred_protein in inferred_proteins],
+        # })
 
-        logger.info("Reading linked idents from disk: {}".format(stem))
-        linked_idents = tapp.read_linked_msms(in_path_ident_link)
-        linked_idents_df = pd.DataFrame({
-            'psm_index': [linked_ident.entity_id for linked_ident in linked_idents],
-            'msms_index': [linked_ident.msms_id for linked_ident in linked_idents],
-        })
+        # logger.info("Reading linked idents from disk: {}".format(stem))
+        # linked_idents = tapp.read_linked_msms(in_path_ident_link)
+        # linked_idents_df = pd.DataFrame({
+            # 'psm_index': [linked_ident.entity_id for linked_ident in linked_idents],
+            # 'msms_index': [linked_ident.msms_id for linked_ident in linked_idents],
+        # })
 
-        logger.info("Creating linked psm protein table: {}".format(stem))
-        linked_features_df = pd.merge(
-            features_df, linked_idents_df, on="msms_index")
-        linked_spectrum_ids = [ident_data.spectrum_ids[i]
-                               for i in linked_features_df['psm_index']]
-        linked_spectrum_ids_df = pd.DataFrame({
-            'psm_id': [linked_spectrum_id.id for linked_spectrum_id in linked_spectrum_ids],
-            'sequence': [linked_spectrum_id.sequence for linked_spectrum_id in linked_spectrum_ids],
-            'charge_state': [linked_spectrum_id.charge_state for linked_spectrum_id in linked_spectrum_ids],
-            'retention_time': [linked_spectrum_id.retention_time for linked_spectrum_id in linked_spectrum_ids],
-        })
-        linked_spectrum_ids_df = pd.merge(
-            linked_spectrum_ids_df, inferred_proteins_df, on="psm_id", how="left")
+        # logger.info("Creating linked psm protein table: {}".format(stem))
+        # linked_features_df = pd.merge(
+            # features_df, linked_idents_df, on="msms_index")
+        # linked_spectrum_ids = [ident_data.spectrum_ids[i]
+                               # for i in linked_features_df['psm_index']]
+        # linked_spectrum_ids_df = pd.DataFrame({
+            # 'psm_id': [linked_spectrum_id.id for linked_spectrum_id in linked_spectrum_ids],
+            # 'sequence': [linked_spectrum_id.sequence for linked_spectrum_id in linked_spectrum_ids],
+            # 'charge_state': [linked_spectrum_id.charge_state for linked_spectrum_id in linked_spectrum_ids],
+            # 'retention_time': [linked_spectrum_id.retention_time for linked_spectrum_id in linked_spectrum_ids],
+        # })
+        # linked_spectrum_ids_df = pd.merge(
+            # linked_spectrum_ids_df, inferred_proteins_df, on="psm_id", how="left")
 
-        protein_names_df = pd.DataFrame({
-            'protein_id': [db_seq.id for db_seq in ident_data.db_sequences],
-            'protein_name': [db_seq.value for db_seq in ident_data.db_sequences],
-        })
-        linked_spectrum_ids_df = pd.merge(
-            linked_spectrum_ids_df, protein_names_df, on="protein_id", how="left")
+        # protein_names_df = pd.DataFrame({
+            # 'protein_id': [db_seq.id for db_seq in ident_data.db_sequences],
+            # 'protein_name': [db_seq.value for db_seq in ident_data.db_sequences],
+        # })
+        # linked_spectrum_ids_df = pd.merge(
+            # linked_spectrum_ids_df, protein_names_df, on="protein_id", how="left")
 
-        linked_features_df = pd.concat(
-            [linked_features_df, linked_spectrum_ids_df], axis=1)
-        linked_features_df.to_csv(out_path_identified_features, index=False)
+        # linked_features_df = pd.concat(
+            # [linked_features_df, linked_spectrum_ids_df], axis=1)
+        # linked_features_df.to_csv(out_path_identified_features, index=False)
 
     # Link metamatch clusters and corresponding features with identification
     # information of peptides and proteins.
@@ -1614,15 +1608,8 @@ def full_dda_pipeline_test():
 
 def testing_feature_detection():
     peaks = tapp.read_peaks('tapp_pipeline_test/warped_peaks/1_3.peaks')
-    ms2_data = tapp.read_raw_data('tapp_pipeline_test/raw/1_3.ms2')
-    linked_peaks = tapp.read_linked_msms(
-        'tapp_pipeline_test/linking/1_3.ms2_peaks.link')
-    linked_idents = tapp.read_linked_msms(
-        'tapp_pipeline_test/linking/1_3.ms2_idents.link')
-    ident_data = tapp.read_ident_data('tapp_pipeline_test/ident/1_3.ident')
-    results = tapp.feature_detection(
-        peaks, ms2_data, ident_data, linked_peaks, linked_idents)
-    return (peaks, ms2_data, ident_data, linked_peaks, linked_idents, results)
+    features = tapp.detect_features(peaks, [5,4,3,2,1])
+    return (peaks, features)
 
 
 def testing_feature_matching():
