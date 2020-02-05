@@ -1305,9 +1305,7 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("method") = "sum")
         .def("perform_protein_inference", &ProteinInference::razor,
              py::arg("ident_data"))
-        .def("feature_detection", &FeatureDetection::feature_detection,
+        .def("detect_features", &FeatureDetection::detect_features,
              "Link peaks as features", py::arg("peaks"),
-             py::arg("raw_data_ms2"), py::arg("ident_data"),
-             py::arg("link_table_idents"), py::arg("link_table_msms"),
-             py::arg("discrepancy_threshold") = 0.25);
+             py::arg("charge_states"));
 }
