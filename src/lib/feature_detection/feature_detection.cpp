@@ -1,3 +1,5 @@
+#include <map>
+
 #include "MIDAs/MIDAs.h"
 
 #include "feature_detection/feature_detection.hpp"
@@ -444,8 +446,6 @@ std::vector<FeatureDetection::Feature> FeatureDetection::feature_detection(
     return features;
 }
 
-#include <iostream>
-
 std::vector<std::vector<uint64_t>> find_all_paths(
     FeatureDetection::CandidateGraph &graph, uint64_t root_node) {
     std::vector<std::vector<uint64_t>> paths;
@@ -567,7 +567,6 @@ OptimalPath rolling_weighted_cosine_sim(std::vector<double> &A,
     return {best_dot, best_path_min_i, best_path_max_i};
 }
 
-#include <map>
 std::map<double, std::vector<double>> averagine_table = {
     {300.17921, {100.00, 16.53, 2.10, 0.20, 0.01}},
     {400.0, {100.00, 22.68, 3.48, 0.40, 0.04}},
@@ -747,21 +746,4 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
     }
 
     return features;
-    // DEBUG:...
-    // std::cout << "-----------" << std::endl;
-    // for (const auto &feature : features) {
-    // std::cout << "Feature ID: " << feature.id << std::endl;
-    // std::cout << "average_rt: " << feature.average_rt << std::endl;
-    // std::cout << "average_rt_sigma: " << feature.average_rt_sigma
-    //<< std::endl;
-    // std::cout << "average_rt_delta: " << feature.average_rt_delta
-    //<< std::endl;
-    // std::cout << "average_mz: " << feature.average_mz << std::endl;
-    // std::cout << "average_mz_sigma: " << feature.average_mz_sigma
-    //<< std::endl;
-    // std::cout << "total_height: " << feature.total_height << std::endl;
-    // std::cout << "total_volume: " << feature.total_volume << std::endl;
-    // std::cout << "max_height: " << feature.max_height << std::endl;
-    // std::cout << "max_volume: " << feature.max_volume << std::endl;
-    //}
 }
