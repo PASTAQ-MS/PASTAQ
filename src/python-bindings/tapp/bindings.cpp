@@ -244,7 +244,7 @@ void write_raw_data(const RawData::RawData &raw_data,
                     std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
-    stream.open(output_file);
+    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -263,7 +263,7 @@ void write_raw_data(const RawData::RawData &raw_data,
 RawData::RawData read_raw_data(std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
-    stream.open(input_file);
+    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -283,7 +283,7 @@ RawData::RawData read_raw_data(std::string &input_file) {
 void write_grid(const Grid::Grid &grid, std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
-    stream.open(output_file);
+    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -301,7 +301,7 @@ void write_grid(const Grid::Grid &grid, std::string &output_file) {
 Grid::Grid read_grid(std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
-    stream.open(input_file);
+    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -321,7 +321,7 @@ Grid::Grid read_grid(std::string &input_file) {
 void write_time_map(const Warp2D::TimeMap &time_map, std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
-    stream.open(output_file);
+    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -340,7 +340,7 @@ void write_time_map(const Warp2D::TimeMap &time_map, std::string &output_file) {
 Warp2D::TimeMap read_time_map(std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
-    stream.open(input_file);
+    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -361,7 +361,7 @@ void write_peaks(const std::vector<Centroid::Peak> &peaks,
                  std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
-    stream.open(output_file);
+    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -379,7 +379,7 @@ void write_peaks(const std::vector<Centroid::Peak> &peaks,
 std::vector<Centroid::Peak> read_peaks(std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
-    stream.open(input_file);
+    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -400,7 +400,7 @@ std::vector<ProteinInference::InferredProtein> read_inferred_proteins(
     std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
-    stream.open(input_file);
+    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -424,7 +424,7 @@ void write_inferred_proteins(
     std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
-    stream.open(output_file);
+    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -446,7 +446,7 @@ void write_feature_clusters(
     std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
-    stream.open(output_file);
+    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -467,7 +467,7 @@ std::vector<MetaMatch::FeatureCluster> read_feature_clusters(
     std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
-    stream.open(input_file);
+    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -490,7 +490,7 @@ void write_features(const std::vector<FeatureDetection::Feature> &features,
                     std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
-    stream.open(output_file);
+    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -509,7 +509,7 @@ void write_features(const std::vector<FeatureDetection::Feature> &features,
 std::vector<FeatureDetection::Feature> read_features(std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
-    stream.open(input_file);
+    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -530,7 +530,7 @@ void write_ident_data(const IdentData::IdentData &ident_data,
                       std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
-    stream.open(output_file);
+    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -549,7 +549,7 @@ void write_ident_data(const IdentData::IdentData &ident_data,
 IdentData::IdentData read_ident_data(std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
-    stream.open(input_file);
+    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -572,7 +572,7 @@ void write_metamatch_clusters(
     std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
-    stream.open(output_file);
+    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -592,7 +592,7 @@ std::vector<MetaMatch::Cluster> read_metamatch_clusters(
     std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
-    stream.open(input_file);
+    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -614,7 +614,7 @@ void write_metamatch_peaks(const std::vector<MetaMatch::Peak> &metamatch_peaks,
                            std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
-    stream.open(output_file);
+    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -633,7 +633,7 @@ void write_metamatch_peaks(const std::vector<MetaMatch::Peak> &metamatch_peaks,
 std::vector<MetaMatch::Peak> read_metamatch_peaks(std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
-    stream.open(input_file);
+    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -655,7 +655,7 @@ void write_linked_msms(const std::vector<Link::LinkedMsms> &linked_msms,
                        std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
-    stream.open(output_file);
+    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -674,7 +674,7 @@ void write_linked_msms(const std::vector<Link::LinkedMsms> &linked_msms,
 std::vector<Link::LinkedMsms> read_linked_msms(std::string &input_file) {
     // Open file stream.
     std::ifstream stream;
-    stream.open(input_file);
+    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -1256,11 +1256,6 @@ PYBIND11_MODULE(tapp, m) {
         .def("write_time_map", &PythonAPI::write_time_map,
              "Write the time_map to disk in a binary format",
              py::arg("time_map"), py::arg("file_name"))
-        .def("theoretical_isotopes_peptide",
-             &FeatureDetection::theoretical_isotopes_peptide,
-             "Calculate the theoretical isotopic distribution of a peptide",
-             py::arg("sequence"), py::arg("charge_state"),
-             py::arg("min_perc") = 0.01)
         .def("read_mzidentml", &PythonAPI::read_mzidentml,
              "Read identification data from the given mzIdentML file ",
              py::arg("file_name"))
