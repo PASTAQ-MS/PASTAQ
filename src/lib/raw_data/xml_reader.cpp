@@ -4,6 +4,276 @@
 #include "utils/base64.hpp"
 #include "xml_reader.hpp"
 
+RawData::Scan parse_scan(std::istream &stream,
+                         std::optional<XmlReader::Tag> &tag, double min_mz,
+                         double max_mz, double min_rt, double max_rt,
+                         Polarity::Type polarity, size_t ms_level) {
+    RawData::Scan scan;
+    uint64_t precursor_id = 0;
+    auto scan_attributes = tag.value().attributes;
+
+    // Find scan number.
+    if (scan_attributes.find("num") == scan_attributes.end()) {
+        return {};
+    }
+    scan.scan_number = std::stoi(scan_attributes["num"]);
+
+    // Find polarity.
+    if (scan_attributes.find("polarity") != scan_attributes.end()) {
+        if (scan_attributes["polarity"] == "+") {
+            scan.polarity = Polarity::POSITIVE;
+        } else if (scan_attributes["polarity"] == "-") {
+            scan.polarity = Polarity::NEGATIVE;
+        } else {
+            scan.polarity = Polarity::BOTH;
+        }
+        if (polarity != Polarity::BOTH && scan.polarity != polarity) {
+            return {};
+        }
+    }
+
+    // Find MS level.
+    if (scan_attributes.find("msLevel") == scan_attributes.end()) {
+        return {};
+    }
+    size_t scan_ms_level = std::stoi(scan_attributes["msLevel"]);
+    scan.ms_level = scan_ms_level;
+
+    // Fill up the rest of the scan information.
+    if (scan_ms_level == ms_level) {
+        // Find the number of m/z-intensity pairs in the scan.
+        if (scan_attributes.find("peaksCount") == scan_attributes.end()) {
+            return {};
+        }
+        size_t num_points = std::stoi(scan_attributes["peaksCount"]);
+
+        // Extract the retention time.
+        if (scan_attributes.find("retentionTime") == scan_attributes.end()) {
+            // NOTE(alex): On the spec, the retention time attribute is
+            // optional, however, we do require it.
+            return {};
+        }
+
+        // The time is in xs:duration units. Here we are only accounting
+        // for the data as stored in seconds, minutes and hours. It is
+        // unlikely that we are going to need to parse the days, months
+        // and years. For more information about the format see:
+        //    https://www.ibm.com/support/knowledgecenter/en/ssw_ibm_i_72/rzasp/rzasp_xsduration.htm
+        std::regex rt_regex(
+            R"(P.*T(?:([[:digit:]]+)H)?(?:([[:digit:]]+)M)?(?:([[:digit:]]+\.?[[:digit:]]*)S))");
+        std::smatch matches;
+        if (!std::regex_search(scan_attributes["retentionTime"], matches,
+                               rt_regex) ||
+            matches.size() != 4) {
+            return {};
+        }
+        double retention_time = std::stod(matches[3]);
+        if (matches[2] != "") {
+            retention_time += std::stod(matches[2]) * 60;
+        }
+        if (matches[1] != "") {
+            retention_time += std::stod(matches[1]) * 60 * 60;
+        }
+        scan.retention_time = retention_time;
+
+        // Check if we are on the desired region as defined by
+        if (retention_time < min_rt) {
+            return {};
+        }
+        // Assuming linearity of the retention time on the mzXML file.
+        // TODO: We should stop searching for the next scan, since we are out of
+        // bounds.
+        if (retention_time > max_rt) {
+            return {};
+        }
+
+        // Fetch the next tag. We are interested in the contents of this scan
+        // tag: precursorMz and peaks.
+        auto next_tag = XmlReader::read_tag(stream);
+        while (next_tag) {
+            if (next_tag.value().name == "scan" && next_tag.value().closed) {
+                break;
+            }
+            // We are not interested in subscans here. Continue until we find
+            // the corresponding output.
+            // FIXME: This only works with ONE subscan! ms1->ms2, if we are in
+            // ms1 and our ms2 contain subscans, it will FAIL. We need to
+            // recursively check child scans.
+            if (next_tag.value().name == "scan" && !next_tag.value().closed) {
+                next_tag = XmlReader::read_tag(stream);
+                while (next_tag) {
+                    if (next_tag.value().name == "scan" &&
+                        next_tag.value().closed) {
+                        break;
+                    }
+                    next_tag = XmlReader::read_tag(stream);
+                }
+            }
+            if (next_tag.value().name == "peaks") {
+                auto peak_attributes = next_tag.value().attributes;
+
+                // Extract the precision from the peaks tag.
+                if (peak_attributes.find("precision") ==
+                    peak_attributes.end()) {
+                    return {};
+                }
+                int precision = std::stoi(peak_attributes["precision"]);
+
+                // Extract the byteOrder from the peaks tag. This determines
+                // the endianness in which the data was stored. `network` ==
+                // `big_endian`.
+                if (peak_attributes.find("byteOrder") ==
+                    peak_attributes.end()) {
+                    return {};
+                }
+                auto byte_order = peak_attributes["byteOrder"];
+                auto little_endian = byte_order != "network";
+
+                // Extract the contentType/pairOrder from the peaks tag and
+                // exit if it is not `m/z-int`. In older versions of
+                // ProteoWizard, the conversion was not validated and the
+                // tag was incorrect. Here we are supporting both versions
+                // for compatibility but we are not trying to be exhaustive.
+                auto content_type_found = peak_attributes.find("contentType") !=
+                                          peak_attributes.end();
+                auto pair_order_found =
+                    peak_attributes.find("pairOrder") != peak_attributes.end();
+                if (!content_type_found && !pair_order_found) {
+                    return {};
+                }
+                std::string pair_order;
+                if (content_type_found) {
+                    pair_order = peak_attributes["contentType"];
+                } else {
+                    pair_order = peak_attributes["pairOrder"];
+                }
+
+                // Extract the peaks from the data.
+                auto data = XmlReader::read_data(stream);
+                if (!data) {
+                    return {};
+                }
+
+                // Decode the points from the base 64 string.
+                // Initialize Base64 decoder.
+                Base64 decoder(
+                    reinterpret_cast<unsigned char *>(&data.value()[0]),
+                    precision, little_endian);
+                double intensity_sum = 0;
+                double max_intensity = 0;
+                for (size_t i = 0; i < num_points; ++i) {
+                    auto mz = decoder.get_double();
+                    auto intensity = decoder.get_double();
+
+                    // We don't need to extract the peaks when we are not
+                    // inside the mz bounds or contain no value.
+                    if (mz < min_mz || mz > max_mz || intensity == 0) {
+                        continue;
+                    }
+
+                    if (intensity > max_intensity) {
+                        max_intensity = intensity;
+                    }
+                    intensity_sum += intensity;
+
+                    // NOTE(alex): Not the most efficient way. It would be
+                    // better to preallocate but we don't know at this point
+                    // how many peaks from peak_count are inside our bounds.
+                    scan.mz.push_back(mz);
+                    scan.intensity.push_back(intensity);
+                }
+                scan.num_points = scan.mz.size();
+                scan.max_intensity = max_intensity;
+                scan.total_intensity = intensity_sum;
+            }
+            if (next_tag.value().name == "precursorMz") {
+                auto precursor_attributes = next_tag.value().attributes;
+                if (precursor_attributes.find("precursorIntensity") !=
+                    precursor_attributes.end()) {
+                    scan.precursor_information.intensity =
+                        std::stod(precursor_attributes["precursorIntensity"]);
+                }
+
+                if (precursor_attributes.find("windowWideness") !=
+                    precursor_attributes.end()) {
+                    scan.precursor_information.window_wideness =
+                        std::stod(precursor_attributes["windowWideness"]);
+                }
+
+                if (precursor_attributes.find("windowWideness") !=
+                    precursor_attributes.end()) {
+                    scan.precursor_information.window_wideness =
+                        std::stod(precursor_attributes["windowWideness"]);
+                }
+
+                if (precursor_attributes.find("precursorCharge") !=
+                    precursor_attributes.end()) {
+                    scan.precursor_information.charge =
+                        std::stoi(precursor_attributes["precursorCharge"]);
+                }
+
+                if (precursor_attributes.find("activationMethod") !=
+                    precursor_attributes.end()) {
+                    if (precursor_attributes["activationMethod"] == "CID") {
+                        scan.precursor_information.activation_method =
+                            ActivationMethod::CID;
+                    } else if (precursor_attributes["activationMethod"] ==
+                               "HCD") {
+                        scan.precursor_information.activation_method =
+                            ActivationMethod::HCD;
+                    } else {
+                        scan.precursor_information.activation_method =
+                            ActivationMethod::UNKNOWN;
+                    }
+                } else {
+                    scan.precursor_information.activation_method =
+                        ActivationMethod::UNKNOWN;
+                }
+
+                auto data = XmlReader::read_data(stream);
+                if (!data) {
+                    return {};
+                }
+                scan.precursor_information.mz = std::stod(data.value());
+
+                if (precursor_attributes.find("precursorScanNum") !=
+                    precursor_attributes.end()) {
+                    scan.precursor_information.scan_number =
+                        std::stoi(precursor_attributes["precursorScanNum"]);
+                }
+            }
+            next_tag = XmlReader::read_tag(stream);
+        }
+        return scan;
+    }
+
+    // If we are interested in a scan with a mz_level != 1, we need to find the
+    // precursor to which it belongs.
+    if (scan_ms_level == ms_level - 1) {
+        precursor_id = scan.scan_number;
+        auto next_tag = XmlReader::read_tag(stream);
+        while (next_tag) {
+            if (next_tag.value().name == "scan" && !next_tag.value().closed) {
+                auto child_scan =
+                    parse_scan(stream, next_tag, min_mz, max_mz, min_rt, max_rt,
+                               polarity, ms_level);
+                child_scan.precursor_information.scan_number = precursor_id;
+                if (child_scan.precursor_information.scan_number !=
+                    precursor_id) {
+                    std::cout
+                        << "PANIC: Mismatched precursor ids: " << precursor_id
+                        << " " << child_scan.precursor_information.scan_number
+                        << std::endl;
+                }
+                return child_scan;
+            }
+            next_tag = XmlReader::read_tag(stream);
+        }
+    }
+
+    return {};
+}
+
 std::optional<RawData::RawData> XmlReader::read_mzxml(
     std::istream &stream, double min_mz, double max_mz, double min_rt,
     double max_rt, Instrument::Type instrument_type, double resolution_ms1,
@@ -23,257 +293,29 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
     raw_data.retention_times = {};
     // TODO(alex): Can we automatically detect the instrument type and set
     // resolution from the header?
-    size_t previous_ms1_scan_number = 0;
     while (stream.good()) {
         auto tag = XmlReader::read_tag(stream);
         if (!tag) {
             continue;
         }
         if (tag.value().name == "scan" && !tag.value().closed) {
-            RawData::Scan scan;
-
-            auto scan_attributes = tag.value().attributes;
-
-            // Find scan number.
-            if (scan_attributes.find("num") == scan_attributes.end()) {
-                return std::nullopt;
-            }
-            scan.scan_number = std::stoi(scan_attributes["num"]);
-
-            // Find polarity.
-            if (scan_attributes.find("polarity") != scan_attributes.end()) {
-                if (scan_attributes["polarity"] == "+") {
-                    scan.polarity = Polarity::POSITIVE;
-                } else if (scan_attributes["polarity"] == "-") {
-                    scan.polarity = Polarity::NEGATIVE;
-                } else {
-                    scan.polarity = Polarity::BOTH;
+            auto scan = parse_scan(stream, tag, min_mz, max_mz, min_rt, max_rt,
+                                   polarity, ms_level);
+            if (scan.num_points != 0) {
+                raw_data.scans.push_back(scan);
+                raw_data.retention_times.push_back(scan.retention_time);
+                if (scan.retention_time < raw_data.min_rt) {
+                    raw_data.min_rt = scan.retention_time;
                 }
-                if (polarity != Polarity::BOTH && scan.polarity != polarity) {
-                    continue;
+                if (scan.retention_time > raw_data.max_rt) {
+                    raw_data.max_rt = scan.retention_time;
                 }
-            }
-
-            // Find MS level.
-            if (scan_attributes.find("msLevel") == scan_attributes.end()) {
-                return std::nullopt;
-            }
-            size_t scan_ms_level = std::stoi(scan_attributes["msLevel"]);
-            if (scan_ms_level == 1) {
-                previous_ms1_scan_number = scan.scan_number;
-            }
-            if (scan_ms_level != ms_level) {
-                continue;
-            }
-            scan.ms_level = scan_ms_level;
-
-            // Find the number of m/z-intensity pairs in the scan.
-            if (scan_attributes.find("peaksCount") == scan_attributes.end()) {
-                return std::nullopt;
-            }
-            size_t num_points = std::stoi(scan_attributes["peaksCount"]);
-
-            // Extract the retention time.
-            if (scan_attributes.find("retentionTime") ==
-                scan_attributes.end()) {
-                // NOTE(alex): On the spec, the retention time attribute is
-                // optional, however, we do require it.
-                return std::nullopt;
-            }
-
-            // The time is in xs:duration units. Here we are only accounting
-            // for the data as stored in seconds, minutes and hours. It is
-            // unlikely that we are going to need to parse the days, months
-            // and years. For more information about the format see:
-            //    https://www.ibm.com/support/knowledgecenter/en/ssw_ibm_i_72/rzasp/rzasp_xsduration.htm
-            std::regex rt_regex(
-                R"(P.*T(?:([[:digit:]]+)H)?(?:([[:digit:]]+)M)?(?:([[:digit:]]+\.?[[:digit:]]*)S))");
-            std::smatch matches;
-            if (!std::regex_search(scan_attributes["retentionTime"], matches,
-                                   rt_regex) ||
-                matches.size() != 4) {
-                return std::nullopt;
-            }
-            double retention_time = std::stod(matches[3]);
-            if (matches[2] != "") {
-                retention_time += std::stod(matches[2]) * 60;
-            }
-            if (matches[1] != "") {
-                retention_time += std::stod(matches[1]) * 60 * 60;
-            }
-            scan.retention_time = retention_time;
-
-            // Check if we are on the desired region as defined by
-            // Grid::Bounds.
-            if (retention_time < min_rt) {
-                continue;
-            }
-            // Assuming linearity of the retention time on the mzXML file.
-            // We stop searching for the next scan, since we are out of bounds.
-            if (retention_time > max_rt) {
-                break;
-            }
-            if (retention_time < raw_data.min_rt) {
-                raw_data.min_rt = retention_time;
-            }
-            if (retention_time > raw_data.max_rt) {
-                raw_data.max_rt = retention_time;
-            }
-
-            // Fetch the peaks tag.
-            tag = XmlReader::read_tag(stream);
-            while (tag) {
-                if (tag.value().name == "scan" && tag.value().closed) {
-                    break;
+                if (scan.mz[0] < raw_data.min_mz) {
+                    raw_data.min_mz = scan.mz[0];
                 }
-                if (tag.value().name == "peaks") {
-                    auto peak_attributes = tag.value().attributes;
-
-                    // Extract the precision from the peaks tag.
-                    if (peak_attributes.find("precision") ==
-                        peak_attributes.end()) {
-                        return std::nullopt;
-                    }
-                    int precision = std::stoi(peak_attributes["precision"]);
-
-                    // Extract the byteOrder from the peaks tag. This determines
-                    // the endianness in which the data was stored. `network` ==
-                    // `big_endian`.
-                    if (peak_attributes.find("byteOrder") ==
-                        peak_attributes.end()) {
-                        return std::nullopt;
-                    }
-                    auto byte_order = peak_attributes["byteOrder"];
-                    auto little_endian = byte_order != "network";
-
-                    // Extract the contentType/pairOrder from the peaks tag and
-                    // exit if it is not `m/z-int`. In older versions of
-                    // ProteoWizard, the conversion was not validated and the
-                    // tag was incorrect. Here we are supporting both versions
-                    // for compatibility but we are not trying to be exhaustive.
-                    auto content_type_found =
-                        peak_attributes.find("contentType") !=
-                        peak_attributes.end();
-                    auto pair_order_found = peak_attributes.find("pairOrder") !=
-                                            peak_attributes.end();
-                    if (!content_type_found && !pair_order_found) {
-                        return std::nullopt;
-                    }
-                    std::string pair_order;
-                    if (content_type_found) {
-                        pair_order = peak_attributes["contentType"];
-                    } else {
-                        pair_order = peak_attributes["pairOrder"];
-                    }
-
-                    // Extract the peaks from the data.
-                    auto data = XmlReader::read_data(stream);
-                    if (!data) {
-                        return std::nullopt;
-                    }
-
-                    // Decode the points from the base 64 string.
-                    // Initialize Base64 decoder.
-                    Base64 decoder(
-                        reinterpret_cast<unsigned char *>(&data.value()[0]),
-                        precision, little_endian);
-                    double intensity_sum = 0;
-                    double max_intensity = 0;
-                    for (size_t i = 0; i < num_points; ++i) {
-                        auto mz = decoder.get_double();
-                        auto intensity = decoder.get_double();
-
-                        // We don't need to extract the peaks when we are not
-                        // inside the mz bounds or contain no value.
-                        if (mz < min_mz || mz > max_mz || intensity == 0) {
-                            continue;
-                        }
-                        if (mz < raw_data.min_mz) {
-                            raw_data.min_mz = mz;
-                        }
-                        if (mz > raw_data.max_mz) {
-                            raw_data.max_mz = mz;
-                        }
-
-                        if (intensity > max_intensity) {
-                            max_intensity = intensity;
-                        }
-                        intensity_sum += intensity;
-
-                        // NOTE(alex): Not the most efficient way. It would be
-                        // better to preallocate but we don't know at this point
-                        // how many peaks from peak_count are inside our bounds.
-                        scan.mz.push_back(mz);
-                        scan.intensity.push_back(intensity);
-                    }
-                    scan.num_points = scan.mz.size();
-                    if (scan.num_points != 0) {
-                        raw_data.scans.push_back(scan);
-                        raw_data.retention_times.push_back(retention_time);
-                        scan.max_intensity = max_intensity;
-                        scan.total_intensity = intensity_sum;
-                    }
+                if (scan.mz[scan.mz.size() - 1] > raw_data.max_mz) {
+                    raw_data.max_mz = scan.mz[scan.mz.size() - 1];
                 }
-                if (tag.value().name == "precursorMz") {
-                    auto precursor_attributes = tag.value().attributes;
-                    if (precursor_attributes.find("precursorIntensity") !=
-                        precursor_attributes.end()) {
-                        scan.precursor_information.intensity = std::stod(
-                            precursor_attributes["precursorIntensity"]);
-                    }
-
-                    if (precursor_attributes.find("windowWideness") !=
-                        precursor_attributes.end()) {
-                        scan.precursor_information.window_wideness =
-                            std::stod(precursor_attributes["windowWideness"]);
-                    }
-
-                    if (precursor_attributes.find("windowWideness") !=
-                        precursor_attributes.end()) {
-                        scan.precursor_information.window_wideness =
-                            std::stod(precursor_attributes["windowWideness"]);
-                    }
-
-                    if (precursor_attributes.find("precursorCharge") !=
-                        precursor_attributes.end()) {
-                        scan.precursor_information.charge =
-                            std::stoi(precursor_attributes["precursorCharge"]);
-                    }
-
-                    if (precursor_attributes.find("activationMethod") !=
-                        precursor_attributes.end()) {
-                        if (precursor_attributes["activationMethod"] == "CID") {
-                            scan.precursor_information.activation_method =
-                                ActivationMethod::CID;
-                        } else if (precursor_attributes["activationMethod"] ==
-                                   "HCD") {
-                            scan.precursor_information.activation_method =
-                                ActivationMethod::HCD;
-                        } else {
-                            scan.precursor_information.activation_method =
-                                ActivationMethod::UNKNOWN;
-                        }
-                    } else {
-                        scan.precursor_information.activation_method =
-                            ActivationMethod::UNKNOWN;
-                    }
-
-                    auto data = XmlReader::read_data(stream);
-                    if (!data) {
-                        return std::nullopt;
-                    }
-                    scan.precursor_information.mz = std::stod(data.value());
-
-                    if (precursor_attributes.find("precursorScanNum") !=
-                        precursor_attributes.end()) {
-                        scan.precursor_information.scan_number =
-                            std::stoi(precursor_attributes["precursorScanNum"]);
-                    } else {
-                        scan.precursor_information.scan_number =
-                            previous_ms1_scan_number;
-                    }
-                }
-                tag = XmlReader::read_tag(stream);
             }
         }
     }
