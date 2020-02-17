@@ -3,6 +3,7 @@
 from scipy.special import erfc, erfcx
 import math
 import os
+import json
 # TODO: Use pathlib instead of os?
 # from pathlib import Path
 
@@ -560,6 +561,9 @@ def dda_pipeline(
     formatter = logging.Formatter('%(asctime)s | %(delta_time)s | %(message)s')
     logger_fh.setFormatter(formatter)
     logger.addHandler(logger_fh)
+    parameters_file_name = os.path.join(output_dir, 'parameters.json')
+    with open(parameters_file_name, 'w') as json_file:
+        json.dump(tapp_parameters, json_file)
 
     time_pipeline_start = time.time()
 
