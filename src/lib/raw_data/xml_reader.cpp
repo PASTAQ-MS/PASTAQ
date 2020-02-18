@@ -10,6 +10,7 @@ RawData::Scan parse_scan(std::istream &stream,
                          Polarity::Type polarity, size_t ms_level) {
     RawData::Scan scan;
     uint64_t precursor_id = 0;
+    scan.precursor_information.scan_number = 0;
     auto scan_attributes = tag.value().attributes;
 
     // Find scan number.
@@ -259,11 +260,9 @@ RawData::Scan parse_scan(std::istream &stream,
                                polarity, ms_level);
                 child_scan.precursor_information.scan_number = precursor_id;
                 if (child_scan.precursor_information.scan_number !=
-                    precursor_id) {
-                    std::cout
-                        << "PANIC: Mismatched precursor ids: " << precursor_id
-                        << " " << child_scan.precursor_information.scan_number
-                        << std::endl;
+                        precursor_id &&
+                    child_scan.precursor_information.scan_number == 0) {
+                    child_scan.precursor_information.scan_number = precursor_id;
                 }
                 return child_scan;
             }

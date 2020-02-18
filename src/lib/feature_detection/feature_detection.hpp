@@ -34,7 +34,8 @@ struct TheoreticalIsotopes {
 };
 
 struct RootNode {
-    std::vector<uint64_t> nodes;
+    std::vector<uint64_t> nodes_next;
+    std::vector<uint64_t> nodes_prev;
     bool visited;
     uint64_t id;
 };
