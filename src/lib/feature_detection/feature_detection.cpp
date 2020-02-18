@@ -792,12 +792,13 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
                             }
                             // TODO: Check if the node deviates too much from
                             // the average retention time.
-                            double distance = std::pow(
-                                peaks[sorted_peaks_mz[current_node].index]
-                                        .fitted_rt -
-                                    peaks[sorted_peaks_mz[node].index]
-                                        .fitted_rt,
-                                2);
+                            const auto &peak_a =
+                                peaks[sorted_peaks_mz[current_node].index];
+                            const auto &peak_b =
+                                peaks[sorted_peaks_mz[node].index];
+                            // Calculate the retention time distance.
+                            double distance =
+                                std::abs(peak_a.fitted_rt - peak_b.fitted_rt);
                             // Check if distance is smaller.
                             if (distance < best_distance) {
                                 selected_node = node;
@@ -816,22 +817,6 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
             }
             // Forward pass.
             {
-                //auto current_node = graph[sorted_peaks_mz_index];
-                //// Add self.
-                //path.push_back(sorted_peaks_mz_index);
-                //while (!current_node.nodes_next.empty()) {
-                    //uint64_t selected_node_index = 0;
-                    //// if (current_node.nodes_next.size() != 1) {
-                    ////// TODO: Conflict resolution.
-                    ////}
-                    //selected_node_index = current_node.nodes_next[0];
-                    //if (selected_node_index == 0 ||
-                        //graph[selected_node_index].visited) {
-                        //break;
-                    //}
-                    //path.push_back(selected_node_index);
-                    //current_node = graph[selected_node_index];
-                //}
                 uint64_t current_node = sorted_peaks_mz_index;
                 path.push_back(current_node);
                 while (!graph[current_node].nodes_next.empty()) {
@@ -849,12 +834,13 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
                             }
                             // TODO: Check if the node deviates too much from
                             // the average retention time.
-                            double distance = std::pow(
-                                peaks[sorted_peaks_mz[current_node].index]
-                                        .fitted_rt -
-                                    peaks[sorted_peaks_mz[node].index]
-                                        .fitted_rt,
-                                2);
+                            const auto &peak_a =
+                                peaks[sorted_peaks_mz[current_node].index];
+                            const auto &peak_b =
+                                peaks[sorted_peaks_mz[node].index];
+                            // Calculate the retention time distance.
+                            double distance =
+                                std::abs(peak_a.fitted_rt - peak_b.fitted_rt);
                             // Check if distance is smaller.
                             if (distance < best_distance) {
                                 selected_node = node;
