@@ -762,45 +762,49 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
     for (size_t i = 0; i < sorted_peaks_height.size(); ++i) {
         auto &ref_peak = peaks[sorted_peaks_height[i].index];
         auto sorted_peaks_mz_index = sorted_peaks_mz_map[ref_peak.id];
-        std::vector<std::vector<uint64_t>> paths;
         // Find paths using a backward/forward approach.
+        std::vector<uint64_t> best_path;
+        double best_dot = 0.0;
+        uint8_t best_charge_state = 0;
         for (size_t k = 0; k < charge_states.size(); ++k) {
-            auto &graph = charge_state_graphs[k];
+            auto graph = charge_state_graphs[k];
+            auto current_node = graph[sorted_peaks_mz_index];
+            if (current_node.visited) {
+                continue;
+            }
             std::vector<uint64_t> path;
+            // Backward pass.
             {
                 auto current_node = graph[sorted_peaks_mz_index];
-                // Backward pass.
-                while (!current_node.nodes_prev.empty() &&
-                       !current_node.visited) {
+                while (!current_node.nodes_prev.empty()) {
                     uint64_t selected_node_index = 0;
                     // if (current_node.nodes_prev.size() != 1) {
                     //// TODO: Conflict resolution.
                     //}
                     selected_node_index = current_node.nodes_prev[0];
-                    if (selected_node_index == 0) {
+                    if (selected_node_index == 0 ||
+                        graph[selected_node_index].visited) {
                         break;
                     }
                     path.push_back(selected_node_index);
                     current_node = graph[selected_node_index];
                 }
+                // Reverse path.
+                std::reverse(path.begin(), path.end());
             }
-            // Reverse path.
-            std::reverse(path.begin(), path.end());
-            // Backward pass.
+            // Forward pass.
             {
                 auto current_node = graph[sorted_peaks_mz_index];
                 // Add self.
-                if (!current_node.visited) {
-                    path.push_back(sorted_peaks_mz_index);
-                }
-                while (!current_node.nodes_next.empty() &&
-                       !current_node.visited) {
-                    uint64_t selected_node_index = sorted_peaks_mz.size();
+                path.push_back(sorted_peaks_mz_index);
+                while (!current_node.nodes_next.empty()) {
+                    uint64_t selected_node_index = 0;
                     // if (current_node.nodes_next.size() != 1) {
                     //// TODO: Conflict resolution.
                     //}
                     selected_node_index = current_node.nodes_next[0];
-                    if (selected_node_index == sorted_peaks_mz.size()) {
+                    if (selected_node_index == 0 ||
+                        graph[selected_node_index].visited) {
                         break;
                     }
                     path.push_back(selected_node_index);
@@ -814,22 +818,116 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
             // std::cout << peaks[sorted_peaks_mz[p].index].id << " ";
             //}
             // std::cout << std::endl;
-            if (!path.empty()) {
-                paths.push_back(path);
+            // TODO: Should this be a parameter?
+            if (path.size() < 2) {
+                continue;
             }
-            // TODO: Should we store the charge state somewhere here?
-            // TODO: Should we do the calculation here instead of creating the
-            // paths vector?
+            // Find the averagine sequence for the reference mz.
+            int64_t charge_state = charge_states[k];
+            double averagine_mz = ref_peak.fitted_mz * charge_state;
+            auto averagine_key = averagine_table.lower_bound(averagine_mz);
+            if (averagine_key == averagine_table.end()) {
+                continue;
+            }
+            auto averagine_key_it_next = averagine_key;
+            averagine_key_it_next++;
+            if (averagine_key_it_next != averagine_table.end() &&
+                averagine_mz - averagine_key->first >
+                    averagine_key_it_next->first - averagine_mz) {
+                averagine_key++;
+            }
+            std::vector<double> &averagine_heights = averagine_key->second;
+            // Get the heights for the peaks in this path.
+            std::vector<double> path_heights;
+            for (const auto &p : path) {
+                path_heights.push_back(
+                    peaks[sorted_peaks_mz[p].index].fitted_height);
+            }
+            auto sim =
+                rolling_weighted_cosine_sim(path_heights, averagine_heights);
+            if (sim.dot > best_dot) {
+                best_dot = sim.dot;
+                best_charge_state = charge_state;
+                best_path = std::vector<size_t>(sim.max_i - sim.min_i);
+                size_t k = 0;
+                for (size_t i = sim.min_i; i < sim.max_i; ++i, ++k) {
+                    best_path[k] = path[i];
+                }
+            }
         }
+        if (best_path.size() < 2) {
+            continue;
+        }
+        // TODO: What if the reference peak was not included in the best
+        // matching path?
         // DEBUG:...
-        //std::cout << "ref: " << ref_peak.id << std::endl;
-        //for (const auto &path : paths) {
-            //std::cout << "> Path: ";
-            //for (const auto &p : path) {
-                //std::cout << peaks[sorted_peaks_mz[p].index].id << " ";
-            //}
-            //std::cout << std::endl;
+        // std::cout << "ref: " << ref_peak.id << std::endl;
+        // for (const auto &path : paths) {
+        // std::cout << "> Path: ";
+        // for (const auto &p : path) {
+        // std::cout << peaks[sorted_peaks_mz[p].index].id << " ";
         //}
+        // std::cout << std::endl;
+        //}
+        // DEBUG:...
+        // std::cout << "ref: " << ref_peak.id << std::endl;
+        // std::cout << "> Best Path: ";
+        // for (const auto &p : best_path) {
+        // std::cout << peaks[sorted_peaks_mz[p].index].id << " ";
+        //}
+        // std::cout << std::endl;
+
+        // Build feature.
+        FeatureDetection::Feature feature = {};
+        feature.score = best_dot;
+        feature.charge_state = best_charge_state;
+        feature.average_rt = 0.0;
+        feature.average_rt_sigma = 0.0;
+        feature.average_rt_delta = 0.0;
+        feature.average_mz = 0.0;
+        feature.average_mz_sigma = 0.0;
+        feature.total_height = 0.0;
+        feature.total_volume = 0.0;
+        feature.max_height = 0.0;
+        feature.max_volume = 0.0;
+        feature.peak_ids = std::vector<uint64_t>(best_path.size());
+        for (size_t i = 0; i < best_path.size(); ++i) {
+            const auto &graph_idx = best_path[i];
+            const auto &peak = peaks[sorted_peaks_mz[graph_idx].index];
+
+            feature.peak_ids[i] = peak.id;
+            feature.average_rt += peak.fitted_rt;
+            feature.average_rt_sigma += peak.fitted_sigma_rt;
+            feature.average_rt_delta += peak.rt_delta;
+            feature.average_mz += peak.fitted_mz * peak.fitted_height;
+            feature.average_mz_sigma += peak.fitted_sigma_mz;
+            feature.total_height += peak.fitted_height;
+            feature.total_volume += peak.fitted_volume;
+            if (peak.fitted_height > feature.max_height) {
+                feature.max_height = peak.fitted_height;
+            }
+            if (peak.fitted_volume > feature.max_volume) {
+                feature.max_volume = peak.fitted_volume;
+            }
+            if (i == 0) {
+                feature.monoisotopic_mz = peak.fitted_mz;
+                feature.monoisotopic_rt = peak.fitted_rt;
+                feature.monoisotopic_height = peak.fitted_height;
+                feature.monoisotopic_volume = peak.fitted_volume;
+            }
+
+            // Mark peaks as used.
+            for (size_t k = 0; k < charge_states.size(); ++k) {
+                charge_state_graphs[k][graph_idx].visited = true;
+            }
+        }
+        feature.average_rt /= best_path.size();
+        feature.average_rt_delta /= best_path.size();
+        feature.average_rt_sigma /= best_path.size();
+        feature.average_mz /= feature.total_height;
+        feature.average_mz_sigma /= best_path.size();
+
+        features.push_back(feature);
     }
     // std::cout << "Charge: " << (int)charge_states[k] << std::endl;
     // size_t i = 0;
