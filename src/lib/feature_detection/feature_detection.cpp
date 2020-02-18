@@ -685,8 +685,8 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
     for (size_t i = 0; i < sorted_peaks_mz.size(); ++i) {
         auto &ref_peak = peaks[sorted_peaks_mz[i].index];
         // TODO: Should the tolerance multiplier be a parameter?
-        double tol_mz = ref_peak.fitted_sigma_mz / 2;
-        double tol_rt = ref_peak.fitted_sigma_rt / 2;
+        double tol_mz = ref_peak.fitted_sigma_mz;
+        double tol_rt = ref_peak.fitted_sigma_rt;
         double min_rt = ref_peak.fitted_rt - tol_rt;
         double max_rt = ref_peak.fitted_rt + tol_rt;
         for (size_t k = 0; k < charge_states.size(); ++k) {
@@ -714,25 +714,6 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
         }
     }
 
-    // DEBUG: Printing the prev/next nodes for each graph.
-    // for (size_t k = 0; k < charge_states.size(); ++k) {
-    // std::cout << "Charge: " << (int)charge_states[k] << std::endl;
-    // auto &graph = charge_state_graphs[k];
-    // for (size_t i = 0; i < sorted_peaks_mz.size(); ++i) {
-    // std::cout << "i: " << i << std::endl;
-    // std::cout << "> Next nodes: ";
-    // for (const auto &node : graph[i].nodes_next) {
-    // std::cout << peaks[sorted_peaks_mz[node].index].id << " ";
-    //}
-    // std::cout << std::endl;
-    // std::cout << "> Prev nodes: ";
-    // for (const auto &node : graph[i].nodes_prev) {
-    // std::cout << peaks[sorted_peaks_mz[node].index].id << " ";
-    //}
-    // std::cout << std::endl;
-    //}
-    //}
-
     // Create a map of peak ids with the corresponding index in the sorted_mz
     // vector:
     //
@@ -758,7 +739,6 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
 
     // Visit nodes to find most likely features.
     std::vector<FeatureDetection::Feature> features;
-    // std::vector<bool>used // NOTE: Should I use the graph for bookkeeping of
     // which peaks have already been used?
     for (size_t i = 0; i < sorted_peaks_height.size(); ++i) {
         auto &ref_peak = peaks[sorted_peaks_height[i].index];
@@ -787,18 +767,17 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
                         std::numeric_limits<double>::infinity();
                     for (const auto &node : graph[current_node].nodes_prev) {
                         if (!graph[node].visited) {
+                            // Check if the node deviates too much from
+                            // the reference retention time.
+                            const auto &peak =
+                                peaks[sorted_peaks_mz[node].index];
+                            double distance = std::abs(ref_peak.fitted_rt - peak.fitted_rt);
+                            if (distance > ref_peak.fitted_sigma_rt) {
+                                continue;
+                            }
                             if (!has_next) {
                                 has_next = true;
                             }
-                            // TODO: Check if the node deviates too much from
-                            // the average retention time.
-                            const auto &peak_a =
-                                peaks[sorted_peaks_mz[current_node].index];
-                            const auto &peak_b =
-                                peaks[sorted_peaks_mz[node].index];
-                            // Calculate the retention time distance.
-                            double distance =
-                                std::abs(peak_a.fitted_rt - peak_b.fitted_rt);
                             // Check if distance is smaller.
                             if (distance < best_distance) {
                                 selected_node = node;
@@ -829,18 +808,17 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
                         std::numeric_limits<double>::infinity();
                     for (const auto &node : graph[current_node].nodes_next) {
                         if (!graph[node].visited) {
+                            // Check if the node deviates too much from
+                            // the reference retention time.
+                            const auto &peak =
+                                peaks[sorted_peaks_mz[node].index];
+                            double distance = std::abs(ref_peak.fitted_rt - peak.fitted_rt);
+                            if (distance > ref_peak.fitted_sigma_rt) {
+                                continue;
+                            }
                             if (!has_next) {
                                 has_next = true;
                             }
-                            // TODO: Check if the node deviates too much from
-                            // the average retention time.
-                            const auto &peak_a =
-                                peaks[sorted_peaks_mz[current_node].index];
-                            const auto &peak_b =
-                                peaks[sorted_peaks_mz[node].index];
-                            // Calculate the retention time distance.
-                            double distance =
-                                std::abs(peak_a.fitted_rt - peak_b.fitted_rt);
                             // Check if distance is smaller.
                             if (distance < best_distance) {
                                 selected_node = node;
@@ -855,13 +833,6 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
                     current_node = selected_node;
                 }
             }
-            // DEBUG:...
-            // std::cout << "Charge: " << (int)charge_states[k] << std::endl;
-            // std::cout << "> Path: ";
-            // for (const auto &p : path) {
-            // std::cout << peaks[sorted_peaks_mz[p].index].id << " ";
-            //}
-            // std::cout << std::endl;
             // TODO: Should this be a parameter?
             if (path.size() < 2) {
                 continue;
@@ -902,24 +873,6 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
         if (best_path.size() < 2) {
             continue;
         }
-        // TODO: What if the reference peak was not included in the best
-        // matching path?
-        // DEBUG:...
-        // std::cout << "ref: " << ref_peak.id << std::endl;
-        // for (const auto &path : paths) {
-        // std::cout << "> Path: ";
-        // for (const auto &p : path) {
-        // std::cout << peaks[sorted_peaks_mz[p].index].id << " ";
-        //}
-        // std::cout << std::endl;
-        //}
-        // DEBUG:...
-        // std::cout << "ref: " << ref_peak.id << std::endl;
-        // std::cout << "> Best Path: ";
-        // for (const auto &p : best_path) {
-        // std::cout << peaks[sorted_peaks_mz[p].index].id << " ";
-        //}
-        // std::cout << std::endl;
 
         // Build feature.
         FeatureDetection::Feature feature = {};
