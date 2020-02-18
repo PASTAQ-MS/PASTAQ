@@ -1,14 +1,11 @@
-# TODO(alex): Write documentation.
-
-from scipy.special import erfc, erfcx
 import math
 import os
 import json
-# TODO: Use pathlib instead of os?
-# from pathlib import Path
+import logging
+import time
+import datetime
 
-import tapp
-from .tapp import *
+from scipy.special import erfc, erfcx
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -18,6 +15,10 @@ import matplotlib.colors as colors
 from matplotlib.patches import Ellipse
 from scipy.optimize import curve_fit
 
+import tapp
+from .tapp import *
+
+# TODO(alex): Write documentation.
 
 def plot_mesh(mesh, transform='sqrt', figure=None):
     plt.style.use('dark_background')
@@ -537,10 +538,10 @@ def dda_pipeline(
     if not os.path.exists(os.path.join(output_dir, 'quant')):
         os.makedirs(os.path.join(output_dir, 'quant'))
 
-    # TODO: Initialize summary, log and parameters files.
-    import logging
-    import time
-    import datetime
+    # Initialize log and parameters files.
+    parameters_file_name = os.path.join(output_dir, 'parameters.json')
+    with open(parameters_file_name, 'w') as json_file:
+        json.dump(tapp_parameters, json_file)
 
     class DeltaTimeFilter(logging.Filter):
         def filter(self, record):
@@ -561,9 +562,6 @@ def dda_pipeline(
     formatter = logging.Formatter('%(asctime)s | %(delta_time)s | %(message)s')
     logger_fh.setFormatter(formatter)
     logger.addHandler(logger_fh)
-    parameters_file_name = os.path.join(output_dir, 'parameters.json')
-    with open(parameters_file_name, 'w') as json_file:
-        json.dump(tapp_parameters, json_file)
 
     time_pipeline_start = time.time()
 
