@@ -1609,10 +1609,100 @@ def full_dda_pipeline_test():
 
 
 def testing_feature_detection():
-    peaks = tapp.read_peaks('tapp_pipeline_test/warped_peaks/1_3.peaks')
+    with open('tapp_pipeline_test/parameters.json') as json_file:
+        tapp_parameters = json.load(json_file)
+    # raw_data = tapp.read_raw_data('tapp_pipeline_test/raw/1_3.ms1')
+    raw_data = tapp.read_mzxml(
+        '/data/b/HYE_DDA_Orbitrap/mzXML/subset/1_3.mzXML',
+        min_mz=tapp_parameters['min_mz'],
+        max_mz=tapp_parameters['max_mz'],
+        min_rt=tapp_parameters['min_rt'],
+        max_rt=tapp_parameters['max_rt'],
+        instrument_type=tapp_parameters['instrument_type'],
+        resolution_ms1=tapp_parameters['resolution_ms1'],
+        resolution_msn=tapp_parameters['resolution_msn'],
+        reference_mz=tapp_parameters['reference_mz'],
+        fwhm_rt=24,
+        polarity=tapp_parameters['polarity'],
+        ms_level=1,
+    )
+    # mesh = []
+    # peaks = []
+    # features = []
+    mesh = tapp.resample(
+        raw_data,
+        7,
+        7,
+        tapp_parameters['smoothing_coefficient_mz'],
+        tapp_parameters['smoothing_coefficient_rt'],
+    )
+    peaks = tapp.find_peaks(raw_data, mesh, tapp_parameters['max_peaks'])
     features = tapp.detect_features(peaks, [5,4,3,2,1])
+
     # TODO: Plot the mesh, detected peaks and detected features.
-    return (peaks, features)
+    plt = []
+    plt = plot_mesh(mesh)
+    for feature in features:
+        feature_peaks = np.array(peaks)[feature.peak_ids]
+        plt['img_plot'].scatter(
+            [peak.fitted_mz for peak in feature_peaks],
+            [peak.fitted_rt for peak in feature_peaks],
+            alpha=0.7
+            )
+        plt['img_plot'].plot(
+            [peak.fitted_mz for peak in feature_peaks],
+            [peak.fitted_rt for peak in feature_peaks],
+            alpha=0.7
+            )
+    # plt['img_plot'].scatter(
+        # [feature.monoisotopic_mz for feature in features],
+        # [feature.monoisotopic_rt for feature in features],
+        # alpha=0.7
+        # )
+    # DEBUG: MINI!
+    # mini_raw_data = tapp.read_mzxml(
+        # '/data/b/HYE_DDA_Orbitrap/mzXML/subset/1_3.mzXML',
+        # min_mz=706.5,
+        # max_mz=711.5,
+        # min_rt=2900,
+        # max_rt=3000,
+        # instrument_type=tapp_parameters['instrument_type'],
+        # resolution_ms1=tapp_parameters['resolution_ms1'],
+        # resolution_msn=tapp_parameters['resolution_msn'],
+        # reference_mz=tapp_parameters['reference_mz'],
+        # fwhm_rt=24,
+        # polarity=tapp_parameters['polarity'],
+        # ms_level=1,
+    # )
+    # mini_mesh = tapp.resample(
+        # mini_raw_data,
+        # 5,
+        # 5,
+        # tapp_parameters['smoothing_coefficient_mz'],
+        # tapp_parameters['smoothing_coefficient_rt'],
+    # )
+    # mini_peaks = tapp.find_peaks(mini_raw_data, mini_mesh, tapp_parameters['max_peaks'])
+    # mini_features = tapp.detect_features(mini_peaks, [5,4,3,2,1])
+    # for feature in mini_features:
+        # feature_peaks = np.array(mini_peaks)[feature.peak_ids]
+        # plt['img_plot'].scatter(
+            # [peak.fitted_mz for peak in feature_peaks],
+            # [peak.fitted_rt for peak in feature_peaks],
+            # alpha=0.7
+            # )
+        # plt['img_plot'].plot(
+            # [peak.fitted_mz for peak in feature_peaks],
+            # [peak.fitted_rt for peak in feature_peaks],
+            # alpha=0.7
+            # )
+    plt['img_plot'].scatter(
+        [peak.fitted_mz for peak in peaks],
+        [peak.fitted_rt for peak in peaks],
+        color='crimson',
+        alpha=0.5,
+        s=8,
+        )
+    return (raw_data, peaks, features, mesh, plt)
 
 
 def testing_feature_matching():
