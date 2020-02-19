@@ -170,8 +170,8 @@ OptimalPath rolling_cosine_sim(std::vector<double> &A, std::vector<double> &B) {
 
             // Check if difference between theoretical and measured is too big.
             double normalized_a = a / A[k];
-            double abs_diff = std::abs(normalized_a - b / 100.0);
-            if (abs_diff >= 0.35) {
+            double abs_diff =  b / 100.0 / normalized_a;
+            if (abs_diff >= 4.0 || abs_diff < 1/4.0) {
                 true_min_i = min_i + k - i + 1;
                 break;
             }
@@ -185,8 +185,8 @@ OptimalPath rolling_cosine_sim(std::vector<double> &A, std::vector<double> &B) {
 
             // Check if difference between theoretical and measured is too big.
             double normalized_a = a / A[k];
-            double abs_diff = std::abs(normalized_a - b / 100.0);
-            if (abs_diff >= 0.35) {
+            double abs_diff =  b / 100.0 / normalized_a;
+            if (abs_diff >= 4.0 || abs_diff < 1/4.0) {
                 true_max_i = i;
                 break;
             }
