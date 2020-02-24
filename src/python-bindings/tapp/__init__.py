@@ -1025,95 +1025,100 @@ def dda_pipeline(
     logger.info('Finished metamatch in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
-    # # Match ms2 events with corresponding detected peaks.
-    # logger.info('Starting peaks/msms linkage')
-    # time_start = time.time()
-    # for stem in input_stems:
-        # # Check if file has already been processed.
-        # in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
-        # in_path_peaks = os.path.join(
-            # output_dir, 'warped_peaks', "{}.peaks".format(stem))
-        # out_path = os.path.join(output_dir, 'linking',
-                                # "{}.ms2_peaks.link".format(stem))
-        # if os.path.exists(out_path) and not override_existing:
-            # continue
+    # Match ms2 events with corresponding detected peaks.
+    logger.info('Starting peaks/msms linkage')
+    time_start = time.time()
+    for stem in input_stems:
+        # Check if file has already been processed.
+        in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
+        in_path_peaks = os.path.join(
+            output_dir, 'warped_peaks', "{}.peaks".format(stem))
+        out_path = os.path.join(output_dir, 'linking',
+                                "{}.ms2_peaks.link".format(stem))
+        if os.path.exists(out_path) and not override_existing:
+            continue
 
-        # logger.info("Reading raw_data from disk (MS2): {}".format(stem))
-        # raw_data = tapp.read_raw_data(in_path_raw)
+        logger.info("Reading raw_data from disk (MS2): {}".format(stem))
+        raw_data = tapp.read_raw_data(in_path_raw)
 
-        # logger.info("Reading peaks from disk: {}".format(stem))
-        # peaks = tapp.read_peaks(in_path_peaks)
+        logger.info("Reading peaks from disk: {}".format(stem))
+        peaks = tapp.read_peaks(in_path_peaks)
 
-        # logger.info("Performing linkage: {}".format(stem))
-        # linked_msms = tapp.link_peaks(peaks, raw_data)
-        # logger.info('Writing linked_msms: {}'.format(out_path))
-        # tapp.write_linked_msms(linked_msms, out_path)
-    # logger.info('Finished peaks/msms linkage in {}'.format(
-        # datetime.timedelta(seconds=time.time()-time_start)))
+        logger.info("Performing linkage: {}".format(stem))
+        linked_msms = tapp.link_peaks(peaks, raw_data)
+        logger.info('Writing linked_msms: {}'.format(out_path))
+        tapp.write_linked_msms(linked_msms, out_path)
+    logger.info('Finished peaks/msms linkage in {}'.format(
+        datetime.timedelta(seconds=time.time()-time_start)))
 
-    # # TODO: (Only if there is ident information)
-    # # Read mzidentdata and save binary data to disk.
-    # logger.info('Starting mzIdentML parsing')
-    # time_start = time.time()
-    # for i, stem in enumerate(input_stems):
-        # in_path = input_ident_files[i]
-        # out_path = os.path.join(output_dir, 'ident', "{}.ident".format(stem))
-        # if in_path == 'none' or (os.path.exists(out_path) and not override_existing):
-            # continue
-        # logger.info('Reading mzIdentML: {}'.format(in_path))
-        # ident_data = tapp.read_mzidentml(in_path)
-        # logger.info('Writing ident data: {}'.format(out_path))
-        # tapp.write_ident_data(ident_data, out_path)
-    # logger.info('Finished mzIdentML parsing in {}'.format(
-        # datetime.timedelta(seconds=time.time()-time_start)))
+    # Read mzidentdata and save binary data to disk.
+    logger.info('Starting mzIdentML parsing')
+    time_start = time.time()
+    for i, stem in enumerate(input_stems):
+        in_path = input_ident_files[i]
+        out_path = os.path.join(output_dir, 'ident', "{}.ident".format(stem))
+        if in_path == 'none' or (os.path.exists(out_path) and not override_existing):
+            continue
+        logger.info('Reading mzIdentML: {}'.format(in_path))
+        ident_data = tapp.read_mzidentml(in_path)
+        logger.info('Writing ident data: {}'.format(out_path))
+        tapp.write_ident_data(ident_data, out_path)
+    logger.info('Finished mzIdentML parsing in {}'.format(
+        datetime.timedelta(seconds=time.time()-time_start)))
 
-    # # Perform protein inference
-    # logger.info('Starting protein inference')
-    # time_start = time.time()
-    # for stem in input_stems:
-        # # Check if file has already been processed.
-        # in_path_idents = os.path.join(
-            # output_dir, 'ident', "{}.ident".format(stem))
-        # out_path = os.path.join(output_dir, 'ident',
-                                # "{}.inferred_proteins".format(stem))
-        # if os.path.exists(out_path) and not override_existing:
-            # continue
+    # Perform protein inference
+    logger.info('Starting protein inference')
+    time_start = time.time()
+    for i, stem in enumerate(input_stems):
+        # Check that we had identification info.
+        if input_ident_files[i] == 'none':
+            continue
+        # Check if file has already been processed.
+        in_path_idents = os.path.join(
+            output_dir, 'ident', "{}.ident".format(stem))
+        out_path = os.path.join(output_dir, 'ident',
+                                "{}.inferred_proteins".format(stem))
+        if os.path.exists(out_path) and not override_existing:
+            continue
 
-        # logger.info("Reading ident from disk: {}".format(stem))
-        # ident_data = tapp.read_ident_data(in_path_idents)
+        logger.info("Reading ident from disk: {}".format(stem))
+        ident_data = tapp.read_ident_data(in_path_idents)
 
-        # logger.info("Performing inference: {}".format(stem))
-        # inferred_proteins = tapp.perform_protein_inference(ident_data)
-        # logger.info('Writing inferred_proteins: {}'.format(out_path))
-        # tapp.write_inferred_proteins(inferred_proteins, out_path)
-    # logger.info('Finished protein inference in {}'.format(
-        # datetime.timedelta(seconds=time.time()-time_start)))
+        logger.info("Performing inference: {}".format(stem))
+        inferred_proteins = tapp.perform_protein_inference(ident_data)
+        logger.info('Writing inferred_proteins: {}'.format(out_path))
+        tapp.write_inferred_proteins(inferred_proteins, out_path)
+    logger.info('Finished protein inference in {}'.format(
+        datetime.timedelta(seconds=time.time()-time_start)))
 
-    # # Link ms2 events with ident information.
-    # logger.info('Starting ident/msms linkage')
-    # time_start = time.time()
-    # for stem in input_stems:
-        # # Check if file has already been processed.
-        # in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
-        # in_path_idents = os.path.join(
-            # output_dir, 'ident', "{}.ident".format(stem))
-        # out_path = os.path.join(output_dir, 'linking',
-                                # "{}.ms2_idents.link".format(stem))
-        # if os.path.exists(out_path) and not override_existing:
-            # continue
+    # Link ms2 events with ident information.
+    logger.info('Starting ident/msms linkage')
+    time_start = time.time()
+    for i, stem in enumerate(input_stems):
+        # Check that we had identification info.
+        if input_ident_files[i] == 'none':
+            continue
+        # Check if file has already been processed.
+        in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
+        in_path_idents = os.path.join(
+            output_dir, 'ident', "{}.ident".format(stem))
+        out_path = os.path.join(output_dir, 'linking',
+                                "{}.ms2_idents.link".format(stem))
+        if os.path.exists(out_path) and not override_existing:
+            continue
 
-        # logger.info("Reading raw_data from disk (MS2): {}".format(stem))
-        # raw_data = tapp.read_raw_data(in_path_raw)
+        logger.info("Reading raw_data from disk (MS2): {}".format(stem))
+        raw_data = tapp.read_raw_data(in_path_raw)
 
-        # logger.info("Reading ident from disk: {}".format(stem))
-        # ident_data = tapp.read_ident_data(in_path_idents)
+        logger.info("Reading ident from disk: {}".format(stem))
+        ident_data = tapp.read_ident_data(in_path_idents)
 
-        # logger.info("Performing linkage: {}".format(stem))
-        # linked_idents = tapp.link_idents(ident_data, raw_data)
-        # logger.info('Writing linked_msms: {}'.format(out_path))
-        # tapp.write_linked_msms(linked_idents, out_path)
-    # logger.info('Finished ident/msms linkage in {}'.format(
-        # datetime.timedelta(seconds=time.time()-time_start)))
+        logger.info("Performing linkage: {}".format(stem))
+        linked_idents = tapp.link_idents(ident_data, raw_data)
+        logger.info('Writing linked_msms: {}'.format(out_path))
+        tapp.write_linked_msms(linked_idents, out_path)
+    logger.info('Finished ident/msms linkage in {}'.format(
+        datetime.timedelta(seconds=time.time()-time_start)))
 
     # Perform feature detection using averagine or linked identification
     # if available in ms2 linked peaks.

@@ -102,6 +102,9 @@ std::vector<Link::LinkedMsms> Link::link_idents(
         double mz;
     };
     auto &spectrum_ids = ident_data.spectrum_ids;
+    if (spectrum_ids.empty()) {
+        return {};
+    }
     auto indices = std::vector<SpectrumIdIndex>(spectrum_ids.size());
     for (size_t i = 0; i < spectrum_ids.size(); ++i) {
         indices[i] = {i, spectrum_ids[i].experimental_mz};
