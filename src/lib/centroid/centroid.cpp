@@ -384,7 +384,8 @@ double Centroid::peak_overlap(const Centroid::Peak &peak_a,
                    std::pow((x_a * var_b + x_b * var_a) / (var_a + var_b), 2);
         double b = (x_a * x_a) / var_a + (x_b * x_b) / var_b;
 
-        return std::exp(0.5 * (a - b)) / std::sqrt(var_a + var_b);
+        return var_a * var_b * std::exp(0.5 * (a - b)) /
+               std::sqrt(var_a + var_b);
     };
 
     auto rt_contrib = gaussian_contribution(
