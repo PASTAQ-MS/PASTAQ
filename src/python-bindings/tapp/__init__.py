@@ -1202,14 +1202,25 @@ def dda_pipeline(
     logger.info('Starting creation of quantitative tables')
     time_start = time.time()
     for stem in input_stems:
-        # Peaks
-        # =====
+        # Peak quantification.
+        # ====================
         in_path_peaks = os.path.join(
             output_dir, 'warped_peaks', "{}.peaks".format(stem))
+        in_path_peaks_link = os.path.join(
+            output_dir, 'linking', "{}.ms2_peaks.link".format(stem))
+        in_path_ident_link = os.path.join(
+            output_dir, 'linking', "{}.ms2_idents.link".format(stem))
+        in_path_ident_data = os.path.join(
+            output_dir, 'ident', "{}.ident".format(stem))
+        in_path_inferred_proteins = os.path.join(
+            output_dir, 'ident', "{}.inferred_proteins".format(stem))
         out_path_peaks = os.path.join(output_dir, 'quant',
                                       "{}_peaks.csv".format(stem))
-        if os.path.exists(out_path_peaks) and not override_existing:
-            continue
+
+        # TODO: This is probably not necessary or needs to be changed if we are
+        # doing all per-peak quantification in a single loop.
+        # if os.path.exists(out_path_peaks) and not override_existing:
+        #     continue
 
         logger.info("Reading peaks from disk: {}".format(stem))
         peaks = tapp.read_peaks(in_path_peaks)
@@ -1245,211 +1256,380 @@ def dda_pipeline(
         })
         peaks_df.to_csv(out_path_peaks, index=False)
 
-    for stem in input_stems:
-        # Features
-        # ========
-        in_path_features = os.path.join(
-            output_dir, 'features', "{}.features".format(stem))
-        out_path_features = os.path.join(output_dir, 'quant',
-                                         "{}_features.csv".format(stem))
-        if os.path.exists(out_path_features) and not override_existing:
-            continue
-
-        logger.info("Reading features from disk: {}".format(stem))
-        features = tapp.read_features(in_path_features)
-
-        logger.info("Generating features quantitative table")
-        features_df = pd.DataFrame({
-            'feature_id': [feature.id for feature in features],
-            'average_mz': [feature.average_mz for feature in features],
-            'average_mz_sigma': [feature.average_mz_sigma for feature in features],
-            'average_rt': [feature.average_rt for feature in features],
-            'average_rt_sigma': [feature.average_rt_sigma for feature in features],
-            'average_rt_delta': [feature.average_rt_delta for feature in features],
-            'total_height': [feature.total_height for feature in features],
-            'monoisotopic_mz': [feature.monoisotopic_mz for feature in features],
-            'monoisotopic_height': [feature.monoisotopic_height for feature in features],
-            'charge_state': [feature.charge_state for feature in features],
-            'peak_ids': [str(feature.peak_ids) for feature in features],
+        # Peak Annotations.
+        # =================
+        # Pre-instantiate the annotations matrix.
+        # -----------------------------------------------------------------------------------------
+        # peak_id linked_ms2(id) sequences(unique) charge_state potential_proteins inferred_protein
+        # -----------------------------------------------------------------------------------------
+        # peak_annotations_df = pd.DataFrame(
+        #         np.zeros((len(peaks), 6)),
+        #     columns=[
+        #         "peak_id", "linked_ms2", "sequences",
+        #         "charge_state", "potential_proteins", "inferred_protein"
+        #     ],
+        # )
+        # peak_annotations_df.peak_id = peak_annotations_df.peak_id.astype('uint64')
+        # peak_annotations_df.linked_ms2 = peak_annotations_df.linked_ms2.astype('uint64')
+        # peak_annotations_df.sequences = peak_annotations_df.sequences.astype('str')
+        # peak_annotations_df.charge_state = peak_annotations_df.charge_state.astype('uint8')
+        # peak_annotations_df.potential_proteins = peak_annotations_df.potential_proteins.astype('str')
+        # peak_annotations_df.inferred_protein = peak_annotations_df.inferred_protein.astype('str')
+        # print(peak_annotations_df)
+        logger.info("Reading linked peaks from disk: {}".format(stem))
+        linked_peaks = tapp.read_linked_msms(in_path_peaks_link)
+        print(linked_peaks[0:10])
+        linked_peaks = pd.DataFrame({
+            'peak_id': [linked_peak.entity_id for linked_peak in linked_peaks],
+            'msms_index': [linked_peak.msms_id for linked_peak in linked_peaks],
         })
-        features_df.to_csv(out_path_features, index=False)
-
-    # Matched Peaks
-    # =============
-    logger.info("Reading peak clusters from disk")
-    in_path_peak_clusters = os.path.join(
-        output_dir, 'metamatch', 'peaks.clusters')
-    out_path_peak_clusters_height = os.path.join(output_dir, 'quant',
-                                                 "peak_clusters_height.csv")
-    out_path_peak_clusters_volume = os.path.join(output_dir, 'quant',
-                                                 "peak_clusters_volume.csv")
-    out_path_peak_clusters_metadata = os.path.join(output_dir, 'quant',
-                                                   "peak_clusters_metadata.csv")
-    if (not os.path.exists(out_path_peak_clusters_metadata) or override_existing):
-        peak_clusters = tapp.read_metamatch_clusters(in_path_peak_clusters)
-        logger.info("Generating peak clusters quantitative table")
-        peak_clusters_metadata_df = pd.DataFrame({
-            'cluster_id': [cluster.id for cluster in peak_clusters],
-            'mz': [cluster.mz for cluster in peak_clusters],
-            'rt': [cluster.rt for cluster in peak_clusters],
-            'avg_height': [cluster.avg_height for cluster in peak_clusters],
+        # print(linked_peaks)
+        logger.info("Reading linked idents from disk: {}".format(stem))
+        linked_idents = tapp.read_linked_msms(in_path_ident_link)
+        linked_idents = pd.DataFrame({
+            'psm_index': [linked_ident.entity_id for linked_ident in linked_idents],
+            'msms_index': [linked_ident.msms_id for linked_ident in linked_idents],
         })
-        peak_clusters_metadata_df.to_csv(
-            out_path_peak_clusters_metadata, index=False)
-        # Volume.
-        peak_clusters_df = pd.DataFrame({
-            'cluster_id': [cluster.id for cluster in peak_clusters],
-        })
-        for i, stem in enumerate(input_stems):
-            peak_clusters_df[stem] = [cluster.file_volumes[i]
-                                      for cluster in peak_clusters]
-        peak_clusters_df.to_csv(out_path_peak_clusters_volume, index=False)
-        peak_clusters_df = pd.DataFrame({
-            'cluster_id': [cluster.id for cluster in peak_clusters],
-        })
-        # Height.
-        for i, stem in enumerate(input_stems):
-            peak_clusters_df[stem] = [cluster.file_heights[i]
-                                      for cluster in peak_clusters]
-        peak_clusters_df.to_csv(out_path_peak_clusters_height, index=False)
-
-    # Matched Features
-    # ================
-    logger.info("Reading feature clusters from disk")
-    in_path_feature_clusters = os.path.join(
-        output_dir, 'metamatch', 'features.clusters')
-    out_path_feature_clusters = os.path.join(output_dir, 'quant',
-                                             "feature_clusters.csv")
-    if (not os.path.exists(out_path_feature_clusters) or override_existing):
-        feature_clusters = tapp.read_feature_clusters(
-            in_path_feature_clusters)
-        logger.info("Generating feature clusters quantitative table")
-        feature_clusters_df = pd.DataFrame({
-            'cluster_id': [cluster.id for cluster in feature_clusters],
-            'mz': [cluster.mz for cluster in feature_clusters],
-            'rt': [cluster.rt for cluster in feature_clusters],
-            'avg_height': [cluster.avg_height for cluster in feature_clusters],
-            'charge_state': [cluster.charge_state for cluster in feature_clusters],
-        })
-        for i, stem in enumerate(input_stems):
-            feature_clusters_df[stem] = [cluster.file_heights[i]
-                                         for cluster in feature_clusters]
-        feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
-
-    # Find protein information for the identified peaks.
-    logger.info("Finding protein information on identified peaks")
-    for stem in input_stems:
-        in_path_peaks_link = os.path.join(
-            output_dir, 'linking', "{}.ms2_peaks.link".format(stem))
-        in_path_ident_link = os.path.join(
-            output_dir, 'linking', "{}.ms2_idents.link".format(stem))
-        in_path_ident_data = os.path.join(
-            output_dir, 'ident', "{}.ident".format(stem))
-        in_path_inferred_proteins = os.path.join(
-            output_dir, 'ident', "{}.inferred_proteins".format(stem))
-        out_path_identified_peaks = os.path.join(
-            output_dir, 'quant', "{}_identified_peaks.csv".format(stem))
-        if os.path.exists(out_path_identified_peaks) and not override_existing:
-            continue
+        # print(linked_idents)
 
         logger.info("Reading ident_data from disk: {}".format(stem))
         ident_data = tapp.read_ident_data(in_path_ident_data)
+        # print(len(ident_data.db_sequences))
+        # print(len(ident_data.spectrum_ids))
+        # print(len(ident_data.protein_hypotheses))
+        # print(len(ident_data.peptides))
+        # print(np.array(ident_data.spectrum_ids)[linked_idents['psm_index']][0:10])
+        # print(ident_data.db_sequences[0:10])
+        # print(ident_data.spectrum_ids[0:10])
+        # print(ident_data.protein_hypotheses[0:10])
+        # print(ident_data.peptides[0:10])
+
+        psms = pd.DataFrame({
+            'psm_index': [i for i in range(0, len(ident_data.spectrum_ids))],
+            'spectrum_ids': [psm.id for psm in ident_data.spectrum_ids],
+            'psm_sequence': [psm.sequence for psm in ident_data.spectrum_ids],
+            'psm_charge_state': [psm.charge_state for psm in ident_data.spectrum_ids],
+            'psm_theoretical_mz': [psm.theoretical_mz for psm in ident_data.spectrum_ids],
+            'psm_experimental_mz': [psm.experimental_mz for psm in ident_data.spectrum_ids],
+            'psm_retention_time': [psm.retention_time for psm in ident_data.spectrum_ids],
+        })
+        # print(psms)
+        psms = pd.merge(
+            psms, linked_idents, on="psm_index"
+        )
+        print(psms)
+
+        linked_peaks = pd.merge(
+            linked_peaks, psms, on="msms_index"
+        )
+        print(linked_peaks)
+
+        db_sequences = pd.DataFrame({
+            'db_seq_id': [db_seq.id for db_seq in ident_data.db_sequences],
+            'protein_name': [db_seq.value for db_seq in ident_data.db_sequences],
+        })
+        # print(db_sequences)
+
+        protein_hypotheses = pd.DataFrame({
+            'db_seq_id': [prot.db_sequence_id for prot in ident_data.protein_hypotheses],
+            'spectrum_ids': [prot.spectrum_ids for prot in ident_data.protein_hypotheses],
+        }).explode('spectrum_ids')
+        # print(protein_hypotheses)
+        protein_hypotheses = pd.merge(
+            db_sequences, protein_hypotheses, on="db_seq_id").drop('db_seq_id', axis=1)
+        protein_hypotheses.columns = ['hypothesis_protein_name', 'spectrum_ids']
+        print(protein_hypotheses)
 
         logger.info("Reading inferred_proteins from disk: {}".format(stem))
         inferred_proteins = tapp.read_inferred_proteins(
             in_path_inferred_proteins)
-        inferred_proteins_df = pd.DataFrame({
-            'protein_id': [inferred_protein.protein_id for inferred_protein in inferred_proteins],
-            'psm_id': [inferred_protein.psm_id for inferred_protein in inferred_proteins],
+        inferred_proteins = pd.DataFrame({
+            'db_seq_id': [inferred_protein.protein_id for inferred_protein in inferred_proteins],
+            'spectrum_ids': [inferred_protein.psm_id for inferred_protein in inferred_proteins],
         })
+        inferred_proteins = pd.merge(
+            db_sequences, inferred_proteins, on="db_seq_id").drop('db_seq_id', axis=1)
+        inferred_proteins.columns = ['inferred_protein_name', 'spectrum_ids']
+        print(inferred_proteins)
 
-        logger.info("Reading linked peaks from disk: {}".format(stem))
-        linked_peaks = tapp.read_linked_msms(in_path_peaks_link)
-        linked_peaks_df = pd.DataFrame({
-            'peak_id': [linked_peak.entity_id for linked_peak in linked_peaks],
-            'msms_index': [linked_peak.msms_id for linked_peak in linked_peaks],
-        })
+        linked_peaks = pd.merge(
+            linked_peaks, inferred_proteins, on="spectrum_ids", how='left'
+        )
+        linked_peaks = pd.merge(
+            linked_peaks, protein_hypotheses, on="spectrum_ids", how='left'
+        )
+        print(linked_peaks)
+        # Aggregate the linked peaks before merging with the final peak list.
 
-        logger.info("Reading linked idents from disk: {}".format(stem))
-        linked_idents = tapp.read_linked_msms(in_path_ident_link)
-        linked_idents_df = pd.DataFrame({
-            'psm_index': [linked_ident.entity_id for linked_ident in linked_idents],
-            'msms_index': [linked_ident.msms_id for linked_ident in linked_idents],
-        })
+        peaks_df = pd.merge(
+            peaks_df, linked_peaks, on="peak_id", how='left'
+        )
+        peaks_df.to_csv("test_out.csv", index=False)
+        # ident_data = pd.DataFrame({
+        #     # 'protein_id': [db_seq.id for db_seq in ident_data.db_sequences],
+        #     # 'protein_name': [db_seq.value for db_seq in ident_data.db_sequences],
+        # })
+        # print(ident_data)
+    #     logger.info("Creating linked psm protein table: {}".format(stem))
+    #     linked_peaks_df = pd.merge(
+    #         linked_peaks_df, linked_idents_df, on="msms_index")
+    #     linked_spectrum_ids = [ident_data.spectrum_ids[i]
+    #                            for i in linked_peaks_df['psm_index']]
+    #     linked_spectrum_ids_df = pd.DataFrame({
+    #         'psm_id': [linked_spectrum_id.id for linked_spectrum_id in linked_spectrum_ids],
+    #         'sequence': [linked_spectrum_id.sequence for linked_spectrum_id in linked_spectrum_ids],
+    #         'charge_state': [linked_spectrum_id.charge_state for linked_spectrum_id in linked_spectrum_ids],
+    #         'retention_time': [linked_spectrum_id.retention_time for linked_spectrum_id in linked_spectrum_ids],
+    #     })
+    #     linked_spectrum_ids_df = pd.merge(
+    #         linked_spectrum_ids_df, inferred_proteins_df, on="psm_id", how="left")
 
-        logger.info("Creating linked psm protein table: {}".format(stem))
-        linked_peaks_df = pd.merge(
-            linked_peaks_df, linked_idents_df, on="msms_index")
-        linked_spectrum_ids = [ident_data.spectrum_ids[i]
-                               for i in linked_peaks_df['psm_index']]
-        linked_spectrum_ids_df = pd.DataFrame({
-            'psm_id': [linked_spectrum_id.id for linked_spectrum_id in linked_spectrum_ids],
-            'sequence': [linked_spectrum_id.sequence for linked_spectrum_id in linked_spectrum_ids],
-            'charge_state': [linked_spectrum_id.charge_state for linked_spectrum_id in linked_spectrum_ids],
-            'retention_time': [linked_spectrum_id.retention_time for linked_spectrum_id in linked_spectrum_ids],
-        })
-        linked_spectrum_ids_df = pd.merge(
-            linked_spectrum_ids_df, inferred_proteins_df, on="psm_id", how="left")
+    #     protein_names_df = pd.DataFrame({
+    #         'protein_id': [db_seq.id for db_seq in ident_data.db_sequences],
+    #         'protein_name': [db_seq.value for db_seq in ident_data.db_sequences],
+    #     })
+    #     linked_spectrum_ids_df = pd.merge(
+    #         linked_spectrum_ids_df, protein_names_df, on="protein_id", how="left")
 
-        protein_names_df = pd.DataFrame({
-            'protein_id': [db_seq.id for db_seq in ident_data.db_sequences],
-            'protein_name': [db_seq.value for db_seq in ident_data.db_sequences],
-        })
-        linked_spectrum_ids_df = pd.merge(
-            linked_spectrum_ids_df, protein_names_df, on="protein_id", how="left")
+    #     linked_peaks_df = pd.concat(
+    #         [linked_peaks_df, linked_spectrum_ids_df], axis=1)
+    #     linked_peaks_df.to_csv(out_path_identified_peaks, index=False)
+        # return
+    #     logger.info("Reading ident_data from disk: {}".format(stem))
+    #     ident_data = tapp.read_ident_data(in_path_ident_data)
 
-        linked_peaks_df = pd.concat(
-            [linked_peaks_df, linked_spectrum_ids_df], axis=1)
-        linked_peaks_df.to_csv(out_path_identified_peaks, index=False)
+    #     logger.info("Reading inferred_proteins from disk: {}".format(stem))
+    #     inferred_proteins = tapp.read_inferred_proteins(
+    #         in_path_inferred_proteins)
+    #     inferred_proteins_df = pd.DataFrame({
+    #         'protein_id': [inferred_protein.protein_id for inferred_protein in inferred_proteins],
+    #         'psm_id': [inferred_protein.psm_id for inferred_protein in inferred_proteins],
+    #     })
+
+    #     logger.info("Reading linked peaks from disk: {}".format(stem))
+    #     linked_peaks = tapp.read_linked_msms(in_path_peaks_link)
+    #     linked_peaks_df = pd.DataFrame({
+    #         'peak_id': [linked_peak.entity_id for linked_peak in linked_peaks],
+    #         'msms_index': [linked_peak.msms_id for linked_peak in linked_peaks],
+    #     })
+
+    #     logger.info("Reading linked idents from disk: {}".format(stem))
+    #     linked_idents = tapp.read_linked_msms(in_path_ident_link)
+
+    # for stem in input_stems:
+    #     # Features
+    #     # ========
+    #     in_path_features = os.path.join(
+    #         output_dir, 'features', "{}.features".format(stem))
+    #     out_path_features = os.path.join(output_dir, 'quant',
+    #                                      "{}_features.csv".format(stem))
+    #     if os.path.exists(out_path_features) and not override_existing:
+    #         continue
+
+    #     logger.info("Reading features from disk: {}".format(stem))
+    #     features = tapp.read_features(in_path_features)
+
+    #     logger.info("Generating features quantitative table")
+    #     features_df = pd.DataFrame({
+    #         'feature_id': [feature.id for feature in features],
+    #         'average_mz': [feature.average_mz for feature in features],
+    #         'average_mz_sigma': [feature.average_mz_sigma for feature in features],
+    #         'average_rt': [feature.average_rt for feature in features],
+    #         'average_rt_sigma': [feature.average_rt_sigma for feature in features],
+    #         'average_rt_delta': [feature.average_rt_delta for feature in features],
+    #         'total_height': [feature.total_height for feature in features],
+    #         'monoisotopic_mz': [feature.monoisotopic_mz for feature in features],
+    #         'monoisotopic_height': [feature.monoisotopic_height for feature in features],
+    #         'charge_state': [feature.charge_state for feature in features],
+    #         'peak_ids': [str(feature.peak_ids) for feature in features],
+    #     })
+    #     features_df.to_csv(out_path_features, index=False)
+
+    # # Matched Peaks
+    # # =============
+    # logger.info("Reading peak clusters from disk")
+    # in_path_peak_clusters = os.path.join(
+    #     output_dir, 'metamatch', 'peaks.clusters')
+    # out_path_peak_clusters_height = os.path.join(output_dir, 'quant',
+    #                                              "peak_clusters_height.csv")
+    # out_path_peak_clusters_volume = os.path.join(output_dir, 'quant',
+    #                                              "peak_clusters_volume.csv")
+    # out_path_peak_clusters_metadata = os.path.join(output_dir, 'quant',
+    #                                                "peak_clusters_metadata.csv")
+    # if (not os.path.exists(out_path_peak_clusters_metadata) or override_existing):
+    #     peak_clusters = tapp.read_metamatch_clusters(in_path_peak_clusters)
+    #     logger.info("Generating peak clusters quantitative table")
+    #     peak_clusters_metadata_df = pd.DataFrame({
+    #         'cluster_id': [cluster.id for cluster in peak_clusters],
+    #         'mz': [cluster.mz for cluster in peak_clusters],
+    #         'rt': [cluster.rt for cluster in peak_clusters],
+    #         'avg_height': [cluster.avg_height for cluster in peak_clusters],
+    #     })
+    #     peak_clusters_metadata_df.to_csv(
+    #         out_path_peak_clusters_metadata, index=False)
+    #     # Volume.
+    #     peak_clusters_df = pd.DataFrame({
+    #         'cluster_id': [cluster.id for cluster in peak_clusters],
+    #     })
+    #     for i, stem in enumerate(input_stems):
+    #         peak_clusters_df[stem] = [cluster.file_volumes[i]
+    #                                   for cluster in peak_clusters]
+    #     peak_clusters_df.to_csv(out_path_peak_clusters_volume, index=False)
+    #     peak_clusters_df = pd.DataFrame({
+    #         'cluster_id': [cluster.id for cluster in peak_clusters],
+    #     })
+    #     # Height.
+    #     for i, stem in enumerate(input_stems):
+    #         peak_clusters_df[stem] = [cluster.file_heights[i]
+    #                                   for cluster in peak_clusters]
+    #     peak_clusters_df.to_csv(out_path_peak_clusters_height, index=False)
+
+    # Matched Features
+    # ================
+    # logger.info("Reading feature clusters from disk")
+    # in_path_feature_clusters = os.path.join(
+    #     output_dir, 'metamatch', 'features.clusters')
+    # out_path_feature_clusters = os.path.join(output_dir, 'quant',
+    #                                          "feature_clusters.csv")
+    # if (not os.path.exists(out_path_feature_clusters) or override_existing):
+    #     feature_clusters = tapp.read_feature_clusters(
+    #         in_path_feature_clusters)
+    #     logger.info("Generating feature clusters quantitative table")
+    #     feature_clusters_df = pd.DataFrame({
+    #         'cluster_id': [cluster.id for cluster in feature_clusters],
+    #         'mz': [cluster.mz for cluster in feature_clusters],
+    #         'rt': [cluster.rt for cluster in feature_clusters],
+    #         'avg_height': [cluster.avg_height for cluster in feature_clusters],
+    #         'charge_state': [cluster.charge_state for cluster in feature_clusters],
+    #     })
+    #     for i, stem in enumerate(input_stems):
+    #         feature_clusters_df[stem] = [cluster.file_heights[i]
+    #                                      for cluster in feature_clusters]
+    #     feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
+
+    # # Find protein information for the identified peaks.
+    # logger.info("Finding protein information on identified peaks")
+    # for stem in input_stems:
+    #     in_path_peaks_link = os.path.join(
+    #         output_dir, 'linking', "{}.ms2_peaks.link".format(stem))
+    #     in_path_ident_link = os.path.join(
+    #         output_dir, 'linking', "{}.ms2_idents.link".format(stem))
+    #     in_path_ident_data = os.path.join(
+    #         output_dir, 'ident', "{}.ident".format(stem))
+    #     in_path_inferred_proteins = os.path.join(
+    #         output_dir, 'ident', "{}.inferred_proteins".format(stem))
+    #     out_path_identified_peaks = os.path.join(
+    #         output_dir, 'quant', "{}_identified_peaks.csv".format(stem))
+    #     if os.path.exists(out_path_identified_peaks) and not override_existing:
+    #         continue
+
+    #     logger.info("Reading ident_data from disk: {}".format(stem))
+    #     ident_data = tapp.read_ident_data(in_path_ident_data)
+
+    #     logger.info("Reading inferred_proteins from disk: {}".format(stem))
+    #     inferred_proteins = tapp.read_inferred_proteins(
+    #         in_path_inferred_proteins)
+    #     inferred_proteins_df = pd.DataFrame({
+    #         'protein_id': [inferred_protein.protein_id for inferred_protein in inferred_proteins],
+    #         'psm_id': [inferred_protein.psm_id for inferred_protein in inferred_proteins],
+    #     })
+
+    #     logger.info("Reading linked peaks from disk: {}".format(stem))
+    #     linked_peaks = tapp.read_linked_msms(in_path_peaks_link)
+    #     linked_peaks_df = pd.DataFrame({
+    #         'peak_id': [linked_peak.entity_id for linked_peak in linked_peaks],
+    #         'msms_index': [linked_peak.msms_id for linked_peak in linked_peaks],
+    #     })
+
+    #     logger.info("Reading linked idents from disk: {}".format(stem))
+    #     linked_idents = tapp.read_linked_msms(in_path_ident_link)
+    #     linked_idents_df = pd.DataFrame({
+    #         'psm_index': [linked_ident.entity_id for linked_ident in linked_idents],
+    #         'msms_index': [linked_ident.msms_id for linked_ident in linked_idents],
+    #     })
+
+    #     logger.info("Creating linked psm protein table: {}".format(stem))
+    #     linked_peaks_df = pd.merge(
+    #         linked_peaks_df, linked_idents_df, on="msms_index")
+    #     linked_spectrum_ids = [ident_data.spectrum_ids[i]
+    #                            for i in linked_peaks_df['psm_index']]
+    #     linked_spectrum_ids_df = pd.DataFrame({
+    #         'psm_id': [linked_spectrum_id.id for linked_spectrum_id in linked_spectrum_ids],
+    #         'sequence': [linked_spectrum_id.sequence for linked_spectrum_id in linked_spectrum_ids],
+    #         'charge_state': [linked_spectrum_id.charge_state for linked_spectrum_id in linked_spectrum_ids],
+    #         'retention_time': [linked_spectrum_id.retention_time for linked_spectrum_id in linked_spectrum_ids],
+    #     })
+    #     linked_spectrum_ids_df = pd.merge(
+    #         linked_spectrum_ids_df, inferred_proteins_df, on="psm_id", how="left")
+
+    #     protein_names_df = pd.DataFrame({
+    #         'protein_id': [db_seq.id for db_seq in ident_data.db_sequences],
+    #         'protein_name': [db_seq.value for db_seq in ident_data.db_sequences],
+    #     })
+    #     linked_spectrum_ids_df = pd.merge(
+    #         linked_spectrum_ids_df, protein_names_df, on="protein_id", how="left")
+
+    #     linked_peaks_df = pd.concat(
+    #         [linked_peaks_df, linked_spectrum_ids_df], axis=1)
+    #     linked_peaks_df.to_csv(out_path_identified_peaks, index=False)
 
     # # Link metamatch clusters and corresponding peaks with identification
     # # information of peptides and proteins.
     # in_path_peak_clusters = os.path.join(
-        # output_dir, 'metamatch', 'peaks.clusters')
+    #     output_dir, 'metamatch', 'peaks.clusters')
     # out_path_peak_clusters_info_peak_ids = os.path.join(
-        # output_dir, 'quant', "peak_clusters_info_peak_ids.csv")
+    #     output_dir, 'quant', "peak_clusters_info_peak_ids.csv")
     # out_path_peak_clusters_info_sequence = os.path.join(
-        # output_dir, 'quant', "peak_clusters_info_sequence.csv")
+    #     output_dir, 'quant', "peak_clusters_info_sequence.csv")
     # out_path_peak_clusters_info_protein_id = os.path.join(
-        # output_dir, 'quant', "peak_clusters_info_protein_id.csv")
+    #     output_dir, 'quant', "peak_clusters_info_protein_id.csv")
     # out_path_peak_clusters_info_protein_name = os.path.join(
-        # output_dir, 'quant', "peak_clusters_info_protein_name.csv")
+    #     output_dir, 'quant', "peak_clusters_info_protein_name.csv")
     # if (not os.path.exists(out_path_peak_clusters_info_peak_ids) or override_existing):
-        # logger.info("Reading peak clusters from disk")
-        # peak_clusters = tapp.read_metamatch_clusters(in_path_peak_clusters)
+    #     logger.info("Reading peak clusters from disk")
+    #     peak_clusters = tapp.read_metamatch_clusters(in_path_peak_clusters)
+    #     print(peak_clusters[0:10])
 
-        # logger.info("Generating peak clusters identification table")
+    #     logger.info("Generating peak clusters identification table")
         # peptide_sequence_df = pd.DataFrame({
-        # 'cluster_id': [cluster.id for cluster in peak_clusters],
+        #     'cluster_id': [cluster.id for cluster in peak_clusters],
         # })
         # protein_id_df = peptide_sequence_df.copy()
         # protein_name_df = peptide_sequence_df.copy()
 
         # logger.info("Generating cluster to peak_id table")
         # cluster_peaks_df = []
-        # for cluster in peak_clusters:
-        # row = np.full(len(input_stems), np.nan)
-        # for peak_id in cluster.peak_ids:
-        # row[peak_id.file_id] = peak_id.feature_id
-        # cluster_peaks_df += [row]
-        # cluster_peaks_df = pd.DataFrame(cluster_peaks_df, dtype='Int64')
-        # cluster_peaks_df.columns = input_stems
-        # cluster_peaks_df = pd.concat(
-        # [peptide_sequence_df.copy(), cluster_peaks_df], axis=1)
+        # for cluster in peak_clusters[0:10]:
+        #     print(cluster)
+        #     row = np.full(len(input_stems), np.nan)
+        #     print(cluster.peak_ids)
+        #     for peak_id in cluster.peak_ids:
+        #         # print(peak_id)
+        #         row[peak_id.file_id] = peak_id.feature_id
+        #         cluster_peaks_df += [row]
+        #         # print(cluster_peaks_df)
+        #         cluster_peaks_df = pd.DataFrame(cluster_peaks_df, dtype='Int64')
+        #         # cluster_peaks_df.columns = input_stems
+        #         # cluster_peaks_df = pd.concat(
+        #         # [peptide_sequence_df.copy(), cluster_peaks_df], axis=1)
+        #         print(cluster_peaks_df)
+        #         return
+        #     print(row)
+    #     # print(cluster_peaks_df)
 
         # for i, stem in enumerate(input_stems):
-        # logger.info(
-        # "Reading identified_peaks from disk: {}".format(stem))
-        # in_path_identified_peaks = os.path.join(
-        # output_dir, 'quant', "{}_identified_peaks.csv".format(stem))
-        # identified_peaks = pd.read_csv(in_path_identified_peaks)
-        # identified_peaks['peak_id'] = identified_peaks['peak_id'].astype(
-        # 'Int64')
-        # cluster_peaks_info = pd.merge(
-        # pd.DataFrame({'peak_id': cluster_peaks_df[stem]}),
-        # identified_peaks,
-        # how='left'
-        # )
+        #     logger.info(
+        #         "Reading identified_peaks from disk: {}".format(stem))
+        #     in_path_identified_peaks = os.path.join(
+        #         output_dir, 'quant', "{}_identified_peaks.csv".format(stem))
+        #     identified_peaks = pd.read_csv(in_path_identified_peaks)
+        #     identified_peaks['peak_id'] = identified_peaks['peak_id'].astype(
+        #         'Int64')
+        #     cluster_peaks_info = pd.merge(
+        #         pd.DataFrame({'peak_id': cluster_peaks_df[stem]}),
+        #         identified_peaks,
+        #         how='left'
+        #     )
         # peptide_sequence_df[stem] = cluster_peaks_info['sequence']
         # protein_id_df[stem] = cluster_peaks_info['protein_id']
         # protein_name_df[stem] = cluster_peaks_info['protein_name']
