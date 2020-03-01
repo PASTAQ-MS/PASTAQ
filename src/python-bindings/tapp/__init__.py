@@ -1216,6 +1216,8 @@ def dda_pipeline(
             output_dir, 'ident', "{}.inferred_proteins".format(stem))
         out_path_peaks = os.path.join(output_dir, 'quant',
                                       "{}_peaks.csv".format(stem))
+        out_path_peak_annotations = os.path.join(output_dir, 'quant',
+                                      "{}_peak_annotations.csv".format(stem))
 
         # TODO: This is probably not necessary or needs to be changed if we are
         # doing all per-peak quantification in a single loop.
@@ -1418,6 +1420,8 @@ def dda_pipeline(
                                                    "peak_clusters_metadata.csv")
     out_path_peak_clusters_peaks = os.path.join(output_dir, 'quant',
                                                    "peak_clusters_peaks.csv")
+    out_path_peak_clusters_peaks_annotations = os.path.join(output_dir, 'quant',
+                                                   "peak_clusters_peaks_annotations.csv")
     if (not os.path.exists(out_path_peak_clusters_metadata) or override_existing or True):
         peak_clusters = tapp.read_metamatch_clusters(in_path_peak_clusters)
         logger.info("Generating peak clusters quantitative table")
@@ -1431,6 +1435,7 @@ def dda_pipeline(
             out_path_peak_clusters_metadata, index=False)
 
         # Volume.
+        logger.info("Generating peak clusters volume table")
         peak_clusters_df = pd.DataFrame({
             'cluster_id': [cluster.id for cluster in peak_clusters],
         })
@@ -1443,18 +1448,45 @@ def dda_pipeline(
         })
 
         # Height.
+        logger.info("Generating peak clusters height table")
         for i, stem in enumerate(input_stems):
             peak_clusters_df[stem] = [cluster.file_heights[i]
                                       for cluster in peak_clusters]
         peak_clusters_df.to_csv(out_path_peak_clusters_height, index=False)
 
         # Peak associations.
+        logger.info("Generating peak clusters peak associations table")
         cluster_peaks = [(cluster.id, cluster.peak_ids) for cluster in peak_clusters]
         cluster_peaks = pd.DataFrame(cluster_peaks, columns=["cluster_id", "peak_ids"]).explode("peak_ids")
         cluster_peaks["file_id"] = cluster_peaks["peak_ids"].map(lambda x: input_stems[x.file_id])
         cluster_peaks["peak_id"] = cluster_peaks["peak_ids"].map(lambda x: x.feature_id)
         cluster_peaks = cluster_peaks.drop(["peak_ids"], axis=1)
         cluster_peaks.to_csv(out_path_peak_clusters_peaks, index=False)
+
+        # Cluster annotations.
+        logger.info("Generating peak clusters annotations table")
+        all_cluster_annotations = pd.DataFrame()
+        for stem in input_stems:
+            logger.info("Reading peak annotations for: {}".format(stem))
+            in_path_peak_annotations = os.path.join(output_dir, 'quant',
+                                                    "{}_peak_annotations.csv".format(stem))
+            peak_annotations = pd.read_csv(in_path_peak_annotations)
+            cluster_annotations = cluster_peaks[cluster_peaks["file_id"] == stem][["cluster_id", "peak_id"]]
+            logger.info("Merging peak/clusters annotations for: {}".format(stem))
+            cluster_annotations = pd.merge(
+                cluster_annotations, peak_annotations, on="peak_id", how="left")
+            all_cluster_annotations = pd.concat([all_cluster_annotations, cluster_annotations])
+        logger.info("Aggregating annotations")
+
+        def aggregate_cluster_annotations(x):
+            ret = {
+                "psm_sequence": ".|.".join(map(str, np.unique(x['psm_sequence'].dropna()))),
+                "inferred_protein_name": ".|.".join(map(str, np.unique(x['inferred_protein_name'].dropna()))),
+                "hypothesis_protein_name": ".|.".join(map(str, np.unique(x['hypothesis_protein_name'].dropna()))),
+            }
+            return pd.Series(ret)
+        all_cluster_annotations = all_cluster_annotations.groupby('cluster_id').apply(aggregate_cluster_annotations)
+        all_cluster_annotations.to_csv(out_path_peak_clusters_peaks_annotations, index=True)
 
     # Matched Features
     # ================
