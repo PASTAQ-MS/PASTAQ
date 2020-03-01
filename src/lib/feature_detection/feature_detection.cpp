@@ -1011,6 +1011,16 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
         features.push_back(feature);
     }
 
+    // Sort features and assign ids.
+    auto sort_features = [](const auto &a, const auto &b) {
+        return (a.total_volume >= b.total_volume);
+    };
+    std::sort(features.begin(), features.end(), sort_features);
+    for (size_t i = 0; i < features.size(); ++i) {
+        auto &feature = features[i];
+        feature.id = i;
+    }
+
     return features;
 }
 
