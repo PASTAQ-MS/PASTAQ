@@ -1342,6 +1342,7 @@ def dda_pipeline(
             def aggregate_linked_peaks_metadata(x):
                 ret = pd.Series({
                     "psm_sequence": '.|.'.join(pd.unique(x['psm_sequence'].dropna())),
+                    "psm_charge_state": '.|.'.join(map(str, np.unique(x['psm_charge_state'].dropna()))),
                     "psm_theoretical_mz": '.|.'.join(map(str, np.unique(x['psm_theoretical_mz'].dropna()))),
                     "psm_experimental_mz": '.|.'.join(map(str, np.unique(x['psm_experimental_mz'].dropna()))),
                     "psm_retention_time": '.|.'.join(map(str, np.unique(x['psm_retention_time'].dropna()))),
@@ -1359,34 +1360,50 @@ def dda_pipeline(
         logger.info("Saving peaks quantitative table to disk: {}".format(stem))
         peaks_df.to_csv(out_path_peaks, index=False)
 
-    # for stem in input_stems:
-    #     # Features
-    #     # ========
-    #     in_path_features = os.path.join(
-    #         output_dir, 'features', "{}.features".format(stem))
-    #     out_path_features = os.path.join(output_dir, 'quant',
-    #                                      "{}_features.csv".format(stem))
-    #     if os.path.exists(out_path_features) and not override_existing:
-    #         continue
+        in_path_features = os.path.join(
+            output_dir, 'features', "{}.features".format(stem))
+        if os.path.isfile(in_path_features):
+            out_path_features = os.path.join(output_dir, 'quant',
+                                            "{}_features.csv".format(stem))
 
-    #     logger.info("Reading features from disk: {}".format(stem))
-    #     features = tapp.read_features(in_path_features)
+            logger.info("Reading features from disk: {}".format(stem))
+            features = tapp.read_features(in_path_features)
 
-    #     logger.info("Generating features quantitative table")
-    #     features_df = pd.DataFrame({
-    #         'feature_id': [feature.id for feature in features],
-    #         'average_mz': [feature.average_mz for feature in features],
-    #         'average_mz_sigma': [feature.average_mz_sigma for feature in features],
-    #         'average_rt': [feature.average_rt for feature in features],
-    #         'average_rt_sigma': [feature.average_rt_sigma for feature in features],
-    #         'average_rt_delta': [feature.average_rt_delta for feature in features],
-    #         'total_height': [feature.total_height for feature in features],
-    #         'monoisotopic_mz': [feature.monoisotopic_mz for feature in features],
-    #         'monoisotopic_height': [feature.monoisotopic_height for feature in features],
-    #         'charge_state': [feature.charge_state for feature in features],
-    #         'peak_ids': [str(feature.peak_ids) for feature in features],
-    #     })
-    #     features_df.to_csv(out_path_features, index=False)
+            logger.info("Generating features quantitative table")
+            features_df = pd.DataFrame({
+                'feature_id': [feature.id for feature in features],
+                'average_mz': [feature.average_mz for feature in features],
+                'average_mz_sigma': [feature.average_mz_sigma for feature in features],
+                'average_rt': [feature.average_rt for feature in features],
+                'average_rt_sigma': [feature.average_rt_sigma for feature in features],
+                'average_rt_delta': [feature.average_rt_delta for feature in features],
+                'total_height': [feature.total_height for feature in features],
+                'monoisotopic_mz': [feature.monoisotopic_mz for feature in features],
+                'monoisotopic_height': [feature.monoisotopic_height for feature in features],
+                'charge_state': [feature.charge_state for feature in features],
+                'peak_id': [feature.peak_ids for feature in features],
+            })
+            # Find the peak annotations that belong to each feature.
+            feature_peaks = features_df[["feature_id", "peak_id"]].explode("peak_id")
+            annotation_columns = [
+                "peak_id", "msms_index", "psm_sequence", "psm_charge_state",
+                "inferred_protein_name", "hypothesis_protein_name"
+            ]
+            feature_peaks = pd.merge(
+                feature_peaks, peaks_df[peaks_df.columns & annotation_columns],
+                on="peak_id"
+            )
+            feature_peaks = feature_peaks.groupby('feature_id').apply(
+                lambda x: x.drop('feature_id', axis=1).apply(
+                    lambda y:'.|.'.join(map(str, np.unique(y.dropna()))), axis=0)
+            )
+            # print(feature_peaks)
+            features_df = pd.merge(
+                features_df.drop("peak_id", axis=1),
+                feature_peaks,
+                on="feature_id", how="left"
+            )
+            features_df.to_csv(out_path_features, index=False)
 
     # # Matched Peaks
     # # =============
