@@ -1486,9 +1486,10 @@ def dda_pipeline(
 
         def aggregate_cluster_annotations(x):
             ret = {
-                "psm_sequence": ".|.".join(map(str, np.unique(x['psm_sequence'].dropna()))),
-                "inferred_protein_name": ".|.".join(map(str, np.unique(x['inferred_protein_name'].dropna()))),
-                "hypothesis_protein_name": ".|.".join(map(str, np.unique(x['hypothesis_protein_name'].dropna()))),
+                "psm_sequence": ".|.".join(np.unique(x['psm_sequence'].dropna())),
+                "psm_charge_state": ".|.".join(map(str, x['psm_charge_state'].dropna())),
+                "inferred_protein_name": ".|.".join(np.unique(x['inferred_protein_name'].dropna())),
+                "hypothesis_protein_name": ".|.".join(np.unique(x['hypothesis_protein_name'].dropna())),
             }
             return pd.Series(ret)
         all_cluster_annotations = all_cluster_annotations.groupby('cluster_id').apply(aggregate_cluster_annotations)
@@ -1496,26 +1497,32 @@ def dda_pipeline(
 
     # Matched Features
     # ================
-    # logger.info("Reading feature clusters from disk")
-    # in_path_feature_clusters = os.path.join(
-    #     output_dir, 'metamatch', 'features.clusters')
-    # out_path_feature_clusters = os.path.join(output_dir, 'quant',
-    #                                          "feature_clusters.csv")
-    # if (not os.path.exists(out_path_feature_clusters) or override_existing):
-    #     feature_clusters = tapp.read_feature_clusters(
-    #         in_path_feature_clusters)
-    #     logger.info("Generating feature clusters quantitative table")
-    #     feature_clusters_df = pd.DataFrame({
-    #         'cluster_id': [cluster.id for cluster in feature_clusters],
-    #         'mz': [cluster.mz for cluster in feature_clusters],
-    #         'rt': [cluster.rt for cluster in feature_clusters],
-    #         'avg_height': [cluster.avg_height for cluster in feature_clusters],
-    #         'charge_state': [cluster.charge_state for cluster in feature_clusters],
-    #     })
-    #     for i, stem in enumerate(input_stems):
-    #         feature_clusters_df[stem] = [cluster.file_heights[i]
-    #                                      for cluster in feature_clusters]
-    #     feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
+    logger.info("Reading feature clusters from disk")
+    in_path_feature_clusters = os.path.join(
+        output_dir, 'metamatch', 'features.clusters')
+    out_path_feature_clusters_height = os.path.join(output_dir, 'quant',
+                                             "feature_clusters_height.csv")
+    out_path_feature_clusters_metadata = os.path.join(output_dir, 'quant',
+                                             "feature_clusters_metadata.csv")
+    if (not os.path.exists(out_path_feature_clusters_height) or override_existing or True):
+        feature_clusters = tapp.read_feature_clusters(
+            in_path_feature_clusters)
+        logger.info("Generating feature clusters quantitative table")
+        feature_clusters_metadata = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in feature_clusters],
+            'mz': [cluster.mz for cluster in feature_clusters],
+            'rt': [cluster.rt for cluster in feature_clusters],
+            'avg_height': [cluster.avg_height for cluster in feature_clusters],
+            'charge_state': [cluster.charge_state for cluster in feature_clusters],
+        })
+        feature_clusters_df = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in feature_clusters],
+        })
+        for i, stem in enumerate(input_stems):
+            feature_clusters_df[stem] = [cluster.file_heights[i]
+                                         for cluster in feature_clusters]
+        feature_clusters_df.to_csv(out_path_feature_clusters_height, index=False)
+        feature_clusters_metadata.to_csv(out_path_feature_clusters_metadata, index=False)
 
     # # Find protein information for the identified peaks.
     # logger.info("Finding protein information on identified peaks")
@@ -1639,7 +1646,7 @@ def dda_pipeline(
         #         pd.DataFrame({'peak_id': cluster_peaks_df[stem]}),
         #         identified_peaks,
         #         how='left'
-        #     )
+            # )
         # peptide_sequence_df[stem] = cluster_peaks_info['sequence']
         # protein_id_df[stem] = cluster_peaks_info['protein_id']
         # protein_name_df[stem] = cluster_peaks_info['protein_name']
