@@ -1264,138 +1264,100 @@ def dda_pipeline(
             'msms_index': [linked_peak.msms_id for linked_peak in linked_peaks],
         })
 
-        logger.info("Reading linked idents from disk: {}".format(stem))
-        linked_idents = tapp.read_linked_msms(in_path_ident_link)
-        linked_idents = pd.DataFrame({
-            'psm_index': [linked_ident.entity_id for linked_ident in linked_idents],
-            'msms_index': [linked_ident.msms_id for linked_ident in linked_idents],
-        })
-
-        logger.info("Reading ident_data from disk: {}".format(stem))
-        ident_data = tapp.read_ident_data(in_path_ident_data)
-
-        psms = pd.DataFrame({
-            'psm_index': [i for i in range(0, len(ident_data.spectrum_ids))],
-            'spectrum_ids': [psm.id for psm in ident_data.spectrum_ids],
-            'psm_sequence': [psm.sequence for psm in ident_data.spectrum_ids],
-            'psm_charge_state': [psm.charge_state for psm in ident_data.spectrum_ids],
-            'psm_theoretical_mz': [psm.theoretical_mz for psm in ident_data.spectrum_ids],
-            'psm_experimental_mz': [psm.experimental_mz for psm in ident_data.spectrum_ids],
-            'psm_retention_time': [psm.retention_time for psm in ident_data.spectrum_ids],
-        })
-        psms = pd.merge(
-            psms, linked_idents, on="psm_index")
-
-        linked_peaks = pd.merge(
-            linked_peaks, psms, on="msms_index")
-
-        db_sequences = pd.DataFrame({
-            'db_seq_id': [db_seq.id for db_seq in ident_data.db_sequences],
-            'protein_name': [db_seq.value for db_seq in ident_data.db_sequences],
-        })
-
-        protein_hypotheses = pd.DataFrame({
-            'db_seq_id': [prot.db_sequence_id for prot in ident_data.protein_hypotheses],
-            'spectrum_ids': [prot.spectrum_ids for prot in ident_data.protein_hypotheses],
-        }).explode('spectrum_ids')
-        protein_hypotheses = pd.merge(
-            db_sequences, protein_hypotheses, on="db_seq_id").drop('db_seq_id', axis=1)
-        protein_hypotheses.columns = ['hypothesis_protein_name', 'spectrum_ids']
-
-        logger.info("Reading inferred_proteins from disk: {}".format(stem))
-        inferred_proteins = tapp.read_inferred_proteins(
-            in_path_inferred_proteins)
-        inferred_proteins = pd.DataFrame({
-            'db_seq_id': [inferred_protein.protein_id for inferred_protein in inferred_proteins],
-            'spectrum_ids': [inferred_protein.psm_id for inferred_protein in inferred_proteins],
-        })
-
-        logger.info("Merging linked annotations: {}".format(stem))
-        inferred_proteins = pd.merge(
-            db_sequences, inferred_proteins, on="db_seq_id").drop('db_seq_id', axis=1)
-        inferred_proteins.columns = ['inferred_protein_name', 'spectrum_ids']
-        linked_peaks = pd.merge(
-            linked_peaks, inferred_proteins, on="spectrum_ids", how='left')
-        linked_peaks = pd.merge(
-            linked_peaks, protein_hypotheses, on="spectrum_ids", how='left')
-
-        # Aggregate the linked peaks before merging with the final peak list. It
-        # is probably easier to look at the duplicated values and know where
-        # everything comes from, but simplicity is important when displaying the
-        # results. The user can always check the data in more detail if necessary.
+        # We want to group first the peaks with msms ids to avoid situations
+        # where there is no identification but there are msms events.
+        logger.info("Merging linked peaks annotations: {}".format(stem))
         def aggregate_linked_peaks_metadata(x):
             ret = pd.Series({
                 "msms_index": '.|.'.join(map(str, np.unique(x['msms_index'].dropna()))),
-                "psm_sequence": '.|.'.join(pd.unique(x['psm_sequence'].dropna())),
-                "psm_theoretical_mz": '.|.'.join(map(str, np.unique(x['psm_theoretical_mz'].dropna()))),
-                "psm_experimental_mz": '.|.'.join(map(str, np.unique(x['psm_experimental_mz'].dropna()))),
-                "psm_retention_time": '.|.'.join(map(str, np.unique(x['psm_retention_time'].dropna()))),
-                "inferred_protein_name": '.|.'.join(np.unique(x['inferred_protein_name'].dropna())),
-                "hypothesis_protein_name": '.|.'.join(np.unique(x['inferred_protein_name'].dropna())),
             })
             return ret
-
-        logger.info("Aggregating linked peaks: {}".format(stem))
-        linked_peaks = linked_peaks.groupby('peak_id').apply(
+        linked_peaks_agg = linked_peaks.groupby('peak_id').apply(
             aggregate_linked_peaks_metadata)
         peaks_df = pd.merge(
-            peaks_df, linked_peaks, on="peak_id", how='left')
+            peaks_df, linked_peaks_agg, on="peak_id", how='left')
+
+        if (os.path.isfile(in_path_ident_link) and
+            os.path.isfile(in_path_ident_data) and
+            os.path.isfile(in_path_inferred_proteins)):
+            logger.info("Reading linked idents from disk: {}".format(stem))
+            linked_idents = tapp.read_linked_msms(in_path_ident_link)
+            linked_idents = pd.DataFrame({
+                'psm_index': [linked_ident.entity_id for linked_ident in linked_idents],
+                'msms_index': [linked_ident.msms_id for linked_ident in linked_idents],
+            })
+
+            logger.info("Reading ident_data from disk: {}".format(stem))
+            ident_data = tapp.read_ident_data(in_path_ident_data)
+
+            psms = pd.DataFrame({
+                'psm_index': [i for i in range(0, len(ident_data.spectrum_ids))],
+                'spectrum_ids': [psm.id for psm in ident_data.spectrum_ids],
+                'psm_sequence': [psm.sequence for psm in ident_data.spectrum_ids],
+                'psm_charge_state': [psm.charge_state for psm in ident_data.spectrum_ids],
+                'psm_theoretical_mz': [psm.theoretical_mz for psm in ident_data.spectrum_ids],
+                'psm_experimental_mz': [psm.experimental_mz for psm in ident_data.spectrum_ids],
+                'psm_retention_time': [psm.retention_time for psm in ident_data.spectrum_ids],
+            })
+            psms = pd.merge(
+                psms, linked_idents, on="psm_index")
+
+            linked_peaks = pd.merge(
+                linked_peaks, psms, on="msms_index")
+
+            db_sequences = pd.DataFrame({
+                'db_seq_id': [db_seq.id for db_seq in ident_data.db_sequences],
+                'protein_name': [db_seq.value for db_seq in ident_data.db_sequences],
+            })
+
+            protein_hypotheses = pd.DataFrame({
+                'db_seq_id': [prot.db_sequence_id for prot in ident_data.protein_hypotheses],
+                'spectrum_ids': [prot.spectrum_ids for prot in ident_data.protein_hypotheses],
+            }).explode('spectrum_ids')
+            protein_hypotheses = pd.merge(
+                db_sequences, protein_hypotheses, on="db_seq_id").drop('db_seq_id', axis=1)
+            protein_hypotheses.columns = ['hypothesis_protein_name', 'spectrum_ids']
+
+            logger.info("Reading inferred_proteins from disk: {}".format(stem))
+            inferred_proteins = tapp.read_inferred_proteins(
+                in_path_inferred_proteins)
+            inferred_proteins = pd.DataFrame({
+                'db_seq_id': [inferred_protein.protein_id for inferred_protein in inferred_proteins],
+                'spectrum_ids': [inferred_protein.psm_id for inferred_protein in inferred_proteins],
+            })
+
+            logger.info("Merging linked annotations: {}".format(stem))
+            inferred_proteins = pd.merge(
+                db_sequences, inferred_proteins, on="db_seq_id").drop('db_seq_id', axis=1)
+            inferred_proteins.columns = ['inferred_protein_name', 'spectrum_ids']
+            linked_peaks = pd.merge(
+                linked_peaks, inferred_proteins, on="spectrum_ids", how='left')
+            linked_peaks = pd.merge(
+                linked_peaks, protein_hypotheses, on="spectrum_ids", how='left')
+
+            # Aggregate the linked peaks before merging with the final peak list. It
+            # is probably easier to look at the duplicated values and know where
+            # everything comes from, but simplicity is important when displaying the
+            # results. The user can always check the data in more detail if necessary.
+            def aggregate_linked_peaks_metadata(x):
+                ret = pd.Series({
+                    "psm_sequence": '.|.'.join(pd.unique(x['psm_sequence'].dropna())),
+                    "psm_theoretical_mz": '.|.'.join(map(str, np.unique(x['psm_theoretical_mz'].dropna()))),
+                    "psm_experimental_mz": '.|.'.join(map(str, np.unique(x['psm_experimental_mz'].dropna()))),
+                    "psm_retention_time": '.|.'.join(map(str, np.unique(x['psm_retention_time'].dropna()))),
+                    "inferred_protein_name": '.|.'.join(np.unique(x['inferred_protein_name'].dropna())),
+                    "hypothesis_protein_name": '.|.'.join(np.unique(x['inferred_protein_name'].dropna())),
+                })
+                return ret
+
+            logger.info("Aggregating linked peaks: {}".format(stem))
+            linked_peaks = linked_peaks.groupby('peak_id').apply(
+                aggregate_linked_peaks_metadata)
+            peaks_df = pd.merge(
+                peaks_df, linked_peaks, on="peak_id", how='left')
 
         logger.info("Saving peaks quantitative table to disk: {}".format(stem))
         peaks_df.to_csv(out_path_peaks, index=False)
-
-        # print(peaks_df)
-        # peaks_df.to_csv("test_out.csv", index=False)
-        # ident_data = pd.DataFrame({
-        #     # 'protein_id': [db_seq.id for db_seq in ident_data.db_sequences],
-        #     # 'protein_name': [db_seq.value for db_seq in ident_data.db_sequences],
-        # })
-        # print(ident_data)
-    #     logger.info("Creating linked psm protein table: {}".format(stem))
-    #     linked_peaks_df = pd.merge(
-    #         linked_peaks_df, linked_idents_df, on="msms_index")
-    #     linked_spectrum_ids = [ident_data.spectrum_ids[i]
-    #                            for i in linked_peaks_df['psm_index']]
-    #     linked_spectrum_ids_df = pd.DataFrame({
-    #         'psm_id': [linked_spectrum_id.id for linked_spectrum_id in linked_spectrum_ids],
-    #         'sequence': [linked_spectrum_id.sequence for linked_spectrum_id in linked_spectrum_ids],
-    #         'charge_state': [linked_spectrum_id.charge_state for linked_spectrum_id in linked_spectrum_ids],
-    #         'retention_time': [linked_spectrum_id.retention_time for linked_spectrum_id in linked_spectrum_ids],
-    #     })
-    #     linked_spectrum_ids_df = pd.merge(
-    #         linked_spectrum_ids_df, inferred_proteins_df, on="psm_id", how="left")
-
-    #     protein_names_df = pd.DataFrame({
-    #         'protein_id': [db_seq.id for db_seq in ident_data.db_sequences],
-    #         'protein_name': [db_seq.value for db_seq in ident_data.db_sequences],
-    #     })
-    #     linked_spectrum_ids_df = pd.merge(
-    #         linked_spectrum_ids_df, protein_names_df, on="protein_id", how="left")
-
-    #     linked_peaks_df = pd.concat(
-    #         [linked_peaks_df, linked_spectrum_ids_df], axis=1)
-    #     linked_peaks_df.to_csv(out_path_identified_peaks, index=False)
-        # return
-    #     logger.info("Reading ident_data from disk: {}".format(stem))
-    #     ident_data = tapp.read_ident_data(in_path_ident_data)
-
-    #     logger.info("Reading inferred_proteins from disk: {}".format(stem))
-    #     inferred_proteins = tapp.read_inferred_proteins(
-    #         in_path_inferred_proteins)
-    #     inferred_proteins_df = pd.DataFrame({
-    #         'protein_id': [inferred_protein.protein_id for inferred_protein in inferred_proteins],
-    #         'psm_id': [inferred_protein.psm_id for inferred_protein in inferred_proteins],
-    #     })
-
-    #     logger.info("Reading linked peaks from disk: {}".format(stem))
-    #     linked_peaks = tapp.read_linked_msms(in_path_peaks_link)
-    #     linked_peaks_df = pd.DataFrame({
-    #         'peak_id': [linked_peak.entity_id for linked_peak in linked_peaks],
-    #         'msms_index': [linked_peak.msms_id for linked_peak in linked_peaks],
-    #     })
-
-    #     logger.info("Reading linked idents from disk: {}".format(stem))
-    #     linked_idents = tapp.read_linked_msms(in_path_ident_link)
 
     # for stem in input_stems:
     #     # Features
