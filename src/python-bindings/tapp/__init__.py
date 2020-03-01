@@ -1356,11 +1356,18 @@ def dda_pipeline(
             logger.info("Aggregating linked peaks: {}".format(stem))
             linked_peaks = linked_peaks.groupby('peak_id').apply(
                 aggregate_linked_peaks_metadata)
-            peaks_df = pd.merge(
-                peaks_df, linked_peaks, on="peak_id", how='left')
+
+            if linked_peaks.shape[0] != 0:
+                linked_peaks_agg = pd.merge(
+                    linked_peaks_agg, linked_peaks, on="peak_id", how="left")
+                peaks_df = pd.merge(
+                    peaks_df, linked_peaks, on="peak_id", how='left')
 
         logger.info("Saving peaks quantitative table to disk: {}".format(stem))
         peaks_df.to_csv(out_path_peaks, index=False)
+
+        logger.info("Saving peaks annotations table to disk: {}".format(stem))
+        linked_peaks_agg.to_csv(out_path_peak_annotations, index=True)
 
         in_path_features = os.path.join(
             output_dir, 'features', "{}.features".format(stem))
@@ -1399,7 +1406,6 @@ def dda_pipeline(
                 lambda x: x.drop('feature_id', axis=1).apply(
                     lambda y:'.|.'.join(map(str, np.unique(y.dropna()))), axis=0)
             )
-            # print(feature_peaks)
             features_df = pd.merge(
                 features_df.drop("peak_id", axis=1),
                 feature_peaks,
@@ -1776,8 +1782,8 @@ def dda_pipeline(
         # cluster_features_df.to_csv(
         # out_path_feature_clusters_info_feature_ids, index=False)
 
-    # logger.info('Finished creation of quantitative tables in {}'.format(
-        # datetime.timedelta(seconds=time.time()-time_start)))
+    logger.info('Finished creation of quantitative tables in {}'.format(
+        datetime.timedelta(seconds=time.time()-time_start)))
 
     logger.info('Total time elapsed: {}'.format(
         datetime.timedelta(seconds=time.time()-time_pipeline_start)))
