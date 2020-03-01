@@ -1405,44 +1405,56 @@ def dda_pipeline(
             )
             features_df.to_csv(out_path_features, index=False)
 
-    # # Matched Peaks
-    # # =============
-    # logger.info("Reading peak clusters from disk")
-    # in_path_peak_clusters = os.path.join(
-    #     output_dir, 'metamatch', 'peaks.clusters')
-    # out_path_peak_clusters_height = os.path.join(output_dir, 'quant',
-    #                                              "peak_clusters_height.csv")
-    # out_path_peak_clusters_volume = os.path.join(output_dir, 'quant',
-    #                                              "peak_clusters_volume.csv")
-    # out_path_peak_clusters_metadata = os.path.join(output_dir, 'quant',
-    #                                                "peak_clusters_metadata.csv")
-    # if (not os.path.exists(out_path_peak_clusters_metadata) or override_existing):
-    #     peak_clusters = tapp.read_metamatch_clusters(in_path_peak_clusters)
-    #     logger.info("Generating peak clusters quantitative table")
-    #     peak_clusters_metadata_df = pd.DataFrame({
-    #         'cluster_id': [cluster.id for cluster in peak_clusters],
-    #         'mz': [cluster.mz for cluster in peak_clusters],
-    #         'rt': [cluster.rt for cluster in peak_clusters],
-    #         'avg_height': [cluster.avg_height for cluster in peak_clusters],
-    #     })
-    #     peak_clusters_metadata_df.to_csv(
-    #         out_path_peak_clusters_metadata, index=False)
-    #     # Volume.
-    #     peak_clusters_df = pd.DataFrame({
-    #         'cluster_id': [cluster.id for cluster in peak_clusters],
-    #     })
-    #     for i, stem in enumerate(input_stems):
-    #         peak_clusters_df[stem] = [cluster.file_volumes[i]
-    #                                   for cluster in peak_clusters]
-    #     peak_clusters_df.to_csv(out_path_peak_clusters_volume, index=False)
-    #     peak_clusters_df = pd.DataFrame({
-    #         'cluster_id': [cluster.id for cluster in peak_clusters],
-    #     })
-    #     # Height.
-    #     for i, stem in enumerate(input_stems):
-    #         peak_clusters_df[stem] = [cluster.file_heights[i]
-    #                                   for cluster in peak_clusters]
-    #     peak_clusters_df.to_csv(out_path_peak_clusters_height, index=False)
+    # Matched Peaks
+    # =============
+    logger.info("Reading peak clusters from disk")
+    in_path_peak_clusters = os.path.join(
+        output_dir, 'metamatch', 'peaks.clusters')
+    out_path_peak_clusters_height = os.path.join(output_dir, 'quant',
+                                                 "peak_clusters_height.csv")
+    out_path_peak_clusters_volume = os.path.join(output_dir, 'quant',
+                                                 "peak_clusters_volume.csv")
+    out_path_peak_clusters_metadata = os.path.join(output_dir, 'quant',
+                                                   "peak_clusters_metadata.csv")
+    out_path_peak_clusters_peaks = os.path.join(output_dir, 'quant',
+                                                   "peak_clusters_peaks.csv")
+    if (not os.path.exists(out_path_peak_clusters_metadata) or override_existing or True):
+        peak_clusters = tapp.read_metamatch_clusters(in_path_peak_clusters)
+        logger.info("Generating peak clusters quantitative table")
+        peak_clusters_metadata_df = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in peak_clusters],
+            'mz': [cluster.mz for cluster in peak_clusters],
+            'rt': [cluster.rt for cluster in peak_clusters],
+            'avg_height': [cluster.avg_height for cluster in peak_clusters],
+        })
+        peak_clusters_metadata_df.to_csv(
+            out_path_peak_clusters_metadata, index=False)
+
+        # Volume.
+        peak_clusters_df = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in peak_clusters],
+        })
+        for i, stem in enumerate(input_stems):
+            peak_clusters_df[stem] = [cluster.file_volumes[i]
+                                      for cluster in peak_clusters]
+        peak_clusters_df.to_csv(out_path_peak_clusters_volume, index=False)
+        peak_clusters_df = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in peak_clusters],
+        })
+
+        # Height.
+        for i, stem in enumerate(input_stems):
+            peak_clusters_df[stem] = [cluster.file_heights[i]
+                                      for cluster in peak_clusters]
+        peak_clusters_df.to_csv(out_path_peak_clusters_height, index=False)
+
+        # Peak associations.
+        cluster_peaks = [(cluster.id, cluster.peak_ids) for cluster in peak_clusters]
+        cluster_peaks = pd.DataFrame(cluster_peaks, columns=["cluster_id", "peak_ids"]).explode("peak_ids")
+        cluster_peaks["file_id"] = cluster_peaks["peak_ids"].map(lambda x: input_stems[x.file_id])
+        cluster_peaks["peak_id"] = cluster_peaks["peak_ids"].map(lambda x: x.feature_id)
+        cluster_peaks = cluster_peaks.drop(["peak_ids"], axis=1)
+        cluster_peaks.to_csv(out_path_peak_clusters_peaks, index=False)
 
     # Matched Features
     # ================
