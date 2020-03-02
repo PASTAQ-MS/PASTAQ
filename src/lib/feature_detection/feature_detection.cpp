@@ -831,8 +831,8 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
         double best_dot = 0.0;
         uint8_t best_charge_state = 0;
         for (size_t k = 0; k < charge_states.size(); ++k) {
-            auto graph = charge_state_graphs[k];
-            auto current_node = graph[sorted_peaks_mz_index];
+            auto &graph = charge_state_graphs[k];
+            auto &current_node = graph[sorted_peaks_mz_index];
             if (current_node.visited) {
                 continue;
             }
