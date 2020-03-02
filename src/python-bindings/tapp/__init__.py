@@ -1142,22 +1142,12 @@ def dda_pipeline(
     time_start = time.time()
     for stem in input_stems:
         # Check if file has already been processed.
-        in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
         in_path_peaks = os.path.join(
             output_dir, 'warped_peaks', "{}.peaks".format(stem))
-        in_path_idents = os.path.join(
-            output_dir, 'ident', "{}.ident".format(stem))
-        in_path_ident_link = os.path.join(output_dir, 'linking',
-                                          "{}.ms2_idents.link".format(stem))
-        in_path_peaks_link = os.path.join(output_dir, 'linking',
-                                          "{}.ms2_peaks.link".format(stem))
         out_path = os.path.join(output_dir, 'features',
                                 "{}.features".format(stem))
         if os.path.exists(out_path) and not override_existing:
             continue
-
-        logger.info("Reading raw_data from disk (MS2): {}".format(stem))
-        raw_data = tapp.read_raw_data(in_path_raw)
 
         logger.info("Reading peaks from disk: {}".format(stem))
         peaks = tapp.read_peaks(in_path_peaks)
@@ -1260,24 +1250,14 @@ def dda_pipeline(
         # Peak Annotations.
         # =================
         logger.info("Reading linked peaks from disk: {}".format(stem))
+        peak_annotations = peaks_df[["peak_id"]]
         linked_peaks = tapp.read_linked_msms(in_path_peaks_link)
         linked_peaks = pd.DataFrame({
             'peak_id': [linked_peak.entity_id for linked_peak in linked_peaks],
-            'msms_index': [linked_peak.msms_id for linked_peak in linked_peaks],
+            'msms_id': [linked_peak.msms_id for linked_peak in linked_peaks],
         })
-
-        # We want to group first the peaks with msms ids to avoid situations
-        # where there is no identification but there are msms events.
-        logger.info("Merging linked peaks annotations: {}".format(stem))
-        def aggregate_linked_peaks_metadata(x):
-            ret = pd.Series({
-                "msms_index": '.|.'.join(map(str, np.unique(x['msms_index'].dropna()))).strip(".|."),
-            })
-            return ret
-        linked_peaks_agg = linked_peaks.groupby('peak_id').apply(
-            aggregate_linked_peaks_metadata)
-        peaks_df = pd.merge(
-            peaks_df, linked_peaks_agg, on="peak_id", how='left')
+        peak_annotations = pd.merge(
+            peak_annotations, linked_peaks, on="peak_id", how="left")
 
         if (os.path.isfile(in_path_ident_link) and
             os.path.isfile(in_path_ident_data) and
@@ -1286,7 +1266,7 @@ def dda_pipeline(
             linked_idents = tapp.read_linked_msms(in_path_ident_link)
             linked_idents = pd.DataFrame({
                 'psm_index': [linked_ident.entity_id for linked_ident in linked_idents],
-                'msms_index': [linked_ident.msms_id for linked_ident in linked_idents],
+                'msms_id': [linked_ident.msms_id for linked_ident in linked_idents],
             })
 
             logger.info("Reading ident_data from disk: {}".format(stem))
@@ -1302,78 +1282,58 @@ def dda_pipeline(
                 'psm_retention_time': [psm.retention_time for psm in ident_data.spectrum_ids],
             })
             psms = pd.merge(
-                psms, linked_idents, on="psm_index")
+                psms, linked_idents, on="psm_index").drop('psm_index', axis=1)
 
-            linked_peaks = pd.merge(
-                linked_peaks, psms, on="msms_index")
-
-            db_sequences = pd.DataFrame({
-                'db_seq_id': [db_seq.id for db_seq in ident_data.db_sequences],
-                'protein_name': [db_seq.value for db_seq in ident_data.db_sequences],
-            })
-
-            protein_hypotheses = pd.DataFrame({
-                'db_seq_id': [prot.db_sequence_id for prot in ident_data.protein_hypotheses],
-                'spectrum_ids': [prot.spectrum_ids for prot in ident_data.protein_hypotheses],
-            }).explode('spectrum_ids')
-            protein_hypotheses = pd.merge(
-                db_sequences, protein_hypotheses, on="db_seq_id").drop('db_seq_id', axis=1)
-            protein_hypotheses.columns = ['hypothesis_protein_name', 'spectrum_ids']
-
-            logger.info("Reading inferred_proteins from disk: {}".format(stem))
-            inferred_proteins = tapp.read_inferred_proteins(
-                in_path_inferred_proteins)
-            inferred_proteins = pd.DataFrame({
-                'db_seq_id': [inferred_protein.protein_id for inferred_protein in inferred_proteins],
-                'spectrum_ids': [inferred_protein.psm_id for inferred_protein in inferred_proteins],
-            })
-
-            logger.info("Merging linked annotations: {}".format(stem))
-            inferred_proteins = pd.merge(
-                db_sequences, inferred_proteins, on="db_seq_id").drop('db_seq_id', axis=1)
-            inferred_proteins.columns = ['inferred_protein_name', 'spectrum_ids']
-            linked_peaks = pd.merge(
-                linked_peaks, inferred_proteins, on="spectrum_ids", how='left')
-            linked_peaks = pd.merge(
-                linked_peaks, protein_hypotheses, on="spectrum_ids", how='left')
-
-            # Aggregate the linked peaks before merging with the final peak list. It
-            # is probably easier to look at the duplicated values and know where
-            # everything comes from, but simplicity is important when displaying the
-            # results. The user can always check the data in more detail if necessary.
-            def aggregate_linked_peaks_metadata(x):
-                ret = pd.Series({
-                    "psm_sequence": '.|.'.join(pd.unique(x['psm_sequence'].dropna())).strip(".|."),
-                    "psm_charge_state": '.|.'.join(map(str, np.unique(x['psm_charge_state'].dropna()))).strip(".|."),
-                    "psm_theoretical_mz": '.|.'.join(map(str, np.unique(x['psm_theoretical_mz'].dropna()))).strip(".|."),
-                    "psm_experimental_mz": '.|.'.join(map(str, np.unique(x['psm_experimental_mz'].dropna()))).strip(".|."),
-                    "psm_retention_time": '.|.'.join(map(str, np.unique(x['psm_retention_time'].dropna()))).strip(".|."),
-                    "inferred_protein_name": '.|.'.join(np.unique(x['inferred_protein_name'].dropna())).strip(".|."),
-                    "hypothesis_protein_name": '.|.'.join(np.unique(x['inferred_protein_name'].dropna())).strip(".|."),
+            if len(set(peak_annotations['msms_id']).intersection(set(psms['msms_id']))) != 0:
+                peak_annotations = pd.merge(
+                    peak_annotations, psms, on="msms_id", how="left")
+                db_sequences = pd.DataFrame({
+                    'db_seq_id': [db_seq.id for db_seq in ident_data.db_sequences],
+                    'protein_name': [db_seq.value for db_seq in ident_data.db_sequences],
                 })
-                return ret
 
-            logger.info("Aggregating linked peaks: {}".format(stem))
-            linked_peaks = linked_peaks.groupby('peak_id').apply(
-                aggregate_linked_peaks_metadata)
+                protein_hypotheses = pd.DataFrame({
+                    'db_seq_id': [prot.db_sequence_id for prot in ident_data.protein_hypotheses],
+                    'spectrum_ids': [prot.spectrum_ids for prot in ident_data.protein_hypotheses],
+                }).explode('spectrum_ids')
+                protein_hypotheses = pd.merge(
+                    db_sequences, protein_hypotheses, on="db_seq_id").drop('db_seq_id', axis=1)
+                protein_hypotheses.columns = ['hypothesis_protein_name', 'spectrum_ids']
 
-            if linked_peaks.shape[0] != 0:
-                linked_peaks_agg = pd.merge(
-                    linked_peaks_agg, linked_peaks, on="peak_id", how="left")
-                peaks_df = pd.merge(
-                    peaks_df, linked_peaks, on="peak_id", how='left')
+                logger.info("Reading inferred_proteins from disk: {}".format(stem))
+                inferred_proteins = tapp.read_inferred_proteins(
+                    in_path_inferred_proteins)
+                inferred_proteins = pd.DataFrame({
+                    'db_seq_id': [inferred_protein.protein_id for inferred_protein in inferred_proteins],
+                    'spectrum_ids': [inferred_protein.psm_id for inferred_protein in inferred_proteins],
+                })
+
+                logger.info("Merging linked annotations: {}".format(stem))
+                inferred_proteins = pd.merge(
+                    db_sequences, inferred_proteins, on="db_seq_id").drop('db_seq_id', axis=1)
+                inferred_proteins.columns = ['inferred_protein_name', 'spectrum_ids']
+                peak_annotations = pd.merge(
+                    peak_annotations, inferred_proteins, on="spectrum_ids", how='left')
+                peak_annotations = pd.merge(
+                    peak_annotations, protein_hypotheses, on="spectrum_ids", how='left')
 
         logger.info("Saving peaks quantitative table to disk: {}".format(stem))
         peaks_df.to_csv(out_path_peaks, index=False)
 
         logger.info("Saving peaks annotations table to disk: {}".format(stem))
-        linked_peaks_agg.to_csv(out_path_peak_annotations, index=True)
+        if "msms_id" in peak_annotations:
+            peak_annotations["msms_id"] = peak_annotations["msms_id"].astype('Int64')
+        if "psm_charge_state" in peak_annotations:
+            peak_annotations["psm_charge_state"] = peak_annotations["psm_charge_state"].astype('Int64')
+        peak_annotations.to_csv(out_path_peak_annotations, index=False)
 
         in_path_features = os.path.join(
             output_dir, 'features', "{}.features".format(stem))
         if os.path.isfile(in_path_features):
             out_path_features = os.path.join(output_dir, 'quant',
                                             "{}_features.csv".format(stem))
+            out_path_feature_annotations = os.path.join(output_dir, 'quant',
+                                            "{}_feature_annotations.csv".format(stem))
 
             logger.info("Reading features from disk: {}".format(stem))
             features = tapp.read_features(in_path_features)
@@ -1393,25 +1353,16 @@ def dda_pipeline(
                 'peak_id': [feature.peak_ids for feature in features],
             })
             # Find the peak annotations that belong to each feature.
-            feature_peaks = features_df[["feature_id", "peak_id"]].explode("peak_id")
-            annotation_columns = [
-                "peak_id", "msms_index", "psm_sequence", "psm_charge_state",
-                "inferred_protein_name", "hypothesis_protein_name"
-            ]
-            feature_peaks = pd.merge(
-                feature_peaks, peaks_df[peaks_df.columns & annotation_columns],
-                on="peak_id"
-            )
-            feature_peaks = feature_peaks.groupby('feature_id').apply(
-                lambda x: x.drop('feature_id', axis=1).apply(
-                    lambda y:'.|.'.join(map(str, np.unique(y.dropna()))).strip(".|."), axis=0)
-            )
-            features_df = pd.merge(
-                features_df.drop("peak_id", axis=1),
-                feature_peaks,
-                on="feature_id", how="left"
-            )
+            feature_annotations = features_df[["feature_id", "peak_id"]].explode("peak_id")
+
+            # TODO: It's possible that we want to regenerate the feature table
+            # without doing the same with the peak tables.
+            feature_annotations = pd.merge(
+                feature_annotations, peak_annotations,
+                on="peak_id", how="left")
+
             features_df.to_csv(out_path_features, index=False)
+            feature_annotations.to_csv(out_path_feature_annotations, index=False)
 
     # Matched Peaks
     # =============
@@ -1426,8 +1377,25 @@ def dda_pipeline(
                                                    "peak_clusters_metadata.csv")
     out_path_peak_clusters_peaks = os.path.join(output_dir, 'quant',
                                                    "peak_clusters_peaks.csv")
-    out_path_peak_clusters_peaks_annotations = os.path.join(output_dir, 'quant',
-                                                   "peak_clusters_peaks_annotations.csv")
+    out_path_peak_clusters_annotations = os.path.join(output_dir, 'quant',
+                                                   "peak_clusters_annotations.csv")
+
+    def aggregate_cluster_annotations(x):
+        ret = {}
+        if "psm_sequence" in x:
+            ret["psm_sequence"] = ".|.".join(
+                np.unique(x['psm_sequence'].dropna())).strip(".|.")
+        if "psm_charge_state" in x:
+            ret["psm_charge_state"] = ".|.".join(
+                map(str, np.unique(x['psm_charge_state'].dropna()))).strip(".|.")
+        if "inferred_protein_name" in x:
+            ret["inferred_protein_name"] = ".|.".join(
+                np.unique(x['inferred_protein_name'].dropna())).strip(".|.")
+        if "hypothesis_protein_name" in x:
+            ret["hypothesis_protein_name"] = ".|.".join(
+                np.unique(x['hypothesis_protein_name'].dropna())).strip(".|.")
+        return pd.Series(ret)
+
     if (not os.path.exists(out_path_peak_clusters_metadata) or override_existing):
         peak_clusters = tapp.read_metamatch_clusters(in_path_peak_clusters)
         logger.info("Generating peak clusters quantitative table")
@@ -1481,19 +1449,16 @@ def dda_pipeline(
             logger.info("Merging peak/clusters annotations for: {}".format(stem))
             cluster_annotations = pd.merge(
                 cluster_annotations, peak_annotations, on="peak_id", how="left")
-            all_cluster_annotations = pd.concat([all_cluster_annotations, cluster_annotations])
-        logger.info("Aggregating annotations")
+            all_cluster_annotations = pd.concat([all_cluster_annotations, cluster_annotations]).reset_index(drop=True)
+        # Ensure these columns have the proper type.
+        if "msms_id" in all_cluster_annotations:
+            all_cluster_annotations["msms_id"] = all_cluster_annotations["msms_id"].astype('Int64')
+        if "psm_charge_state" in all_cluster_annotations:
+            all_cluster_annotations["psm_charge_state"] = all_cluster_annotations["psm_charge_state"].astype('Int64')
 
-        def aggregate_cluster_annotations(x):
-            ret = {
-                "psm_sequence": ".|.".join(np.unique(x['psm_sequence'].dropna())).strip(".|."),
-                "psm_charge_state": ".|.".join(map(str, x['psm_charge_state'].dropna())).strip(".|."),
-                "inferred_protein_name": ".|.".join(np.unique(x['inferred_protein_name'].dropna())).strip(".|."),
-                "hypothesis_protein_name": ".|.".join(np.unique(x['hypothesis_protein_name'].dropna())).strip(".|."),
-            }
-            return pd.Series(ret)
+        logger.info("Aggregating annotations")
         all_cluster_annotations = all_cluster_annotations.groupby('cluster_id').apply(aggregate_cluster_annotations)
-        all_cluster_annotations.to_csv(out_path_peak_clusters_peaks_annotations, index=True)
+        all_cluster_annotations.to_csv(out_path_peak_clusters_annotations, index=True)
 
     # Matched Features
     # ================
@@ -1506,9 +1471,9 @@ def dda_pipeline(
                                              "feature_clusters_metadata.csv")
     out_path_feature_clusters_features = os.path.join(output_dir, 'quant',
                                              "feature_clusters_features.csv")
-    out_path_feature_clusters_peaks_annotations = os.path.join(output_dir, 'quant',
-                                                   "feature_clusters_peaks_annotations.csv")
-    if (not os.path.exists(out_path_feature_clusters_height) or override_existing or True):
+    out_path_feature_clusters_annotations = os.path.join(output_dir, 'quant',
+                                                   "feature_clusters_annotations.csv")
+    if (not os.path.exists(out_path_feature_clusters_height) or override_existing):
         feature_clusters = tapp.read_feature_clusters(
             in_path_feature_clusters)
         logger.info("Generating feature clusters quantitative table")
@@ -1557,18 +1522,15 @@ def dda_pipeline(
             cluster_annotations = pd.merge(
                 cluster_annotations, peak_annotations, on="peak_id", how="left")
             all_cluster_annotations = pd.concat([all_cluster_annotations, cluster_annotations])
-        logger.info("Aggregating annotations")
 
-        def aggregate_cluster_annotations(x):
-            ret = {
-                "psm_sequence": ".|.".join(np.unique(x['psm_sequence'].dropna())).strip(".|."),
-                "psm_charge_state": ".|.".join(map(str, x['psm_charge_state'].dropna())).strip(".|."),
-                "inferred_protein_name": ".|.".join(np.unique(x['inferred_protein_name'].dropna())).strip(".|."),
-                "hypothesis_protein_name": ".|.".join(np.unique(x['hypothesis_protein_name'].dropna())).strip(".|."),
-            }
-            return pd.Series(ret)
+        logger.info("Aggregating annotations")
+        # Ensure these columns have the proper type.
+        if "msms_id" in all_cluster_annotations:
+            all_cluster_annotations["msms_id"] = all_cluster_annotations["msms_id"].astype('Int64')
+        if "psm_charge_state" in all_cluster_annotations:
+            all_cluster_annotations["psm_charge_state"] = all_cluster_annotations["psm_charge_state"].astype('Int64')
         all_cluster_annotations = all_cluster_annotations.groupby('cluster_id').apply(aggregate_cluster_annotations)
-        all_cluster_annotations.to_csv(out_path_feature_clusters_peaks_annotations, index=True)
+        all_cluster_annotations.to_csv(out_path_feature_clusters_annotations, index=True)
 
     logger.info('Finished creation of quantitative tables in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
@@ -1607,6 +1569,14 @@ def full_dda_pipeline_test():
 
     dda_pipeline(tapp_parameters, input_files, 'tapp_pipeline_test')
 
+
+def testing_feature_detection_big():
+    with open("/home/alex/Projects/thesis/01-tapp-paper/code/tapp-v0.3.0/hye/parameters.json") as json_file:
+        tapp_parameters = json.load(json_file)
+    peaks = tapp.read_peaks("/home/alex/Projects/thesis/01-tapp-paper/code/tapp-v0.3.0/hye/warped_peaks/1_1.peaks")
+    print(len(peaks))
+    features = tapp.detect_features(peaks, [5, 4, 3, 2, 1])
+    return features
 
 def testing_feature_detection():
     with open('tapp_pipeline_test/parameters.json') as json_file:
