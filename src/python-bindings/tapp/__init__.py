@@ -1284,9 +1284,10 @@ def dda_pipeline(
             psms = pd.merge(
                 psms, linked_idents, on="psm_index").drop('psm_index', axis=1)
 
-            if len(set(peak_annotations['msms_id']).intersection(set(psms['msms_id']))) != 0:
-                peak_annotations = pd.merge(
-                    peak_annotations, psms, on="msms_id", how="left")
+            peak_annotations_2 = pd.merge(
+                peak_annotations, psms, on="msms_id", how="left")
+            if not peak_annotations_2.empty:
+                peak_annotations = peak_annotations_2
                 db_sequences = pd.DataFrame({
                     'db_seq_id': [db_seq.id for db_seq in ident_data.db_sequences],
                     'protein_name': [db_seq.value for db_seq in ident_data.db_sequences],
