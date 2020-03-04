@@ -706,10 +706,10 @@ def dda_pipeline(
         logger.info("Saving similarity matrix: {}.csv".format(out_path))
         similarity_matrix.to_csv("{}.csv".format(out_path))
         # TODO: Use plot saving from utilities library.
-        fig.set_size_inches(7.5 * 16/9, 7.5)
-        plt.savefig("{}.png".format(out_path), dpi=100)
+        fig.set_size_inches(7.0, 7.0 * 9/16)
+        plt.savefig("{}.pdf".format(out_path), dpi=300)
         plt.close(fig)
-        logger.info("Saving similarity matrix plot: {}.png".format(out_path))
+        logger.info("Saving similarity matrix plot: {}.pdf".format(out_path))
     logger.info('Finished unwarped similarity matrix calculation in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
@@ -765,10 +765,10 @@ def dda_pipeline(
         logger.info("Saving similarity matrix: {}.csv".format(out_path))
         similarity_matrix.to_csv("{}.csv".format(out_path))
         # TODO: Use plot saving from utilities library.
-        fig.set_size_inches(7.5 * 16/9, 7.5)
-        plt.savefig("{}.png".format(out_path), dpi=100)
+        fig.set_size_inches(7.0, 7.0 * 9/16)
+        plt.savefig("{}.pdf".format(out_path), dpi=300)
         plt.close(fig)
-        logger.info("Saving similarity matrix plot: {}.png".format(out_path))
+        logger.info("Saving similarity matrix plot: {}.pdf".format(out_path))
     else:
         # Load exhaustive_warping_similarity to calculate the reference idx.
         similarity_matrix = pd.read_csv("{}.csv".format(out_path), index_col=0)
@@ -862,10 +862,10 @@ def dda_pipeline(
         logger.info("Saving similarity matrix: {}.csv".format(out_path))
         similarity_matrix.to_csv("{}.csv".format(out_path))
         # TODO: Use plot saving from utilities library.
-        fig.set_size_inches(7.5 * 16/9, 7.5)
-        plt.savefig("{}.png".format(out_path), dpi=100)
+        fig.set_size_inches(7.0, 7.0 * 9/16)
+        plt.savefig("{}.pdf".format(out_path), dpi=300)
         plt.close(fig)
-        logger.info("Saving similarity matrix plot: {}.png".format(out_path))
+        logger.info("Saving similarity matrix plot: {}.pdf".format(out_path))
     logger.info('Finished warped similarity matrix calculation in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
@@ -984,9 +984,9 @@ def dda_pipeline(
                          va='center', rotation='vertical')
         handles, labels = ax4.get_legend_handles_labels()
         fig_tic_bpc.legend(handles, labels, loc='upper right')
-        fig_tic_bpc.set_size_inches(7.5 * 16/9, 7.5)
+        fig_tic_bpc.set_size_inches(7.0, 7.0 * 9/16)
         plt.figure(fig_tic_bpc.number)
-        plt.savefig("{}.png".format(out_path_tic_bpc), dpi=100)
+        plt.savefig("{}.pdf".format(out_path_tic_bpc), dpi=300)
         plt.close(fig_tic_bpc)
 
         # Save rt vs rt_delta figure.
@@ -994,8 +994,8 @@ def dda_pipeline(
         ax5.set_ylabel('Retention time delta (s)')
         plt.figure(fig_rt_vs_delta.number)
         fig_rt_vs_delta.legend(handles, labels, loc='upper right')
-        fig_rt_vs_delta.set_size_inches(7.5 * 16/9, 7.5)
-        plt.savefig("{}.png".format(out_path_rt_vs_delta), dpi=100)
+        fig_rt_vs_delta.set_size_inches(7.0, 7.0 * 9/16)
+        plt.savefig("{}.pdf".format(out_path_rt_vs_delta), dpi=300)
         plt.close(fig_rt_vs_delta)
 
         # Save sigma density figure.
@@ -1003,8 +1003,8 @@ def dda_pipeline(
         ax7.set_xlabel('$\\sigma_{mz}$')
         ax6.set_ylabel('Density')
         plt.figure(fig_sigmas_density.number)
-        fig_sigmas_density.set_size_inches(7.5 * 16/9, 7.5)
-        plt.savefig("{}.png".format(out_path_sigmas_density), dpi=100)
+        fig_sigmas_density.set_size_inches(7.0, 7.0 * 9/16)
+        plt.savefig("{}.pdf".format(out_path_sigmas_density), dpi=300)
         plt.close(fig_sigmas_density)
 
     logger.info('Finished quality control plotting in {}'.format(
@@ -1286,7 +1286,7 @@ def dda_pipeline(
 
             peak_annotations_2 = pd.merge(
                 peak_annotations, psms, on="msms_id", how="left")
-            if not peak_annotations_2.empty:
+            if not peak_annotations_2["spectrum_ids"].dropna().empty:
                 peak_annotations = peak_annotations_2
                 db_sequences = pd.DataFrame({
                     'db_seq_id': [db_seq.id for db_seq in ident_data.db_sequences],
