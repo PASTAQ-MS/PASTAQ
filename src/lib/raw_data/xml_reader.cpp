@@ -357,6 +357,9 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
             // here that this assumption is the same for all formats, but should
             // probably find a more robust way of doing this.
             scan.scan_number = std::stoi(scan_attributes["index"]) + 1;
+            std::vector<bool> filter_points;
+            std::vector<double> mzs;
+            std::vector<double> intensities;
             while (stream.good()) {
                 auto tag = XmlReader::read_tag(stream);
                 if (!tag) {
@@ -513,21 +516,54 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
                             reinterpret_cast<unsigned char *>(&data.value()[0]),
                             precision, true);
                         num_points = num_points / (precision / 8) / 4 * 3;
+                        if (type == 0) {  // mz
+                            mzs = std::vector<double>(num_points);
+                        }
+                        if (type == 1) {  // intensity
+                            intensities = std::vector<double>(num_points);
+                        }
+                        if (filter_points.empty()) {
+                            filter_points =
+                                std::vector<bool>(num_points, false);
+                        }
                         for (size_t i = 0; i < num_points; ++i) {
                             auto value = decoder.get_double();
                             if (type == 0) {  // mz
-                                scan.mz.push_back(value);
+                                mzs[i] = value;
+                                if (value < min_mz || value > max_mz) {
+                                    filter_points[i] = true;
+                                }
                             }
                             if (type == 1) {  // intensity
-                                scan.intensity.push_back(value);
+                                intensities[i] = value;
+                                if (value == 0.0) {
+                                    filter_points[i] = true;
+                                }
                             }
                         }
                     }
                 }
             }
-            // TODO: Filter mzs not in range and intensity == 0 scans.
-            // TODO: Calculate max_intensity and total_intensity.
+
+            // Filter mzs not in range and intensity == 0 scans and calculate
+            // max_intensity and total_intensity.
+            double intensity_sum = 0;
+            double max_intensity = 0;
+            for (size_t i = 0; i < filter_points.size(); ++i) {
+                if (filter_points[i]) {
+                    continue;
+                }
+                scan.mz.push_back(mzs[i]);
+                scan.intensity.push_back(intensities[i]);
+                if (intensities[i] > max_intensity) {
+                    max_intensity = intensities[i];
+                }
+                intensity_sum += intensities[i];
+            }
             scan.num_points = scan.mz.size();
+            scan.max_intensity = max_intensity;
+            scan.total_intensity = intensity_sum;
+
             // TODO: Assert that mz.size() == intenstiy.size()
             if (scan.ms_level == 0 || scan.ms_level != ms_level) {
                 scan = {};
