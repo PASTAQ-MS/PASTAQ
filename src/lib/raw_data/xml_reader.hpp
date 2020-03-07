@@ -33,6 +33,14 @@ std::optional<RawData::RawData> read_mzxml(
     double resolution_msn, double reference_mz, Polarity::Type polarity,
     size_t ms_level);
 
+// Read an entire mzML file into the RawData::RawData data structure filtering
+// based on min/max mz/rt and polarity.
+std::optional<RawData::RawData> read_mzml(
+    std::istream &stream, double min_mz, double max_mz, double min_rt,
+    double max_rt, Instrument::Type instrument_type, double resolution_ms1,
+    double resolution_msn, double reference_mz, Polarity::Type polarity,
+    size_t ms_level);
+
 // Read an entire mzIdentML file into a IdentData::IdentData data structure.
 IdentData::IdentData read_mzidentml(std::istream &stream);
 }  // namespace XmlReader

@@ -202,12 +202,6 @@ RawData::Scan parse_mzxml_scan(std::istream &stream,
                         std::stod(precursor_attributes["windowWideness"]);
                 }
 
-                if (precursor_attributes.find("windowWideness") !=
-                    precursor_attributes.end()) {
-                    scan.precursor_information.window_wideness =
-                        std::stod(precursor_attributes["windowWideness"]);
-                }
-
                 if (precursor_attributes.find("precursorCharge") !=
                     precursor_attributes.end()) {
                     scan.precursor_information.charge =
@@ -316,6 +310,245 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
                 if (scan.mz[scan.mz.size() - 1] > raw_data.max_mz) {
                     raw_data.max_mz = scan.mz[scan.mz.size() - 1];
                 }
+            }
+        }
+    }
+    return raw_data;
+}
+
+std::optional<RawData::RawData> XmlReader::read_mzml(
+    std::istream &stream, double min_mz, double max_mz, double min_rt,
+    double max_rt, Instrument::Type instrument_type, double resolution_ms1,
+    double resolution_msn, double reference_mz, Polarity::Type polarity,
+    size_t ms_level) {
+    RawData::RawData raw_data = {};
+    raw_data.instrument_type = instrument_type;
+    raw_data.min_mz = std::numeric_limits<double>::infinity();
+    raw_data.max_mz = -std::numeric_limits<double>::infinity();
+    raw_data.min_rt = std::numeric_limits<double>::infinity();
+    raw_data.max_rt = -std::numeric_limits<double>::infinity();
+    raw_data.resolution_ms1 = resolution_ms1;
+    raw_data.resolution_msn = resolution_msn;
+    raw_data.reference_mz = reference_mz;
+    raw_data.fwhm_rt = 0;  // TODO(alex): Should this be passed as well?
+    raw_data.scans = {};
+    raw_data.retention_times = {};
+    // TODO(alex): Can we automatically detect the instrument type and set
+    // resolution from the header?
+    while (stream.good()) {
+        auto tag = XmlReader::read_tag(stream);
+        if (!tag) {
+            continue;
+        }
+        if (tag.value().name == "spectrumList" && tag.value().closed) {
+            break;
+        }
+        RawData::Scan scan = {};
+        if (tag.value().name == "spectrum" && !tag.value().closed) {
+            // Parse the contents and metadata of this spectrum.
+            scan.precursor_information.scan_number = 0;
+            auto scan_attributes = tag.value().attributes;
+
+            // NOTE: In the mzML spec, the native scan number is described on
+            // the "id" attribute, and can contain more information than
+            // required for just an integer identifer. Moreover, it looks like,
+            // at least for Orbitrap data, the scan numbers are non-zero
+            // consecutive integers. For the sake of time, I'm just assuming
+            // here that this assumption is the same for all formats, but should
+            // probably find a more robust way of doing this.
+            scan.scan_number = std::stoi(scan_attributes["index"]) + 1;
+            while (stream.good()) {
+                auto tag = XmlReader::read_tag(stream);
+                if (!tag) {
+                    break;
+                }
+                if (tag.value().name == "spectrum" && tag.value().closed) {
+                    break;
+                }
+
+                if (tag.value().name == "cvParam") {
+                    auto cv_attributes = tag.value().attributes;
+                    auto accession = cv_attributes["accession"];
+
+                    // This scan is ms_level 1
+                    if (accession == "MS:1000579") {
+                        scan.ms_level = 1;
+                    }
+
+                    // MS level a multi-level MSn experiment.
+                    if (accession == "MS:1000511") {
+                        size_t scan_ms_level =
+                            std::stoi(cv_attributes["value"]);
+                        scan.ms_level = scan_ms_level;
+                    }
+
+                    // Polarity.
+                    if (accession == "MS:1000130") {
+                        if (polarity != Polarity::BOTH &&
+                            Polarity::POSITIVE != polarity) {
+                            continue;
+                        }
+                        scan.polarity = Polarity::POSITIVE;
+                    }
+                    if (accession == "MS:1000129") {
+                        if (polarity != Polarity::BOTH &&
+                            Polarity::NEGATIVE != polarity) {
+                            continue;
+                        }
+                        scan.polarity = Polarity::NEGATIVE;
+                    }
+
+                    // Retention time.
+                    if (accession == "MS:1000016") {
+                        scan.retention_time = std::stod(cv_attributes["value"]);
+                        // Retention time is store in seconds. Make sure it is
+                        // the right unit. If the unit accession was
+                        // "UO:0000010" it would be in seconds, so no action is
+                        // required.
+                        if (cv_attributes["unitAccession"] == "UO:0000031") {
+                            scan.retention_time *= 60.0;
+                        }
+                    }
+                }
+
+                if (tag.value().name == "precursor") {
+                    // TODO: Get precursor id from "spectrumRef" attribute.
+                    scan.precursor_information.scan_number = 0;
+                    scan.precursor_information.charge = 0;
+                    scan.precursor_information.mz = 0.0;
+                    scan.precursor_information.window_wideness = 0.0;
+                    scan.precursor_information.intensity = 0.0;
+                    scan.precursor_information.activation_method =
+                        ActivationMethod::UNKNOWN;
+                    while (stream.good()) {
+                        auto tag = XmlReader::read_tag(stream);
+                        if (!tag) {
+                            break;
+                        }
+                        if (tag.value().name == "precursor" &&
+                            tag.value().closed) {
+                            break;
+                        }
+                        if (tag.value().name == "cvParam") {
+                            auto cv_attributes = tag.value().attributes;
+                            auto accession = cv_attributes["accession"];
+                            // Isolation window.
+                            if (accession == "MS:1000827") {
+                                scan.precursor_information.mz =
+                                    std::stod(cv_attributes["value"]);
+                            }
+                            if (accession == "MS:1000828") {
+                                scan.precursor_information.window_wideness +=
+                                    std::stod(cv_attributes["value"]);
+                            }
+                            if (accession == "MS:1000829") {
+                                scan.precursor_information.window_wideness +=
+                                    std::stod(cv_attributes["value"]);
+                            }
+                            // Charge state.
+                            if (accession == "MS:1000041") {
+                                scan.precursor_information.charge =
+                                    std::stoi(cv_attributes["value"]);
+                            }
+                            if (accession == "MS:1000042") {
+                                scan.precursor_information.intensity =
+                                    std::stod(cv_attributes["value"]);
+                            }
+                            // Activation method.
+                            if (accession == "MS:1000422") {
+                                scan.precursor_information.activation_method =
+                                    ActivationMethod::HCD;
+                            }
+                        }
+                    }
+                }
+
+                if (tag.value().name == "binaryDataArray") {
+                    // precision can be: 64 or 32 (bits).
+                    int precision = 0;
+                    // mz: 0, intensity: 1
+                    int type = -1;
+                    std::optional<std::string> data;
+                    size_t num_points =
+                        std::stoi(tag.value().attributes["encodedLength"]);
+                    while (stream.good()) {
+                        auto tag = XmlReader::read_tag(stream);
+                        if (!tag) {
+                            break;
+                        }
+                        if (tag.value().name == "binaryDataArray" &&
+                            tag.value().closed) {
+                            break;
+                        }
+                        if (tag.value().name == "cvParam") {
+                            auto cv_attributes = tag.value().attributes;
+                            auto accession = cv_attributes["accession"];
+                            // Precision.
+                            if (accession == "MS:1000523") {
+                                precision = 64;
+                            }
+                            if (accession == "MS:1000521") {
+                                precision = 32;
+                            }
+                            // Type of vector.
+                            if (accession == "MS:1000514") {
+                                type = 0;
+                            }
+                            if (accession == "MS:1000515") {
+                                type = 1;
+                            }
+                        }
+                        if (tag.value().name == "binary" &&
+                            !tag.value().closed) {
+                            data = XmlReader::read_data(stream);
+                        }
+                    }
+                    if (data) {
+                        Base64 decoder(
+                            reinterpret_cast<unsigned char *>(&data.value()[0]),
+                            precision, true);
+                        for (size_t i = 0; i < num_points; ++i) {
+                            auto value = decoder.get_double();
+                            if (type == 0) {  // mz
+                                scan.mz.push_back(value);
+                            }
+                            if (type == 1) {  // intensity
+                                scan.intensity.push_back(value);
+                            }
+                        }
+                    }
+                }
+            }
+            // TODO: Filter mzs not in range and intensity == 0 scans.
+            // TODO: Calculate max_intensity and total_intensity.
+            scan.num_points = scan.mz.size();
+            // TODO: Assert that mz.size() == intenstiy.size()
+            if (scan.ms_level == 0 || scan.ms_level != ms_level) {
+                scan = {};
+            }
+        }
+
+        // Update RawData.
+        if (scan.num_points != 0) {
+            if (scan.retention_time < min_rt) {
+                continue;
+            }
+            if (scan.retention_time > max_rt) {
+                break;
+            }
+            raw_data.scans.push_back(scan);
+            raw_data.retention_times.push_back(scan.retention_time);
+            if (scan.retention_time < raw_data.min_rt) {
+                raw_data.min_rt = scan.retention_time;
+            }
+            if (scan.retention_time > raw_data.max_rt) {
+                raw_data.max_rt = scan.retention_time;
+            }
+            if (scan.mz[0] < raw_data.min_mz) {
+                raw_data.min_mz = scan.mz[0];
+            }
+            if (scan.mz[scan.mz.size() - 1] > raw_data.max_mz) {
+                raw_data.max_mz = scan.mz[scan.mz.size() - 1];
             }
         }
     }
