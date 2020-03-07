@@ -4,10 +4,11 @@
 #include "utils/base64.hpp"
 #include "xml_reader.hpp"
 
-RawData::Scan parse_scan(std::istream &stream,
-                         std::optional<XmlReader::Tag> &tag, double min_mz,
-                         double max_mz, double min_rt, double max_rt,
-                         Polarity::Type polarity, size_t ms_level) {
+RawData::Scan parse_mzxml_scan(std::istream &stream,
+                               std::optional<XmlReader::Tag> &tag,
+                               double min_mz, double max_mz, double min_rt,
+                               double max_rt, Polarity::Type polarity,
+                               size_t ms_level) {
     RawData::Scan scan;
     uint64_t precursor_id = 0;
     scan.precursor_information.scan_number = 0;
@@ -256,8 +257,8 @@ RawData::Scan parse_scan(std::istream &stream,
         while (next_tag) {
             if (next_tag.value().name == "scan" && !next_tag.value().closed) {
                 auto child_scan =
-                    parse_scan(stream, next_tag, min_mz, max_mz, min_rt, max_rt,
-                               polarity, ms_level);
+                    parse_mzxml_scan(stream, next_tag, min_mz, max_mz, min_rt,
+                                     max_rt, polarity, ms_level);
                 child_scan.precursor_information.scan_number = precursor_id;
                 if (child_scan.precursor_information.scan_number !=
                         precursor_id &&
@@ -298,8 +299,8 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
             continue;
         }
         if (tag.value().name == "scan" && !tag.value().closed) {
-            auto scan = parse_scan(stream, tag, min_mz, max_mz, min_rt, max_rt,
-                                   polarity, ms_level);
+            auto scan = parse_mzxml_scan(stream, tag, min_mz, max_mz, min_rt,
+                                         max_rt, polarity, ms_level);
             if (scan.num_points != 0) {
                 raw_data.scans.push_back(scan);
                 raw_data.retention_times.push_back(scan.retention_time);
