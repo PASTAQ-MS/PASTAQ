@@ -408,6 +408,11 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
                         if (cv_attributes["unitAccession"] == "UO:0000031") {
                             scan.retention_time *= 60.0;
                         }
+                        if (scan.retention_time < min_rt ||
+                            scan.retention_time > max_rt) {
+                            scan = {};
+                            break;
+                        }
                     }
                 }
 
@@ -507,6 +512,7 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
                         Base64 decoder(
                             reinterpret_cast<unsigned char *>(&data.value()[0]),
                             precision, true);
+                        num_points = num_points / (precision / 8) / 4 * 3;
                         for (size_t i = 0; i < num_points; ++i) {
                             auto value = decoder.get_double();
                             if (type == 0) {  // mz
