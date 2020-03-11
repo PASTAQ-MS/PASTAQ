@@ -1,3 +1,5 @@
+from .tapp import *
+import tapp
 import math
 import os
 import json
@@ -21,8 +23,6 @@ plt.rcParams.update({
     'font.size': 7,
 })
 
-import tapp
-from .tapp import *
 
 # TODO(alex): Write documentation.
 
@@ -716,7 +716,8 @@ def dda_pipeline(
         plt.savefig("{}.pdf".format(out_path), dpi=300)
         plt.savefig("{}.png".format(out_path), dpi=300)
         plt.close(fig)
-        logger.info("Saving similarity matrix plot: {}.pdf/png".format(out_path))
+        logger.info(
+            "Saving similarity matrix plot: {}.pdf/png".format(out_path))
     logger.info('Finished unwarped similarity matrix calculation in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
@@ -776,7 +777,8 @@ def dda_pipeline(
         plt.savefig("{}.pdf".format(out_path), dpi=300)
         plt.savefig("{}.png".format(out_path), dpi=300)
         plt.close(fig)
-        logger.info("Saving similarity matrix plot: {}.pdf/png".format(out_path))
+        logger.info(
+            "Saving similarity matrix plot: {}.pdf/png".format(out_path))
     else:
         # Load exhaustive_warping_similarity to calculate the reference idx.
         similarity_matrix = pd.read_csv("{}.csv".format(out_path), index_col=0)
@@ -874,7 +876,8 @@ def dda_pipeline(
         plt.savefig("{}.pdf".format(out_path), dpi=300)
         plt.savefig("{}.png".format(out_path), dpi=300)
         plt.close(fig)
-        logger.info("Saving similarity matrix plot: {}.pdf/png".format(out_path))
+        logger.info(
+            "Saving similarity matrix plot: {}.pdf/png".format(out_path))
     logger.info('Finished warped similarity matrix calculation in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
@@ -886,10 +889,10 @@ def dda_pipeline(
     out_path_sigmas_density = os.path.join(
         output_dir, 'quality', 'density_sigma')
     if (not os.path.exists(out_path_tic_bpc)
-            or not os.path.exists(out_path_rt_vs_delta)
-            or not os.path.exists(out_path_sigmas_density)
-            or override_existing
-        ):
+                or not os.path.exists(out_path_rt_vs_delta)
+                or not os.path.exists(out_path_sigmas_density)
+                or override_existing
+            ):
         plt.ioff()
 
         fig_tic_bpc, axes = plt.subplots(2, 2, sharex=True)
@@ -1399,6 +1402,8 @@ def dda_pipeline(
                                                 "peak_clusters_peaks.csv")
     out_path_peak_clusters_annotations = os.path.join(output_dir, 'quant',
                                                       "peak_clusters_annotations.csv")
+    out_path_peak_clusters_annotations_all = os.path.join(output_dir, 'quant',
+                                                          "peak_clusters_annotations_all.csv")
 
     def aggregate_cluster_annotations(x):
         ret = {}
@@ -1472,6 +1477,7 @@ def dda_pipeline(
                 in_path_peak_annotations, low_memory=False)
             cluster_annotations = cluster_peaks[cluster_peaks["file_id"] == stem][[
                 "cluster_id", "peak_id"]]
+            cluster_annotations["file_id"] = stem
             logger.info(
                 "Merging peak/clusters annotations for: {}".format(stem))
             cluster_annotations = pd.merge(
@@ -1485,6 +1491,12 @@ def dda_pipeline(
         if "psm_charge_state" in all_cluster_annotations:
             all_cluster_annotations["psm_charge_state"] = all_cluster_annotations["psm_charge_state"].astype(
                 'Int64')
+
+        # Saving annotations before aggregation.
+        all_cluster_annotations = all_cluster_annotations.sort_values(by=[
+                                                                      "cluster_id"])
+        all_cluster_annotations.to_csv(
+            out_path_peak_clusters_annotations_all, index=False)
 
         logger.info("Aggregating annotations")
         all_cluster_annotations = all_cluster_annotations.groupby(
@@ -1505,6 +1517,9 @@ def dda_pipeline(
                                                       "feature_clusters_features.csv")
     out_path_feature_clusters_annotations = os.path.join(output_dir, 'quant',
                                                          "feature_clusters_annotations.csv")
+    out_path_feature_clusters_annotations_all = os.path.join(output_dir, 'quant',
+                                                             "feature_clusters_annotations_all.csv")
+
     if (not os.path.exists(out_path_feature_clusters_height) or override_existing):
         feature_clusters = tapp.read_feature_clusters(
             in_path_feature_clusters)
@@ -1558,6 +1573,7 @@ def dda_pipeline(
                 in_path_peak_annotations, low_memory=False)
             cluster_annotations = cluster_features[cluster_features["file_id"] == stem][[
                 "cluster_id", "feature_id"]]
+            cluster_annotations["file_id"] = stem
             logger.info(
                 "Merging peak/clusters annotations for: {}".format(stem))
             cluster_annotations = pd.merge(
@@ -1567,7 +1583,6 @@ def dda_pipeline(
             all_cluster_annotations = pd.concat(
                 [all_cluster_annotations, cluster_annotations])
 
-        logger.info("Aggregating annotations")
         # Ensure these columns have the proper type.
         if "msms_id" in all_cluster_annotations:
             all_cluster_annotations["msms_id"] = all_cluster_annotations["msms_id"].astype(
@@ -1575,6 +1590,14 @@ def dda_pipeline(
         if "psm_charge_state" in all_cluster_annotations:
             all_cluster_annotations["psm_charge_state"] = all_cluster_annotations["psm_charge_state"].astype(
                 'Int64')
+
+        # Saving annotations before aggregation.
+        all_cluster_annotations = all_cluster_annotations.sort_values(by=[
+                                                                      "cluster_id"])
+        all_cluster_annotations.to_csv(
+            out_path_feature_clusters_annotations_all, index=False)
+
+        logger.info("Aggregating annotations")
         all_cluster_annotations = all_cluster_annotations.groupby(
             'cluster_id').apply(aggregate_cluster_annotations)
         all_cluster_annotations.to_csv(
