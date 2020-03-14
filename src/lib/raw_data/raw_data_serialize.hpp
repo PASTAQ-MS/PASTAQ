@@ -29,13 +29,14 @@ bool write_raw_data(std::ostream &stream, const RawData &raw_data);
 // structures into a binary stream.
 namespace IdentData::Serialize {
 
-// IdentData::SpectrumId
-bool read_spectrum_id(std::istream &stream, SpectrumId *spectrum_id);
-bool write_spectrum_id(std::ostream &stream, const SpectrumId &spectrum_id);
+// IdentData::SpectrumMatch
+bool read_spectrum_match(std::istream &stream, SpectrumMatch *spectrum_match);
+bool write_spectrum_match(std::ostream &stream,
+                          const SpectrumMatch &spectrum_match);
 
-// IdentData::CVParam
-bool read_cv_param(std::istream &stream, CVParam *cv_param);
-bool write_cv_param(std::ostream &stream, const CVParam &cv_param);
+// IdentData::DBSequence
+bool read_db_sequence(std::istream &stream, DBSequence *db_sequence);
+bool write_db_sequence(std::ostream &stream, const DBSequence &db_sequence);
 
 // IdentData::PeptideModification
 bool read_peptide_mod(std::istream &stream, PeptideModification *peptide_mod);
@@ -45,15 +46,11 @@ bool write_peptide_mod(std::ostream &stream,
 bool read_peptide(std::istream &stream, Peptide *peptide);
 bool write_peptide(std::ostream &stream, const Peptide &peptide);
 
-// IdentData::DBSequence
-bool read_db_sequence(std::istream &stream, DBSequence *db_sequence);
-bool write_db_sequence(std::ostream &stream, const DBSequence &db_sequence);
-
-// IdentData::ProteinHypothesis
-bool read_protein_hypothesis(std::istream &stream,
-                             ProteinHypothesis *protein_hypothesis);
-bool write_protein_hypothesis(std::ostream &stream,
-                              const ProteinHypothesis &protein_hypothesis);
+// IdentData::PeptideEvidence
+bool read_peptide_evidence(std::istream &stream,
+                           PeptideEvidence *peptide_evidence);
+bool write_peptide_evidence(std::ostream &stream,
+                            const PeptideEvidence &peptide_evidence);
 
 // IdentData::IdentData
 bool read_ident_data(std::istream &stream, IdentData *ident_data);

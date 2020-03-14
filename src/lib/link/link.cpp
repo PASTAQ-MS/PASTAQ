@@ -101,13 +101,13 @@ std::vector<Link::LinkedMsms> Link::link_idents(
         uint64_t id;
         double mz;
     };
-    auto &spectrum_ids = ident_data.spectrum_ids;
-    if (spectrum_ids.empty()) {
+    auto &spectrum_matches = ident_data.spectrum_matches;
+    if (spectrum_matches.empty()) {
         return {};
     }
-    auto indices = std::vector<SpectrumIdIndex>(spectrum_ids.size());
-    for (size_t i = 0; i < spectrum_ids.size(); ++i) {
-        indices[i] = {i, spectrum_ids[i].experimental_mz};
+    auto indices = std::vector<SpectrumIdIndex>(spectrum_matches.size());
+    for (size_t i = 0; i < spectrum_matches.size(); ++i) {
+        indices[i] = {i, spectrum_matches[i].experimental_mz};
     }
 
     // Sort mz index by mz.
@@ -146,11 +146,11 @@ std::vector<Link::LinkedMsms> Link::link_idents(
         size_t spectrum_id_id = 0;
         for (size_t j = min_j; j < index_ids.size(); ++j) {
             size_t i = index_ids[j];
-            if (spectrum_ids[i].experimental_mz > max_mz) {
+            if (spectrum_matches[i].experimental_mz > max_mz) {
                 break;
             }
-            double a = event_mz - spectrum_ids[i].experimental_mz;
-            double b = event_rt - spectrum_ids[i].retention_time;
+            double a = event_mz - spectrum_matches[i].experimental_mz;
+            double b = event_rt - spectrum_matches[i].retention_time;
             double distance = std::sqrt(a * a + b * b);
             if (distance < min_distance) {
                 min_distance = distance;

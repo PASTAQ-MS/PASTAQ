@@ -179,18 +179,7 @@ struct SpectrumMatch {
     // rank is `1`, and a rank of `5` is worse than the former. The exception to
     // this is when the rank is considered meaningless, in which case the value
     // of `0` is assigned to the rank.
-    unt64_t rank;
-};
-
-// FIXME(alex): Do some research on this. Superficially, we can have
-// substitution or normal modifications, but I'm not sure what this entails or
-// how this information should be stored.
-struct PeptideModification {
-    double monoisotopic_mass_delta;
-    double average_mass_delta;
-    std::string residues;
-    int64_t location;
-    // TODO: Add more fields or more appropriate information here.
+    uint64_t rank;
 };
 
 // A database sequence used for identification.
@@ -203,6 +192,17 @@ struct DBSequence {
     // A description of the sequence, including ambiguous identifiers or other
     // information.
     std::string description;
+};
+
+// FIXME(alex): Do some research on this. Superficially, we can have
+// substitution or normal modifications, but I'm not sure what this entails or
+// how this information should be stored.
+struct PeptideModification {
+    double monoisotopic_mass_delta;
+    double average_mass_delta;
+    std::string residues;
+    int64_t location;
+    // TODO: Add more fields or more appropriate information here.
 };
 
 // A peptide that can be associated with an entry from a database sequence.
@@ -244,7 +244,7 @@ struct IdentData {
     std::vector<DBSequence> db_sequences;
     std::vector<Peptide> peptides;
     std::vector<SpectrumMatch> spectrum_matches;
-    std::vector<PeptideEvidence> peptide_evidences;
+    std::vector<PeptideEvidence> peptide_evidence;
 };
 }  // namespace IdentData
 

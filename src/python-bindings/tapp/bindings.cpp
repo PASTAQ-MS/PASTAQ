@@ -1073,24 +1073,23 @@ PYBIND11_MODULE(tapp, m) {
                    ", mean_ratio: " + std::to_string(s.mean_ratio);
         });
 
-    py::class_<IdentData::SpectrumId>(m, "SpectrumId")
-        .def_readonly("id", &IdentData::SpectrumId::id)
-        .def_readonly("pass_threshold", &IdentData::SpectrumId::pass_threshold)
-        .def_readonly("modifications", &IdentData::SpectrumId::modifications)
-        .def_readonly("sequence", &IdentData::SpectrumId::sequence)
-        .def_readonly("peptide_id", &IdentData::SpectrumId::peptide_id)
-        .def_readonly("charge_state", &IdentData::SpectrumId::charge_state)
-        .def_readonly("theoretical_mz", &IdentData::SpectrumId::theoretical_mz)
+    py::class_<IdentData::SpectrumMatch>(m, "SpectrumMatch")
+        .def_readonly("id", &IdentData::SpectrumMatch::id)
+        .def_readonly("pass_threshold",
+                      &IdentData::SpectrumMatch::pass_threshold)
+        .def_readonly("match_id", &IdentData::SpectrumMatch::match_id)
+        .def_readonly("charge_state", &IdentData::SpectrumMatch::charge_state)
+        .def_readonly("theoretical_mz",
+                      &IdentData::SpectrumMatch::theoretical_mz)
         .def_readonly("experimental_mz",
-                      &IdentData::SpectrumId::experimental_mz)
-        .def_readonly("retention_time", &IdentData::SpectrumId::retention_time)
-        .def_readonly("rank", &IdentData::SpectrumId::rank)
-        .def("__repr__", [](const IdentData::SpectrumId &s) {
-            return "SpectrumId <id: " + s.id +
+                      &IdentData::SpectrumMatch::experimental_mz)
+        .def_readonly("retention_time",
+                      &IdentData::SpectrumMatch::retention_time)
+        .def_readonly("rank", &IdentData::SpectrumMatch::rank)
+        .def("__repr__", [](const IdentData::SpectrumMatch &s) {
+            return "SpectrumMatch <id: " + s.id +
                    ", pass_threshold: " + std::to_string(s.pass_threshold) +
-                   ", modifications: " + std::to_string(s.modifications) +
-                   ", sequence: " + s.sequence +
-                   ", peptide_id: " + s.peptide_id +
+                   ", match_id: " + s.match_id +
                    ", charge_state: " + std::to_string(s.charge_state) +
                    ", theoretical_mz: " + std::to_string(s.theoretical_mz) +
                    ", experimental_mz: " + std::to_string(s.experimental_mz) +
@@ -1100,9 +1099,12 @@ PYBIND11_MODULE(tapp, m) {
 
     py::class_<IdentData::DBSequence>(m, "DBSequence")
         .def_readonly("id", &IdentData::DBSequence::id)
-        .def_readonly("value", &IdentData::DBSequence::value)
+        .def_readonly("accession", &IdentData::DBSequence::accession)
+        .def_readonly("description", &IdentData::DBSequence::description)
+        .def_readonly("db_reference", &IdentData::DBSequence::db_reference)
         .def("__repr__", [](const IdentData::DBSequence &s) {
-            return "DBSequence <id: " + s.id + ", value: " + s.value + ">";
+            return "DBSequence <id: " + s.id + ", accession: " + s.accession +
+                   ", description: " + s.description + ">";
         });
 
     py::class_<IdentData::PeptideModification>(m, "PeptideModification")
@@ -1118,9 +1120,7 @@ PYBIND11_MODULE(tapp, m) {
                    ", average_mass_delta: " +
                    std::to_string(s.average_mass_delta) +
                    ", residues: " + s.residues +
-                   ", location: " + std::to_string(s.location) +
-                   ", num_cv_params: " + std::to_string(s.cv_params.size()) +
-                   ">";
+                   ", location: " + std::to_string(s.location) + ">";
         });
 
     py::class_<IdentData::Peptide>(m, "Peptide")
@@ -1133,26 +1133,26 @@ PYBIND11_MODULE(tapp, m) {
                    std::to_string(s.modifications.size()) + ">";
         });
 
-    py::class_<IdentData::ProteinHypothesis>(m, "ProteinHypothesis")
+    py::class_<IdentData::PeptideEvidence>(m, "PeptideEvidence")
+        .def_readonly("id", &IdentData::PeptideEvidence::id)
         .def_readonly("db_sequence_id",
-                      &IdentData::ProteinHypothesis::db_sequence_id)
-        .def_readonly("pass_threshold",
-                      &IdentData::ProteinHypothesis::pass_threshold)
-        .def_readonly("spectrum_ids",
-                      &IdentData::ProteinHypothesis::spectrum_ids)
-        .def("__repr__", [](const IdentData::ProteinHypothesis &s) {
-            return "ProteinHypothesis <db_sequence_id: " + s.db_sequence_id +
-                   ", pass_threshold: " + std::to_string(s.pass_threshold) +
-                   ", num_spectrum_ids: " +
-                   std::to_string(s.spectrum_ids.size()) + ">";
+                      &IdentData::PeptideEvidence::db_sequence_id)
+        .def_readonly("peptide_id", &IdentData::PeptideEvidence::peptide_id)
+        .def_readonly("decoy", &IdentData::PeptideEvidence::decoy)
+        .def("__repr__", [](const IdentData::PeptideEvidence &s) {
+            return "PeptideEvidence <id: " + s.id +
+                   ", db_sequence_id: " + s.db_sequence_id +
+                   ", peptide_id: " + s.peptide_id +
+                   ", decoy: " + std::to_string(s.decoy) + ">";
         });
 
     py::class_<IdentData::IdentData>(m, "IdentData")
         .def_readonly("db_sequences", &IdentData::IdentData::db_sequences)
         .def_readonly("peptides", &IdentData::IdentData::peptides)
-        .def_readonly("spectrum_ids", &IdentData::IdentData::spectrum_ids)
-        .def_readonly("protein_hypotheses",
-                      &IdentData::IdentData::protein_hypotheses);
+        .def_readonly("spectrum_matches",
+                      &IdentData::IdentData::spectrum_matches)
+        .def_readonly("peptide_evidence",
+                      &IdentData::IdentData::peptide_evidence);
 
     py::class_<FeatureDetection::Feature>(m, "Feature")
         .def_readonly("id", &FeatureDetection::Feature::id)

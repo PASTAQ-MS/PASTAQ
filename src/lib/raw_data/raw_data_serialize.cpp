@@ -106,51 +106,47 @@ bool RawData::Serialize::write_raw_data(std::ostream &stream,
     return stream.good();
 }
 
-bool IdentData::Serialize::read_spectrum_id(std::istream &stream,
-                                            SpectrumId *spectrum_id) {
-    Serialization::read_string(stream, &spectrum_id->id);
-    Serialization::read_bool(stream, &spectrum_id->pass_threshold);
-    Serialization::read_bool(stream, &spectrum_id->modifications);
-    Serialization::read_string(stream, &spectrum_id->sequence);
-    Serialization::read_string(stream, &spectrum_id->peptide_id);
-    Serialization::read_uint8(stream, &spectrum_id->charge_state);
-    Serialization::read_double(stream, &spectrum_id->theoretical_mz);
-    Serialization::read_double(stream, &spectrum_id->experimental_mz);
-    Serialization::read_double(stream, &spectrum_id->retention_time);
-    Serialization::read_int64(stream, &spectrum_id->rank);
+bool IdentData::Serialize::read_spectrum_match(std::istream &stream,
+                                               SpectrumMatch *spectrum_match) {
+    Serialization::read_string(stream, &spectrum_match->id);
+    Serialization::read_bool(stream, &spectrum_match->pass_threshold);
+    Serialization::read_string(stream, &spectrum_match->match_id);
+    Serialization::read_uint8(stream, &spectrum_match->charge_state);
+    Serialization::read_double(stream, &spectrum_match->theoretical_mz);
+    Serialization::read_double(stream, &spectrum_match->experimental_mz);
+    Serialization::read_double(stream, &spectrum_match->retention_time);
+    Serialization::read_uint64(stream, &spectrum_match->rank);
     return stream.good();
 }
 
-bool IdentData::Serialize::write_spectrum_id(std::ostream &stream,
-                                             const SpectrumId &spectrum_id) {
-    Serialization::write_string(stream, spectrum_id.id);
-    Serialization::write_bool(stream, spectrum_id.pass_threshold);
-    Serialization::write_bool(stream, spectrum_id.modifications);
-    Serialization::write_string(stream, spectrum_id.sequence);
-    Serialization::write_string(stream, spectrum_id.peptide_id);
-    Serialization::write_uint8(stream, spectrum_id.charge_state);
-    Serialization::write_double(stream, spectrum_id.theoretical_mz);
-    Serialization::write_double(stream, spectrum_id.experimental_mz);
-    Serialization::write_double(stream, spectrum_id.retention_time);
-    Serialization::write_int64(stream, spectrum_id.rank);
+bool IdentData::Serialize::write_spectrum_match(
+    std::ostream &stream, const SpectrumMatch &spectrum_match) {
+    Serialization::write_string(stream, spectrum_match.id);
+    Serialization::write_bool(stream, spectrum_match.pass_threshold);
+    Serialization::write_string(stream, spectrum_match.match_id);
+    Serialization::write_uint8(stream, spectrum_match.charge_state);
+    Serialization::write_double(stream, spectrum_match.theoretical_mz);
+    Serialization::write_double(stream, spectrum_match.experimental_mz);
+    Serialization::write_double(stream, spectrum_match.retention_time);
+    Serialization::write_uint64(stream, spectrum_match.rank);
     return stream.good();
 }
 
-bool IdentData::Serialize::read_cv_param(std::istream &stream,
-                                         CVParam *cv_param) {
-    Serialization::read_string(stream, &cv_param->name);
-    Serialization::read_string(stream, &cv_param->accession);
-    Serialization::read_string(stream, &cv_param->cv_ref);
-    Serialization::read_string(stream, &cv_param->value);
+bool IdentData::Serialize::read_db_sequence(std::istream &stream,
+                                            DBSequence *db_sequence) {
+    Serialization::read_string(stream, &db_sequence->id);
+    Serialization::read_string(stream, &db_sequence->accession);
+    Serialization::read_string(stream, &db_sequence->db_reference);
+    Serialization::read_string(stream, &db_sequence->description);
     return stream.good();
 }
 
-bool IdentData::Serialize::write_cv_param(std::ostream &stream,
-                                          const CVParam &cv_param) {
-    Serialization::write_string(stream, cv_param.name);
-    Serialization::write_string(stream, cv_param.accession);
-    Serialization::write_string(stream, cv_param.cv_ref);
-    Serialization::write_string(stream, cv_param.value);
+bool IdentData::Serialize::write_db_sequence(std::ostream &stream,
+                                             const DBSequence &db_sequence) {
+    Serialization::write_string(stream, db_sequence.id);
+    Serialization::write_string(stream, db_sequence.accession);
+    Serialization::write_string(stream, db_sequence.db_reference);
+    Serialization::write_string(stream, db_sequence.description);
     return stream.good();
 }
 
@@ -160,8 +156,6 @@ bool IdentData::Serialize::read_peptide_mod(std::istream &stream,
     Serialization::read_double(stream, &peptide_mod->average_mass_delta);
     Serialization::read_string(stream, &peptide_mod->residues);
     Serialization::read_int64(stream, &peptide_mod->location);
-    Serialization::read_vector<CVParam>(stream, &peptide_mod->cv_params,
-                                        read_cv_param);
     return stream.good();
 }
 
@@ -171,8 +165,6 @@ bool IdentData::Serialize::write_peptide_mod(
     Serialization::write_double(stream, peptide_mod.average_mass_delta);
     Serialization::write_string(stream, peptide_mod.residues);
     Serialization::write_int64(stream, peptide_mod.location);
-    Serialization::write_vector<CVParam>(stream, peptide_mod.cv_params,
-                                         write_cv_param);
     return stream.good();
 }
 
@@ -194,35 +186,21 @@ bool IdentData::Serialize::write_peptide(std::ostream &stream,
     return stream.good();
 }
 
-bool IdentData::Serialize::read_db_sequence(std::istream &stream,
-                                            DBSequence *db_sequence) {
-    Serialization::read_string(stream, &db_sequence->id);
-    Serialization::read_string(stream, &db_sequence->value);
+bool IdentData::Serialize::read_peptide_evidence(
+    std::istream &stream, PeptideEvidence *peptide_evidence) {
+    Serialization::read_string(stream, &peptide_evidence->id);
+    Serialization::read_string(stream, &peptide_evidence->db_sequence_id);
+    Serialization::read_string(stream, &peptide_evidence->peptide_id);
+    Serialization::read_bool(stream, &peptide_evidence->decoy);
     return stream.good();
 }
 
-bool IdentData::Serialize::write_db_sequence(std::ostream &stream,
-                                             const DBSequence &db_sequence) {
-    Serialization::write_string(stream, db_sequence.id);
-    Serialization::write_string(stream, db_sequence.value);
-    return stream.good();
-}
-
-bool IdentData::Serialize::read_protein_hypothesis(
-    std::istream &stream, ProteinHypothesis *protein_hypothesis) {
-    Serialization::read_string(stream, &protein_hypothesis->db_sequence_id);
-    Serialization::read_bool(stream, &protein_hypothesis->pass_threshold);
-    Serialization::read_vector<std::string>(
-        stream, &protein_hypothesis->spectrum_ids, Serialization::read_string);
-    return stream.good();
-}
-
-bool IdentData::Serialize::write_protein_hypothesis(
-    std::ostream &stream, const ProteinHypothesis &protein_hypothesis) {
-    Serialization::write_string(stream, protein_hypothesis.db_sequence_id);
-    Serialization::write_bool(stream, protein_hypothesis.pass_threshold);
-    Serialization::write_vector<std::string>(
-        stream, protein_hypothesis.spectrum_ids, Serialization::write_string);
+bool IdentData::Serialize::write_peptide_evidence(
+    std::ostream &stream, const PeptideEvidence &peptide_evidence) {
+    Serialization::write_string(stream, peptide_evidence.id);
+    Serialization::write_string(stream, peptide_evidence.db_sequence_id);
+    Serialization::write_string(stream, peptide_evidence.peptide_id);
+    Serialization::write_bool(stream, peptide_evidence.decoy);
     return stream.good();
 }
 
@@ -232,10 +210,10 @@ bool IdentData::Serialize::read_ident_data(std::istream &stream,
                                            read_db_sequence);
     Serialization::read_vector<Peptide>(stream, &ident_data->peptides,
                                         read_peptide);
-    Serialization::read_vector<SpectrumId>(stream, &ident_data->spectrum_ids,
-                                           read_spectrum_id);
-    Serialization::read_vector<ProteinHypothesis>(
-        stream, &ident_data->protein_hypotheses, read_protein_hypothesis);
+    Serialization::read_vector<SpectrumMatch>(
+        stream, &ident_data->spectrum_matches, read_spectrum_match);
+    Serialization::read_vector<PeptideEvidence>(
+        stream, &ident_data->peptide_evidence, read_peptide_evidence);
     return stream.good();
 }
 
@@ -245,9 +223,9 @@ bool IdentData::Serialize::write_ident_data(std::ostream &stream,
                                             write_db_sequence);
     Serialization::write_vector<Peptide>(stream, ident_data.peptides,
                                          write_peptide);
-    Serialization::write_vector<SpectrumId>(stream, ident_data.spectrum_ids,
-                                            write_spectrum_id);
-    Serialization::write_vector<ProteinHypothesis>(
-        stream, ident_data.protein_hypotheses, write_protein_hypothesis);
+    Serialization::write_vector<SpectrumMatch>(
+        stream, ident_data.spectrum_matches, write_spectrum_match);
+    Serialization::write_vector<PeptideEvidence>(
+        stream, ident_data.peptide_evidence, write_peptide_evidence);
     return stream.good();
 }

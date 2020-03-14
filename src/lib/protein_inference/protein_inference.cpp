@@ -8,65 +8,66 @@ ProteinInference::Graph ProteinInference::create_graph(
     std::map<std::string, uint64_t> protein_map;
     std::map<std::string, uint64_t> psm_map;
     ProteinInference::Graph graph;
+    // FIXME: Rework this to use the new IdentData data structures.
     // Initialize nodes.
-    for (size_t i = 0; i < ident_data.protein_hypotheses.size(); ++i) {
-        const auto &protein_hypothesis = ident_data.protein_hypotheses[i];
-        if (protein_map.count(protein_hypothesis.db_sequence_id) == 0) {
-            ProteinInference::Node node = {};
-            node.type = ProteinInference::PROTEIN;
-            node.id = protein_hypothesis.db_sequence_id;
-            node.num = 0;
-            node.nodes = {};
-            protein_map[protein_hypothesis.db_sequence_id] =
-                graph.protein_nodes.size();
-            graph.protein_nodes.push_back(node);
-        }
-        for (const auto &psm : protein_hypothesis.spectrum_ids) {
-            if (psm_map.count(psm) == 0) {
-                ProteinInference::Node node = {};
-                node.type = ProteinInference::PSM;
-                node.id = psm;
-                node.num = 0;
-                node.nodes = {};
-                psm_map[psm] = graph.psm_nodes.size();
-                graph.psm_nodes.push_back(node);
-            }
-        }
-    }
-    // Create graph by assigning edges to the adjacency list of each node.
-    for (size_t i = 0; i < ident_data.protein_hypotheses.size(); ++i) {
-        const auto &protein_hypothesis = ident_data.protein_hypotheses[i];
+    // for (size_t i = 0; i < ident_data.protein_hypotheses.size(); ++i) {
+    //     const auto &protein_hypothesis = ident_data.protein_hypotheses[i];
+    //     if (protein_map.count(protein_hypothesis.db_sequence_id) == 0) {
+    //         ProteinInference::Node node = {};
+    //         node.type = ProteinInference::PROTEIN;
+    //         node.id = protein_hypothesis.db_sequence_id;
+    //         node.num = 0;
+    //         node.nodes = {};
+    //         protein_map[protein_hypothesis.db_sequence_id] =
+    //             graph.protein_nodes.size();
+    //         graph.protein_nodes.push_back(node);
+    //     }
+    //     for (const auto &psm : protein_hypothesis.spectrum_ids) {
+    //         if (psm_map.count(psm) == 0) {
+    //             ProteinInference::Node node = {};
+    //             node.type = ProteinInference::PSM;
+    //             node.id = psm;
+    //             node.num = 0;
+    //             node.nodes = {};
+    //             psm_map[psm] = graph.psm_nodes.size();
+    //             graph.psm_nodes.push_back(node);
+    //         }
+    //     }
+    // }
+    // // Create graph by assigning edges to the adjacency list of each node.
+    // for (size_t i = 0; i < ident_data.protein_hypotheses.size(); ++i) {
+    //     const auto &protein_hypothesis = ident_data.protein_hypotheses[i];
 
-        // Check if protein already in the graph.
-        auto protein_index = protein_map.at(protein_hypothesis.db_sequence_id);
+    //     // Check if protein already in the graph.
+    //     auto protein_index = protein_map.at(protein_hypothesis.db_sequence_id);
 
-        for (const auto &psm : protein_hypothesis.spectrum_ids) {
-            auto psm_index = psm_map.at(psm);
+    //     for (const auto &psm : protein_hypothesis.spectrum_ids) {
+    //         auto psm_index = psm_map.at(psm);
 
-            // Update nodes. We need to make sure that the node was not
-            // included already on the adjacency list.
-            auto ptr_in_node_list =
-                [](uint64_t target_node,
-                   std::vector<std::optional<uint64_t>> &node_list) {
-                    for (const auto &node : node_list) {
-                        if (node == target_node) {
-                            return true;
-                        }
-                    }
-                    return false;
-                };
-            if (!ptr_in_node_list(psm_index,
-                                  graph.protein_nodes[protein_index].nodes)) {
-                graph.protein_nodes[protein_index].nodes.push_back(psm_index);
-                ++graph.protein_nodes[protein_index].num;
-            }
-            if (!ptr_in_node_list(protein_index,
-                                  graph.psm_nodes[psm_index].nodes)) {
-                graph.psm_nodes[psm_index].nodes.push_back(protein_index);
-                ++graph.psm_nodes[psm_index].num;
-            }
-        }
-    }
+    //         // Update nodes. We need to make sure that the node was not
+    //         // included already on the adjacency list.
+    //         auto ptr_in_node_list =
+    //             [](uint64_t target_node,
+    //                std::vector<std::optional<uint64_t>> &node_list) {
+    //                 for (const auto &node : node_list) {
+    //                     if (node == target_node) {
+    //                         return true;
+    //                     }
+    //                 }
+    //                 return false;
+    //             };
+    //         if (!ptr_in_node_list(psm_index,
+    //                               graph.protein_nodes[protein_index].nodes)) {
+    //             graph.protein_nodes[protein_index].nodes.push_back(psm_index);
+    //             ++graph.protein_nodes[protein_index].num;
+    //         }
+    //         if (!ptr_in_node_list(protein_index,
+    //                               graph.psm_nodes[psm_index].nodes)) {
+    //             graph.psm_nodes[psm_index].nodes.push_back(protein_index);
+    //             ++graph.psm_nodes[psm_index].num;
+    //         }
+    //     }
+    // }
     return graph;
 }
 
