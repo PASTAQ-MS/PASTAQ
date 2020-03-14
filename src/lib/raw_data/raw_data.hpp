@@ -149,17 +149,39 @@ RawPoints raw_points(const RawData &raw_data, double min_mz, double max_mz,
 // identification data in mzIdentML format.
 namespace IdentData {
 // FIXME: A lot more documentation is necessary here.
-struct SpectrumId {
+
+// A SpectrumMatch represents a unique identification. In a proteomics
+// experiment this could be considered a Peptide Spectrum Match (PSM). Multiple
+// PSM can be assigned to a single MS/MS event.
+struct SpectrumMatch {
     std::string id;
+    // If the matching passes the threshold set up by the search engine.
     bool pass_threshold;
-    bool modifications;
-    std::string sequence;
-    std::string peptide_id;
+    // The corresponding ID for the matched molecule. In a Proteomics
+    // experiment, the match_id corresponds to a Peptide.id.
+    std::string match_id;
+    // The charge state assigned to this match.
     uint8_t charge_state;
+    // The theoretical mass-to-charge ratio as calculated from the matched
+    // sequence or chemical formula.
     double theoretical_mz;
+    // The experimental mass-to-charge ratio as measured by the instrument.
     double experimental_mz;
+    // The retention time at which the MS/MS spectra was measured. Note that
+    // this element might not appear for a given identification file, or might
+    // appear under different names, e.g. "retention time" or "scan start index"
+    // for a cvParam on a SpectrumIdentificationResult tag (mzIdentML). In our
+    // case, we require the retention time to exist for some of our algorithms,
+    // and thus, files that don't include this variable, like mzIdentML files
+    // generated with Peaks, can't be used.
     double retention_time;
-    int64_t rank;
+    // The ranked score of the match, in case multiple identifications were
+    // assigned to an MS/MS event. As the rank grows larger, the confidence in
+    // the identification quality decreases. The highest confidence and maximum
+    // rank is `1`, and a rank of `5` is worse than the former. The exception to
+    // this is when the rank is considered meaningless, in which case the value
+    // of `0` is assigned to the rank.
+    unt64_t rank;
 };
 
 struct CVParam {
