@@ -146,10 +146,8 @@ RawPoints raw_points(const RawData &raw_data, double min_mz, double max_mz,
 }  // namespace RawData
 
 // In this namespace we have access to the data structures for working with
-// identification data in mzIdentML format.
+// identification data.
 namespace IdentData {
-// FIXME: A lot more documentation is necessary here.
-
 // A SpectrumMatch represents a unique identification. In a proteomics
 // experiment this could be considered a Peptide Spectrum Match (PSM). Multiple
 // PSM can be assigned to a single MS/MS event.
@@ -184,43 +182,69 @@ struct SpectrumMatch {
     unt64_t rank;
 };
 
-struct CVParam {
-    std::string name;
-    std::string accession;
-    std::string cv_ref;
-    std::string value;
-};
-
+// FIXME(alex): Do some research on this. Superficially, we can have
+// substitution or normal modifications, but I'm not sure what this entails or
+// how this information should be stored.
 struct PeptideModification {
     double monoisotopic_mass_delta;
     double average_mass_delta;
     std::string residues;
     int64_t location;
-    std::vector<CVParam> cv_params;
+    // TODO: Add more fields or more appropriate information here.
 };
 
+// A database sequence used for identification.
+struct DBSequence {
+    std::string id;
+    // A unique accession for this sequence.
+    std::string accession;
+    // The database reference used as a source for this sequence.
+    std::string db_reference;
+    // A description of the sequence, including ambiguous identifiers or other
+    // information.
+    std::string description;
+};
+
+// A peptide that can be associated with an entry from a database sequence.
 struct Peptide {
     std::string id;
+    // The amino acid sequence of this peptide without any  modifications.
     std::string sequence;
+    // The modifications associated with this peptide, if any.
     std::vector<PeptideModification> modifications;
 };
 
-struct DBSequence {
+// The PeptideEvidence stores the relationship between a peptide and database
+// sequence. A peptide can originate from different original amino acid
+// sequences, or different locations within a sequence. The combination of
+// db_sequence_id and peptide_id must be unique.
+struct PeptideEvidence {
     std::string id;
-    std::string value;
+    // The unique identifier of DBSequence::id.
+    std::string db_sequence_id;
+    // The unique identifier of Peptide::id.
+    std::string peptide_id;
+    // If this match was associated with a decoy sequence.
+    bool decoy;
 };
 
+// FIXME: DEPRECATED we don't need this for protein inference, instead we
+// need Peptides and proteins. Plus there might be a better way of
+// organizing this data if need be. This should be removed once it's not used
+// anywhere in the codebase.
 struct ProteinHypothesis {
     std::string db_sequence_id;
     bool pass_threshold;
     std::vector<std::string> spectrum_ids;
 };
 
+// Contains all data structures that model a proteomics identification set for
+// one sample.
 struct IdentData {
     std::vector<DBSequence> db_sequences;
     std::vector<Peptide> peptides;
-    std::vector<SpectrumId> spectrum_ids;
-    std::vector<ProteinHypothesis> protein_hypotheses;
+    std::vector<SpectrumMatch> spectrum_matches;
+    std::vector<PeptideEvidence> peptide_evidences;
 };
 }  // namespace IdentData
 
