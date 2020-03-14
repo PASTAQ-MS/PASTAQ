@@ -243,8 +243,8 @@ struct ProteinHypothesis {
 struct IdentData {
     std::vector<DBSequence> db_sequences;
     std::vector<Peptide> peptides;
-    std::vector<SpectrumMatch> spectrum_matches;
     std::vector<PeptideEvidence> peptide_evidence;
+    std::vector<SpectrumMatch> spectrum_matches;
 };
 }  // namespace IdentData
 
