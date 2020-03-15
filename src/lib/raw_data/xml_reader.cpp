@@ -709,7 +709,7 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream) {
                     auto attributes = tag.value().attributes;
                     if (tag.value().name == "cvParam" &&
                         attributes["accession"] == "MS:1001088") {
-                        db_sequence.description = attributes["description"];
+                        db_sequence.description = attributes["value"];
                     }
                 }
             }
