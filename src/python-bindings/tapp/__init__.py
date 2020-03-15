@@ -888,10 +888,13 @@ def dda_pipeline(
         output_dir, 'quality', 'rt_vs_rt_delta')
     out_path_sigmas_density = os.path.join(
         output_dir, 'quality', 'density_sigma')
-    if (not os.path.exists(out_path_tic_bpc)
-                or not os.path.exists(out_path_rt_vs_delta)
-                or not os.path.exists(out_path_sigmas_density)
-                or override_existing
+    if (not os.path.exists("{}.png".format(out_path_tic_bpc))
+            or not os.path.exists("{}.png".format(out_path_rt_vs_delta))
+            or not os.path.exists("{}.png".format(out_path_sigmas_density))
+            or not os.path.exists("{}.pdf".format(out_path_tic_bpc))
+            or not os.path.exists("{}.pdf".format(out_path_rt_vs_delta))
+            or not os.path.exists("{}.pdf".format(out_path_sigmas_density))
+            or override_existing
             ):
         plt.ioff()
 
@@ -1276,7 +1279,7 @@ def dda_pipeline(
             peak_annotations, linked_peaks, on="peak_id", how="left")
 
         if (os.path.isfile(in_path_ident_link) and
-            os.path.isfile(in_path_ident_data)):
+                os.path.isfile(in_path_ident_data)):
             logger.info("Reading linked idents from disk: {}".format(stem))
             linked_idents = tapp.read_linked_msms(in_path_ident_link)
             linked_idents = pd.DataFrame({
@@ -1341,6 +1344,9 @@ def dda_pipeline(
                 'Int64')
         if "psm_charge_state" in peak_annotations:
             peak_annotations["psm_charge_state"] = peak_annotations["psm_charge_state"].astype(
+                'Int64')
+        if "psm_rank" in peak_annotations:
+            peak_annotations["psm_rank"] = peak_annotations["psm_rank"].astype(
                 'Int64')
         peak_annotations.to_csv(out_path_peak_annotations, index=False)
 
@@ -1487,6 +1493,9 @@ def dda_pipeline(
         if "psm_charge_state" in all_cluster_annotations:
             all_cluster_annotations["psm_charge_state"] = all_cluster_annotations["psm_charge_state"].astype(
                 'Int64')
+        if "psm_rank" in peak_annotations:
+            peak_annotations["psm_rank"] = peak_annotations["psm_rank"].astype(
+                'Int64')
 
         # Saving annotations before aggregation.
         all_cluster_annotations = all_cluster_annotations.sort_values(by=[
@@ -1585,6 +1594,9 @@ def dda_pipeline(
                 'Int64')
         if "psm_charge_state" in all_cluster_annotations:
             all_cluster_annotations["psm_charge_state"] = all_cluster_annotations["psm_charge_state"].astype(
+                'Int64')
+        if "psm_rank" in peak_annotations:
+            peak_annotations["psm_rank"] = peak_annotations["psm_rank"].astype(
                 'Int64')
 
         # Saving annotations before aggregation.
