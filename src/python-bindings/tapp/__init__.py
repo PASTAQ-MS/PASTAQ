@@ -1097,30 +1097,30 @@ def dda_pipeline(
     logger.info('Finished mzIdentML parsing in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
-    # Perform protein inference
-    logger.info('Starting protein inference')
-    time_start = time.time()
-    for i, stem in enumerate(input_stems):
-        # Check that we had identification info.
-        if input_ident_files[i] == 'none':
-            continue
-        # Check if file has already been processed.
-        in_path_idents = os.path.join(
-            output_dir, 'ident', "{}.ident".format(stem))
-        out_path = os.path.join(output_dir, 'ident',
-                                "{}.inferred_proteins".format(stem))
-        if os.path.exists(out_path) and not override_existing:
-            continue
+    # TODO: Fix protein inference.
+    # logger.info('Starting protein inference')
+    # time_start = time.time()
+    # for i, stem in enumerate(input_stems):
+    #     # Check that we had identification info.
+    #     if input_ident_files[i] == 'none':
+    #         continue
+    #     # Check if file has already been processed.
+    #     in_path_idents = os.path.join(
+    #         output_dir, 'ident', "{}.ident".format(stem))
+    #     out_path = os.path.join(output_dir, 'ident',
+    #                             "{}.inferred_proteins".format(stem))
+    #     if os.path.exists(out_path) and not override_existing:
+    #         continue
 
-        logger.info("Reading ident from disk: {}".format(stem))
-        ident_data = tapp.read_ident_data(in_path_idents)
+    #     logger.info("Reading ident from disk: {}".format(stem))
+    #     ident_data = tapp.read_ident_data(in_path_idents)
 
-        logger.info("Performing inference: {}".format(stem))
-        inferred_proteins = tapp.perform_protein_inference(ident_data)
-        logger.info('Writing inferred_proteins: {}'.format(out_path))
-        tapp.write_inferred_proteins(inferred_proteins, out_path)
-    logger.info('Finished protein inference in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
+    #     logger.info("Performing inference: {}".format(stem))
+    #     inferred_proteins = tapp.perform_protein_inference(ident_data)
+    #     logger.info('Writing inferred_proteins: {}'.format(out_path))
+    #     tapp.write_inferred_proteins(inferred_proteins, out_path)
+    # logger.info('Finished protein inference in {}'.format(
+    #     datetime.timedelta(seconds=time.time()-time_start)))
 
     # Link ms2 events with ident information.
     logger.info('Starting ident/msms linkage')
@@ -1217,8 +1217,9 @@ def dda_pipeline(
             output_dir, 'linking', "{}.ms2_idents.link".format(stem))
         in_path_ident_data = os.path.join(
             output_dir, 'ident', "{}.ident".format(stem))
-        in_path_inferred_proteins = os.path.join(
-            output_dir, 'ident', "{}.inferred_proteins".format(stem))
+        # TODO: Fix protein inference.
+        # in_path_inferred_proteins = os.path.join(
+        #     output_dir, 'ident', "{}.inferred_proteins".format(stem))
         out_path_peaks = os.path.join(output_dir, 'quant',
                                       "{}_peaks.csv".format(stem))
         out_path_peak_annotations = os.path.join(output_dir, 'quant',
@@ -1275,8 +1276,7 @@ def dda_pipeline(
             peak_annotations, linked_peaks, on="peak_id", how="left")
 
         if (os.path.isfile(in_path_ident_link) and
-            os.path.isfile(in_path_ident_data) and
-                os.path.isfile(in_path_inferred_proteins)):
+            os.path.isfile(in_path_ident_data)):
             logger.info("Reading linked idents from disk: {}".format(stem))
             linked_idents = tapp.read_linked_msms(in_path_ident_link)
             linked_idents = pd.DataFrame({
@@ -1288,53 +1288,49 @@ def dda_pipeline(
             ident_data = tapp.read_ident_data(in_path_ident_data)
 
             psms = pd.DataFrame({
-                'psm_index': [i for i in range(0, len(ident_data.spectrum_ids))],
-                'spectrum_ids': [psm.id for psm in ident_data.spectrum_ids],
-                'psm_sequence': [psm.sequence for psm in ident_data.spectrum_ids],
-                'psm_charge_state': [psm.charge_state for psm in ident_data.spectrum_ids],
-                'psm_theoretical_mz': [psm.theoretical_mz for psm in ident_data.spectrum_ids],
-                'psm_experimental_mz': [psm.experimental_mz for psm in ident_data.spectrum_ids],
-                'psm_retention_time': [psm.retention_time for psm in ident_data.spectrum_ids],
+                'psm_index': [i for i in range(0, len(ident_data.spectrum_matches))],
+                'psm_id': [psm.id for psm in ident_data.spectrum_matches],
+                'psm_pass_threshold': [psm.pass_threshold for psm in ident_data.spectrum_matches],
+                'psm_charge_state': [psm.charge_state for psm in ident_data.spectrum_matches],
+                'psm_theoretical_mz': [psm.theoretical_mz for psm in ident_data.spectrum_matches],
+                'psm_experimental_mz': [psm.experimental_mz for psm in ident_data.spectrum_matches],
+                'psm_retention_time': [psm.retention_time for psm in ident_data.spectrum_matches],
+                'psm_rank': [psm.rank for psm in ident_data.spectrum_matches],
+                'psm_peptide_id': [psm.match_id for psm in ident_data.spectrum_matches],
             })
             psms = pd.merge(
                 psms, linked_idents, on="psm_index").drop('psm_index', axis=1)
 
             peak_annotations_2 = pd.merge(
                 peak_annotations, psms, on="msms_id", how="left")
-            if not peak_annotations_2["spectrum_ids"].dropna().empty:
+            if not peak_annotations_2["psm_id"].dropna().empty:
                 peak_annotations = peak_annotations_2
+
+                # Get the peptide information per psm.
+                peptides = pd.DataFrame({
+                    'psm_peptide_id': [pep.id for pep in ident_data.peptides],
+                    'psm_sequence': [pep.sequence for pep in ident_data.peptides],
+                })
+                peak_annotations = pd.merge(
+                    peak_annotations, peptides, on="psm_peptide_id", how="left")
+
+                # Get the protein information per peptide.
                 db_sequences = pd.DataFrame({
                     'db_seq_id': [db_seq.id for db_seq in ident_data.db_sequences],
-                    'protein_name': [db_seq.value for db_seq in ident_data.db_sequences],
+                    'protein_name': [db_seq.accession for db_seq in ident_data.db_sequences],
+                    'protein_description': [db_seq.description for db_seq in ident_data.db_sequences],
                 })
-
-                protein_hypotheses = pd.DataFrame({
-                    'db_seq_id': [prot.db_sequence_id for prot in ident_data.protein_hypotheses],
-                    'spectrum_ids': [prot.spectrum_ids for prot in ident_data.protein_hypotheses],
-                }).explode('spectrum_ids')
-                protein_hypotheses = pd.merge(
-                    db_sequences, protein_hypotheses, on="db_seq_id").drop('db_seq_id', axis=1)
-                protein_hypotheses.columns = [
-                    'hypothesis_protein_name', 'spectrum_ids']
-
-                logger.info(
-                    "Reading inferred_proteins from disk: {}".format(stem))
-                inferred_proteins = tapp.read_inferred_proteins(
-                    in_path_inferred_proteins)
-                inferred_proteins = pd.DataFrame({
-                    'db_seq_id': [inferred_protein.protein_id for inferred_protein in inferred_proteins],
-                    'spectrum_ids': [inferred_protein.psm_id for inferred_protein in inferred_proteins],
+                peptide_evidence = pd.DataFrame({
+                    'db_seq_id': [pe.db_sequence_id for pe in ident_data.peptide_evidence],
+                    'psm_peptide_id': [pe.peptide_id for pe in ident_data.peptide_evidence],
+                    'psm_decoy': [pe.decoy for pe in ident_data.peptide_evidence],
                 })
+                peptide_evidence = pd.merge(
+                    peptide_evidence, db_sequences, on="db_seq_id").drop(["db_seq_id"], axis=1)
 
-                logger.info("Merging linked annotations: {}".format(stem))
-                inferred_proteins = pd.merge(
-                    db_sequences, inferred_proteins, on="db_seq_id").drop('db_seq_id', axis=1)
-                inferred_proteins.columns = [
-                    'inferred_protein_name', 'spectrum_ids']
+                # Get the protein information per psm.
                 peak_annotations = pd.merge(
-                    peak_annotations, inferred_proteins, on="spectrum_ids", how='left')
-                peak_annotations = pd.merge(
-                    peak_annotations, protein_hypotheses, on="spectrum_ids", how='left')
+                    peak_annotations, peptide_evidence, on="psm_peptide_id")
 
         logger.info("Saving peaks quantitative table to disk: {}".format(stem))
         peaks_df.to_csv(out_path_peaks, index=False)
@@ -1413,12 +1409,12 @@ def dda_pipeline(
         if "psm_charge_state" in x:
             ret["psm_charge_state"] = ".|.".join(
                 map(str, np.unique(x['psm_charge_state'].dropna()))).strip(".|.")
-        if "inferred_protein_name" in x:
-            ret["inferred_protein_name"] = ".|.".join(
-                np.unique(x['inferred_protein_name'].dropna())).strip(".|.")
-        if "hypothesis_protein_name" in x:
-            ret["hypothesis_protein_name"] = ".|.".join(
-                np.unique(x['hypothesis_protein_name'].dropna())).strip(".|.")
+        if "protein_name" in x:
+            ret["protein_name"] = ".|.".join(
+                np.unique(x['protein_name'].dropna())).strip(".|.")
+        if "protein_description" in x:
+            ret["protein_description"] = ".|.".join(
+                np.unique(x['protein_description'].dropna())).strip(".|.")
         return pd.Series(ret)
 
     if (not os.path.exists(out_path_peak_clusters_metadata) or override_existing):
