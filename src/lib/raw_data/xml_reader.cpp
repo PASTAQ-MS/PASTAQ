@@ -672,7 +672,10 @@ std::optional<XmlReader::Tag> XmlReader::read_tag(std::istream &stream) {
     return tag;
 };
 
-IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream) {
+IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
+                                               bool ignore_decoy,
+                                               bool require_threshold,
+                                               bool max_rank_only) {
     IdentData::IdentData ident_data = {};
 
     // Find the DBSequences, Peptides and PeptideEvidence in the
@@ -798,6 +801,9 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream) {
             if (attributes.find("isDecoy") != attributes.end()) {
                 peptide_evidence.decoy = attributes["isDecoy"] == "true";
             }
+            if (ignore_decoy && peptide_evidence.decoy) {
+                continue;
+            }
             ident_data.peptide_evidence.push_back(peptide_evidence);
         }
     }
@@ -851,6 +857,9 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream) {
                 spectrum_match.id = attributes["id"];
                 spectrum_match.pass_threshold =
                     attributes["passThreshold"] == "true";
+                if (require_threshold && !spectrum_match.pass_threshold) {
+                    continue;
+                }
                 spectrum_match.match_id = attributes["peptide_ref"];
                 spectrum_match.charge_state =
                     std::stoi(attributes["chargeState"]);
@@ -870,11 +879,27 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream) {
             }
         }
 
-        // Update retention time on the provisional spectrum_matches list and
-        // push each element to the list of PSM.
-        for (auto &spectrum_match : spectrum_matches) {
-            spectrum_match.retention_time = retention_time;
-            ident_data.spectrum_matches.push_back(spectrum_match);
+        if (max_rank_only) {
+            IdentData::SpectrumMatch selected_spectrum;
+            // Update retention time on the provisional spectrum_matches list
+            // and find the maximum rank spectrum. The rank is in descending
+            // order of importance, thus rank 1 is the maximum, and bigger
+            // numbers are worse.
+            for (size_t i = 0; i < spectrum_matches.size(); ++i) {
+                auto &spectrum_match = spectrum_matches[i];
+                spectrum_match.retention_time = retention_time;
+                if (i == 0 || spectrum_match.rank < selected_spectrum.rank) {
+                    selected_spectrum = spectrum_match;
+                }
+            }
+            ident_data.spectrum_matches.push_back(selected_spectrum);
+        } else {
+            // Update retention time on the provisional spectrum_matches list
+            // and push each element to the list of PSM.
+            for (auto &spectrum_match : spectrum_matches) {
+                spectrum_match.retention_time = retention_time;
+                ident_data.spectrum_matches.push_back(spectrum_match);
+            }
         }
     }
     return ident_data;

@@ -780,7 +780,9 @@ std::vector<Link::LinkedMsms> read_linked_msms(std::string &input_file) {
     return linked_msms;
 }
 
-IdentData::IdentData read_mzidentml(std::string &input_file) {
+IdentData::IdentData read_mzidentml(std::string &input_file, bool ignore_decoy,
+                                    bool require_threshold,
+                                    bool max_rank_only) {
     // Open file stream.
     std::ifstream stream;
     stream.open(input_file);
@@ -789,7 +791,8 @@ IdentData::IdentData read_mzidentml(std::string &input_file) {
         error_stream << "error: couldn't open input file" << input_file;
         throw std::invalid_argument(error_stream.str());
     }
-    return XmlReader::read_mzidentml(stream);
+    return XmlReader::read_mzidentml(stream, ignore_decoy, require_threshold,
+                                     max_rank_only);
 }
 
 struct MetaMatchResults {
@@ -1354,7 +1357,9 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("time_map"), py::arg("file_name"))
         .def("read_mzidentml", &PythonAPI::read_mzidentml,
              "Read identification data from the given mzIdentML file ",
-             py::arg("file_name"))
+             py::arg("file_name"), py::arg("ignore_decoy") = true,
+             py::arg("require_threshold") = true,
+             py::arg("max_rank_only") = false)
         .def("read_ident_data", &PythonAPI::read_ident_data,
              "Read the ident_data from the binary ident_data file",
              py::arg("file_name"))
