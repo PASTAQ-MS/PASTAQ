@@ -682,7 +682,6 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream) {
         if (!tag) {
             continue;
         }
-        std::cout << tag.value().name << std::endl;
         if (tag.value().name == "SequenceCollection" && tag.value().closed) {
             break;
         }
@@ -802,120 +801,81 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream) {
             ident_data.peptide_evidence.push_back(peptide_evidence);
         }
     }
+
+    // Find the PSMs for this data (SpectrumIdentificationResult).
+    while (stream.good()) {
+        auto tag = XmlReader::read_tag(stream);
+        if (!tag) {
+            continue;
+        }
+        if (tag.value().name == "SpectrumIdentificationList" &&
+            tag.value().closed) {
+            break;
+        }
+        // Find the next SpectrumIdentificationResult.
+        if (tag.value().name != "SpectrumIdentificationResult") {
+            continue;
+        }
+
+        // Record all SpectrumIdentificationItems for this result.
+        std::vector<IdentData::SpectrumMatch> spectrum_matches;
+        double retention_time = 0.0;
+        while (stream.good()) {
+            tag = XmlReader::read_tag(stream);
+            if (!tag) {
+                continue;
+            }
+            if (tag.value().name == "SpectrumIdentificationResult" &&
+                tag.value().closed) {
+                break;
+            }
+            auto attributes = tag.value().attributes;
+
+            if (tag.value().name == "cvParam") {
+                // Retention time or scan start time.
+                if (attributes["accession"] == "MS:1000894" ||
+                    attributes["accession"] == "MS:1000016") {
+                    retention_time = std::stod(attributes["value"]);
+                    // If the retention time is in minutes, we convert it back
+                    // to seconds.
+                    if (attributes["unitAccession"] == "UO:0000031") {
+                        retention_time *= 60.0;
+                    }
+                }
+            }
+
+            // Identification item.
+            if (tag.value().name == "SpectrumIdentificationItem" &&
+                !tag.value().closed) {
+                IdentData::SpectrumMatch spectrum_match;
+                spectrum_match.id = attributes["id"];
+                spectrum_match.pass_threshold =
+                    attributes["passThreshold"] == "true";
+                spectrum_match.match_id = attributes["peptide_ref"];
+                spectrum_match.charge_state =
+                    std::stoi(attributes["chargeState"]);
+                spectrum_match.experimental_mz =
+                    std::stod(attributes["experimentalMassToCharge"]);
+                spectrum_match.retention_time = 0;
+                spectrum_match.rank = std::stoi(attributes["rank"]);
+                // Might be optional according to the mzIdentML v1.2.0 spec.
+                if (attributes.find("calculatedMassToCharge") !=
+                    attributes.end()) {
+                    spectrum_match.theoretical_mz =
+                        std::stod(attributes["calculatedMassToCharge"]);
+                } else {
+                    spectrum_match.theoretical_mz = 0.0;
+                }
+                spectrum_matches.push_back(spectrum_match);
+            }
+        }
+
+        // Update retention time on the provisional spectrum_matches list and
+        // push each element to the list of PSM.
+        for (auto &spectrum_match : spectrum_matches) {
+            spectrum_match.retention_time = retention_time;
+            ident_data.spectrum_matches.push_back(spectrum_match);
+        }
+    }
     return ident_data;
-    // // Find the PSMs for this data (SpectrumIdentificationResult).
-    // while (stream.good()) {
-    //     auto tag = XmlReader::read_tag(stream);
-    //     if (!tag) {
-    //         continue;
-    //     }
-    //     if (tag.value().name == "SpectrumIdentificationList" &&
-    //         tag.value().closed) {
-    //         break;
-    //     }
-    //     if (tag.value().name != "SpectrumIdentificationResult") {
-    //         continue;
-    //     }
-    //     auto spectrum_id = IdentData::SpectrumMatch{};
-    //     bool identification_item_found = false;
-    //     while (stream.good()) {
-    //         tag = XmlReader::read_tag(stream);
-    //         if (!tag) {
-    //             continue;
-    //         }
-    //         auto attributes = tag.value().attributes;
-
-    //         // Retention time.
-    //         if (tag.value().name == "cvParam" &&
-    //             attributes["accession"] == "MS:1000894") {
-    //             spectrum_id.retention_time =
-    //             std::stod(attributes["value"]);
-    //             // FIXME(alex): What happens if we don't have the
-    //             retention
-    //             // time?
-    //         }
-
-    //         // Identification item.
-    //         if (tag.value().name == "SpectrumIdentificationItem" &&
-    //             !tag.value().closed) {
-    //             if (identification_item_found &&
-    //                 std::stoi(attributes["rank"]) < spectrum_id.rank) {
-    //                 continue;
-    //             }
-    //             spectrum_id.id = attributes["id"];
-    //             spectrum_id.rank = std::stoi(attributes["rank"]);
-    //             spectrum_id.pass_threshold =
-    //                 attributes["passThreshold"] == "true";
-    //             spectrum_id.peptide_id = attributes["peptide_ref"];
-    //             spectrum_id.charge_state =
-    //             std::stoi(attributes["chargeState"]);
-    //             spectrum_id.theoretical_mz =
-    //                 std::stod(attributes["calculatedMassToCharge"]);
-    //             spectrum_id.experimental_mz =
-    //                 std::stod(attributes["experimentalMassToCharge"]);
-    //             identification_item_found = true;
-    //         }
-
-    //         if (tag.value().name == "SpectrumIdentificationResult" &&
-    //             tag.value().closed) {
-    //             if (spectrum_id.pass_threshold) {
-    //                 spectrum_ids.push_back(spectrum_id);
-    //             }
-    //             break;
-    //         }
-    //     }
-    // }
-    // // Find the protein groups for this data (ProteinDetectionList).
-    // while (stream.good()) {
-    //     auto tag = XmlReader::read_tag(stream);
-    //     if (!tag) {
-    //         continue;
-    //     }
-    //     if (tag.value().name == "ProteinDetectionList" &&
-    //     tag.value().closed)
-    //     {
-    //         break;
-    //     }
-    //     if (tag.value().name == "ProteinDetectionHypothesis" &&
-    //         !tag.value().closed) {
-    //         auto protein_hypothesis = IdentData::ProteinHypothesis{};
-    //         auto attributes = tag.value().attributes;
-    //         protein_hypothesis.db_sequence_id =
-    //         attributes["dBSequence_ref"];
-    //         protein_hypothesis.pass_threshold =
-    //             attributes["passThreshold"] == "true";
-    //         while (stream.good()) {
-    //             tag = XmlReader::read_tag(stream);
-    //             if (!tag) {
-    //                 continue;
-    //             }
-    //             if (tag.value().name == "ProteinDetectionHypothesis" &&
-    //                 tag.value().closed) {
-    //                 if (protein_hypothesis.pass_threshold) {
-    //                     protein_hypotheses.push_back(protein_hypothesis);
-    //                 }
-    //                 break;
-    //             }
-    //             if (tag.value().name == "SpectrumIdentificationItemRef")
-    //             {
-    //                 auto attributes = tag.value().attributes;
-    //                 protein_hypothesis.spectrum_ids.push_back(
-    //                     attributes["spectrumIdentificationItem_ref"]);
-    //             }
-    //         }
-    //     }
-    // }
-    // // Cross link peptide_id per SpectrumMatch to obtain the original
-    // sequence. for (auto &ident : spectrum_ids) {
-    //     for (const auto &peptide : peptides) {
-    //         if (peptide.id == ident.peptide_id) {
-    //             ident.sequence = peptide.sequence;
-    //             if (!peptide.modifications.empty()) {
-    //                 ident.modifications = true;
-    //             }
-    //             break;
-    //         }
-    //     }
-    // }
-    // return {db_sequences, peptides, spectrum_ids, protein_hypotheses};
 }
