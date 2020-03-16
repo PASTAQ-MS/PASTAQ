@@ -4,38 +4,6 @@
 
 #include "feature_detection/feature_detection.hpp"
 
-std::vector<std::vector<uint64_t>> find_all_paths(
-    FeatureDetection::CandidateGraph &graph, uint64_t root_node) {
-    std::vector<std::vector<uint64_t>> paths;
-    std::vector<std::vector<uint64_t>> stack;
-    stack.push_back({root_node});
-    while (!stack.empty()) {
-        auto curr_path = stack.back();
-        stack.pop_back();
-        auto last = curr_path[curr_path.size() - 1];
-        auto &root_node = graph[last];
-        if (root_node.visited) {
-            continue;
-        }
-
-        bool path_finished = true;
-        for (const auto &node : root_node.nodes_next) {
-            if (graph[node].visited) {
-                continue;
-            }
-            path_finished = false;
-            auto new_path = curr_path;
-            new_path.push_back(node);
-            stack.push_back(new_path);
-        }
-        if (path_finished) {
-            paths.push_back(curr_path);
-        }
-    }
-
-    return paths;
-}
-
 // NOTE: The order matters. A should be the path we are exploring, and B the
 // reference theoretical path.
 struct OptimalPath {
