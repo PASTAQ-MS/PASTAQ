@@ -889,10 +889,10 @@ def dda_pipeline(
     out_path_sigmas_density = os.path.join(
         output_dir, 'quality', 'density_sigma')
     if (not os.path.exists(out_path_tic_bpc)
-                or not os.path.exists(out_path_rt_vs_delta)
-                or not os.path.exists(out_path_sigmas_density)
-                or override_existing
-            ):
+        or not os.path.exists(out_path_rt_vs_delta)
+        or not os.path.exists(out_path_sigmas_density)
+        or override_existing
+        ):
         plt.ioff()
 
         fig_tic_bpc, axes = plt.subplots(2, 2, sharex=True)
@@ -1276,7 +1276,7 @@ def dda_pipeline(
             peak_annotations, linked_peaks, on="peak_id", how="left")
 
         if (os.path.isfile(in_path_ident_link) and
-            os.path.isfile(in_path_ident_data)):
+                os.path.isfile(in_path_ident_data)):
             logger.info("Reading linked idents from disk: {}".format(stem))
             linked_idents = tapp.read_linked_msms(in_path_ident_link)
             linked_idents = pd.DataFrame({

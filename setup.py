@@ -9,10 +9,12 @@ from distutils.version import LooseVersion
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
 
+
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
         Extension.__init__(self, name, sources=[])
         self.sourcedir = os.path.abspath(sourcedir)
+
 
 class CMakeBuild(build_ext):
     def run(self):
@@ -64,6 +66,7 @@ class CMakeBuild(build_ext):
                               cwd=self.build_temp)
         print()  # Add an empty line for cleaner output
 
+
 setup(
     name='tapp',
     version='0.1',
@@ -72,8 +75,15 @@ setup(
     description='Pre-processing platform for LC-MS/MS data',
     long_description='',
     packages=find_packages('src/python-bindings'),
-    package_dir={'':'src/python-bindings'},
+    package_dir={'': 'src/python-bindings'},
     ext_modules=[CMakeExtension('tapp/tapp_cpp')],
     cmdclass=dict(build_ext=CMakeBuild),
+    install_requires=[
+          'scipy',
+          'numpy',
+          'pandas',
+          'seaborn',
+          'matplotlib',
+    ],
     zip_safe=False,
 )

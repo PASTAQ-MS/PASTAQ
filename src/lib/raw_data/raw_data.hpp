@@ -73,7 +73,7 @@ struct Scan {
     uint64_t ms_level;
     // How many mz-intensity pairs are contained in this scan.
     uint64_t num_points;
-    // Retention time in seconds of this scan;
+    // Retention time in seconds of this scan.
     double retention_time;
     // This is the actual data of the scan, split into two vectors, mz and
     // intensity. These vectors should have the same size (num_points).
