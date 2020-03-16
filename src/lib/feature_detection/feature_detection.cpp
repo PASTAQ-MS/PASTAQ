@@ -947,7 +947,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
             if (sim.dot > best_dot) {
                 best_dot = sim.dot;
                 best_charge_state = charge_state;
-                best_path = std::vector<size_t>(sim.max_i - sim.min_i);
+                best_path = std::vector<uint64_t>(sim.max_i - sim.min_i);
                 size_t k = 0;
                 for (size_t i = sim.min_i; i < sim.max_i; ++i, ++k) {
                     best_path[k] = path[i];
