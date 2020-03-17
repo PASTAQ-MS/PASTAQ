@@ -3,3 +3,5 @@ build
 __pycache__
 *.so
 *.egg-info*
+.clangd
+compile_commands.json

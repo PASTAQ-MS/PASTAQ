@@ -853,7 +853,7 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
             // Identification item.
             if (tag.value().name == "SpectrumIdentificationItem" &&
                 !tag.value().closed) {
-                IdentData::SpectrumMatch spectrum_match;
+                IdentData::SpectrumMatch spectrum_match = {};
                 spectrum_match.id = attributes["id"];
                 spectrum_match.pass_threshold =
                     attributes["passThreshold"] == "true";
@@ -874,6 +874,25 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
                         std::stod(attributes["calculatedMassToCharge"]);
                 } else {
                     spectrum_match.theoretical_mz = 0.0;
+                }
+
+                // Try to extract identification scores.
+                while (stream.good()) {
+                    tag = XmlReader::read_tag(stream);
+                    if (!tag) {
+                        continue;
+                    }
+                    if (tag.value().name == "SpectrumIdentificationItem" &&
+                        tag.value().closed) {
+                        break;
+                    }
+                    if (tag.value().name == "cvParam") {
+                        auto attributes = tag.value().attributes;
+                        // Comet.
+                        if (attributes["accession"] == "MS:1002252") {
+                            spectrum_match.score_comet_xcor = std::stod(attributes["value"]);
+                        }
+                    }
                 }
                 spectrum_matches.push_back(spectrum_match);
             }

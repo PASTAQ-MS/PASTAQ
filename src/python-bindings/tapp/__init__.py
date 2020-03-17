@@ -1094,7 +1094,7 @@ def dda_pipeline(
         if in_path == 'none' or (os.path.exists(out_path) and not override_existing):
             continue
         logger.info('Reading mzIdentML: {}'.format(in_path))
-        ident_data = tapp.read_mzidentml(in_path)
+        ident_data = tapp.read_mzidentml(in_path, max_rank_only=False)
         logger.info('Writing ident data: {}'.format(out_path))
         tapp.write_ident_data(ident_data, out_path)
     logger.info('Finished mzIdentML parsing in {}'.format(
@@ -1299,6 +1299,7 @@ def dda_pipeline(
                 'psm_experimental_mz': [psm.experimental_mz for psm in ident_data.spectrum_matches],
                 'psm_retention_time': [psm.retention_time for psm in ident_data.spectrum_matches],
                 'psm_rank': [psm.rank for psm in ident_data.spectrum_matches],
+                'psm_score_comet_xcor': [psm.score_comet_xcor for psm in ident_data.spectrum_matches],
                 'psm_peptide_id': [psm.match_id for psm in ident_data.spectrum_matches],
             })
             psms = pd.merge(
@@ -1493,13 +1494,12 @@ def dda_pipeline(
         if "psm_charge_state" in all_cluster_annotations:
             all_cluster_annotations["psm_charge_state"] = all_cluster_annotations["psm_charge_state"].astype(
                 'Int64')
-        if "psm_rank" in peak_annotations:
-            peak_annotations["psm_rank"] = peak_annotations["psm_rank"].astype(
+        if "psm_rank" in all_cluster_annotations:
+            all_cluster_annotations["psm_rank"] = all_cluster_annotations["psm_rank"].astype(
                 'Int64')
 
         # Saving annotations before aggregation.
-        all_cluster_annotations = all_cluster_annotations.sort_values(by=[
-                                                                      "cluster_id"])
+        all_cluster_annotations = all_cluster_annotations.sort_values(by=["cluster_id"])
         all_cluster_annotations.to_csv(
             out_path_peak_clusters_annotations_all, index=False)
 

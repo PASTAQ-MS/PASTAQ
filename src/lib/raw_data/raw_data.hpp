@@ -180,6 +180,8 @@ struct SpectrumMatch {
     // this is when the rank is considered meaningless, in which case the value
     // of `0` is assigned to the rank.
     uint64_t rank;
+    // The score assigned by the Comet identification engine.
+    double score_comet_xcor;
 };
 
 // A database sequence used for identification.
