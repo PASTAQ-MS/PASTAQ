@@ -739,56 +739,53 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
                     }
                     peptide.sequence = data.value();
                 }
-                // TODO: Search modifications, substitution modifications, and
-                // other relevant parameters for a peptide.
-                // if (tag.value().name == "Modification" &&
-                // !tag.value().closed) {
-                //     // Save modification info.
-                //     auto attributes = tag.value().attributes;
-                //     auto modification = IdentData::PeptideModification{};
-                //     if (attributes.find("monoisotopicMassDelta") !=
-                //         attributes.end()) {
-                //         modification.monoisotopic_mass_delta =
-                //             std::stod(attributes["monoisotopicMassDelta"]);
-                //     }
-                //     if (attributes.find("avgMassDelta") != attributes.end())
-                //     {
-                //         modification.average_mass_delta =
-                //             std::stod(attributes["avgMassDelta"]);
-                //     }
-                //     if (attributes.find("residues") != attributes.end()) {
-                //         modification.residues = attributes["residues"];
-                //     }
-                //     if (attributes.find("location") != attributes.end()) {
-                //         modification.location =
-                //             std::stoi(attributes["location"]);
-                //     }
-                //     // Find CVParams for this modification..
-                //     // while (stream.good()) {
-                //     //     auto tag = XmlReader::read_tag(stream);
-                //     //     if (!tag) {
-                //     //         continue;
-                //     //     }
-                //     //     if (tag.value().name == "cvParam") {
-                //     //         auto cv_param = IdentData::CVParam{};
-                //     //         auto attributes = tag.value().attributes;
-                //     //         cv_param.name = attributes["name"];
-                //     //         cv_param.accession = attributes["accession"];
-                //     //         cv_param.cv_ref = attributes["cvRef"];
-                //     //         if (attributes.find("value") !=
-                //     attributes.end())
-                //     //         {
-                //     //             cv_param.value = attributes["value"];
-                //     //         }
-                //     //         modification.cv_params.push_back(cv_param);
-                //     //     }
-                //     //     if (tag.value().name == "Modification" &&
-                //     //         tag.value().closed) {
-                //     //         peptide.modifications.push_back(modification);
-                //     //         break;
-                //     //     }
-                //     // }
-                // }
+                // Search peptide modifications.
+                if (tag.value().name == "Modification" && !tag.value().closed) {
+                    // Save modification info.
+                    auto attributes = tag.value().attributes;
+                    auto modification = IdentData::PeptideModification{};
+                    if (attributes.find("monoisotopicMassDelta") !=
+                        attributes.end()) {
+                        modification.monoisotopic_mass_delta =
+                            std::stod(attributes["monoisotopicMassDelta"]);
+                    }
+                    if (attributes.find("avgMassDelta") != attributes.end()) {
+                        modification.average_mass_delta =
+                            std::stod(attributes["avgMassDelta"]);
+                    }
+                    if (attributes.find("residues") != attributes.end()) {
+                        modification.residues = attributes["residues"];
+                    }
+                    if (attributes.find("location") != attributes.end()) {
+                        modification.location =
+                            std::stoi(attributes["location"]);
+                    }
+                    // Find CVParams for this modification..
+                    // while (stream.good()) {
+                    //     auto tag = XmlReader::read_tag(stream);
+                    //     if (!tag) {
+                    //         continue;
+                    //     }
+                    //     if (tag.value().name == "cvParam") {
+                    //         auto cv_param = IdentData::CVParam{};
+                    //         auto attributes = tag.value().attributes;
+                    //         cv_param.name = attributes["name"];
+                    //         cv_param.accession = attributes["accession"];
+                    //         cv_param.cv_ref = attributes["cvRef"];
+                    //         if (attributes.find("value") !=
+                    // attributes.end())
+                    //         {
+                    //             cv_param.value = attributes["value"];
+                    //         }
+                    //         modification.cv_params.push_back(cv_param);
+                    //     }
+                    //     if (tag.value().name == "Modification" &&
+                    //         tag.value().closed) {
+                    //         peptide.modifications.push_back(modification);
+                    //         break;
+                    //     }
+                    // }
+                }
             }
             ident_data.peptides.push_back(peptide);
         } else if (tag.value().name == "PeptideEvidence") {
@@ -853,7 +850,7 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
             // Identification item.
             if (tag.value().name == "SpectrumIdentificationItem" &&
                 !tag.value().closed) {
-                IdentData::SpectrumMatch spectrum_match;
+                IdentData::SpectrumMatch spectrum_match = {};
                 spectrum_match.id = attributes["id"];
                 spectrum_match.pass_threshold =
                     attributes["passThreshold"] == "true";
@@ -874,6 +871,26 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
                         std::stod(attributes["calculatedMassToCharge"]);
                 } else {
                     spectrum_match.theoretical_mz = 0.0;
+                }
+
+                // Try to extract identification scores.
+                while (stream.good()) {
+                    tag = XmlReader::read_tag(stream);
+                    if (!tag) {
+                        continue;
+                    }
+                    if (tag.value().name == "SpectrumIdentificationItem" &&
+                        tag.value().closed) {
+                        break;
+                    }
+                    if (tag.value().name == "cvParam") {
+                        auto attributes = tag.value().attributes;
+                        // Comet.
+                        if (attributes["accession"] == "MS:1002252") {
+                            spectrum_match.score_comet_xcor =
+                                std::stod(attributes["value"]);
+                        }
+                    }
                 }
                 spectrum_matches.push_back(spectrum_match);
             }

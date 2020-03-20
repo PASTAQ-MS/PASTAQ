@@ -180,6 +180,8 @@ struct SpectrumMatch {
     // this is when the rank is considered meaningless, in which case the value
     // of `0` is assigned to the rank.
     uint64_t rank;
+    // The score assigned by the Comet identification engine.
+    double score_comet_xcor;
 };
 
 // A database sequence used for identification.
@@ -200,9 +202,11 @@ struct DBSequence {
 struct PeptideModification {
     double monoisotopic_mass_delta;
     double average_mass_delta;
+    // Amino-acid/s where the modification occurs.
     std::string residues;
+    // Optional field (-1 if unset).
     int64_t location;
-    // TODO: Add more fields or more appropriate information here.
+    std::vector<std::string> id;
 };
 
 // A peptide that can be associated with an entry from a database sequence.

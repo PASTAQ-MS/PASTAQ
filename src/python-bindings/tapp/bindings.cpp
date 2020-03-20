@@ -1089,6 +1089,7 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("retention_time",
                       &IdentData::SpectrumMatch::retention_time)
         .def_readonly("rank", &IdentData::SpectrumMatch::rank)
+        .def_readonly("score_comet_xcor", &IdentData::SpectrumMatch::score_comet_xcor)
         .def("__repr__", [](const IdentData::SpectrumMatch &s) {
             return "SpectrumMatch <id: " + s.id +
                    ", pass_threshold: " + std::to_string(s.pass_threshold) +
