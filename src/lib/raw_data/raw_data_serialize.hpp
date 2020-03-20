@@ -42,6 +42,7 @@ bool write_db_sequence(std::ostream &stream, const DBSequence &db_sequence);
 bool read_peptide_mod(std::istream &stream, PeptideModification *peptide_mod);
 bool write_peptide_mod(std::ostream &stream,
                        const PeptideModification &peptide_mod);
+
 // IdentData::Peptide
 bool read_peptide(std::istream &stream, Peptide *peptide);
 bool write_peptide(std::ostream &stream, const Peptide &peptide);

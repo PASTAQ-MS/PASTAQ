@@ -158,6 +158,8 @@ bool IdentData::Serialize::read_peptide_mod(std::istream &stream,
     Serialization::read_double(stream, &peptide_mod->average_mass_delta);
     Serialization::read_string(stream, &peptide_mod->residues);
     Serialization::read_int64(stream, &peptide_mod->location);
+    Serialization::read_vector<std::string>(stream, &peptide_mod->id,
+                                            Serialization::read_string);
     return stream.good();
 }
 
@@ -167,6 +169,8 @@ bool IdentData::Serialize::write_peptide_mod(
     Serialization::write_double(stream, peptide_mod.average_mass_delta);
     Serialization::write_string(stream, peptide_mod.residues);
     Serialization::write_int64(stream, peptide_mod.location);
+    Serialization::write_vector<std::string>(stream, peptide_mod.id,
+                                             Serialization::write_string);
     return stream.good();
 }
 
