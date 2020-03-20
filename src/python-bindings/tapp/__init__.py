@@ -1094,7 +1094,7 @@ def dda_pipeline(
         if in_path == 'none' or (os.path.exists(out_path) and not override_existing):
             continue
         logger.info('Reading mzIdentML: {}'.format(in_path))
-        ident_data = tapp.read_mzidentml(in_path, max_rank_only=False)
+        ident_data = tapp.read_mzidentml(in_path, max_rank_only=True)
         logger.info('Writing ident data: {}'.format(out_path))
         tapp.write_ident_data(ident_data, out_path)
     logger.info('Finished mzIdentML parsing in {}'.format(
