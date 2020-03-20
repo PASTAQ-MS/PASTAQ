@@ -894,8 +894,7 @@ def dda_pipeline(
             or not os.path.exists("{}.pdf".format(out_path_tic_bpc))
             or not os.path.exists("{}.pdf".format(out_path_rt_vs_delta))
             or not os.path.exists("{}.pdf".format(out_path_sigmas_density))
-            or override_existing
-            ):
+            or override_existing):
         plt.ioff()
 
         fig_tic_bpc, axes = plt.subplots(2, 2, sharex=True)
@@ -1311,9 +1310,18 @@ def dda_pipeline(
                 peak_annotations = peak_annotations_2
 
                 # Get the peptide information per psm.
+                def format_modification(mod):
+                    ret = "monoisotopic_mass_delta: {}, ".format(mod.monoisotopic_mass_delta)
+                    ret += "average_mass_delta: {}, ".format(mod.average_mass_delta)
+                    ret += "residues: {}, ".format(mod.residues)
+                    ret += "location: {}, ".format(mod.location)
+                    ret += "id: {}".format("|".join(mod.id))
+                    return ret
                 peptides = pd.DataFrame({
                     'psm_peptide_id': [pep.id for pep in ident_data.peptides],
                     'psm_sequence': [pep.sequence for pep in ident_data.peptides],
+                    'psm_modifications_num': [len(pep.modifications) for pep in ident_data.peptides],
+                    'psm_modifications_info': [map(format_modification, pep.modifications) for pep in ident_data.peptides],
                 })
                 peak_annotations = pd.merge(
                     peak_annotations, peptides, on="psm_peptide_id", how="left")
@@ -1499,7 +1507,8 @@ def dda_pipeline(
                 'Int64')
 
         # Saving annotations before aggregation.
-        all_cluster_annotations = all_cluster_annotations.sort_values(by=["cluster_id"])
+        all_cluster_annotations = all_cluster_annotations.sort_values(by=[
+                                                                      "cluster_id"])
         all_cluster_annotations.to_csv(
             out_path_peak_clusters_annotations_all, index=False)
 

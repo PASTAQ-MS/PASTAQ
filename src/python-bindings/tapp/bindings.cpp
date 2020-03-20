@@ -1118,6 +1118,7 @@ PYBIND11_MODULE(tapp, m) {
                       &IdentData::PeptideModification::average_mass_delta)
         .def_readonly("residues", &IdentData::PeptideModification::residues)
         .def_readonly("location", &IdentData::PeptideModification::location)
+        .def_readonly("id", &IdentData::PeptideModification::id)
         .def("__repr__", [](const IdentData::PeptideModification &s) {
             return "PeptideModification <monoisotopic_mass_delta: " +
                    std::to_string(s.monoisotopic_mass_delta) +
