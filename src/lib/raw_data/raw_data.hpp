@@ -196,16 +196,18 @@ struct DBSequence {
     std::string description;
 };
 
-// FIXME(alex): Do some research on this. Superficially, we can have
-// substitution or normal modifications, but I'm not sure what this entails or
-// how this information should be stored.
+// A single modification for a Peptide.
 struct PeptideModification {
+    // Optional, 0 if unset.
     double monoisotopic_mass_delta;
+    // Optional, 0 if unset.
     double average_mass_delta;
     // Amino-acid/s where the modification occurs.
     std::string residues;
-    // Optional field (-1 if unset).
+    // Location of the modification from the N-terminus (Optional, -1 if unset).
     int64_t location;
+    // Detailed information about the modification. If more than one
+    // identification is provided, the id is ambiguous.
     std::vector<std::string> id;
 };
 
