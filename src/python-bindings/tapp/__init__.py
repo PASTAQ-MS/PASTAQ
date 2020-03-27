@@ -1311,17 +1311,19 @@ def dda_pipeline(
 
                 # Get the peptide information per psm.
                 def format_modification(mod):
-                    ret = "monoisotopic_mass_delta: {}, ".format(mod.monoisotopic_mass_delta)
-                    ret += "average_mass_delta: {}, ".format(mod.average_mass_delta)
+                    ret = "monoisotopic_mass_delta: {}, ".format(
+                        mod.monoisotopic_mass_delta)
+                    ret += "average_mass_delta: {}, ".format(
+                        mod.average_mass_delta)
                     ret += "residues: {}, ".format(mod.residues)
                     ret += "location: {}, ".format(mod.location)
-                    ret += "id: {}".format("|".join(mod.id))
+                    ret += "id: {}".format("; ".join(mod.id))
                     return ret
                 peptides = pd.DataFrame({
                     'psm_peptide_id': [pep.id for pep in ident_data.peptides],
                     'psm_sequence': [pep.sequence for pep in ident_data.peptides],
                     'psm_modifications_num': [len(pep.modifications) for pep in ident_data.peptides],
-                    'psm_modifications_info': [map(format_modification, pep.modifications) for pep in ident_data.peptides],
+                    'psm_modifications_info': [" / ".join(map(format_modification, pep.modifications)) for pep in ident_data.peptides],
                 })
                 peak_annotations = pd.merge(
                     peak_annotations, peptides, on="psm_peptide_id", how="left")
@@ -1357,6 +1359,10 @@ def dda_pipeline(
         if "psm_rank" in peak_annotations:
             peak_annotations["psm_rank"] = peak_annotations["psm_rank"].astype(
                 'Int64')
+        if "psm_modifications_num" in peak_annotations:
+            peak_annotations["psm_modifications_num"] = peak_annotations["psm_modifications_num"].astype(
+                'Int64')
+        peak_annotations = peak_annotations.sort_values("peak_id")
         peak_annotations.to_csv(out_path_peak_annotations, index=False)
 
         in_path_features = os.path.join(
@@ -1424,6 +1430,9 @@ def dda_pipeline(
         if "psm_charge_state" in x:
             ret["psm_charge_state"] = ".|.".join(
                 map(str, np.unique(x['psm_charge_state'].dropna()))).strip(".|.")
+        if "psm_modifications_num" in x:
+            ret["psm_modifications_num"] = ".|.".join(
+                map(str, np.unique(x['psm_modifications_num'].dropna()))).strip(".|.")
         if "protein_name" in x:
             ret["protein_name"] = ".|.".join(
                 np.unique(x['protein_name'].dropna())).strip(".|.")
@@ -1504,6 +1513,9 @@ def dda_pipeline(
                 'Int64')
         if "psm_rank" in all_cluster_annotations:
             all_cluster_annotations["psm_rank"] = all_cluster_annotations["psm_rank"].astype(
+                'Int64')
+        if "psm_modifications_num" in all_cluster_annotations:
+            all_cluster_annotations["psm_modifications_num"] = all_cluster_annotations["psm_modifications_num"].astype(
                 'Int64')
 
         # Saving annotations before aggregation.
@@ -1604,13 +1616,15 @@ def dda_pipeline(
         if "psm_charge_state" in all_cluster_annotations:
             all_cluster_annotations["psm_charge_state"] = all_cluster_annotations["psm_charge_state"].astype(
                 'Int64')
-        if "psm_rank" in peak_annotations:
-            peak_annotations["psm_rank"] = peak_annotations["psm_rank"].astype(
+        if "psm_rank" in all_cluster_annotations:
+            all_cluster_annotations["psm_rank"] = all_cluster_annotations["psm_rank"].astype(
+                'Int64')
+        if "psm_modifications_num" in all_cluster_annotations:
+            all_cluster_annotations["psm_modifications_num"] = all_cluster_annotations["psm_modifications_num"].astype(
                 'Int64')
 
         # Saving annotations before aggregation.
-        all_cluster_annotations = all_cluster_annotations.sort_values(by=[
-                                                                      "cluster_id"])
+        all_cluster_annotations = all_cluster_annotations.sort_values(by=["cluster_id"])
         all_cluster_annotations.to_csv(
             out_path_feature_clusters_annotations_all, index=False)
 
