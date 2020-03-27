@@ -227,6 +227,113 @@ std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
     return clusters;
 }
 
+// Returns a vector of non owning pointers. For read use only. It assumes that
+// the peaks in `feature' are contained in the given `peaks' vector and the
+// latter is sorted by peak id.
+std::vector<Centroid::Peak*> peaks_from_feature(
+    FeatureDetection::Feature& feature, std::vector<Centroid::Peak>& peaks) {
+    std::vector<Centroid::Peak*> peak_refs;
+    if (peaks.empty()) {
+        return {};
+    }
+    for (const auto peak_id : feature.peak_ids) {
+        size_t left = 0;
+        size_t right = peaks.size();
+        while (left < right) {
+            size_t mid = left + ((right - left) / 2);
+            if (peaks[mid].id < peak_id) {
+                left = mid + 1;
+            } else {
+                right = mid;
+            }
+        }
+        if (right < peaks.size() && peaks[right].id == peak_id) {
+            peak_refs.push_back(&peaks[right]);
+        }
+    }
+    return peak_refs;
+}
+
+std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
+    std::vector<MetaMatch::InputSetFeatures>& input_sets, double keep_perc) {
+    std::vector<MetaMatch::FeatureCluster> clusters;
+
+    // We need two sets of indexes, one sorted in descending order of intensity
+    // to prioritize the seletion of a reference feature to match to, and a set
+    // of indexes per file to sort by ascending retention time order. This is
+    // done to speedup searching of features using binary search.
+    struct Index {
+        uint64_t file_index;
+        uint64_t group_id;
+        uint64_t feature_index;
+        double retention_time;
+        double intensity;
+    };
+
+    // Find the total number of features and prepare index vectors.
+    auto available_features = std::vector<std::vector<bool>>(input_sets.size());
+    auto feature_lists = std::vector<std::vector<Index>>(input_sets.size());
+    std::vector<Index> all_features;
+    for (size_t i = 0; i < input_sets.size(); ++i) {
+        const auto& input_set = input_sets[i];
+        available_features[i] =
+            std::vector<bool>(input_set.features.size(), true);
+        feature_lists[i] = std::vector<Index>(input_set.features.size());
+        for (size_t j = 0; j < input_set.features.size(); ++j) {
+            feature_lists[i][j] = {i, input_set.group_id, j,
+                                   input_set.features[j].average_rt,
+                                   input_set.features[j].total_volume};
+        }
+        // Copy feature_lists[i] to the end of all_features.
+        all_features.insert(all_features.end(), feature_lists[i].begin(),
+                            feature_lists[i].end());
+
+        // Further parts of the algorithm need peak files to be sorted by id.
+        // This should be the default, but it is not guaranteed.
+        std::sort(input_set.peaks.begin(), input_set.peaks.end(),
+                  [](auto a, auto b) -> bool { return a.id < b.id; });
+    }
+
+    // Sort all_features by intensity and feature_lists by retention time.
+    std::sort(all_features.begin(), all_features.end(),
+              [](auto a, auto b) -> bool { return a.intensity > b.intensity; });
+    for (auto& feature_list : feature_lists) {
+        std::sort(feature_list.begin(), feature_list.end(),
+                  [](auto a, auto b) -> bool {
+                      return a.retention_time < b.retention_time;
+                  });
+    }
+
+    // Start the matching.
+    for (size_t i = 0; i < all_features.size(); ++i) {
+        auto& ref_feature_index = all_features[i];
+        auto file_index = ref_feature_index.file_index;
+        auto feature_index = ref_feature_index.feature_index;
+        // Check availability.
+        if (!available_features[file_index][feature_index]) {
+            continue;
+        }
+        auto& ref_feature = input_sets[file_index].features[feature_index];
+        // Get the peaks for the reference feature.
+        auto& ref_peak_ids = ref_feature.peak_ids;
+        // TODO: Write function to get non owning peak references for a feature.
+        // It will be used here and in the future loop for finding matches on
+        // each file.
+        // TODO: Get min/max mz range from the ref peaks.
+        double ref_min_rt =
+            ref_feature.average_rt - 3 * ref_feature.average_rt_sigma;
+        double ref_max_rt =
+            ref_feature.average_rt + 3 * ref_feature.average_rt_sigma;
+        // TODO: Check that the feature in range has the same charge_state as
+        // the reference.
+        // TODO: Check the instersection of the boundaries between reference and
+        // target.
+        // TODO: Check that the target has not been used before.
+    }
+
+    return clusters;
+}
+
 std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
     std::vector<MetaMatch::InputSetFeatures>& input_sets) {
     std::vector<MetaMatch::FeatureCluster> clusters;
