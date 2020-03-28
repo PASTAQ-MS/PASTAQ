@@ -254,6 +254,27 @@ std::vector<Centroid::Peak*> peaks_from_feature(
     return peak_refs;
 }
 
+// Calculates the cosine similarity of two sets of vectors. Note that the peaks
+// might not necessarily be aligned, so we must first find the equivalence of
+// the peaks for both vectors.
+double find_feature_overlap(std::vector<Centroid::Peak*>& ref_peaks,
+                            std::vector<Centroid::Peak*>& feature_peaks) {
+    // TODO: ...
+    return 0;
+}
+
+// Check if the given feature_ids selected for this cluster meet the filter
+// critera of a minimum number of samples for any given group. For example, if
+// we have three groups of 10 samples, with a `keep_perc' of 0.7, we meet the
+// nan percentage if in any of the three groups we have at least 7 features
+// being matched.
+bool meets_nan_percentage(std::vector<FeatureId>& feature_ids,
+                          std::vector<InputSetFeatures>& input_sets,
+                          double keep_perc) {
+    // TODO: ...
+    return false;
+}
+
 std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
     std::vector<MetaMatch::InputSetFeatures>& input_sets, double keep_perc) {
     std::vector<MetaMatch::FeatureCluster> clusters;
@@ -275,7 +296,7 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
     auto feature_lists = std::vector<std::vector<Index>>(input_sets.size());
     std::vector<Index> all_features;
     for (size_t i = 0; i < input_sets.size(); ++i) {
-        const auto& input_set = input_sets[i];
+        auto& input_set = input_sets[i];
         available_features[i] =
             std::vector<bool>(input_set.features.size(), true);
         feature_lists[i] = std::vector<Index>(input_set.features.size());
@@ -307,28 +328,102 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
     // Start the matching.
     for (size_t i = 0; i < all_features.size(); ++i) {
         auto& ref_feature_index = all_features[i];
-        auto file_index = ref_feature_index.file_index;
+        auto ref_file_index = ref_feature_index.ref_file_index;
         auto feature_index = ref_feature_index.feature_index;
         // Check availability.
-        if (!available_features[file_index][feature_index]) {
+        if (!available_features[ref_file_index][feature_index]) {
             continue;
         }
-        auto& ref_feature = input_sets[file_index].features[feature_index];
         // Get the peaks for the reference feature.
-        auto& ref_peak_ids = ref_feature.peak_ids;
-        // TODO: Write function to get non owning peak references for a feature.
-        // It will be used here and in the future loop for finding matches on
-        // each file.
-        // TODO: Get min/max mz range from the ref peaks.
+        auto& ref_feature = input_sets[ref_file_index].features[feature_index];
+        auto ref_peaks =
+            peaks_from_feature(ref_feature, input_sets[ref_file_index].peaks);
+        if (ref_peaks.empty()) {
+            continue;
+        }
+
+        // Calculate the boundary region for this feature.
+        size_t n = ref_peaks.size();
+        double ref_min_mz =
+            ref_peaks[0]->fitted_mz - 3 * ref_peaks[0]->fitted_sigma_mz;
+        double ref_max_mz =
+            ref_peaks[n - 1]->fitted_mz + 3 * ref_peaks[0]->fitted_sigma_mz;
         double ref_min_rt =
             ref_feature.average_rt - 3 * ref_feature.average_rt_sigma;
         double ref_max_rt =
             ref_feature.average_rt + 3 * ref_feature.average_rt_sigma;
-        // TODO: Check that the feature in range has the same charge_state as
-        // the reference.
-        // TODO: Check the instersection of the boundaries between reference and
-        // target.
-        // TODO: Check that the target has not been used before.
+
+        // NOTE: Currently storing the feature index instead of the the feature
+        // ids for performance. If we are to keep this cluster, this should be
+        // swapped.
+        std::vector<FeatureId> features_in_cluster;
+        features_in_cluster.push_back({ref_file_id, ref_feature_index});
+        for (size_t j = 0; j < feature_lists.size(); ++j) {
+            if (j == ref_file_index) {
+                continue;
+            }
+            const auto& feature_list = feature_lists[j];
+            const auto& input_set = input_set[j];
+            // Find features within the retention time ROI.
+            size_t left = 0;
+            size_t right = feature_list.size();
+            while (left < right) {
+                size_t mid = left + ((right - left) / 2);
+                if (feature_list[mid].retention_time < ref_min_rt) {
+                    left = mid + 1;
+                } else {
+                    right = mid;
+                }
+            }
+            size_t min_k = right;
+            // FIXME: We are using point in rectangle collision checking instead
+            // of rectangle and rectangle intersection  for retention time
+            // boundary. Check if this is really what we want.
+            if (right > feature_list.size() ||
+                feature_list[min_k].retention_time > ref_max_rt) {
+                continue;
+            }
+            // Keep track of the best candidate for this file.
+            double best_overlap = 0;
+            size_t best_index = 0;
+            for (size_t k = min_k; k < feature_list.size(); ++k) {
+                if (feature_list[k].retention_time > ref_max_rt) {
+                    break;
+                }
+                auto& feature =
+                    input_set.features[feature_list[k].feature_index];
+                if (feature.charge_state != ref_feature.charge_state ||
+                    feature.average_mz < ref_min_mz ||
+                    feature.average_mz > ref_max_mz ||
+                    !available_features[j][k]) {
+                    continue;
+                }
+                // Find the peaks for this feature.
+                auto feature_peaks =
+                    peaks_from_feature(feature, input_set.peaks);
+                if (feature_peaks.empty()) {
+                    continue;
+                }
+
+                // Check the overlap between the reference and this feature.
+                // If the overlap is greater than the previous one, swap it.
+                double overlap = find_feature_overlap(ref_peaks, feature_peaks);
+                if (overlap > best_overlap) {
+                    best_overlap = overlap;
+                    best_index = feature_index;
+                }
+            }
+            if (best_overlap > overlap_threshold) {
+                features_in_cluster.push_back({j, best_index});
+            }
+        }
+        // TODO: Only keep this feature if it meets the percentage keep
+        // criteria.
+        // TODO: If we are keeping the feature as a cluster, we need to mark the
+        // reference and features from different files into the availability
+        // vector.
+        // TODO: Replace feature_index with feature_id on the features in cluster vector.
+        // TODO: Build cluster object.
     }
 
     return clusters;
