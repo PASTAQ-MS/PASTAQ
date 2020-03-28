@@ -72,14 +72,22 @@ struct FeatureCluster {
     uint64_t id;
     double mz;
     double rt;
-
+    int8_t charge_state;
+    double avg_total_height;
+    double avg_monoisotopic_height;
+    double avg_max_height;
+    double avg_total_volume;
+    double avg_monoisotopic_volume;
+    double avg_max_volume;
+    std::vector<double> total_heights;
+    std::vector<double> monoisotopic_heights;
+    std::vector<double> max_heights;
+    std::vector<double> total_volumes;
+    std::vector<double> monoisotopic_volumes;
+    std::vector<double> max_volumes;
     // The feature ids on each file associated with this cluster.
     // NOTE: Should we make this a relational model?
     std::vector<FeatureId> feature_ids;
-
-    double avg_height;
-    int8_t charge_state;
-    std::vector<double> file_heights;
 };
 
 struct InputSetFeatures {

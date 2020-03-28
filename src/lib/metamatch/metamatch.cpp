@@ -263,22 +263,8 @@ double find_feature_overlap(std::vector<Centroid::Peak*>& ref_peaks,
     return 0;
 }
 
-// Check if the given feature_ids selected for this cluster meet the filter
-// critera of a minimum number of samples for any given group. For example, if
-// we have three groups of 10 samples, with a `keep_perc' of 0.7, we meet the
-// nan percentage if in any of the three groups we have at least 7 features
-// being matched.
-bool meets_nan_percentage(std::vector<FeatureId>& feature_ids,
-                          std::vector<InputSetFeatures>& input_sets,
-                          double keep_perc) {
-    // TODO: ...
-    return false;
-}
-
 std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
     std::vector<MetaMatch::InputSetFeatures>& input_sets, double keep_perc) {
-    std::vector<MetaMatch::FeatureCluster> clusters;
-
     // We need two sets of indexes, one sorted in descending order of intensity
     // to prioritize the seletion of a reference feature to match to, and a set
     // of indexes per file to sort by ascending retention time order. This is
@@ -326,6 +312,7 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
     }
 
     // Start the matching.
+    std::vector<MetaMatch::FeatureCluster> clusters;
     for (size_t i = 0; i < all_features.size(); ++i) {
         auto& ref_feature_index = all_features[i];
         auto ref_file_index = ref_feature_index.ref_file_index;
@@ -376,13 +363,11 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
                 }
             }
             size_t min_k = right;
-            // FIXME: We are using point in rectangle collision checking instead
-            // of rectangle and rectangle intersection  for retention time
-            // boundary. Check if this is really what we want.
             if (right > feature_list.size() ||
                 feature_list[min_k].retention_time > ref_max_rt) {
                 continue;
             }
+
             // Keep track of the best candidate for this file.
             double best_overlap = 0;
             size_t best_index = 0;
@@ -390,14 +375,19 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
                 if (feature_list[k].retention_time > ref_max_rt) {
                     break;
                 }
-                auto& feature =
-                    input_set.features[feature_list[k].feature_index];
+                size_t feature_index = feature_list[k].feature_index;
+                auto& feature = input_set.features[feature_index];
+
+                // We are using point-in-rectangle check instead of intersection
+                // of boundaries to determine if two features are in range for
+                // further processing.
                 if (feature.charge_state != ref_feature.charge_state ||
                     feature.average_mz < ref_min_mz ||
                     feature.average_mz > ref_max_mz ||
-                    !available_features[j][k]) {
+                    !available_features[j][feature_index]) {
                     continue;
                 }
+
                 // Find the peaks for this feature.
                 auto feature_peaks =
                     peaks_from_feature(feature, input_set.peaks);
@@ -417,13 +407,63 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
                 features_in_cluster.push_back({j, best_index});
             }
         }
-        // TODO: Only keep this feature if it meets the percentage keep
-        // criteria.
-        // TODO: If we are keeping the feature as a cluster, we need to mark the
-        // reference and features from different files into the availability
-        // vector.
-        // TODO: Replace feature_index with feature_id on the features in cluster vector.
-        // TODO: Build cluster object.
+        if (features_in_cluster.empty()) {
+            continue;
+        }
+
+        // Build cluster object.
+        FeatureCluster cluster = {};
+        cluster.charge_state = ref_feature.charge_state;
+        std::vector<uint64_t> cluster_groups;
+        for (auto& feature_id : features_in_cluster) {
+            size_t file_id = feature_id.file_id;
+            size_t feature_index = feature_id.feature_id;
+            auto& feature = input_sets[file_id].features[feature_index];
+
+            // Mark clustered features as not available.
+            available_features[file_id][feature_index] = false;
+
+            // Replace feature_index with its corresponding id.
+            feature_id.feature_id = feature.id;
+
+            // Keep track of the groups within this cluster.
+            cluster_groups.push_back(input_sets[file_id].group_id);
+
+            // Store some statistics about the cluster.
+            cluster.mz += feature.average_mz;
+            cluster.rt += feature.average_rt + feature.average_rt_delta;
+            cluster.avg_total_height += feature.total_height;
+            cluster.avg_monoisotopic_height += feature.monoisotopic_height;
+            cluster.avg_max_height += feature.max_height;
+            cluster.avg_total_volume += feature.total_volume;
+            cluster.avg_monoisotopic_volume += feature.monoisotopic_volume;
+            cluster.avg_max_volume += feature.max_volume;
+            cluster.total_heights.push_back(feature.total_height);
+            cluster.monoisotopic_heights.push_back(feature.monoisotopic_height);
+            cluster.max_heights.push_back(feature.max_height);
+            cluster.total_volumes.push_back(feature.total_volume);
+            cluster.monoisotopic_volumes.push_back(feature.monoisotopic_volume);
+            cluster.max_volumes.push_back(feature.max_volume);
+        }
+        cluster.mz /= features_in_cluster.size();
+        cluster.rt /= features_in_cluster.size();
+        cluster.avg_total_height /= features_in_cluster.size();
+        cluster.avg_monoisotopic_height /= features_in_cluster.size();
+        cluster.avg_max_height /= features_in_cluster.size();
+        cluster.avg_total_volume /= features_in_cluster.size();
+        cluster.avg_monoisotopic_volume /= features_in_cluster.size();
+        cluster.avg_max_volume /= features_in_cluster.size();
+
+        // Check if the given feature_ids selected for this cluster meet the
+        // filter critera of a minimum number of samples for any given group.
+        // For example, if we have three groups of 10 samples, with a
+        // `keep_perc' of 0.7, we meet the nan percentage if in any of the three
+        // groups we have at least 7 features being matched.
+        // TODO: ...
+        bool nan_criteria_met = false;
+        if (nan_criteria_met) {
+            clusters.push_back(cluster);
+        }
     }
 
     return clusters;
