@@ -258,10 +258,93 @@ std::vector<Centroid::Peak*> peaks_from_feature(
 // Calculates the cosine similarity of two sets of vectors. Note that the peaks
 // might not necessarily be aligned, so we must first find the equivalence of
 // the peaks for both vectors.
-double find_feature_overlap(std::vector<Centroid::Peak*>& ref_peaks,
-                            std::vector<Centroid::Peak*>& feature_peaks) {
-    // TODO: ...
-    return 0;
+double find_feature_overlap(std::vector<Centroid::Peak*>& A,
+                            std::vector<Centroid::Peak*>& B,
+                            int64_t charge_state) {
+    if (A.empty() || B.empty()) {
+        return 0;
+    }
+    // FIXME: Currently using maximum cumulative overlap for simplicity. Test
+    // with this first, but I want to be able to set a minimum threshold of
+    // matching before considering features. For that, the cosine similarity
+    // makes more sense, but the vectors need to be aligned before.
+    std::vector<Centroid::Peak> peaks_a;
+    for (auto peak : A) {
+        peaks_a.push_back(*peak);
+    }
+    std::vector<Centroid::Peak> peaks_b;
+    for (auto peak : B) {
+        peaks_b.push_back(*peak);
+    }
+
+    return Centroid::cumulative_overlap(peaks_a, peaks_b);
+
+    // NOTE: We assume A belongs to the reference peaks, and use the
+    // monoisotopic peak as a reference for the tolerance range.
+    double mz_tol = A[0]->fitted_sigma_mz * 3;
+
+    // Calculate the norms for both vectors.
+    double norm_a = 0;
+    for (const auto& peak : A) {
+        double x = peak->fitted_height;
+        norm_a += x * x;
+    }
+    norm_a = std::sqrt(norm_a);
+    double norm_b = 0;
+    for (const auto& peak : B) {
+        double x = peak->fitted_height;
+        norm_b += x * x;
+    }
+    norm_b = std::sqrt(norm_b);
+
+    // The reference and candidate peaks have been constrained to have the same
+    // charge state. During feature detection, the peaks at the extremes might
+    // be missing. Specially as the intensity decreases. The vectors then need
+    // to be aligned before comparison. The constrain makes it easy to just use
+    // the monoisotopic difference and discard comparisons, where the intervals
+    // don't make sense.
+    // double mz_diff = A[0]->fitted_mz - B[0]->fitted_mz;
+    // TODO: FIX THIS
+    // if (std::abs(charge_state - std::abs(mz_diff) * charge_state) > mz_tol) {
+    //     return 0;
+    // }
+    // How many peaks of difference between reference and candidates. Negative
+    // numbers mean that candidate starts before reference.
+    // int n = std::round(mz_diff * charge_state);
+    double dot = 0;
+    // if (n < 0) {
+    //     for (size_t i = n, k = 0; i < B.size() && k < A.size(); ++i, ++k) {
+    //         dot += B[i]->fitted_height * A[k]->fitted_height;
+    //     }
+    // } else {
+    //     for (size_t i = n, k = 0; i < A.size() && k < B.size(); ++i, ++k) {
+    //         dot += A[i]->fitted_height * B[k]->fitted_height;
+    //     }
+    // }
+    for (auto peak_a : A) {
+        for (auto peak_b : B) {
+            double peak_a_mz = peak_a->fitted_mz;
+            double peak_b_mz = peak_b->fitted_mz;
+            double peak_a_rt = peak_a->fitted_rt + peak_a->rt_delta;
+            double peak_b_rt = peak_b->fitted_rt + peak_b->rt_delta;
+            double min_rt_a = peak_a_rt - 3 * peak_a->fitted_sigma_rt;
+            double max_rt_a = peak_a_rt + 3 * peak_a->fitted_sigma_rt;
+            double min_mz_a = peak_a_mz - 3 * peak_a->fitted_sigma_mz;
+            double max_mz_a = peak_a_mz + 3 * peak_a->fitted_sigma_mz;
+            double min_rt_b = peak_b_rt - 3 * peak_b->fitted_sigma_rt;
+            double max_rt_b = peak_b_rt + 3 * peak_b->fitted_sigma_rt;
+            double min_mz_b = peak_b_mz - 3 * peak_b->fitted_sigma_mz;
+            double max_mz_b = peak_b_mz + 3 * peak_b->fitted_sigma_mz;
+
+            if (max_rt_a < min_rt_b || max_rt_b < min_rt_a ||
+                max_mz_a < min_mz_b || max_mz_b < min_mz_a) {
+                continue;
+            }
+            dot += peak_a->fitted_height * peak_b->fitted_height;
+        }
+    }
+    dot /= (norm_a * norm_b);
+    return dot;
 }
 
 std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
@@ -321,6 +404,7 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
 
     // Start the matching.
     std::vector<MetaMatch::FeatureCluster> clusters;
+    size_t cluster_counter = 0;
     for (size_t i = 0; i < all_features.size(); ++i) {
         auto& ref_feature_index = all_features[i];
         auto ref_file_index = ref_feature_index.file_index;
@@ -406,7 +490,8 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
 
                 // Check the overlap between the reference and this feature.
                 // If the overlap is greater than the previous one, swap it.
-                double overlap = find_feature_overlap(ref_peaks, feature_peaks);
+                double overlap = find_feature_overlap(ref_peaks, feature_peaks,
+                                                      ref_feature.charge_state);
                 if (overlap > best_overlap) {
                     best_overlap = overlap;
                     best_index = feature_index;
@@ -431,7 +516,7 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
             auto group_id = cluster_group.first;
             auto group_number = cluster_group.second;
             uint64_t required_number = groups[group_id] * keep_perc;
-            if (group_number > required_number) {
+            if (group_number >= required_number) {
                 nan_criteria_met = true;
                 break;
             }
@@ -442,6 +527,7 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
 
         // Build cluster object.
         MetaMatch::FeatureCluster cluster = {};
+        cluster.id = cluster_counter++;
         cluster.charge_state = ref_feature.charge_state;
         for (auto& feature_id : features_in_cluster) {
             size_t file_id = feature_id.file_id;
@@ -487,6 +573,7 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
 std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
     std::vector<MetaMatch::InputSetFeatures>& input_sets) {
     std::vector<MetaMatch::FeatureCluster> clusters;
+    return find_feature_clusters_new(input_sets, 0.7, 0.5);
     // TODO: Do noise discrimination based on desired % per group.
     // 1.- Create an indexed set of the highest intensity peaks in descending
     //     order.
@@ -673,5 +760,5 @@ std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
     //     clusters[i].id = i;
     // }
 
-    return clusters;
+    // return clusters;
 }

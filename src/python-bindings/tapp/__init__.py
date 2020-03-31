@@ -1554,14 +1554,14 @@ def dda_pipeline(
             'cluster_id': [cluster.id for cluster in feature_clusters],
             'mz': [cluster.mz for cluster in feature_clusters],
             'rt': [cluster.rt for cluster in feature_clusters],
-            'avg_height': [cluster.avg_height for cluster in feature_clusters],
+            'avg_total_height': [cluster.avg_total_height for cluster in feature_clusters],
             'charge_state': [cluster.charge_state for cluster in feature_clusters],
         })
         feature_clusters_df = pd.DataFrame({
             'cluster_id': [cluster.id for cluster in feature_clusters],
         })
         for i, stem in enumerate(input_stems):
-            feature_clusters_df[stem] = [cluster.file_heights[i]
+            feature_clusters_df[stem] = [cluster.total_heights[i]
                                          for cluster in feature_clusters]
         feature_clusters_df.to_csv(
             out_path_feature_clusters_height, index=False)
@@ -1624,7 +1624,8 @@ def dda_pipeline(
                 'Int64')
 
         # Saving annotations before aggregation.
-        all_cluster_annotations = all_cluster_annotations.sort_values(by=["cluster_id"])
+        all_cluster_annotations = all_cluster_annotations.sort_values(by=[
+                                                                      "cluster_id"])
         all_cluster_annotations.to_csv(
             out_path_feature_clusters_annotations_all, index=False)
 
