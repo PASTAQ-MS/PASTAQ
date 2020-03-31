@@ -51,14 +51,29 @@ bool MetaMatch::Serialize::read_feature_cluster(std::istream &stream,
     Serialization::read_uint64(stream, &cluster->id);
     Serialization::read_double(stream, &cluster->mz);
     Serialization::read_double(stream, &cluster->rt);
+    Serialization::read_int8(stream, &cluster->charge_state);
+    Serialization::read_double(stream, &cluster->avg_total_height);
+    Serialization::read_double(stream, &cluster->avg_monoisotopic_height);
+    Serialization::read_double(stream, &cluster->avg_max_height);
+    Serialization::read_double(stream, &cluster->avg_total_volume);
+    Serialization::read_double(stream, &cluster->avg_monoisotopic_volume);
+    Serialization::read_double(stream, &cluster->avg_max_volume);
+
+    Serialization::read_vector<double>(stream, &cluster->total_heights,
+                                       Serialization::read_double);
+    Serialization::read_vector<double>(stream, &cluster->monoisotopic_heights,
+                                       Serialization::read_double);
+    Serialization::read_vector<double>(stream, &cluster->max_heights,
+                                       Serialization::read_double);
+    Serialization::read_vector<double>(stream, &cluster->total_volumes,
+                                       Serialization::read_double);
+    Serialization::read_vector<double>(stream, &cluster->monoisotopic_volumes,
+                                       Serialization::read_double);
+    Serialization::read_vector<double>(stream, &cluster->max_volumes,
+                                       Serialization::read_double);
 
     Serialization::read_vector<FeatureId>(stream, &cluster->feature_ids,
                                           read_feature_id);
-
-    Serialization::read_double(stream, &cluster->avg_height);
-    Serialization::read_int8(stream, &cluster->charge_state);
-    Serialization::read_vector<double>(stream, &cluster->file_heights,
-                                       Serialization::read_double);
     return stream.good();
 }
 
@@ -67,14 +82,29 @@ bool MetaMatch::Serialize::write_feature_cluster(
     Serialization::write_uint64(stream, cluster.id);
     Serialization::write_double(stream, cluster.mz);
     Serialization::write_double(stream, cluster.rt);
+    Serialization::write_int8(stream, cluster.charge_state);
+    Serialization::write_double(stream, cluster.avg_total_height);
+    Serialization::write_double(stream, cluster.avg_monoisotopic_height);
+    Serialization::write_double(stream, cluster.avg_max_height);
+    Serialization::write_double(stream, cluster.avg_total_volume);
+    Serialization::write_double(stream, cluster.avg_monoisotopic_volume);
+    Serialization::write_double(stream, cluster.avg_max_volume);
+
+    Serialization::write_vector<double>(stream, cluster.total_heights,
+                                        Serialization::write_double);
+    Serialization::write_vector<double>(stream, cluster.monoisotopic_heights,
+                                        Serialization::write_double);
+    Serialization::write_vector<double>(stream, cluster.max_heights,
+                                        Serialization::write_double);
+    Serialization::write_vector<double>(stream, cluster.total_volumes,
+                                        Serialization::write_double);
+    Serialization::write_vector<double>(stream, cluster.monoisotopic_volumes,
+                                        Serialization::write_double);
+    Serialization::write_vector<double>(stream, cluster.max_volumes,
+                                        Serialization::write_double);
 
     Serialization::write_vector<FeatureId>(stream, cluster.feature_ids,
                                            write_feature_id);
-
-    Serialization::write_double(stream, cluster.avg_height);
-    Serialization::write_int8(stream, cluster.charge_state);
-    Serialization::write_vector<double>(stream, cluster.file_heights,
-                                        Serialization::write_double);
     return stream.good();
 }
 
@@ -143,4 +173,3 @@ bool MetaMatch::Serialize::write_peaks(std::ostream &stream,
     }
     return stream.good();
 }
-

@@ -1089,7 +1089,8 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("retention_time",
                       &IdentData::SpectrumMatch::retention_time)
         .def_readonly("rank", &IdentData::SpectrumMatch::rank)
-        .def_readonly("score_comet_xcor", &IdentData::SpectrumMatch::score_comet_xcor)
+        .def_readonly("score_comet_xcor",
+                      &IdentData::SpectrumMatch::score_comet_xcor)
         .def("__repr__", [](const IdentData::SpectrumMatch &s) {
             return "SpectrumMatch <id: " + s.id +
                    ", pass_threshold: " + std::to_string(s.pass_threshold) +
@@ -1235,15 +1236,34 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("id", &MetaMatch::FeatureCluster::id)
         .def_readonly("mz", &MetaMatch::FeatureCluster::mz)
         .def_readonly("rt", &MetaMatch::FeatureCluster::rt)
-        .def_readonly("avg_height", &MetaMatch::FeatureCluster::avg_height)
+        .def_readonly("avg_total_height",
+                      &MetaMatch::FeatureCluster::avg_total_height)
+        .def_readonly("avg_monoisotopic_height",
+                      &MetaMatch::FeatureCluster::avg_monoisotopic_height)
+        .def_readonly("avg_max_height",
+                      &MetaMatch::FeatureCluster::avg_max_height)
+        .def_readonly("avg_total_volume",
+                      &MetaMatch::FeatureCluster::avg_total_volume)
+        .def_readonly("avg_monoisotopic_volume",
+                      &MetaMatch::FeatureCluster::avg_monoisotopic_volume)
+        .def_readonly("avg_max_volume",
+                      &MetaMatch::FeatureCluster::avg_max_volume)
         .def_readonly("charge_state", &MetaMatch::FeatureCluster::charge_state)
-        .def_readonly("file_heights", &MetaMatch::FeatureCluster::file_heights)
+        .def_readonly("total_heights",
+                      &MetaMatch::FeatureCluster::total_heights)
+        .def_readonly("monoisotopic_heights",
+                      &MetaMatch::FeatureCluster::monoisotopic_heights)
+        .def_readonly("max_heights", &MetaMatch::FeatureCluster::max_heights)
+        .def_readonly("total_volumes",
+                      &MetaMatch::FeatureCluster::total_volumes)
+        .def_readonly("monoisotopic_volumes",
+                      &MetaMatch::FeatureCluster::monoisotopic_volumes)
+        .def_readonly("max_volumes", &MetaMatch::FeatureCluster::max_volumes)
         .def_readonly("feature_ids", &MetaMatch::FeatureCluster::feature_ids)
         .def("__repr__", [](const MetaMatch::FeatureCluster &c) {
             return "MetaCluster <id: " + std::to_string(c.id) +
                    ", mz: " + std::to_string(c.mz) +
-                   ", rt: " + std::to_string(c.rt) +
-                   ", avg_height: " + std::to_string(c.avg_height) + ">";
+                   ", rt: " + std::to_string(c.rt) + ">";
         });
 
     py::class_<MetaMatch::Peak>(m, "MetaMatchPeak")
