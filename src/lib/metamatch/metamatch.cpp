@@ -436,12 +436,15 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
         // ids for performance. If we are to keep this cluster, this should be
         // swapped.
         std::vector<MetaMatch::FeatureId> features_in_cluster;
-        features_in_cluster.push_back({ref_file_index, feature_index});
         std::map<uint64_t, uint64_t> cluster_groups;
+        MetaMatch::FeatureCluster cluster = {};
+        cluster.total_heights = std::vector<double>(input_sets.size());
+        cluster.monoisotopic_heights = std::vector<double>(input_sets.size());
+        cluster.max_heights = std::vector<double>(input_sets.size());
+        cluster.total_volumes = std::vector<double>(input_sets.size());
+        cluster.monoisotopic_volumes = std::vector<double>(input_sets.size());
+        cluster.max_volumes = std::vector<double>(input_sets.size());
         for (size_t j = 0; j < feature_lists.size(); ++j) {
-            if (j == ref_file_index) {
-                continue;
-            }
             const auto& feature_list = feature_lists[j];
             const auto& input_set = input_sets[j];
             // Find features within the retention time ROI.
@@ -500,9 +503,16 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
             if (best_overlap > overlap_threshold) {
                 features_in_cluster.push_back({j, best_index});
                 ++cluster_groups[input_set.group_id];
+                auto& feature = input_set.features[best_index];
+                cluster.total_heights[j] = (feature.total_height);
+                cluster.monoisotopic_heights[j] = (feature.monoisotopic_height);
+                cluster.max_heights[j] = (feature.max_height);
+                cluster.total_volumes[j] = (feature.total_volume);
+                cluster.monoisotopic_volumes[j] = (feature.monoisotopic_volume);
+                cluster.max_volumes[j] = (feature.max_volume);
             }
         }
-        if (features_in_cluster.empty()) {
+        if (features_in_cluster.size() < 2) {
             continue;
         }
 
@@ -526,7 +536,6 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
         }
 
         // Build cluster object.
-        MetaMatch::FeatureCluster cluster = {};
         cluster.id = cluster_counter++;
         cluster.charge_state = ref_feature.charge_state;
         for (auto& feature_id : features_in_cluster) {
@@ -539,6 +548,7 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
 
             // Replace feature_index with its corresponding id.
             feature_id.feature_id = feature.id;
+            cluster.feature_ids.push_back(feature_id);
 
             // Store some statistics about the cluster.
             cluster.mz += feature.average_mz;
@@ -549,12 +559,6 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
             cluster.avg_total_volume += feature.total_volume;
             cluster.avg_monoisotopic_volume += feature.monoisotopic_volume;
             cluster.avg_max_volume += feature.max_volume;
-            cluster.total_heights.push_back(feature.total_height);
-            cluster.monoisotopic_heights.push_back(feature.monoisotopic_height);
-            cluster.max_heights.push_back(feature.max_height);
-            cluster.total_volumes.push_back(feature.total_volume);
-            cluster.monoisotopic_volumes.push_back(feature.monoisotopic_volume);
-            cluster.max_volumes.push_back(feature.max_volume);
         }
         cluster.mz /= features_in_cluster.size();
         cluster.rt /= features_in_cluster.size();
