@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <map>
 #include <sstream>
 
 #include "metamatch/metamatch.hpp"
@@ -264,7 +265,8 @@ double find_feature_overlap(std::vector<Centroid::Peak*>& ref_peaks,
 }
 
 std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
-    std::vector<MetaMatch::InputSetFeatures>& input_sets, double keep_perc) {
+    std::vector<MetaMatch::InputSetFeatures>& input_sets, double keep_perc,
+    double overlap_threshold) {
     // We need two sets of indexes, one sorted in descending order of intensity
     // to prioritize the seletion of a reference feature to match to, and a set
     // of indexes per file to sort by ascending retention time order. This is
@@ -311,11 +313,17 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
                   });
     }
 
+    // Create map with the number of files on each group.
+    std::map<uint64_t, uint64_t> groups;
+    for (const auto& input_set : input_sets) {
+        ++groups[input_set.group_id];
+    }
+
     // Start the matching.
     std::vector<MetaMatch::FeatureCluster> clusters;
     for (size_t i = 0; i < all_features.size(); ++i) {
         auto& ref_feature_index = all_features[i];
-        auto ref_file_index = ref_feature_index.ref_file_index;
+        auto ref_file_index = ref_feature_index.file_index;
         auto feature_index = ref_feature_index.feature_index;
         // Check availability.
         if (!available_features[ref_file_index][feature_index]) {
@@ -343,14 +351,15 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
         // NOTE: Currently storing the feature index instead of the the feature
         // ids for performance. If we are to keep this cluster, this should be
         // swapped.
-        std::vector<FeatureId> features_in_cluster;
-        features_in_cluster.push_back({ref_file_id, ref_feature_index});
+        std::vector<MetaMatch::FeatureId> features_in_cluster;
+        features_in_cluster.push_back({ref_file_index, feature_index});
+        std::map<uint64_t, uint64_t> cluster_groups;
         for (size_t j = 0; j < feature_lists.size(); ++j) {
             if (j == ref_file_index) {
                 continue;
             }
             const auto& feature_list = feature_lists[j];
-            const auto& input_set = input_set[j];
+            const auto& input_set = input_sets[j];
             // Find features within the retention time ROI.
             size_t left = 0;
             size_t right = feature_list.size();
@@ -405,16 +414,35 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
             }
             if (best_overlap > overlap_threshold) {
                 features_in_cluster.push_back({j, best_index});
+                ++cluster_groups[input_set.group_id];
             }
         }
         if (features_in_cluster.empty()) {
             continue;
         }
 
+        // Check if the given feature_ids selected for this cluster meet the
+        // filter critera of a minimum number of samples for any given group.
+        // For example, if we have three groups of 10 samples, with a
+        // `keep_perc' of 0.7, we meet the nan percentage if in any of the three
+        // groups we have at least 7 features being matched.
+        bool nan_criteria_met = false;
+        for (const auto& cluster_group : cluster_groups) {
+            auto group_id = cluster_group.first;
+            auto group_number = cluster_group.second;
+            uint64_t required_number = groups[group_id] * keep_perc;
+            if (group_number > required_number) {
+                nan_criteria_met = true;
+                break;
+            }
+        }
+        if (!nan_criteria_met) {
+            continue;
+        }
+
         // Build cluster object.
-        FeatureCluster cluster = {};
+        MetaMatch::FeatureCluster cluster = {};
         cluster.charge_state = ref_feature.charge_state;
-        std::vector<uint64_t> cluster_groups;
         for (auto& feature_id : features_in_cluster) {
             size_t file_id = feature_id.file_id;
             size_t feature_index = feature_id.feature_id;
@@ -425,9 +453,6 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
 
             // Replace feature_index with its corresponding id.
             feature_id.feature_id = feature.id;
-
-            // Keep track of the groups within this cluster.
-            cluster_groups.push_back(input_sets[file_id].group_id);
 
             // Store some statistics about the cluster.
             cluster.mz += feature.average_mz;
@@ -453,17 +478,7 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
         cluster.avg_total_volume /= features_in_cluster.size();
         cluster.avg_monoisotopic_volume /= features_in_cluster.size();
         cluster.avg_max_volume /= features_in_cluster.size();
-
-        // Check if the given feature_ids selected for this cluster meet the
-        // filter critera of a minimum number of samples for any given group.
-        // For example, if we have three groups of 10 samples, with a
-        // `keep_perc' of 0.7, we meet the nan percentage if in any of the three
-        // groups we have at least 7 features being matched.
-        // TODO: ...
-        bool nan_criteria_met = false;
-        if (nan_criteria_met) {
-            clusters.push_back(cluster);
-        }
+        clusters.push_back(cluster);
     }
 
     return clusters;
@@ -485,170 +500,178 @@ std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
     // 6.- GOTO 2
     // 7.- Once done, go back to peak lists to find undetected features.
 
-    // Find the total number of features.
-    uint64_t num_features = 0;
-    for (const auto& input_set : input_sets) {
-        num_features += input_set.features.size();
-    }
+    // // Find the total number of features.
+    // uint64_t num_features = 0;
+    // for (const auto& input_set : input_sets) {
+    //     num_features += input_set.features.size();
+    // }
 
-    // Create an index of the features in each file sorted by retention time in
-    // ascending order.
-    auto retention_time_index =
-        std::vector<std::vector<Search::KeySort<double>>>(input_sets.size());
+    // // Create an index of the features in each file sorted by retention time
+    // in
+    // // ascending order.
+    // auto retention_time_index =
+    //     std::vector<std::vector<Search::KeySort<double>>>(input_sets.size());
 
-    // Keep track of which features are available, i.e. features that have not
-    // been assigned a cluster yet.
-    //     true: feature has been used
-    //     false: feature have not been used
-    auto availability_index = std::vector<std::vector<bool>>(input_sets.size());
+    // // Keep track of which features are available, i.e. features that have
+    // not
+    // // been assigned a cluster yet.
+    // //     true: feature has been used
+    // //     false: feature have not been used
+    // auto availability_index =
+    // std::vector<std::vector<bool>>(input_sets.size());
 
-    // We need to index the features to sort by descending intensity to
-    // prioritize the next initial candidate.
-    // FIXME: The name `file_id` might be confusing. Maybe `sample_id` is more
-    // clear.
-    struct Index {
-        uint64_t file_id;
-        uint64_t feature_id;
-        double total_intensity;
-    };
-    auto feature_indexes = std::vector<Index>(num_features);
+    // // We need to index the features to sort by descending intensity to
+    // // prioritize the next initial candidate.
+    // // FIXME: The name `file_id` might be confusing. Maybe `sample_id` is
+    // more
+    // // clear.
+    // struct Index {
+    //     uint64_t file_id;
+    //     uint64_t feature_id;
+    //     double total_intensity;
+    // };
+    // auto feature_indexes = std::vector<Index>(num_features);
 
-    // Build the index objects.
-    size_t k = 0;
-    for (size_t i = 0; i < input_sets.size(); ++i) {
-        const auto& features = input_sets[i].features;
-        retention_time_index[i] =
-            std::vector<Search::KeySort<double>>(features.size());
-        availability_index[i] = std::vector<bool>(features.size());
-        for (size_t j = 0; j < features.size(); ++j, ++k) {
-            feature_indexes[k].file_id = i;
-            feature_indexes[k].feature_id = j;
-            feature_indexes[k].total_intensity = features[j].total_height;
-            retention_time_index[i][j] = {
-                j, features[j].average_rt + features[j].average_rt_delta};
-        }
-        std::sort(retention_time_index[i].begin(),
-                  retention_time_index[i].end(),
-                  [](auto a, auto b) { return a.sorting_key < b.sorting_key; });
-    }
-    std::sort(feature_indexes.begin(), feature_indexes.end(),
-              [](auto a, auto b) -> bool {
-                  return a.total_intensity > b.total_intensity;
-              });
+    // // Build the index objects.
+    // size_t k = 0;
+    // for (size_t i = 0; i < input_sets.size(); ++i) {
+    //     const auto& features = input_sets[i].features;
+    //     retention_time_index[i] =
+    //         std::vector<Search::KeySort<double>>(features.size());
+    //     availability_index[i] = std::vector<bool>(features.size());
+    //     for (size_t j = 0; j < features.size(); ++j, ++k) {
+    //         feature_indexes[k].file_id = i;
+    //         feature_indexes[k].feature_id = j;
+    //         feature_indexes[k].total_intensity = features[j].total_height;
+    //         retention_time_index[i][j] = {
+    //             j, features[j].average_rt + features[j].average_rt_delta};
+    //     }
+    //     std::sort(retention_time_index[i].begin(),
+    //               retention_time_index[i].end(),
+    //               [](auto a, auto b) { return a.sorting_key < b.sorting_key;
+    //               });
+    // }
+    // std::sort(feature_indexes.begin(), feature_indexes.end(),
+    //           [](auto a, auto b) -> bool {
+    //               return a.total_intensity > b.total_intensity;
+    //           });
 
-    for (const auto& index : feature_indexes) {
-        // Find the next available reference feature.
-        size_t ref_file_id = index.file_id;
-        size_t ref_feature_id = index.feature_id;
-        if (availability_index[ref_file_id][ref_feature_id]) {
-            continue;
-        }
-        const auto& ref = input_sets[ref_file_id].features[ref_feature_id];
+    // for (const auto& index : feature_indexes) {
+    //     // Find the next available reference feature.
+    //     size_t ref_file_id = index.file_id;
+    //     size_t ref_feature_id = index.feature_id;
+    //     if (availability_index[ref_file_id][ref_feature_id]) {
+    //         continue;
+    //     }
+    //     const auto& ref = input_sets[ref_file_id].features[ref_feature_id];
 
-        // Get the peaks corresponding with the reference feature.
-        std::vector<Centroid::Peak> ref_peaks;
-        for (const auto& peak_id : ref.peak_ids) {
-            ref_peaks.push_back(input_sets[ref_file_id].peaks[peak_id]);
-        }
+    //     // Get the peaks corresponding with the reference feature.
+    //     std::vector<Centroid::Peak> ref_peaks;
+    //     for (const auto& peak_id : ref.peak_ids) {
+    //         ref_peaks.push_back(input_sets[ref_file_id].peaks[peak_id]);
+    //     }
 
-        // Calculate ROI.
-        double min_mz = ref_peaks[0].fitted_mz - 3 * ref.average_mz_sigma;
-        double max_mz = ref_peaks[ref_peaks.size() - 1].fitted_mz +
-                        3 * ref.average_mz_sigma;
-        double min_rt =
-            ref.average_rt + ref.average_rt_delta - 3 * ref.average_rt_sigma;
-        double max_rt =
-            ref.average_rt + ref.average_rt_delta + 3 * ref.average_rt_sigma;
+    //     // Calculate ROI.
+    //     double min_mz = ref_peaks[0].fitted_mz - 3 * ref.average_mz_sigma;
+    //     double max_mz = ref_peaks[ref_peaks.size() - 1].fitted_mz +
+    //                     3 * ref.average_mz_sigma;
+    //     double min_rt =
+    //         ref.average_rt + ref.average_rt_delta - 3 * ref.average_rt_sigma;
+    //     double max_rt =
+    //         ref.average_rt + ref.average_rt_delta + 3 * ref.average_rt_sigma;
 
-        // Find the maximally similar feature in the rest of the files within
-        // the ROI.
-        std::vector<FeatureDetection::Feature*> clustered_features(
-            input_sets.size());
-        for (size_t file_id = 0; file_id < input_sets.size(); ++file_id) {
-            if (ref_file_id == file_id) {
-                clustered_features[file_id] =
-                    &input_sets[ref_file_id].features[ref_feature_id];
-                continue;
-            }
-            const auto& input_set = input_sets[file_id];
-            auto& features = input_set.features;
-            size_t min_j =
-                Search::lower_bound(retention_time_index[file_id], min_rt);
-            size_t max_j = retention_time_index[file_id].size();
-            double prev_cum_overlap = 0;
-            for (size_t j = min_j; j < max_j; ++j) {
-                auto feature_id = retention_time_index[file_id][j].index;
-                if (retention_time_index[file_id][j].sorting_key > max_rt) {
-                    break;
-                }
-                if (availability_index[file_id][feature_id]) {
-                    continue;
-                }
-                auto& feature = features[feature_id];
-                double mz = feature.average_mz;
-                double sigma_mz = feature.average_mz_sigma;
+    //     // Find the maximally similar feature in the rest of the files within
+    //     // the ROI.
+    //     std::vector<FeatureDetection::Feature*> clustered_features(
+    //         input_sets.size());
+    //     for (size_t file_id = 0; file_id < input_sets.size(); ++file_id) {
+    //         if (ref_file_id == file_id) {
+    //             clustered_features[file_id] =
+    //                 &input_sets[ref_file_id].features[ref_feature_id];
+    //             continue;
+    //         }
+    //         const auto& input_set = input_sets[file_id];
+    //         auto& features = input_set.features;
+    //         size_t min_j =
+    //             Search::lower_bound(retention_time_index[file_id], min_rt);
+    //         size_t max_j = retention_time_index[file_id].size();
+    //         double prev_cum_overlap = 0;
+    //         for (size_t j = min_j; j < max_j; ++j) {
+    //             auto feature_id = retention_time_index[file_id][j].index;
+    //             if (retention_time_index[file_id][j].sorting_key > max_rt) {
+    //                 break;
+    //             }
+    //             if (availability_index[file_id][feature_id]) {
+    //                 continue;
+    //             }
+    //             auto& feature = features[feature_id];
+    //             double mz = feature.average_mz;
+    //             double sigma_mz = feature.average_mz_sigma;
 
-                if ((mz + sigma_mz * 3) < min_mz ||
-                    (mz - sigma_mz * 3) > max_mz) {
-                    continue;
-                }
+    //             if ((mz + sigma_mz * 3) < min_mz ||
+    //                 (mz - sigma_mz * 3) > max_mz) {
+    //                 continue;
+    //             }
 
-                // Feature is within ROI. Calculate gaussian overlap of the
-                // peaks from this feature with the reference feature. We will
-                // keep the feature that maximizes the overlap with the
-                // reference.
-                std::vector<Centroid::Peak> feature_peaks;
-                for (const auto& peak_id : feature.peak_ids) {
-                    auto peak = input_sets[file_id].peaks[peak_id];
-                    feature_peaks.push_back(peak);
-                }
-                double cum_overlap =
-                    Centroid::cumulative_overlap(ref_peaks, feature_peaks);
-                if (cum_overlap > prev_cum_overlap) {
-                    prev_cum_overlap = cum_overlap;
-                    clustered_features[file_id] = &feature;
-                }
-            }
-        }
+    //             // Feature is within ROI. Calculate gaussian overlap of the
+    //             // peaks from this feature with the reference feature. We
+    //             will
+    //             // keep the feature that maximizes the overlap with the
+    //             // reference.
+    //             std::vector<Centroid::Peak> feature_peaks;
+    //             for (const auto& peak_id : feature.peak_ids) {
+    //                 auto peak = input_sets[file_id].peaks[peak_id];
+    //                 feature_peaks.push_back(peak);
+    //             }
+    //             double cum_overlap =
+    //                 Centroid::cumulative_overlap(ref_peaks, feature_peaks);
+    //             if (cum_overlap > prev_cum_overlap) {
+    //                 prev_cum_overlap = cum_overlap;
+    //                 clustered_features[file_id] = &feature;
+    //             }
+    //         }
+    //     }
 
-        MetaMatch::FeatureCluster cluster = {};
-        cluster.mz = 0.0;
-        cluster.rt = 0.0;
-        cluster.avg_height = 0.0;
-        cluster.file_heights = std::vector<double>(clustered_features.size());
-        for (size_t file_id = 0; file_id < clustered_features.size();
-             ++file_id) {
-            const auto& feature = clustered_features[file_id];
-            if (feature == nullptr) {
-                continue;
-            }
-            // FIXME: feature->id is UB if indices are not sequencial starting
-            // at 0.
-            // Mark the selected features as not available.
-            availability_index[file_id][feature->id] = true;
-            // Build cluster object.
-            cluster.mz += feature->average_mz;
-            cluster.rt += feature->average_rt;
-            cluster.file_heights[file_id] = feature->total_height;
-            cluster.avg_height += feature->total_height;
-            cluster.feature_ids.push_back({file_id, feature->id});
-        }
-        if (cluster.feature_ids.size() <= 1) {
-            continue;
-        }
-        cluster.mz /= cluster.feature_ids.size();
-        cluster.rt /= cluster.feature_ids.size();
-        cluster.avg_height /= cluster.feature_ids.size();
-        cluster.charge_state = ref.charge_state;
-        if (cluster.mz != 0 && cluster.rt != 0) {
-            clusters.push_back(cluster);
-        }
-    }
+    //     MetaMatch::FeatureCluster cluster = {};
+    //     cluster.mz = 0.0;
+    //     cluster.rt = 0.0;
+    //     cluster.avg_height = 0.0;
+    //     cluster.file_heights =
+    //     std::vector<double>(clustered_features.size()); for (size_t file_id =
+    //     0; file_id < clustered_features.size();
+    //          ++file_id) {
+    //         const auto& feature = clustered_features[file_id];
+    //         if (feature == nullptr) {
+    //             continue;
+    //         }
+    //         // FIXME: feature->id is UB if indices are not sequencial
+    //         starting
+    //         // at 0.
+    //         // Mark the selected features as not available.
+    //         availability_index[file_id][feature->id] = true;
+    //         // Build cluster object.
+    //         cluster.mz += feature->average_mz;
+    //         cluster.rt += feature->average_rt;
+    //         cluster.file_heights[file_id] = feature->total_height;
+    //         cluster.avg_height += feature->total_height;
+    //         cluster.feature_ids.push_back({file_id, feature->id});
+    //     }
+    //     if (cluster.feature_ids.size() <= 1) {
+    //         continue;
+    //     }
+    //     cluster.mz /= cluster.feature_ids.size();
+    //     cluster.rt /= cluster.feature_ids.size();
+    //     cluster.avg_height /= cluster.feature_ids.size();
+    //     cluster.charge_state = ref.charge_state;
+    //     if (cluster.mz != 0 && cluster.rt != 0) {
+    //         clusters.push_back(cluster);
+    //     }
+    // }
 
-    // Assign ids to clusters.
-    for (size_t i = 0; i < clusters.size(); ++i) {
-        clusters[i].id = i;
-    }
+    // // Assign ids to clusters.
+    // for (size_t i = 0; i < clusters.size(); ++i) {
+    //     clusters[i].id = i;
+    // }
 
     return clusters;
 }
