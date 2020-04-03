@@ -803,7 +803,7 @@ struct MetaMatchResults {
 MetaMatchResults perform_metamatch(
     // NOTE: [(class_0, peaks_0),...(class_i, peaks_i)]
     std::vector<std::tuple<uint32_t, std::vector<Centroid::Peak>>> input,
-    double radius_mz, double radius_rt, double fraction) {
+    double fraction) {
     MetaMatchResults results;
 
     // Create the ClassMaps.
@@ -830,12 +830,8 @@ MetaMatchResults perform_metamatch(
         }
         ++file_id;
     }
-    MetaMatch::Parameters parameters = {};
-    parameters.radius_mz = radius_mz;
-    parameters.radius_rt = radius_rt;
-    parameters.class_maps = class_maps;
 
-    MetaMatch::find_clusters(metapeaks, parameters);
+    MetaMatch::find_clusters(metapeaks, class_maps);
     results.orphans = MetaMatch::extract_orphans(metapeaks);
     results.clusters = MetaMatch::reduce_cluster(metapeaks, file_id);
 
@@ -1409,7 +1405,7 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("feature_clusters"), py::arg("file_name"))
         .def("perform_metamatch", &PythonAPI::perform_metamatch,
              "Perform metamatch for peak matching", py::arg("input"),
-             py::arg("radius_mz"), py::arg("radius_rt"), py::arg("fraction"))
+             py::arg("fraction"))
         .def("find_feature_clusters", &PythonAPI::find_feature_clusters,
              "Perform metamatch for feature matching", py::arg("group_ids"),
              py::arg("peaks"), py::arg("features"))

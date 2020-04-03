@@ -5,17 +5,25 @@
 #include "metamatch/metamatch.hpp"
 
 void calculate_cluster_pos(double& cluster_mz, double& cluster_rt,
+                           double& cluster_sigma_mz, double& cluster_sigma_rt,
                            std::vector<MetaMatch::Peak>& peaks,
                            std::vector<size_t>& metapeak_indexes) {
-    double x_sum = 0;
-    double y_sum = 0;
+    double avg_mz = 0;
+    double avg_rt = 0;
+    double avg_sigma_mz = 0;
+    double avg_sigma_rt = 0;
     double height_sum = 0;
     for (const auto& index : metapeak_indexes) {
         double mz = peaks[index].fitted_mz;
         double rt = peaks[index].fitted_rt + peaks[index].rt_delta;
-        x_sum += mz * peaks[index].fitted_height;
-        y_sum += rt * peaks[index].fitted_height;
-        height_sum += peaks[index].fitted_height;
+        double sigma_mz = peaks[index].fitted_sigma_mz;
+        double sigma_rt = peaks[index].fitted_sigma_rt;
+        double height = peaks[index].fitted_height;
+        avg_mz += mz * height;
+        avg_rt += rt * height;
+        avg_sigma_mz += sigma_mz * height;
+        avg_sigma_rt += sigma_rt * height;
+        height_sum += height;
 
         // NOTE(alex): This is a weighted average, it might cause problems if
         // the overall intensity between the files are very different (The
@@ -23,19 +31,21 @@ void calculate_cluster_pos(double& cluster_mz, double& cluster_rt,
         // intensity). If instead of a weighted average we want a density
         // average we could use the following:
         //
-        //     x_sum += peaks[index].fitted_mz;
-        //     y_sum += peaks[index].fitted_rt;
+        //     avg_mz += peaks[index].fitted_mz;
+        //     avg_rt += peaks[index].fitted_rt;
         //     height_sum += 1;
         //
         // This might have a problem where the noise could have a greater impact
         // in the position of the centroid.
     }
-    cluster_mz = x_sum / height_sum;
-    cluster_rt = y_sum / height_sum;
+    cluster_mz = avg_mz / height_sum;
+    cluster_rt = avg_rt / height_sum;
+    cluster_sigma_mz = avg_sigma_mz / height_sum;
+    cluster_sigma_rt = avg_sigma_rt / height_sum;
 }
 
 void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
-                              const MetaMatch::Parameters& parameters) {
+                              const std::vector<ClassMap>& class_maps) {
     auto sort_peaks = [](auto p1, auto p2) -> bool {
         double p1_mz = p1.fitted_mz;
         double p2_mz = p2.fitted_mz;
@@ -55,23 +65,26 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
         // Calculate initial centroid stats.
         double cluster_mz = 0;
         double cluster_rt = 0;
+        double cluster_sigma_mz = 0;
+        double cluster_sigma_rt = 0;
         std::vector<size_t> metapeak_indexes = {i};
         peaks[i].cluster_id = cluster_id;
-        calculate_cluster_pos(cluster_mz, cluster_rt, peaks, metapeak_indexes);
+        calculate_cluster_pos(cluster_mz, cluster_rt, cluster_sigma_mz,
+                              cluster_sigma_rt, peaks, metapeak_indexes);
 
         for (size_t j = (i + 1); j < peaks.size(); ++j) {
             // Since we know that the peaks are sorted monotonically in mz and
             // then rt, in order to calculate the maximum potential j we only
             // need to find the point where the peak.fitted_mz is above the
             // cluster radius.
-            if (peaks[j].fitted_mz > cluster_mz + parameters.radius_mz) {
+            if (peaks[j].fitted_mz > cluster_mz + cluster_sigma_mz) {
                 break;
             }
             double peak_mz = peaks[j].fitted_mz;
             double peak_rt = peaks[j].fitted_rt + peaks[j].rt_delta;
             if (peaks[j].cluster_id == -1 &&
-                (peak_mz < cluster_mz + parameters.radius_mz &&
-                 peak_rt < cluster_rt + parameters.radius_rt)) {
+                (peak_mz < cluster_mz + cluster_sigma_mz &&
+                 peak_rt < cluster_rt + cluster_sigma_rt)) {
                 // If the cluster already contains a peak from the same file as
                 // peaks[j], check if height of said peak is greater than
                 // peaks[j].fitted_height, if it is, swap the index,
@@ -95,7 +108,8 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
                     peaks[j].cluster_id = cluster_id;
                     metapeak_indexes.push_back(j);
                 }
-                calculate_cluster_pos(cluster_mz, cluster_rt, peaks,
+                calculate_cluster_pos(cluster_mz, cluster_rt, cluster_sigma_mz,
+                                      cluster_sigma_rt, peaks,
                                       metapeak_indexes);
 
                 // Cull far peaks.
@@ -104,14 +118,15 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
                     double peak_mz = peaks[index].fitted_mz;
                     double peak_rt =
                         peaks[index].fitted_rt + peaks[index].rt_delta;
-                    if (peak_mz > cluster_mz + parameters.radius_mz ||
-                        peak_mz < cluster_mz - parameters.radius_mz ||
-                        peak_rt > cluster_rt + parameters.radius_rt ||
-                        peak_rt < cluster_rt - parameters.radius_rt) {
+                    if (peak_mz > cluster_mz + cluster_sigma_mz ||
+                        peak_mz < cluster_mz - cluster_sigma_mz ||
+                        peak_rt > cluster_rt + cluster_sigma_rt ||
+                        peak_rt < cluster_rt - cluster_sigma_rt) {
                         peaks[index].cluster_id = -1;
                         metapeak_indexes.erase(metapeak_indexes.begin() + k);
-                        calculate_cluster_pos(cluster_mz, cluster_rt, peaks,
-                                              metapeak_indexes);
+                        calculate_cluster_pos(
+                            cluster_mz, cluster_rt, cluster_sigma_mz,
+                            cluster_sigma_rt, peaks, metapeak_indexes);
                     }
                 }
             }
@@ -119,11 +134,11 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
 
         // Check if there is enough hits from a class in order to consider the
         // cluster valid.
-        std::vector<size_t> class_hits(parameters.class_maps.size());
+        std::vector<size_t> class_hits(class_maps.size());
         for (const auto& index : metapeak_indexes) {
             const auto& peak = peaks[index];
             for (size_t k = 0; k < class_hits.size(); ++k) {
-                if (peak.class_id == parameters.class_maps[k].id) {
+                if (peak.class_id == class_maps[k].id) {
                     class_hits[k] += 1;
                     break;
                 }
@@ -132,8 +147,7 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
         bool fraction_achieved = false;
         for (size_t k = 0; k < class_hits.size(); ++k) {
             const auto& n_hits = class_hits[k];
-            if (n_hits >= parameters.class_maps[k].required_hits &&
-                n_hits != 0) {
+            if (n_hits >= class_maps[k].required_hits && n_hits != 0) {
                 fraction_achieved = true;
                 break;
             }

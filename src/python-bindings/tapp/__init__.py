@@ -463,8 +463,6 @@ def default_parameters(instrument, avg_fwhm_rt):
             'warp2d_rt_expand_factor': 0.2,
             'warp2d_peaks_per_window': 100,
             # MetaMatch.
-            'metamatch_radius_mz': 0.005,
-            'metamatch_radius_rt': avg_fwhm_rt/2,
             'metamatch_fraction': 0.7,
             # Feature detection.
             'feature_detection_charge_states': [5, 4, 3, 2, 1],
@@ -1042,8 +1040,6 @@ def dda_pipeline(
 
         metamatch_results = tapp.perform_metamatch(
             metamatch_input,
-            tapp_parameters['metamatch_radius_mz'],
-            tapp_parameters['metamatch_radius_rt'],
             tapp_parameters['metamatch_fraction'])
 
         # Save metamatch results to disk.

@@ -20,13 +20,6 @@ struct ClassMap {
     uint32_t required_hits;
 };
 
-// TODO(alex): Currently we don't use adaptative mz radius.
-struct Parameters {
-    double radius_mz;
-    double radius_rt;
-    std::vector<ClassMap> class_maps;
-};
-
 // A MetaMatch::Peak is an extension of Centroid::Peak that allow us to store
 // the necessary information for the clustering algorithm.
 // FIXME: This might be overkill, I must find a better way of doing this.
@@ -102,7 +95,7 @@ std::vector<FeatureCluster> find_feature_clusters(
 // given peaks array in place, changing the order and the clustering
 // information.
 void find_clusters(std::vector<MetaMatch::Peak>& peaks,
-                   const MetaMatch::Parameters& parameters);
+                   const std::vector<ClassMap>& class_maps);
 
 // Returns the orphan peaks and remove them from the given peaks array.
 std::vector<MetaMatch::Peak> extract_orphans(
