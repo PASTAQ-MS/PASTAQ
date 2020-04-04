@@ -278,25 +278,33 @@ double find_feature_overlap(std::vector<Centroid::Peak*>& A,
     if (A.empty() || B.empty()) {
         return 0;
     }
+    // NOTE: Exp 5?
     // FIXME: Currently using maximum cumulative overlap for simplicity. Test
     // with this first, but I want to be able to set a minimum threshold of
     // matching before considering features. For that, the cosine similarity
     // makes more sense, but the vectors need to be aligned before.
-    std::vector<Centroid::Peak> peaks_a;
-    for (auto peak : A) {
-        peaks_a.push_back(*peak);
-    }
-    std::vector<Centroid::Peak> peaks_b;
-    for (auto peak : B) {
-        peaks_b.push_back(*peak);
-    }
+    // std::vector<Centroid::Peak> peaks_a;
+    // for (auto peak : A) {
+    //     peaks_a.push_back(*peak);
+    // }
+    // std::vector<Centroid::Peak> peaks_b;
+    // for (auto peak : B) {
+    //     peaks_b.push_back(*peak);
+    // }
+
+    // return Centroid::cumulative_overlap(peaks_a, peaks_b);
+
+    // NOTE: Exp 8?
+    std::vector<Centroid::Peak> peaks_a = {*A[0]};
+    std::vector<Centroid::Peak> peaks_b = {*B[0]};
 
     return Centroid::cumulative_overlap(peaks_a, peaks_b);
 
     // NOTE: We assume A belongs to the reference peaks, and use the
     // monoisotopic peak as a reference for the tolerance range.
-    double mz_tol = A[0]->fitted_sigma_mz * 3;
+    // double mz_tol = A[0]->fitted_sigma_mz * 3;
 
+    // NOTE: Exp 7?
     // Calculate the norms for both vectors.
     double norm_a = 0;
     for (const auto& peak : A) {
@@ -341,14 +349,14 @@ double find_feature_overlap(std::vector<Centroid::Peak*>& A,
             double peak_b_mz = peak_b->fitted_mz;
             double peak_a_rt = peak_a->fitted_rt + peak_a->rt_delta;
             double peak_b_rt = peak_b->fitted_rt + peak_b->rt_delta;
-            double min_rt_a = peak_a_rt - 3 * peak_a->fitted_sigma_rt;
-            double max_rt_a = peak_a_rt + 3 * peak_a->fitted_sigma_rt;
-            double min_mz_a = peak_a_mz - 3 * peak_a->fitted_sigma_mz;
-            double max_mz_a = peak_a_mz + 3 * peak_a->fitted_sigma_mz;
-            double min_rt_b = peak_b_rt - 3 * peak_b->fitted_sigma_rt;
-            double max_rt_b = peak_b_rt + 3 * peak_b->fitted_sigma_rt;
-            double min_mz_b = peak_b_mz - 3 * peak_b->fitted_sigma_mz;
-            double max_mz_b = peak_b_mz + 3 * peak_b->fitted_sigma_mz;
+            double min_rt_a = peak_a_rt - peak_a->fitted_sigma_rt;
+            double max_rt_a = peak_a_rt + peak_a->fitted_sigma_rt;
+            double min_mz_a = peak_a_mz - peak_a->fitted_sigma_mz;
+            double max_mz_a = peak_a_mz + peak_a->fitted_sigma_mz;
+            double min_rt_b = peak_b_rt - peak_b->fitted_sigma_rt;
+            double max_rt_b = peak_b_rt + peak_b->fitted_sigma_rt;
+            double min_mz_b = peak_b_mz - peak_b->fitted_sigma_mz;
+            double max_mz_b = peak_b_mz + peak_b->fitted_sigma_mz;
 
             if (max_rt_a < min_rt_b || max_rt_b < min_rt_a ||
                 max_mz_a < min_mz_b || max_mz_b < min_mz_a) {
@@ -386,9 +394,12 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
             std::vector<bool>(input_set.features.size(), true);
         feature_lists[i] = std::vector<Index>(input_set.features.size());
         for (size_t j = 0; j < input_set.features.size(); ++j) {
-            feature_lists[i][j] = {i, input_set.group_id, j,
-                                   input_set.features[j].average_rt,
-                                   input_set.features[j].total_volume};
+            feature_lists[i][j] = {
+                i, input_set.group_id, j,
+                input_set.features[j].average_rt +
+                    input_set.features[j].average_rt_delta,
+                input_set.features[j].total_volume};  // TODO: Should this be
+                                                      // total_height or other?
         }
         // Copy feature_lists[i] to the end of all_features.
         all_features.insert(all_features.end(), feature_lists[i].begin(),
@@ -420,31 +431,28 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
     std::vector<MetaMatch::FeatureCluster> clusters;
     size_t cluster_counter = 0;
     for (size_t i = 0; i < all_features.size(); ++i) {
-        auto& ref_feature_index = all_features[i];
-        auto ref_file_index = ref_feature_index.file_index;
-        auto feature_index = ref_feature_index.feature_index;
+        auto ref_file_index = all_features[i].file_index;
+        auto ref_feature_index = all_features[i].feature_index;
         // Check availability.
-        if (!available_features[ref_file_index][feature_index]) {
+        if (!available_features[ref_file_index][ref_feature_index]) {
             continue;
         }
         // Get the peaks for the reference feature.
-        auto& ref_feature = input_sets[ref_file_index].features[feature_index];
-        auto ref_peaks =
-            peaks_from_feature(ref_feature, input_sets[ref_file_index].peaks);
-        if (ref_peaks.empty()) {
-            continue;
-        }
+        auto& ref_feature =
+            input_sets[ref_file_index].features[ref_feature_index];
 
         // Calculate the boundary region for this feature.
-        size_t n = ref_peaks.size();
+        // TODO: Mono instead of average???
         double ref_min_mz =
-            ref_peaks[0]->fitted_mz - 3 * ref_peaks[0]->fitted_sigma_mz;
+            ref_feature.monoisotopic_mz - ref_feature.average_mz_sigma;
         double ref_max_mz =
-            ref_peaks[n - 1]->fitted_mz + 3 * ref_peaks[0]->fitted_sigma_mz;
-        double ref_min_rt =
-            ref_feature.average_rt - 3 * ref_feature.average_rt_sigma;
-        double ref_max_rt =
-            ref_feature.average_rt + 3 * ref_feature.average_rt_sigma;
+            ref_feature.monoisotopic_mz + ref_feature.average_mz_sigma;
+        double ref_min_rt = ref_feature.average_rt +
+                            ref_feature.average_rt_delta -
+                            ref_feature.average_rt_sigma;
+        double ref_max_rt = ref_feature.average_rt +
+                            ref_feature.average_rt_delta +
+                            ref_feature.average_rt_sigma;
 
         // NOTE: Currently storing the feature index instead of the the feature
         // ids for performance. If we are to keep this cluster, this should be
@@ -492,23 +500,18 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
                 // of boundaries to determine if two features are in range for
                 // further processing.
                 if (feature.charge_state != ref_feature.charge_state ||
-                    feature.average_mz < ref_min_mz ||
-                    feature.average_mz > ref_max_mz ||
+                    feature.monoisotopic_mz < ref_min_mz ||
+                    feature.monoisotopic_mz > ref_max_mz ||
                     !available_features[j][feature_index]) {
-                    continue;
-                }
-
-                // Find the peaks for this feature.
-                auto feature_peaks =
-                    peaks_from_feature(feature, input_set.peaks);
-                if (feature_peaks.empty()) {
                     continue;
                 }
 
                 // Check the overlap between the reference and this feature.
                 // If the overlap is greater than the previous one, swap it.
-                double overlap = find_feature_overlap(ref_peaks, feature_peaks,
-                                                      ref_feature.charge_state);
+                // double overlap = find_feature_overlap(ref_peaks,
+                // feature_peaks,
+                //                                       ref_feature.charge_state);
+                double overlap = feature.total_height;
                 if (overlap > best_overlap) {
                     best_overlap = overlap;
                     best_index = feature_index;
@@ -518,12 +521,12 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
                 features_in_cluster.push_back({j, best_index});
                 ++cluster_groups[input_set.group_id];
                 auto& feature = input_set.features[best_index];
-                cluster.total_heights[j] = (feature.total_height);
-                cluster.monoisotopic_heights[j] = (feature.monoisotopic_height);
-                cluster.max_heights[j] = (feature.max_height);
-                cluster.total_volumes[j] = (feature.total_volume);
-                cluster.monoisotopic_volumes[j] = (feature.monoisotopic_volume);
-                cluster.max_volumes[j] = (feature.max_volume);
+                cluster.total_heights[j] = feature.total_height;
+                cluster.monoisotopic_heights[j] = feature.monoisotopic_height;
+                cluster.max_heights[j] = feature.max_height;
+                cluster.total_volumes[j] = feature.total_volume;
+                cluster.monoisotopic_volumes[j] = feature.monoisotopic_volume;
+                cluster.max_volumes[j] = feature.max_volume;
             }
         }
         if (features_in_cluster.size() < 2) {
@@ -565,7 +568,7 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
             cluster.feature_ids.push_back(feature_id);
 
             // Store some statistics about the cluster.
-            cluster.mz += feature.average_mz;
+            cluster.mz += feature.monoisotopic_mz;
             cluster.rt += feature.average_rt + feature.average_rt_delta;
             cluster.avg_total_height += feature.total_height;
             cluster.avg_monoisotopic_height += feature.monoisotopic_height;

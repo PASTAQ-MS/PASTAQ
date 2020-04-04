@@ -1531,8 +1531,18 @@ def dda_pipeline(
     logger.info("Reading feature clusters from disk")
     in_path_feature_clusters = os.path.join(
         output_dir, 'metamatch', 'features.clusters')
-    out_path_feature_clusters_height = os.path.join(output_dir, 'quant',
-                                                    "feature_clusters_height.csv")
+    out_path_feature_clusters_total_height = os.path.join(output_dir, 'quant',
+                                                          "feature_clusters_total_height.csv")
+    out_path_feature_clusters_monoisotopic_height = os.path.join(output_dir, 'quant',
+                                                                 "feature_clusters_monoisotopic_height.csv")
+    out_path_feature_clusters_max_height = os.path.join(output_dir, 'quant',
+                                                        "feature_clusters_max_height.csv")
+    out_path_feature_clusters_total_volume = os.path.join(output_dir, 'quant',
+                                                          "feature_clusters_total_volume.csv")
+    out_path_feature_clusters_monoisotopic_volume = os.path.join(output_dir, 'quant',
+                                                                 "feature_clusters_monoisotopic_volume.csv")
+    out_path_feature_clusters_max_volume = os.path.join(output_dir, 'quant',
+                                                        "feature_clusters_max_volume.csv")
     out_path_feature_clusters_metadata = os.path.join(output_dir, 'quant',
                                                       "feature_clusters_metadata.csv")
     out_path_feature_clusters_features = os.path.join(output_dir, 'quant',
@@ -1542,7 +1552,7 @@ def dda_pipeline(
     out_path_feature_clusters_annotations_all = os.path.join(output_dir, 'quant',
                                                              "feature_clusters_annotations_all.csv")
 
-    if (not os.path.exists(out_path_feature_clusters_height) or override_existing):
+    if (not os.path.exists(out_path_feature_clusters_metadata) or override_existing):
         feature_clusters = tapp.read_feature_clusters(
             in_path_feature_clusters)
         logger.info("Generating feature clusters quantitative table")
@@ -1550,17 +1560,63 @@ def dda_pipeline(
             'cluster_id': [cluster.id for cluster in feature_clusters],
             'mz': [cluster.mz for cluster in feature_clusters],
             'rt': [cluster.rt for cluster in feature_clusters],
-            'avg_total_height': [cluster.avg_total_height for cluster in feature_clusters],
+            'avg_height': [cluster.avg_total_height for cluster in feature_clusters],
             'charge_state': [cluster.charge_state for cluster in feature_clusters],
         })
-        feature_clusters_df = pd.DataFrame({
+        # Quantitative tables.
+        # Height.
+        feature_clusters_total_heights = pd.DataFrame({
             'cluster_id': [cluster.id for cluster in feature_clusters],
         })
         for i, stem in enumerate(input_stems):
-            feature_clusters_df[stem] = [cluster.total_heights[i]
-                                         for cluster in feature_clusters]
-        feature_clusters_df.to_csv(
-            out_path_feature_clusters_height, index=False)
+            feature_clusters_total_heights[stem] = [cluster.total_heights[i]
+                                                    for cluster in feature_clusters]
+        feature_clusters_total_heights.to_csv(
+            out_path_feature_clusters_total_height, index=False)
+
+        feature_clusters_monoisotopic_heights = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in feature_clusters],
+        })
+        for i, stem in enumerate(input_stems):
+            feature_clusters_monoisotopic_heights[stem] = [cluster.monoisotopic_heights[i]
+                                                           for cluster in feature_clusters]
+        feature_clusters_monoisotopic_heights.to_csv(
+            out_path_feature_clusters_monoisotopic_height, index=False)
+        feature_clusters_max_heights = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in feature_clusters],
+        })
+        for i, stem in enumerate(input_stems):
+            feature_clusters_max_heights[stem] = [cluster.max_heights[i]
+                                                  for cluster in feature_clusters]
+        feature_clusters_max_heights.to_csv(
+            out_path_feature_clusters_max_height, index=False)
+        # Volume.
+        feature_clusters_total_volumes = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in feature_clusters],
+        })
+        for i, stem in enumerate(input_stems):
+            feature_clusters_total_volumes[stem] = [cluster.total_volumes[i]
+                                                    for cluster in feature_clusters]
+        feature_clusters_total_volumes.to_csv(
+            out_path_feature_clusters_total_volume, index=False)
+
+        feature_clusters_monoisotopic_volumes = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in feature_clusters],
+        })
+        for i, stem in enumerate(input_stems):
+            feature_clusters_monoisotopic_volumes[stem] = [cluster.monoisotopic_volumes[i]
+                                                           for cluster in feature_clusters]
+        feature_clusters_monoisotopic_volumes.to_csv(
+            out_path_feature_clusters_monoisotopic_volume, index=False)
+        feature_clusters_max_volumes = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in feature_clusters],
+        })
+        for i, stem in enumerate(input_stems):
+            feature_clusters_max_volumes[stem] = [cluster.max_volumes[i]
+                                                  for cluster in feature_clusters]
+        feature_clusters_max_volumes.to_csv(
+            out_path_feature_clusters_max_volume, index=False)
+        # Metadata.
         feature_clusters_metadata.to_csv(
             out_path_feature_clusters_metadata, index=False)
 
