@@ -1177,7 +1177,6 @@ def dda_pipeline(
     logger.info('Starting metamatch on features')
     time_start = time.time()
     in_path_features = os.path.join(output_dir, 'features')
-    in_path_peaks = os.path.join(output_dir, 'warped_peaks')
     out_path = os.path.join(output_dir, 'metamatch', "features.clusters")
     if (not os.path.exists(out_path) or override_existing):
         logger.info("Reading features from disk")
@@ -1186,14 +1185,9 @@ def dda_pipeline(
                 os.path.join(in_path_features, "{}.features".format(input_stem)))
             for input_stem in input_stems]
 
-        logger.info("Reading peaks from disk")
-        peaks = [
-            tapp.read_peaks(
-                os.path.join(in_path_peaks, "{}.peaks".format(input_stem)))
-            for input_stem in input_stems]
-
         logger.info("Finding feature clusters")
-        feature_clusters = tapp.find_feature_clusters(groups, peaks, features)
+        feature_clusters = tapp.find_feature_clusters(
+            groups, features, tapp_parameters["metamatch_fraction"])
 
         logger.info("Writing feature clusters to disk")
         tapp.write_feature_clusters(feature_clusters, out_path)
@@ -1830,18 +1824,3 @@ def testing_feature_detection():
         s=8,
     )
     return (raw_data, peaks, features, mesh, plt)
-
-
-def testing_feature_matching():
-    file_names = ["1_1", "1_2", "1_3", "1_4",
-                  "1_5", "3_1", "3_2", "3_3", "3_4", "3_5"]
-    features = [
-        tapp.read_features(
-            "tapp_pipeline_test/features/{}.features".format(file_name))
-        for file_name in file_names]
-    peaks = [
-        tapp.read_peaks(
-            "tapp_pipeline_test/warped_peaks/{}.peaks".format(file_name))
-        for file_name in file_names]
-    groups = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
-    return tapp.find_feature_clusters(groups, peaks, features)

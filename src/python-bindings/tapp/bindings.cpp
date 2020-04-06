@@ -840,23 +840,17 @@ MetaMatchResults perform_metamatch(
 
 std::vector<MetaMatch::FeatureCluster> find_feature_clusters(
     std::vector<uint64_t> group_ids,
-    std::vector<std::vector<Centroid::Peak>> peaks,
-    std::vector<std::vector<FeatureDetection::Feature>> features) {
-    if (group_ids.size() != peaks.size() ||
-        group_ids.size() != features.size()) {
+    std::vector<std::vector<FeatureDetection::Feature>> features,
+    double keep_perc, double intensity_threshold, double n_sig_mz,
+    double n_sig_rt) {
+    if (group_ids.size() != features.size()) {
         std::ostringstream error_stream;
-        error_stream
-            << "error: groups, peaks and features have different lengths";
+        error_stream << "error: the length of groups and features don't match";
         throw std::invalid_argument(error_stream.str());
     }
-    // Create input set.
-    std::vector<MetaMatch::InputSetFeatures> input_sets;
-    for (size_t i = 0; i < group_ids.size(); ++i) {
-        MetaMatch::InputSetFeatures input_set = {group_ids[i], peaks[i],
-                                                 features[i]};
-        input_sets.push_back(input_set);
-    }
-    return MetaMatch::find_feature_clusters(input_sets);
+    return MetaMatch::find_feature_clusters(group_ids, features, keep_perc,
+                                            intensity_threshold, n_sig_mz,
+                                            n_sig_rt);
 }
 
 }  // namespace PythonAPI
@@ -1408,7 +1402,9 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("fraction"))
         .def("find_feature_clusters", &PythonAPI::find_feature_clusters,
              "Perform metamatch for feature matching", py::arg("group_ids"),
-             py::arg("peaks"), py::arg("features"))
+             py::arg("features"), py::arg("keep_perc"),
+             py::arg("intensity_threshold") = 0.5, py::arg("n_sig_mz") = 1.5,
+             py::arg("n_sig_rt") = 1.5)
         .def("link_peaks", &Link::link_peaks, "Link msms events to peak ids",
              py::arg("peaks"), py::arg("raw_data"))
         .def("link_idents", &Link::link_idents,

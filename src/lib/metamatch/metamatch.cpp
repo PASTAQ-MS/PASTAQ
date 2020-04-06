@@ -242,12 +242,16 @@ std::vector<MetaMatch::Cluster> MetaMatch::reduce_cluster(
     return clusters;
 }
 
-std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
-    std::vector<MetaMatch::InputSetFeatures>& input_sets, double keep_perc,
-    double intensity_threshold) {
+std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
+    std::vector<uint64_t>& group_ids,
+    std::vector<std::vector<FeatureDetection::Feature>>& features,
+    double keep_perc, double intensity_threshold, double n_sig_mz,
+    double n_sig_rt) {
+    size_t n_files = features.size();
+
     // We need two sets of indexes, one sorted in descending order of intensity
     // to prioritize the seletion of a reference feature to match to, and a set
-    // of indexes per file to sort by ascending retention time order. This is
+    // of indexes per file to sort by ascending m/z order. This is
     // done to speedup searching of features using binary search.
     struct Index {
         uint64_t file_index;
@@ -262,19 +266,18 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
     };
 
     // Find the total number of features and prepare index vectors.
-    auto available_features = std::vector<std::vector<bool>>(input_sets.size());
-    auto feature_lists = std::vector<std::vector<Index>>(input_sets.size());
+    auto available_features = std::vector<std::vector<bool>>(n_files);
+    auto feature_lists = std::vector<std::vector<Index>>(n_files);
     std::vector<Index> all_features;
-    for (size_t i = 0; i < input_sets.size(); ++i) {
-        auto& input_set = input_sets[i];
-        available_features[i] =
-            std::vector<bool>(input_set.features.size(), true);
-        feature_lists[i] = std::vector<Index>(input_set.features.size());
-        for (size_t j = 0; j < input_set.features.size(); ++j) {
-            auto& feature = input_set.features[j];
+    for (size_t i = 0; i < n_files; ++i) {
+        size_t n_features = features[i].size();
+        available_features[i] = std::vector<bool>(n_features, true);
+        feature_lists[i] = std::vector<Index>(n_features);
+        for (size_t j = 0; j < n_features; ++j) {
+            auto& feature = features[i][j];
             feature_lists[i][j] = {
                 i,                                              // file_index
-                input_set.group_id,                             // group_id
+                group_ids[i],                                   // group_id
                 j,                                              // feature_index
                 feature.monoisotopic_mz,                        // mz
                 feature.average_rt + feature.average_rt_delta,  // rt
@@ -298,9 +301,9 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
     }
 
     // Create map with the number of files on each group.
-    std::map<uint64_t, uint64_t> groups;
-    for (const auto& input_set : input_sets) {
-        ++groups[input_set.group_id];
+    std::map<uint64_t, uint64_t> groups_map;
+    for (const auto& group : group_ids) {
+        ++groups_map[group];
     }
 
     // Start the matching.
@@ -317,21 +320,26 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
         }
 
         // Calculate the boundary region for this feature.
-        double ref_min_mz = ref_feature.mz - 1.5 * ref_feature.mz_sigma;
-        double ref_max_mz = ref_feature.mz + 1.5 * ref_feature.mz_sigma;
-        double ref_min_rt = ref_feature.rt - 1.5 * ref_feature.rt_sigma;
-        double ref_max_rt = ref_feature.rt + 1.5 * ref_feature.rt_sigma;
+        double ref_min_mz = ref_feature.mz - n_sig_mz * ref_feature.mz_sigma;
+        double ref_max_mz = ref_feature.mz + n_sig_mz * ref_feature.mz_sigma;
+        double ref_min_rt = ref_feature.rt - n_sig_rt * ref_feature.rt_sigma;
+        double ref_max_rt = ref_feature.rt + n_sig_rt * ref_feature.rt_sigma;
 
         // NOTE: Currently storing the feature index instead of the the feature
         // ids for performance. If we are to keep this cluster, this should be
         // swapped.
         std::vector<MetaMatch::FeatureId> features_in_cluster;
-        std::map<uint64_t, uint64_t> cluster_groups;
-        for (size_t j = 0; j < feature_lists.size(); ++j) {
+        std::map<uint64_t, uint64_t> cluster_groups_map;
+        // To search the ROI we use a combination of binary search and linear
+        // search. We want to minimize the time we spend on the linear search
+        // portion, and for that reason the binary search focuses on m/z, as it
+        // is less likely to have points with an exact mass at multiple
+        // retention times than the opposite.
+        for (size_t j = 0; j < n_files; ++j) {
             const auto& feature_list = feature_lists[j];
-            const auto& input_set = input_sets[j];
+            size_t n_features = feature_list.size();
             size_t left = 0;
-            size_t right = feature_list.size();
+            size_t right = n_features;
             while (left < right) {
                 size_t mid = left + ((right - left) / 2);
                 if (feature_list[mid].mz < ref_min_mz) {
@@ -341,15 +349,14 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
                 }
             }
             size_t min_k = right;
-            if (right >= feature_list.size() ||
-                feature_list[min_k].mz > ref_max_mz) {
+            if (right >= n_features || feature_list[min_k].mz > ref_max_mz) {
                 continue;
             }
 
             // Keep track of the best candidate for this file.
             double best_intensity = 0;
             size_t best_index = 0;
-            for (size_t k = min_k; k < feature_list.size(); ++k) {
+            for (size_t k = min_k; k < n_features; ++k) {
                 if (feature_list[k].mz > ref_max_mz) {
                     break;
                 }
@@ -370,23 +377,20 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
             }
             if (best_intensity > intensity_threshold) {
                 features_in_cluster.push_back({j, best_index});
-                ++cluster_groups[input_set.group_id];
+                ++cluster_groups_map[group_ids[j]];
             }
-        }
-        if (features_in_cluster.size() < 2) {
-            continue;
         }
 
         // Check if the given feature_ids selected for this cluster meet the
-        // filter critera of a minimum number of samples for any given group.
+        // filter criteria of a minimum number of samples for any given group.
         // For example, if we have three groups of 10 samples, with a
         // `keep_perc' of 0.7, we meet the nan percentage if in any of the three
         // groups we have at least 7 features being matched.
         bool nan_criteria_met = false;
-        for (const auto& cluster_group : cluster_groups) {
+        for (const auto& cluster_group : cluster_groups_map) {
             auto group_id = cluster_group.first;
             auto group_number = cluster_group.second;
-            uint64_t required_number = groups[group_id] * keep_perc;
+            uint64_t required_number = groups_map[group_id] * keep_perc;
             if (group_number >= required_number) {
                 nan_criteria_met = true;
                 break;
@@ -398,18 +402,18 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
 
         // Build cluster object.
         MetaMatch::FeatureCluster cluster = {};
-        cluster.total_heights = std::vector<double>(input_sets.size());
-        cluster.monoisotopic_heights = std::vector<double>(input_sets.size());
-        cluster.max_heights = std::vector<double>(input_sets.size());
-        cluster.total_volumes = std::vector<double>(input_sets.size());
-        cluster.monoisotopic_volumes = std::vector<double>(input_sets.size());
-        cluster.max_volumes = std::vector<double>(input_sets.size());
+        cluster.total_heights = std::vector<double>(n_files);
+        cluster.monoisotopic_heights = std::vector<double>(n_files);
+        cluster.max_heights = std::vector<double>(n_files);
+        cluster.total_volumes = std::vector<double>(n_files);
+        cluster.monoisotopic_volumes = std::vector<double>(n_files);
+        cluster.max_volumes = std::vector<double>(n_files);
         cluster.id = cluster_counter++;
         cluster.charge_state = ref_feature.charge_state;
         for (auto& feature_id : features_in_cluster) {
             size_t file_id = feature_id.file_id;
             size_t feature_index = feature_id.feature_id;
-            auto& feature = input_sets[file_id].features[feature_index];
+            auto& feature = features[file_id][feature_index];
 
             // Mark clustered features as not available.
             available_features[file_id][feature_index] = false;
@@ -446,10 +450,4 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters_new(
     }
 
     return clusters;
-}
-
-std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
-    std::vector<MetaMatch::InputSetFeatures>& input_sets) {
-    std::vector<MetaMatch::FeatureCluster> clusters;
-    return find_feature_clusters_new(input_sets, 0.7, 0.5);
 }

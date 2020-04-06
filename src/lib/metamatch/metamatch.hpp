@@ -81,13 +81,14 @@ struct FeatureCluster {
     std::vector<FeatureId> feature_ids;
 };
 
-struct InputSetFeatures {
-    uint64_t group_id;
-    std::vector<Centroid::Peak>& peaks;
-    std::vector<FeatureDetection::Feature>& features;
-};
+// Performs a greedy feature clustering algorithm by trying to match features
+// from multiple files based on their charge state and monoisotopic peak. The
+// features are searched in descending intensity order.
 std::vector<FeatureCluster> find_feature_clusters(
-    std::vector<InputSetFeatures>& input_sets);
+    std::vector<uint64_t>& group_ids,
+    std::vector<std::vector<FeatureDetection::Feature>>& features,
+    double keep_perc, double intensity_threshold, double n_sig_mz,
+    double n_sig_rt);
 
 // Performs a centroid based clustering algorithm. This algorithm modifies the
 // given peaks array in place, changing the order and the clustering
