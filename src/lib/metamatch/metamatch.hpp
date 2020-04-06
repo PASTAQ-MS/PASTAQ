@@ -65,12 +65,14 @@ struct FeatureCluster {
     double mz;
     double rt;
     int8_t charge_state;
+    // Statistics for this cluster.
     double avg_total_height;
     double avg_monoisotopic_height;
     double avg_max_height;
     double avg_total_volume;
     double avg_monoisotopic_volume;
     double avg_max_volume;
+    // Quantifications for this cluster.
     std::vector<double> total_heights;
     std::vector<double> monoisotopic_heights;
     std::vector<double> max_heights;

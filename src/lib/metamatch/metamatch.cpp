@@ -325,16 +325,13 @@ std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
         double ref_min_rt = ref_feature.rt - n_sig_rt * ref_feature.rt_sigma;
         double ref_max_rt = ref_feature.rt + n_sig_rt * ref_feature.rt_sigma;
 
-        // NOTE: Currently storing the feature index instead of the the feature
-        // ids for performance. If we are to keep this cluster, this should be
-        // swapped.
-        std::vector<MetaMatch::FeatureId> features_in_cluster;
-        std::map<uint64_t, uint64_t> cluster_groups_map;
         // To search the ROI we use a combination of binary search and linear
         // search. We want to minimize the time we spend on the linear search
         // portion, and for that reason the binary search focuses on m/z, as it
         // is less likely to have points with an exact mass at multiple
         // retention times than the opposite.
+        std::vector<MetaMatch::FeatureId> features_in_cluster;
+        std::map<uint64_t, uint64_t> cluster_groups_map;
         for (size_t j = 0; j < n_files; ++j) {
             const auto& feature_list = feature_lists[j];
             size_t n_features = feature_list.size();
@@ -376,6 +373,9 @@ std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
                 }
             }
             if (best_intensity > intensity_threshold) {
+                // NOTE: Currently storing the feature index instead of the
+                // feature ids for performance. If we are to keep this cluster,
+                // they will be swapped.
                 features_in_cluster.push_back({j, best_index});
                 ++cluster_groups_map[group_ids[j]];
             }
