@@ -20,8 +20,8 @@ endif()
 # ------------------------------
 # Threads.
 find_package(Threads REQUIRED)
-# Eigen
-find_package (Eigen3 3.3 REQUIRED NO_MODULE)
+# Eigen.
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/eigen" ${CMAKE_CURRENT_BINARY_DIR}/eigen)
 # Build TAPPs library.
 add_library(tapplib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid.cpp"

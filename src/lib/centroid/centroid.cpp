@@ -1,11 +1,12 @@
 #include <algorithm>
-#include <cmath>
 #include <thread>
 
 #include "Eigen/Dense"
 
 #include "centroid/centroid.hpp"
 #include "utils/search.hpp"
+
+#define PI 3.141592653589793238
 
 std::vector<Centroid::LocalMax> Centroid::find_local_maxima(
     const Grid::Grid &grid) {
@@ -233,7 +234,7 @@ std::optional<Centroid::Peak> Centroid::build_peak(
             peak.fitted_rt = rt;
             peak.fitted_sigma_mz = sigma_mz;
             peak.fitted_sigma_rt = sigma_rt;
-            peak.fitted_volume = height * sigma_mz * sigma_rt * 2.0 * M_PI;
+            peak.fitted_volume = height * sigma_mz * sigma_rt * 2.0 * PI;
         }
     }
 
