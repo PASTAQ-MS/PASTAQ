@@ -287,12 +287,18 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
     raw_data.retention_times = {};
     // TODO(alex): Can we automatically detect the instrument type and set
     // resolution from the header?
-    while (stream.good()) {
+    while (stream.good() && !stream.eof()) {
         auto tag = XmlReader::read_tag(stream);
         if (!tag) {
             continue;
         }
+        auto atts = tag.value().attributes;
+
+        if (tag.value().name == "msRun" && tag.value().closed) {
+            break;
+        }
         if (tag.value().name == "scan" && !tag.value().closed) {
+
             auto scan = parse_mzxml_scan(stream, tag, min_mz, max_mz, min_rt,
                                          max_rt, polarity, ms_level);
             if (scan.num_points != 0) {
@@ -618,59 +624,114 @@ std::optional<std::string> XmlReader::read_data(std::istream &stream) {
 }
 
 std::optional<XmlReader::Tag> XmlReader::read_tag(std::istream &stream) {
-    bool is_closed = false;
-    bool reading_content = false;
     auto tag = std::optional<Tag>(Tag{});
-
-    // Store the tag contents in a buffer for further processing.
-    std::string buffer;
-    while (stream.good()) {
-        char c = stream.get();
-        if (c == '<') {
-            if (stream.peek() == '/') {
-                tag->closed = true;
-                stream.get();
-            } else if (stream.peek() == ' ') {
-                return std::nullopt;
-            }
-            reading_content = true;
-        } else if (c == '>') {
-            is_closed = true;
-            // Read the previous character to check for self closing tag.
-            stream.seekg(-2, stream.cur);
-            if (stream.good()) {
-                if (stream.get() == '/') {
-                    tag->closed = true;
-                };
-                stream.get();
-            }
-            break;
-        } else if (reading_content) {
-            buffer += c;
-        }
-    }
-
-    if (!is_closed) {
+    if (!stream.good() || stream.eof()) {
         return std::nullopt;
     }
 
-    // Tokenize tag contents.
-    std::stringstream ss(buffer);
-    ss >> tag->name;
+    // Store the tag contents in a buffer for further processing.
+    std::string buffer;
 
-    // Find all attributes of this tag and store them on the attribute map.
-    std::regex attribute_regex("(\\S+)=\"([^\"]+)\"");
-    std::smatch matches;
-    while (std::regex_search(buffer, matches, attribute_regex)) {
-        if (matches.size() != 3 || matches[1] == "" || matches[2] == "") {
-            return std::nullopt;
+    while (stream.good() && !stream.eof() && stream.get() != '<') {}
+    std::getline(stream, buffer, '>');
+
+    if (buffer.empty()) {
+        return std::nullopt;
+    }
+
+    // Check if this is a closing tag for a previous one.
+    if (buffer[0] == '/') {
+        tag->closed = true;
+        // Read tag name
+        size_t end_name = buffer.size();
+        for (size_t i = 1; i < buffer.size(); ++i) {
+            if (std::isspace(buffer[i])) {
+                end_name = i;
+                break;
+            }
         }
-        tag->attributes[matches[1]] = matches[2];
-        buffer = matches.suffix().str();
+        tag->name = buffer.substr(1, end_name);
+        return tag;
+    }
+
+    // Read tag name
+    size_t start_ptr = buffer.size();
+    size_t end_ptr = buffer.size();
+    for (size_t i = 1; i < buffer.size(); ++i) {
+        if (std::isspace(buffer[i])) {
+            start_ptr = i;
+            break;
+        }
+    }
+    tag->name = buffer.substr(0, start_ptr);
+
+    // Check if this is a self-closing tag.
+    if (buffer[buffer.size() - 1] == '/') {
+        end_ptr = buffer.size() - 1;
+        tag->closed = true;
+    }
+
+    // Read attributes
+    for (size_t i = start_ptr; i < end_ptr; ++i) {
+        // Find attribute name.
+        if (std::isspace(buffer[i])) {
+            continue;
+        }
+        size_t ptr = i;
+        while (buffer[ptr] != '=') {
+            // Malformed xml.
+            if (ptr == end_ptr) {
+                break;
+            }
+            ptr++;
+        }
+        if (ptr == end_ptr) {
+            break;
+        }
+        std::string att_name = buffer.substr(i, ptr - i);
+
+        // Find attribute value.
+        i = ptr;
+        ptr--;
+        bool beg = false;
+        bool end = false;
+        bool escaped = false;
+        while (!(beg && end)) {
+            // Malformed xml.
+            if (ptr == end_ptr) {
+                return std::nullopt;
+            }
+            if (escaped) {
+                escaped = false;
+                ptr++;
+                continue;
+            }
+
+            char c = buffer[ptr];
+            if (c == '\\') {
+                escaped = true;
+            }
+            if (c == '"') {
+                if (!beg) {
+                    beg = true;
+                    ptr++;
+                    continue;
+                }
+                if (!end) {
+                    end = true;
+                    break;
+                }
+            }
+            ptr++;
+        }
+        std::string att_value = buffer.substr(i + 2, ptr - i - 2);
+        i = ptr;
+
+        tag->attributes[att_name] = att_value;
     }
 
     return tag;
-};
+}
 
 IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
                                                bool ignore_decoy,
