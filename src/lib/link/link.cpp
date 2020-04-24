@@ -64,16 +64,16 @@ std::vector<Link::LinkedMsms> Link::link_peaks(
             }
         }
 
-        // Check if linked event is within 10 sigma of the minimum distance
+        // Check if linked event is within 3 sigma of the minimum distance
         // peak.
         double roi_min_mz =
-            peaks[peak_id].fitted_mz - 10 * peaks[peak_id].fitted_sigma_mz;
+            peaks[peak_id].fitted_mz - 3 * peaks[peak_id].fitted_sigma_mz;
         double roi_max_mz =
-            peaks[peak_id].fitted_mz + 10 * peaks[peak_id].fitted_sigma_mz;
+            peaks[peak_id].fitted_mz + 3 * peaks[peak_id].fitted_sigma_mz;
         double roi_min_rt =
-            peaks[peak_id].fitted_rt - 10 * peaks[peak_id].fitted_sigma_rt;
+            peaks[peak_id].fitted_rt - 3 * peaks[peak_id].fitted_sigma_rt;
         double roi_max_rt =
-            peaks[peak_id].fitted_rt + 10 * peaks[peak_id].fitted_sigma_rt;
+            peaks[peak_id].fitted_rt + 3 * peaks[peak_id].fitted_sigma_rt;
         if (event_mz < roi_min_mz || event_mz > roi_max_mz ||
             event_rt < roi_min_rt || event_rt > roi_max_rt) {
             continue;

@@ -1294,10 +1294,10 @@ def dda_pipeline(
             psms = pd.merge(
                 psms, linked_idents, on="psm_index").drop('psm_index', axis=1)
 
-            peak_annotations_2 = pd.merge(
+            peak_annotations_tmp = pd.merge(
                 peak_annotations, psms, on="msms_id", how="left")
-            if not peak_annotations_2["psm_id"].dropna().empty:
-                peak_annotations = peak_annotations_2
+            if not peak_annotations_tmp["psm_id"].dropna().empty:
+                peak_annotations = peak_annotations_tmp
 
                 # Get the peptide information per psm.
                 def format_modification(mod):
