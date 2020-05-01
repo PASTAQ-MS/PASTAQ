@@ -341,7 +341,7 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
     raw_data.retention_times = {};
     // TODO(alex): Can we automatically detect the instrument type and set
     // resolution from the header?
-    while (stream.good()) {
+    while (stream.good() && !stream.eof()) {
         auto tag = XmlReader::read_tag(stream);
         if (!tag) {
             continue;
@@ -366,7 +366,7 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
             std::vector<bool> filter_points;
             std::vector<double> mzs;
             std::vector<double> intensities;
-            while (stream.good()) {
+            while (stream.good() && !stream.eof()) {
                 auto tag = XmlReader::read_tag(stream);
                 if (!tag) {
                     break;
@@ -434,7 +434,7 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
                     scan.precursor_information.intensity = 0.0;
                     scan.precursor_information.activation_method =
                         ActivationMethod::UNKNOWN;
-                    while (stream.good()) {
+                    while (stream.good() && !stream.eof()) {
                         auto tag = XmlReader::read_tag(stream);
                         if (!tag) {
                             break;
@@ -485,7 +485,7 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
                     std::optional<std::string> data;
                     size_t num_points =
                         std::stoi(tag.value().attributes["encodedLength"]);
-                    while (stream.good()) {
+                    while (stream.good() && !stream.eof()) {
                         auto tag = XmlReader::read_tag(stream);
                         if (!tag) {
                             break;
@@ -741,7 +741,7 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
 
     // Find the DBSequences, Peptides and PeptideEvidence in the
     // SequenceCollection tag.
-    while (stream.good()) {
+    while (stream.good() && !stream.eof()) {
         auto tag = XmlReader::read_tag(stream);
         if (!tag) {
             continue;
@@ -761,7 +761,7 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
             if (!tag.value().closed) {
                 // Check if the DBSequence contains the protein description as a
                 // cvParam tag.
-                while (stream.good()) {
+                while (stream.good() && !stream.eof()) {
                     auto tag = XmlReader::read_tag(stream);
                     if (!tag) {
                         continue;
@@ -783,7 +783,7 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
             auto attributes = tag.value().attributes;
             peptide.id = attributes["id"];
             // Find peptide sequence and modifications.
-            while (stream.good()) {
+            while (stream.good() && !stream.eof()) {
                 auto tag = XmlReader::read_tag(stream);
                 if (!tag) {
                     continue;
@@ -824,7 +824,7 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
                         modification.location = -1;
                     }
                     // Find identification information for this modification.
-                    while (stream.good()) {
+                    while (stream.good() && !stream.eof()) {
                         auto tag = XmlReader::read_tag(stream);
                         if (!tag) {
                             continue;
@@ -888,7 +888,7 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
     }
 
     // Find the PSMs for this data (SpectrumIdentificationResult).
-    while (stream.good()) {
+    while (stream.good() && !stream.eof()) {
         auto tag = XmlReader::read_tag(stream);
         if (!tag) {
             continue;
@@ -905,7 +905,7 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
         // Record all SpectrumIdentificationItems for this result.
         std::vector<IdentData::SpectrumMatch> spectrum_matches;
         double retention_time = 0.0;
-        while (stream.good()) {
+        while (stream.good() && !stream.eof()) {
             tag = XmlReader::read_tag(stream);
             if (!tag) {
                 continue;
@@ -956,7 +956,7 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
                 }
 
                 // Try to extract identification scores.
-                while (stream.good()) {
+                while (stream.good() && !stream.eof()) {
                     tag = XmlReader::read_tag(stream);
                     if (!tag) {
                         continue;
@@ -974,12 +974,16 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
                         }
                     }
                 }
+
                 spectrum_matches.push_back(spectrum_match);
             }
         }
 
         if (max_rank_only) {
-            IdentData::SpectrumMatch selected_spectrum;
+            if (spectrum_matches.empty()) {
+                continue;
+            }
+            IdentData::SpectrumMatch selected_spectrum = {};
             // Update retention time on the provisional spectrum_matches list
             // and find the maximum rank spectrum. The rank is in descending
             // order of importance, thus rank 1 is the maximum, and bigger
