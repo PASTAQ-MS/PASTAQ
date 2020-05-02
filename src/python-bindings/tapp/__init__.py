@@ -1129,10 +1129,14 @@ def dda_pipeline(
             continue
         # Check if file has already been processed.
         in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
+        in_path_peaks = os.path.join(
+            output_dir, 'warped_peaks', "{}.peaks".format(stem))
         in_path_idents = os.path.join(
             output_dir, 'ident', "{}.ident".format(stem))
         out_path = os.path.join(output_dir, 'linking',
                                 "{}.ms2_idents.link".format(stem))
+        out_path_psm = os.path.join(output_dir, 'linking',
+                                "{}.peak_idents.link".format(stem))
         if os.path.exists(out_path) and not override_existing:
             continue
 
@@ -1142,10 +1146,17 @@ def dda_pipeline(
         logger.info("Reading ident from disk: {}".format(stem))
         ident_data = tapp.read_ident_data(in_path_idents)
 
+        logger.info("Reading peaks from disk: {}".format(stem))
+        peaks = tapp.read_peaks(in_path_peaks)
+
         logger.info("Performing linkage: {}".format(stem))
         linked_idents = tapp.link_idents(ident_data, raw_data)
         logger.info('Writing linked_msms: {}'.format(out_path))
         tapp.write_linked_msms(linked_idents, out_path)
+        logger.info("Performing psm linkage: {}".format(stem))
+        linked_psm = tapp.link_psm(ident_data, peaks, raw_data)
+        logger.info('Writing linked_psm: {}'.format(out_path))
+        tapp.write_linked_psm(linked_psm, out_path_psm)
     logger.info('Finished ident/msms linkage in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
@@ -1205,8 +1216,10 @@ def dda_pipeline(
             output_dir, 'warped_peaks', "{}.peaks".format(stem))
         in_path_peaks_link = os.path.join(
             output_dir, 'linking', "{}.ms2_peaks.link".format(stem))
+        # in_path_ident_link = os.path.join(
+        #     output_dir, 'linking', "{}.ms2_idents.link".format(stem))
         in_path_ident_link = os.path.join(
-            output_dir, 'linking', "{}.ms2_idents.link".format(stem))
+            output_dir, 'linking', "{}.peak_idents.link".format(stem))
         in_path_ident_data = os.path.join(
             output_dir, 'ident', "{}.ident".format(stem))
         # TODO: Fix protein inference.
@@ -1267,18 +1280,17 @@ def dda_pipeline(
         peak_annotations = pd.merge(
             peak_annotations, linked_peaks, on="peak_id", how="left")
 
-        if (os.path.isfile(in_path_ident_link) and
-                os.path.isfile(in_path_ident_data)):
-            logger.info("Reading linked idents from disk: {}".format(stem))
-            linked_idents = tapp.read_linked_msms(in_path_ident_link)
+        if os.path.isfile(in_path_ident_data):
+            logger.info("Reading linked peak_idents from disk: {}".format(stem))
+            linked_idents = tapp.read_linked_psm(in_path_ident_link)
             linked_idents = pd.DataFrame({
-                'psm_index': [linked_ident.entity_id for linked_ident in linked_idents],
-                'msms_id': [linked_ident.msms_id for linked_ident in linked_idents],
+                'peak_id': [linked_ident.peak_id for linked_ident in linked_idents],
+                'psm_index': [linked_ident.psm_index for linked_ident in linked_idents],
+                'psm_link_distance': [linked_ident.distance for linked_ident in linked_idents],
             })
 
             logger.info("Reading ident_data from disk: {}".format(stem))
             ident_data = tapp.read_ident_data(in_path_ident_data)
-
             psms = pd.DataFrame({
                 'psm_index': [i for i in range(0, len(ident_data.spectrum_matches))],
                 'psm_id': [psm.id for psm in ident_data.spectrum_matches],
@@ -1291,14 +1303,10 @@ def dda_pipeline(
                 'psm_score_comet_xcor': [psm.score_comet_xcor for psm in ident_data.spectrum_matches],
                 'psm_peptide_id': [psm.match_id for psm in ident_data.spectrum_matches],
             })
-            psms = pd.merge(
-                psms, linked_idents, on="psm_index").drop('psm_index', axis=1)
-
-            peak_annotations_tmp = pd.merge(
-                peak_annotations, psms, on="msms_id", how="left")
-            if not peak_annotations_tmp["psm_id"].dropna().empty:
-                peak_annotations = peak_annotations_tmp
-
+            if not psms.empty:
+                linked_idents = pd.merge(linked_idents, psms, on="psm_index")
+                peak_annotations = pd.merge(
+                    peak_annotations, linked_idents, on="peak_id", how="left")
                 # Get the peptide information per psm.
                 def format_modification(mod):
                     ret = "monoisotopic_mass_delta: {}, ".format(

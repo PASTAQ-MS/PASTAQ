@@ -27,6 +27,15 @@ std::vector<LinkedMsms> link_peaks(const std::vector<Centroid::Peak> &peaks,
 std::vector<LinkedMsms> link_idents(const IdentData::IdentData &ident_data,
                                     const RawData::RawData &raw_data);
 
+struct LinkedPsm {
+    uint64_t peak_id;
+    uint64_t psm_index;
+    double distance;
+};
+std::vector<LinkedPsm> link_psm(const IdentData::IdentData &ident_data,
+                                const std::vector<Centroid::Peak> &peaks,
+                                const RawData::RawData &raw_data);
+
 }  // namespace Link
 
 #endif /* LINK_LINKMSMS_HPP */

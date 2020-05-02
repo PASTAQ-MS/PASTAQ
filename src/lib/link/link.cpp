@@ -55,8 +55,8 @@ std::vector<Link::LinkedMsms> Link::link_peaks(
             if (peaks[i].fitted_mz > max_mz) {
                 break;
             }
-            double a = event_mz - peaks[i].fitted_mz;
-            double b = event_rt - peaks[i].fitted_rt;
+            double a = (event_mz - peaks[i].fitted_mz) / peaks[i].fitted_sigma_mz;
+            double b = (event_rt - peaks[i].fitted_rt) / peaks[i].fitted_sigma_rt;
             double distance = std::sqrt(a * a + b * b);
             if (distance < min_distance) {
                 min_distance = distance;
@@ -169,6 +169,101 @@ std::vector<Link::LinkedMsms> Link::link_idents(
         [](const Link::LinkedMsms &a, const Link::LinkedMsms &b) -> bool {
             return (a.entity_id < b.entity_id) ||
                    ((a.entity_id == b.entity_id) && (a.distance < b.distance));
+        });
+    return link_table;
+}
+
+// Experimental PSM to peak linkage based on theoretical m/z instead of
+// experimental m/z or MSMS id (scan index).
+std::vector<Link::LinkedPsm> Link::link_psm(
+        const IdentData::IdentData &ident_data,
+        const std::vector<Centroid::Peak> &peaks,
+        const RawData::RawData &raw_data) {
+    // Index the peak list by m/z.
+    struct PeakIndex {
+        uint64_t id;
+        double mz;
+    };
+    auto indices = std::vector<PeakIndex>(peaks.size());
+    for (size_t i = 0; i < peaks.size(); ++i) {
+        indices[i] = {peaks[i].id, peaks[i].fitted_mz};
+    }
+
+    // Sort mz index by mz.
+    std::sort(indices.begin(), indices.end(),
+              [](const PeakIndex &a, const PeakIndex &b) -> bool {
+                  return a.mz < b.mz;
+              });
+
+    // Flatten index into separate arrays.
+    auto index_ids = std::vector<size_t>(indices.size());
+    auto index_mzs = std::vector<double>(indices.size());
+    for (size_t i = 0; i < indices.size(); ++i) {
+        index_ids[i] = indices[i].id;
+        index_mzs[i] = indices[i].mz;
+    }
+    indices.clear();
+
+    // Perform linkage of ms/ms events to closest peak.
+    std::vector<Link::LinkedPsm> link_table;
+    for (size_t k = 0; k < ident_data.spectrum_matches.size(); ++k) {
+        const auto &psm = ident_data.spectrum_matches[k];
+
+        size_t psm_index = k;
+        double psm_mz = psm.theoretical_mz;
+        double psm_rt = psm.retention_time;
+        // FIXME: This is ugly, we don't need rawdata anywere else in this
+        // function. We should decouple theoretical mz calculation from the raw
+        // data...
+        double theoretical_sigma_mz = RawData::fwhm_to_sigma(
+            RawData::theoretical_fwhm(raw_data, psm_mz));
+
+        // Find min_mz and loop until we reach the max_mz.
+        double min_mz = psm_mz - 3 * theoretical_sigma_mz;
+        double max_mz = psm_mz + 3 * theoretical_sigma_mz;
+        size_t min_j = Search::lower_bound(index_mzs, min_mz);
+        double min_distance = std::numeric_limits<double>::infinity();
+        size_t peak_id = 0;
+        for (size_t j = min_j; j < index_ids.size(); ++j) {
+            size_t i = index_ids[j];
+            if (peaks[i].fitted_mz > max_mz) {
+                break;
+            }
+            double a = (psm_mz - peaks[i].fitted_mz) / peaks[i].fitted_sigma_mz;
+            double b = (psm_rt - peaks[i].fitted_rt) / peaks[i].fitted_sigma_rt;
+            double distance = std::sqrt(a * a + b * b);
+            if (distance < min_distance) {
+                min_distance = distance;
+                peak_id = i;
+            }
+        }
+
+        // Check if linked event is within 3 sigma of the minimum distance
+        // peak.
+        double roi_min_mz =
+            peaks[peak_id].fitted_mz - 3 * peaks[peak_id].fitted_sigma_mz;
+        double roi_max_mz =
+            peaks[peak_id].fitted_mz + 3 * peaks[peak_id].fitted_sigma_mz;
+        double roi_min_rt =
+            peaks[peak_id].fitted_rt - 3 * peaks[peak_id].fitted_sigma_rt;
+        double roi_max_rt =
+            peaks[peak_id].fitted_rt + 3 * peaks[peak_id].fitted_sigma_rt;
+        if (psm_mz < roi_min_mz || psm_mz > roi_max_mz ||
+            psm_rt < roi_min_rt || psm_rt > roi_max_rt) {
+            continue;
+        }
+
+        if (min_distance != std::numeric_limits<double>::infinity()) {
+            link_table.push_back({peak_id, psm_index, min_distance});
+        }
+    }
+
+    // Sort link_table by peak_id.
+    std::sort(
+        link_table.begin(), link_table.end(),
+        [](const Link::LinkedPsm &a, const Link::LinkedPsm &b) -> bool {
+            return (a.peak_id < b.peak_id) ||
+                   ((a.peak_id == b.peak_id) && (a.distance < b.distance));
         });
     return link_table;
 }

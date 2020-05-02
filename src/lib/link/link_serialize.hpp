@@ -15,6 +15,10 @@ bool read_linked_msms_table(std::istream &stream,
                             std::vector<Link::LinkedMsms> *links);
 bool write_linked_msms_table(std::ostream &stream,
                              const std::vector<LinkedMsms> &links);
+bool read_linked_psm_table(std::istream &stream,
+                           std::vector<Link::LinkedPsm> *links);
+bool write_linked_psm_table(std::ostream &stream,
+                            const std::vector<LinkedPsm> &links);
 
 }  // namespace Link::Serialize
 

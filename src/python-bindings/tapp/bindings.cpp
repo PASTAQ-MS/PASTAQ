@@ -780,6 +780,47 @@ std::vector<Link::LinkedMsms> read_linked_msms(std::string &input_file) {
     return linked_msms;
 }
 
+void write_linked_psm(const std::vector<Link::LinkedPsm> &linked_psm,
+                       std::string &output_file) {
+    // Open file stream.
+    std::ofstream stream;
+    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open output file" << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    if (!Link::Serialize::write_linked_psm_table(stream, linked_psm)) {
+        std::ostringstream error_stream;
+        error_stream
+            << "error: couldn't write the linked_psm into the output file"
+            << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+}
+
+std::vector<Link::LinkedPsm> read_linked_psm(std::string &input_file) {
+    // Open file stream.
+    std::ifstream stream;
+    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open input file" << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    std::vector<Link::LinkedPsm> linked_psm;
+    if (!Link::Serialize::read_linked_psm_table(stream, &linked_psm)) {
+        std::ostringstream error_stream;
+        error_stream
+            << "error: couldn't write the linked_psm into the input file"
+            << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+    return linked_psm;
+}
+
 IdentData::IdentData read_mzidentml(std::string &input_file, bool ignore_decoy,
                                     bool require_threshold,
                                     bool max_rank_only) {
@@ -1282,6 +1323,17 @@ PYBIND11_MODULE(tapp, m) {
                    ", distance: " + std::to_string(p.distance) + ">";
         });
 
+    py::class_<Link::LinkedPsm>(m, "LinkedPsm")
+        .def_readonly("peak_id", &Link::LinkedPsm::peak_id)
+        .def_readonly("psm_index", &Link::LinkedPsm::psm_index)
+        .def_readonly("distance", &Link::LinkedPsm::distance)
+        .def("__repr__", [](const Link::LinkedPsm &p) {
+            return "LinkedPsm <peak_id: " + std::to_string(p.peak_id) +
+                   ", psm_index: " + std::to_string(p.psm_index) +
+                   ", distance: " + std::to_string(p.distance) + ">";
+        });
+
+
     py::class_<ProteinInference::InferredProtein>(m, "InferredProtein")
         .def_readonly("protein_id",
                       &ProteinInference::InferredProtein::protein_id)
@@ -1344,6 +1396,9 @@ PYBIND11_MODULE(tapp, m) {
         .def("write_linked_msms", &PythonAPI::write_linked_msms,
              "Write the linked_msms to disk in a binary format",
              py::arg("linked_msms"), py::arg("file_name"))
+        .def("write_linked_psm", &PythonAPI::write_linked_psm,
+             "Write the linked_psm to disk in a binary format",
+             py::arg("linked_psm"), py::arg("file_name"))
         .def("read_peaks", &PythonAPI::read_peaks,
              "Read the peaks from the binary peaks file", py::arg("file_name"))
         .def("read_metamatch_clusters", &PythonAPI::read_metamatch_clusters,
@@ -1358,6 +1413,9 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("file_name"))
         .def("read_grid", &PythonAPI::read_grid,
              "Read the grid from the binary grid file", py::arg("file_name"))
+        .def("read_linked_psm", &PythonAPI::read_linked_psm,
+             "Read the linked_psm from the binary linked_psm file",
+             py::arg("file_name"))
         .def("read_linked_msms", &PythonAPI::read_linked_msms,
              "Read the linked_msms from the binary linked_msms file",
              py::arg("file_name"))
@@ -1410,6 +1468,9 @@ PYBIND11_MODULE(tapp, m) {
         .def("link_idents", &Link::link_idents,
              "Link msms events to spectrum identifications",
              py::arg("ident_data"), py::arg("raw_data"))
+        .def("link_psm", &Link::link_psm,
+             "Link spectrum identifications with peaks",
+             py::arg("ident_data"), py::arg("peaks"), py::arg("raw_data"))
         .def("xic", &PythonAPI::xic, py::arg("raw_data"), py::arg("min_mz"),
              py::arg("max_mz"), py::arg("min_rt"), py::arg("max_rt"),
              py::arg("method") = "sum")
