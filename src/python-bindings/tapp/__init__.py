@@ -30,14 +30,17 @@ def find_sequence_consensus(annotations, sequence_column, min_consensus_count):
     consensus = annotations[["cluster_id", "file_id", sequence_column]]
     consensus = consensus.drop_duplicates()
     consensus.columns = ["cluster_id", "file_id", "consensus_sequence"]
-    consensus = consensus.groupby(["cluster_id", "consensus_sequence"]).agg(consensus_count=('consensus_sequence', 'count'))
+    consensus = consensus.groupby(["cluster_id", "consensus_sequence"]).agg(
+        consensus_count=('consensus_sequence', 'count'))
     max_count = consensus.groupby("cluster_id").max().reset_index()
     max_count.columns = ["cluster_id", "consensus_count_max"]
     consensus = pd.merge(consensus.reset_index(), max_count, on="cluster_id")
-    consensus = consensus[consensus["consensus_count"] == consensus["consensus_count_max"]]
+    consensus = consensus[consensus["consensus_count"]
+                          == consensus["consensus_count_max"]]
     consensus = consensus[consensus["consensus_count"] >= min_consensus_count]
     consensus = consensus.drop(["consensus_count_max"], axis=1)
     return consensus
+
 
 def plot_mesh(mesh, transform='sqrt', figure=None):
     plt.style.use('dark_background')
@@ -528,12 +531,12 @@ def default_parameters(instrument, avg_fwhm_rt):
             'quant_consensus': True,
             # Demand a minimum number of files with identification per cluster.
             'quant_consensus_min_ident': 2,
-            # Razor method:
+            # TODO: Protein inference method:
             #     - 'none': Don't perform protein inference.
             #     - 'general_razor': All files are considered for Occam's razor inference.
             #     - 'group_razor': Occam's razor inference is performed per group.
             #     - 'file_razor': Occam's razor inference is performed per file.
-            'quant_inference_type': 'group_razor',# TODO
+            'quant_inference_type': 'group_razor',
         }
         return tapp_parameters
 
@@ -1149,7 +1152,7 @@ def dda_pipeline(
             continue
         logger.info('Reading mzIdentML: {}'.format(in_path))
         ident_data = tapp.read_mzidentml(
-                in_path, max_rank_only=tapp_parameters['ident_max_rank_only'])
+            in_path, max_rank_only=tapp_parameters['ident_max_rank_only'])
         logger.info('Writing ident data: {}'.format(out_path))
         tapp.write_ident_data(ident_data, out_path)
     logger.info('Finished mzIdentML parsing in {}'.format(
@@ -1171,7 +1174,7 @@ def dda_pipeline(
         out_path = os.path.join(output_dir, 'linking',
                                 "{}.ms2_idents.link".format(stem))
         out_path_psm = os.path.join(output_dir, 'linking',
-                                "{}.peak_idents.link".format(stem))
+                                    "{}.peak_idents.link".format(stem))
         if os.path.exists(out_path) and not override_existing:
             continue
 
@@ -1329,25 +1332,31 @@ def dda_pipeline(
             })
             if not psms.empty:
                 if tapp_parameters["quant_ident_linkage"] == 'theoretical_mz':
-                    logger.info("Reading linked peak_idents from disk: {}".format(stem))
-                    linked_idents = tapp.read_linked_psm(in_path_ident_link_theomz)
+                    logger.info(
+                        "Reading linked peak_idents from disk: {}".format(stem))
+                    linked_idents = tapp.read_linked_psm(
+                        in_path_ident_link_theomz)
                     linked_idents = pd.DataFrame({
                         'peak_id': [linked_ident.peak_id for linked_ident in linked_idents],
                         'psm_index': [linked_ident.psm_index for linked_ident in linked_idents],
                         'psm_link_distance': [linked_ident.distance for linked_ident in linked_idents],
                     })
-                    linked_idents = pd.merge(linked_idents, psms, on="psm_index")
+                    linked_idents = pd.merge(
+                        linked_idents, psms, on="psm_index")
                     peak_annotations = pd.merge(
                         peak_annotations, linked_idents, on="peak_id", how="left")
                 elif tapp_parameters["quant_ident_linkage"] == 'msms_event':
-                    logger.info("Reading linked peak_idents from disk: {}".format(stem))
-                    linked_idents = tapp.read_linked_msms(in_path_ident_link_msms)
+                    logger.info(
+                        "Reading linked peak_idents from disk: {}".format(stem))
+                    linked_idents = tapp.read_linked_msms(
+                        in_path_ident_link_msms)
                     linked_idents = pd.DataFrame({
                         'msms_id': [linked_ident.msms_id for linked_ident in linked_idents],
                         'psm_index': [linked_ident.entity_id for linked_ident in linked_idents],
                         'psm_link_distance': [linked_ident.distance for linked_ident in linked_idents],
                     })
-                    linked_idents = pd.merge(linked_idents, psms, on="psm_index")
+                    linked_idents = pd.merge(
+                        linked_idents, psms, on="psm_index")
                     peak_annotations = pd.merge(
                         peak_annotations, linked_idents, on="msms_id", how="left")
                 else:
@@ -1461,6 +1470,7 @@ def dda_pipeline(
                                                       "peak_clusters_annotations.csv")
     out_path_peak_clusters_annotations_all = os.path.join(output_dir, 'quant',
                                                           "peak_clusters_annotations_all.csv")
+
     def aggregate_cluster_annotations(x):
         ret = {}
         if "psm_sequence" in x:
@@ -1510,16 +1520,16 @@ def dda_pipeline(
         })
         if tapp_parameters['quant_isotopes'] == 'volume':
             out_path_peak_clusters = os.path.join(output_dir, 'quant',
-                                                "peak_clusters_volume.csv")
+                                                  "peak_clusters_volume.csv")
             for i, stem in enumerate(input_stems):
                 peak_clusters_df[stem] = [cluster.file_volumes[i]
-                                        for cluster in peak_clusters]
+                                          for cluster in peak_clusters]
         elif tapp_parameters['quant_isotopes'] == 'height':
             out_path_peak_clusters = os.path.join(output_dir, 'quant',
-                                                "peak_clusters_height.csv")
+                                                  "peak_clusters_height.csv")
             for i, stem in enumerate(input_stems):
                 peak_clusters_df[stem] = [cluster.file_heights[i]
-                                        for cluster in peak_clusters]
+                                          for cluster in peak_clusters]
         else:
             raise ValueError("unknown quant_isotopes parameter")
         peak_clusters_df.to_csv(out_path_peak_clusters, index=False)
@@ -1571,7 +1581,8 @@ def dda_pipeline(
 
         if tapp_parameters['quant_consensus']:
             # Find a sequence consensus
-            consensus_sequence = find_sequence_consensus(annotations, 'psm_sequence', tapp_parameters['quant_consensus_min_ident'])
+            consensus_sequence = find_sequence_consensus(
+                annotations, 'psm_sequence', tapp_parameters['quant_consensus_min_ident'])
             annotations = pd.merge(
                 annotations,
                 consensus_sequence[[
@@ -1580,17 +1591,22 @@ def dda_pipeline(
                     "consensus_count",
                 ]], on="cluster_id", how="left")
             # Find a consensus proteins
-            proteins = annotations[annotations['psm_sequence'] == annotations['consensus_sequence']]
-            proteins = proteins[['cluster_id', 'protein_name', 'protein_description']].drop_duplicates()
-            proteins.columns = ['cluster_id', 'consensus_protein_name', 'consensus_protein_description']
-            annotations = pd.merge(annotations, proteins, on="cluster_id", how="left")
+            proteins = annotations[annotations['psm_sequence']
+                                   == annotations['consensus_sequence']]
+            proteins = proteins[['cluster_id', 'protein_name',
+                                 'protein_description']].drop_duplicates()
+            proteins.columns = [
+                'cluster_id', 'consensus_protein_name', 'consensus_protein_description']
+            annotations = pd.merge(annotations, proteins,
+                                   on="cluster_id", how="left")
 
         # Saving annotations before aggregation.
         annotations = annotations.sort_values(by=["cluster_id"])
         annotations.to_csv(out_path_peak_clusters_annotations_all, index=False)
 
         logger.info("Aggregating annotations")
-        annotations = annotations.groupby('cluster_id').apply(aggregate_cluster_annotations)
+        annotations = annotations.groupby(
+            'cluster_id').apply(aggregate_cluster_annotations)
         annotations.to_csv(out_path_peak_clusters_annotations, index=True)
 
     # Matched Features
@@ -1623,44 +1639,45 @@ def dda_pipeline(
         })
         if tapp_parameters['quant_features'] == 'monoisotopic_height':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
-                    "feature_clusters_monoisotopic_height.csv")
+                                                     "feature_clusters_monoisotopic_height.csv")
             for i, stem in enumerate(input_stems):
                 feature_clusters_df[stem] = [cluster.monoisotopic_heights[i]
-                        for cluster in feature_clusters]
+                                             for cluster in feature_clusters]
             feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
         elif tapp_parameters['quant_features'] == 'monoisotopic_volume':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
-                    "feature_clusters_monoisotopic_volume.csv")
+                                                     "feature_clusters_monoisotopic_volume.csv")
             for i, stem in enumerate(input_stems):
                 feature_clusters_df[stem] = [cluster.monoisotopic_volumes[i]
-                        for cluster in feature_clusters]
+                                             for cluster in feature_clusters]
             feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
         elif tapp_parameters['quant_features'] == 'total_height':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
-                    "feature_clusters_total_height.csv")
+                                                     "feature_clusters_total_height.csv")
             for i, stem in enumerate(input_stems):
                 feature_clusters_df[stem] = [cluster.total_heights[i]
-                        for cluster in feature_clusters]
+                                             for cluster in feature_clusters]
             feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
         elif tapp_parameters['quant_features'] == 'total_volume':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
-                    "feature_clusters_total_volume.csv")
+                                                     "feature_clusters_total_volume.csv")
             for i, stem in enumerate(input_stems):
                 feature_clusters_df[stem] = [cluster.total_volumes[i]
-                        for cluster in feature_clusters]
+                                             for cluster in feature_clusters]
             feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
         elif tapp_parameters['quant_features'] == 'max_height':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
-                    "feature_clusters_max_height.csv")
+                                                     "feature_clusters_max_height.csv")
             for i, stem in enumerate(input_stems):
-                feature_clusters_df[stem] = [cluster.max_heights[i] for cluster in feature_clusters]
+                feature_clusters_df[stem] = [cluster.max_heights[i]
+                                             for cluster in feature_clusters]
             feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
         elif tapp_parameters['quant_features'] == 'max_volume':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
-                    "feature_clusters_max_volume.csv")
+                                                     "feature_clusters_max_volume.csv")
             for i, stem in enumerate(input_stems):
                 feature_clusters_df[stem] = [cluster.max_volumes[i]
-                        for cluster in feature_clusters]
+                                             for cluster in feature_clusters]
             feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
         else:
             raise ValueError("unknown quant_features parameter")
@@ -1693,12 +1710,14 @@ def dda_pipeline(
             in_path_peak_annotations = os.path.join(output_dir, 'quant',
                                                     "{}_peak_annotations.csv".format(stem))
             features = tapp.read_features(in_path_peak_features)
-            features = [(feature.id, feature.peak_ids, feature.charge_state) for feature in features]
+            features = [(feature.id, feature.peak_ids, feature.charge_state)
+                        for feature in features]
             features = pd.DataFrame(
                 features, columns=["feature_id", "peak_id", "charge_state"]).explode("peak_id")
             peak_annotations = pd.read_csv(
                 in_path_peak_annotations, low_memory=False)
-            cluster_annotations = cluster_features[cluster_features["file_id"] == stem][["cluster_id", "feature_id"]]
+            cluster_annotations = cluster_features[cluster_features["file_id"] == stem][[
+                "cluster_id", "feature_id"]]
             cluster_annotations["file_id"] = stem
             logger.info(
                 "Merging peak/clusters annotations for: {}".format(stem))
@@ -1706,24 +1725,27 @@ def dda_pipeline(
                 cluster_annotations, features, on="feature_id", how="left")
             cluster_annotations = pd.merge(
                 cluster_annotations, peak_annotations, on="peak_id", how="left")
-            annotations = pd.concat(
-                [annotations, cluster_annotations])
+            annotations = pd.concat([annotations, cluster_annotations])
 
         # Ensure these columns have the proper type.
         if "msms_id" in annotations:
             annotations["msms_id"] = annotations["msms_id"].astype('Int64')
         if "charge_state" in annotations:
-            annotations["charge_state"] = annotations["charge_state"].astype('Int64')
+            annotations["charge_state"] = annotations["charge_state"].astype(
+                'Int64')
         if "psm_charge_state" in annotations:
-            annotations["psm_charge_state"] = annotations["psm_charge_state"].astype('Int64')
+            annotations["psm_charge_state"] = annotations["psm_charge_state"].astype(
+                'Int64')
         if "psm_rank" in annotations:
             annotations["psm_rank"] = annotations["psm_rank"].astype('Int64')
         if "psm_modifications_num" in annotations:
-            annotations["psm_modifications_num"] = annotations["psm_modifications_num"].astype('Int64')
+            annotations["psm_modifications_num"] = annotations["psm_modifications_num"].astype(
+                'Int64')
 
         if tapp_parameters['quant_consensus']:
             # Find a sequence consensus
-            consensus_sequence = find_sequence_consensus(annotations, 'psm_sequence', tapp_parameters['quant_consensus_min_ident'])
+            consensus_sequence = find_sequence_consensus(
+                annotations, 'psm_sequence', tapp_parameters['quant_consensus_min_ident'])
             annotations = pd.merge(
                 annotations,
                 consensus_sequence[[
@@ -1732,10 +1754,14 @@ def dda_pipeline(
                     "consensus_count",
                 ]], on="cluster_id", how="left")
             # Find a consensus proteins
-            proteins = annotations[annotations['psm_sequence'] == annotations['consensus_sequence']]
-            proteins = proteins[['cluster_id', 'protein_name', 'protein_description']].drop_duplicates()
-            proteins.columns = ['cluster_id', 'consensus_protein_name', 'consensus_protein_description']
-            annotations = pd.merge(annotations, proteins, on="cluster_id", how="left")
+            proteins = annotations[annotations['psm_sequence']
+                                   == annotations['consensus_sequence']]
+            proteins = proteins[['cluster_id', 'protein_name',
+                                 'protein_description']].drop_duplicates()
+            proteins.columns = [
+                'cluster_id', 'consensus_protein_name', 'consensus_protein_description']
+            annotations = pd.merge(annotations, proteins,
+                                   on="cluster_id", how="left")
 
         # Saving annotations before aggregation.
         annotations = annotations.sort_values(by=["cluster_id"])
@@ -1744,7 +1770,8 @@ def dda_pipeline(
 
         logger.info("Aggregating annotations")
         if "psm_charge_state" in annotations and tapp_parameters['quant_features_charge_state_filter']:
-            annotations = annotations[annotations["psm_charge_state"] == annotations["charge_state"]]
+            annotations = annotations[annotations["psm_charge_state"]
+                                      == annotations["charge_state"]]
         annotations = annotations.groupby(
             'cluster_id').apply(aggregate_cluster_annotations)
         annotations.to_csv(
