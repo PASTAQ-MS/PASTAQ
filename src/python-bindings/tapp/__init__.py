@@ -443,38 +443,79 @@ def plot_raw_points(
     })
 
 
+# TODO: Probably we don't want avg_fwhm_rt to be a parameter being passed on
+# this function. Just set it to a resonable level for the default parameters and
+# modify it later as needed.
 def default_parameters(instrument, avg_fwhm_rt):
     if instrument == 'orbitrap':
         tapp_parameters = {
+            #
+            # Instrument configuration.
+            #
             'instrument_type': 'orbitrap',
             'resolution_ms1': 70000,
             'resolution_msn': 30000,
             'reference_mz': 200,
             'avg_fwhm_rt': avg_fwhm_rt,
+            #
             # Meshing.
+            #
             'num_samples_mz': 5,
             'num_samples_rt': 5,
             'smoothing_coefficient_mz': 0.4,
             'smoothing_coefficient_rt': 0.4,
+            #
             # Warp2D.
+            #
             'warp2d_slack': 30,
             'warp2d_window_size': 50,
             'warp2d_num_points': 2000,
             'warp2d_rt_expand_factor': 0.2,
             'warp2d_peaks_per_window': 100,
+            #
             # MetaMatch.
+            #
             'metamatch_fraction': 0.7,
+            #
             # Feature detection.
+            #
             'feature_detection_charge_states': [5, 4, 3, 2, 1],
-            # Other
+            #
+            # Other.
+            #
             'max_peaks': 100000,
             'polarity': 'both',
             'min_mz': 0,
             'max_mz': 100000,
             'min_rt': 0,
             'max_rt': 100000,
+            #
+            # Identification.
+            #
+            'ident_max_rank_only': True,
+            #
             # Quality.
+            #
             'similarity_num_peaks': 2000,
+            #
+            # Quantitative table generation.
+            #
+            # Options: 'height', 'volume'
+            'quant_isotopes': 'height',
+            # Options: 'monoisotopic_height', 'monoisotopic_volume',
+            #          'total_height', 'total_volume',
+            #          'max_height', 'max_volume',
+            'quant_features': 'max_height',
+            # Options: 'theoretical_mz', 'msms_event'
+            'quant_ident_linkage': 'theoretical_mz',
+            # Demand a minimum number of files with identification per cluster.
+            'quant_consensus_min_ident': 2, # TODO
+            # Razor method:
+            #     - 'none': Don't perform protein inference.
+            #     - 'general_razor': All files are considered for Occam's razor inference.
+            #     - 'group_razor': Occam's razor inference is performed per group.
+            #     - 'file_razor': Occam's razor inference is performed per file.
+            'quant_inference_type': 'group_razor',# TODO
         }
         return tapp_parameters
 
@@ -1089,36 +1130,12 @@ def dda_pipeline(
         if in_path == 'none' or (os.path.exists(out_path) and not override_existing):
             continue
         logger.info('Reading mzIdentML: {}'.format(in_path))
-        ident_data = tapp.read_mzidentml(in_path, max_rank_only=True)
+        ident_data = tapp.read_mzidentml(
+                in_path, max_rank_only=tapp_parameters['ident_max_rank_only'])
         logger.info('Writing ident data: {}'.format(out_path))
         tapp.write_ident_data(ident_data, out_path)
     logger.info('Finished mzIdentML parsing in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
-
-    # TODO: Fix protein inference.
-    # logger.info('Starting protein inference')
-    # time_start = time.time()
-    # for i, stem in enumerate(input_stems):
-    #     # Check that we had identification info.
-    #     if input_ident_files[i] == 'none':
-    #         continue
-    #     # Check if file has already been processed.
-    #     in_path_idents = os.path.join(
-    #         output_dir, 'ident', "{}.ident".format(stem))
-    #     out_path = os.path.join(output_dir, 'ident',
-    #                             "{}.inferred_proteins".format(stem))
-    #     if os.path.exists(out_path) and not override_existing:
-    #         continue
-
-    #     logger.info("Reading ident from disk: {}".format(stem))
-    #     ident_data = tapp.read_ident_data(in_path_idents)
-
-    #     logger.info("Performing inference: {}".format(stem))
-    #     inferred_proteins = tapp.perform_protein_inference(ident_data)
-    #     logger.info('Writing inferred_proteins: {}'.format(out_path))
-    #     tapp.write_inferred_proteins(inferred_proteins, out_path)
-    # logger.info('Finished protein inference in {}'.format(
-    #     datetime.timedelta(seconds=time.time()-time_start)))
 
     # Link ms2 events with ident information.
     logger.info('Starting ident/msms linkage')
@@ -1216,15 +1233,12 @@ def dda_pipeline(
             output_dir, 'warped_peaks', "{}.peaks".format(stem))
         in_path_peaks_link = os.path.join(
             output_dir, 'linking', "{}.ms2_peaks.link".format(stem))
-        # in_path_ident_link = os.path.join(
-        #     output_dir, 'linking', "{}.ms2_idents.link".format(stem))
-        in_path_ident_link = os.path.join(
+        in_path_ident_link_msms = os.path.join(
+            output_dir, 'linking', "{}.ms2_idents.link".format(stem))
+        in_path_ident_link_theomz = os.path.join(
             output_dir, 'linking', "{}.peak_idents.link".format(stem))
         in_path_ident_data = os.path.join(
             output_dir, 'ident', "{}.ident".format(stem))
-        # TODO: Fix protein inference.
-        # in_path_inferred_proteins = os.path.join(
-        #     output_dir, 'ident', "{}.inferred_proteins".format(stem))
         out_path_peaks = os.path.join(output_dir, 'quant',
                                       "{}_peaks.csv".format(stem))
         out_path_peak_annotations = os.path.join(output_dir, 'quant',
@@ -1281,14 +1295,6 @@ def dda_pipeline(
             peak_annotations, linked_peaks, on="peak_id", how="left")
 
         if os.path.isfile(in_path_ident_data):
-            logger.info("Reading linked peak_idents from disk: {}".format(stem))
-            linked_idents = tapp.read_linked_psm(in_path_ident_link)
-            linked_idents = pd.DataFrame({
-                'peak_id': [linked_ident.peak_id for linked_ident in linked_idents],
-                'psm_index': [linked_ident.psm_index for linked_ident in linked_idents],
-                'psm_link_distance': [linked_ident.distance for linked_ident in linked_idents],
-            })
-
             logger.info("Reading ident_data from disk: {}".format(stem))
             ident_data = tapp.read_ident_data(in_path_ident_data)
             psms = pd.DataFrame({
@@ -1304,9 +1310,31 @@ def dda_pipeline(
                 'psm_peptide_id': [psm.match_id for psm in ident_data.spectrum_matches],
             })
             if not psms.empty:
-                linked_idents = pd.merge(linked_idents, psms, on="psm_index")
-                peak_annotations = pd.merge(
-                    peak_annotations, linked_idents, on="peak_id", how="left")
+                if tapp_parameters["quant_ident_linkage"] == 'theoretical_mz':
+                    logger.info("Reading linked peak_idents from disk: {}".format(stem))
+                    linked_idents = tapp.read_linked_psm(in_path_ident_link_theomz)
+                    linked_idents = pd.DataFrame({
+                        'peak_id': [linked_ident.peak_id for linked_ident in linked_idents],
+                        'psm_index': [linked_ident.psm_index for linked_ident in linked_idents],
+                        'psm_link_distance': [linked_ident.distance for linked_ident in linked_idents],
+                    })
+                    linked_idents = pd.merge(linked_idents, psms, on="psm_index")
+                    peak_annotations = pd.merge(
+                        peak_annotations, linked_idents, on="peak_id", how="left")
+                elif tapp_parameters["quant_ident_linkage"] == 'msms_event':
+                    logger.info("Reading linked peak_idents from disk: {}".format(stem))
+                    linked_idents = tapp.read_linked_msms(in_path_ident_link_msms)
+                    linked_idents = pd.DataFrame({
+                        'msms_id': [linked_ident.msms_id for linked_ident in linked_idents],
+                        'psm_index': [linked_ident.entity_id for linked_ident in linked_idents],
+                        'psm_link_distance': [linked_ident.distance for linked_ident in linked_idents],
+                    })
+                    linked_idents = pd.merge(linked_idents, psms, on="psm_index")
+                    peak_annotations = pd.merge(
+                        peak_annotations, linked_idents, on="msms_id", how="left")
+                else:
+                    raise ValueError("unknown quant_ident_linkage parameter")
+
                 # Get the peptide information per psm.
                 def format_modification(mod):
                     ret = "monoisotopic_mass_delta: {}, ".format(
@@ -1407,10 +1435,6 @@ def dda_pipeline(
     logger.info("Reading peak clusters from disk")
     in_path_peak_clusters = os.path.join(
         output_dir, 'metamatch', 'peaks.clusters')
-    out_path_peak_clusters_height = os.path.join(output_dir, 'quant',
-                                                 "peak_clusters_height.csv")
-    out_path_peak_clusters_volume = os.path.join(output_dir, 'quant',
-                                                 "peak_clusters_volume.csv")
     out_path_peak_clusters_metadata = os.path.join(output_dir, 'quant',
                                                    "peak_clusters_metadata.csv")
     out_path_peak_clusters_peaks = os.path.join(output_dir, 'quant',
@@ -1419,7 +1443,6 @@ def dda_pipeline(
                                                       "peak_clusters_annotations.csv")
     out_path_peak_clusters_annotations_all = os.path.join(output_dir, 'quant',
                                                           "peak_clusters_annotations_all.csv")
-
     def aggregate_cluster_annotations(x):
         ret = {}
         if "psm_sequence" in x:
@@ -1451,25 +1474,25 @@ def dda_pipeline(
         peak_clusters_metadata_df.to_csv(
             out_path_peak_clusters_metadata, index=False)
 
-        # Volume.
-        logger.info("Generating peak clusters volume table")
+        logger.info("Generating peak clusters quantitative table")
         peak_clusters_df = pd.DataFrame({
             'cluster_id': [cluster.id for cluster in peak_clusters],
         })
-        for i, stem in enumerate(input_stems):
-            peak_clusters_df[stem] = [cluster.file_volumes[i]
-                                      for cluster in peak_clusters]
-        peak_clusters_df.to_csv(out_path_peak_clusters_volume, index=False)
-        peak_clusters_df = pd.DataFrame({
-            'cluster_id': [cluster.id for cluster in peak_clusters],
-        })
-
-        # Height.
-        logger.info("Generating peak clusters height table")
-        for i, stem in enumerate(input_stems):
-            peak_clusters_df[stem] = [cluster.file_heights[i]
-                                      for cluster in peak_clusters]
-        peak_clusters_df.to_csv(out_path_peak_clusters_height, index=False)
+        if tapp_parameters['quant_isotopes'] == 'volume':
+            out_path_peak_clusters = os.path.join(output_dir, 'quant',
+                                                "peak_clusters_volume.csv")
+            for i, stem in enumerate(input_stems):
+                peak_clusters_df[stem] = [cluster.file_volumes[i]
+                                        for cluster in peak_clusters]
+        elif tapp_parameters['quant_isotopes'] == 'height':
+            out_path_peak_clusters = os.path.join(output_dir, 'quant',
+                                                "peak_clusters_height.csv")
+            for i, stem in enumerate(input_stems):
+                peak_clusters_df[stem] = [cluster.file_heights[i]
+                                        for cluster in peak_clusters]
+        else:
+            raise ValueError("unknown quant_isotopes parameter")
+        peak_clusters_df.to_csv(out_path_peak_clusters, index=False)
 
         # Peak associations.
         logger.info("Generating peak clusters peak associations table")
@@ -1533,18 +1556,6 @@ def dda_pipeline(
     logger.info("Reading feature clusters from disk")
     in_path_feature_clusters = os.path.join(
         output_dir, 'metamatch', 'features.clusters')
-    out_path_feature_clusters_total_height = os.path.join(output_dir, 'quant',
-                                                          "feature_clusters_total_height.csv")
-    out_path_feature_clusters_monoisotopic_height = os.path.join(output_dir, 'quant',
-                                                                 "feature_clusters_monoisotopic_height.csv")
-    out_path_feature_clusters_max_height = os.path.join(output_dir, 'quant',
-                                                        "feature_clusters_max_height.csv")
-    out_path_feature_clusters_total_volume = os.path.join(output_dir, 'quant',
-                                                          "feature_clusters_total_volume.csv")
-    out_path_feature_clusters_monoisotopic_volume = os.path.join(output_dir, 'quant',
-                                                                 "feature_clusters_monoisotopic_volume.csv")
-    out_path_feature_clusters_max_volume = os.path.join(output_dir, 'quant',
-                                                        "feature_clusters_max_volume.csv")
     out_path_feature_clusters_metadata = os.path.join(output_dir, 'quant',
                                                       "feature_clusters_metadata.csv")
     out_path_feature_clusters_features = os.path.join(output_dir, 'quant',
@@ -1553,7 +1564,6 @@ def dda_pipeline(
                                                          "feature_clusters_annotations.csv")
     out_path_feature_clusters_annotations_all = os.path.join(output_dir, 'quant',
                                                              "feature_clusters_annotations_all.csv")
-
     if (not os.path.exists(out_path_feature_clusters_metadata) or override_existing):
         feature_clusters = tapp.read_feature_clusters(
             in_path_feature_clusters)
@@ -1565,59 +1575,54 @@ def dda_pipeline(
             'avg_height': [cluster.avg_total_height for cluster in feature_clusters],
             'charge_state': [cluster.charge_state for cluster in feature_clusters],
         })
-        # Quantitative tables.
-        # Height.
-        feature_clusters_total_heights = pd.DataFrame({
-            'cluster_id': [cluster.id for cluster in feature_clusters],
-        })
-        for i, stem in enumerate(input_stems):
-            feature_clusters_total_heights[stem] = [cluster.total_heights[i]
-                                                    for cluster in feature_clusters]
-        feature_clusters_total_heights.to_csv(
-            out_path_feature_clusters_total_height, index=False)
 
-        feature_clusters_monoisotopic_heights = pd.DataFrame({
+        feature_clusters_df = pd.DataFrame({
             'cluster_id': [cluster.id for cluster in feature_clusters],
         })
-        for i, stem in enumerate(input_stems):
-            feature_clusters_monoisotopic_heights[stem] = [cluster.monoisotopic_heights[i]
-                                                           for cluster in feature_clusters]
-        feature_clusters_monoisotopic_heights.to_csv(
-            out_path_feature_clusters_monoisotopic_height, index=False)
-        feature_clusters_max_heights = pd.DataFrame({
-            'cluster_id': [cluster.id for cluster in feature_clusters],
-        })
-        for i, stem in enumerate(input_stems):
-            feature_clusters_max_heights[stem] = [cluster.max_heights[i]
-                                                  for cluster in feature_clusters]
-        feature_clusters_max_heights.to_csv(
-            out_path_feature_clusters_max_height, index=False)
-        # Volume.
-        feature_clusters_total_volumes = pd.DataFrame({
-            'cluster_id': [cluster.id for cluster in feature_clusters],
-        })
-        for i, stem in enumerate(input_stems):
-            feature_clusters_total_volumes[stem] = [cluster.total_volumes[i]
-                                                    for cluster in feature_clusters]
-        feature_clusters_total_volumes.to_csv(
-            out_path_feature_clusters_total_volume, index=False)
+        if tapp_parameters['quant_features'] == 'monoisotopic_height':
+            out_path_feature_clusters = os.path.join(output_dir, 'quant',
+                    "feature_clusters_monoisotopic_height.csv")
+            for i, stem in enumerate(input_stems):
+                feature_clusters_df[stem] = [cluster.monoisotopic_heights[i]
+                        for cluster in feature_clusters]
+            feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
+        elif tapp_parameters['quant_features'] == 'monoisotopic_volume':
+            out_path_feature_clusters = os.path.join(output_dir, 'quant',
+                    "feature_clusters_monoisotopic_volume.csv")
+            for i, stem in enumerate(input_stems):
+                feature_clusters_df[stem] = [cluster.monoisotopic_volumes[i]
+                        for cluster in feature_clusters]
+            feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
+        elif tapp_parameters['quant_features'] == 'total_height':
+            out_path_feature_clusters = os.path.join(output_dir, 'quant',
+                    "feature_clusters_total_height.csv")
+            for i, stem in enumerate(input_stems):
+                feature_clusters_df[stem] = [cluster.total_heights[i]
+                        for cluster in feature_clusters]
+            feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
+        elif tapp_parameters['quant_features'] == 'total_volume':
+            out_path_feature_clusters = os.path.join(output_dir, 'quant',
+                    "feature_clusters_total_volume.csv")
+            for i, stem in enumerate(input_stems):
+                feature_clusters_df[stem] = [cluster.total_volumes[i]
+                        for cluster in feature_clusters]
+            feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
+        elif tapp_parameters['quant_features'] == 'max_height':
+            out_path_feature_clusters = os.path.join(output_dir, 'quant',
+                    "feature_clusters_max_height.csv")
+            for i, stem in enumerate(input_stems):
+                feature_clusters_df[stem] = [cluster.max_heights[i] for cluster in feature_clusters]
+            feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
+        elif tapp_parameters['quant_features'] == 'max_volume':
+            out_path_feature_clusters = os.path.join(output_dir, 'quant',
+                    "feature_clusters_max_volume.csv")
+            for i, stem in enumerate(input_stems):
+                feature_clusters_df[stem] = [cluster.max_volumes[i]
+                        for cluster in feature_clusters]
+            feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
+        else:
+            raise ValueError("unknown quant_features parameter")
 
-        feature_clusters_monoisotopic_volumes = pd.DataFrame({
-            'cluster_id': [cluster.id for cluster in feature_clusters],
-        })
-        for i, stem in enumerate(input_stems):
-            feature_clusters_monoisotopic_volumes[stem] = [cluster.monoisotopic_volumes[i]
-                                                           for cluster in feature_clusters]
-        feature_clusters_monoisotopic_volumes.to_csv(
-            out_path_feature_clusters_monoisotopic_volume, index=False)
-        feature_clusters_max_volumes = pd.DataFrame({
-            'cluster_id': [cluster.id for cluster in feature_clusters],
-        })
-        for i, stem in enumerate(input_stems):
-            feature_clusters_max_volumes[stem] = [cluster.max_volumes[i]
-                                                  for cluster in feature_clusters]
-        feature_clusters_max_volumes.to_csv(
-            out_path_feature_clusters_max_volume, index=False)
         # Metadata.
         feature_clusters_metadata.to_csv(
             out_path_feature_clusters_metadata, index=False)
