@@ -26,6 +26,18 @@ plt.rcParams.update({
 
 # TODO(alex): Write documentation.
 
+def find_sequence_consensus(annotations, sequence_column, min_consensus_count):
+    consensus = annotations[["cluster_id", "file_id", sequence_column]]
+    consensus = consensus.drop_duplicates()
+    consensus.columns = ["cluster_id", "file_id", "consensus_sequence"]
+    consensus = consensus.groupby(["cluster_id", "consensus_sequence"]).agg(consensus_count=('consensus_sequence', 'count'))
+    max_count = consensus.groupby("cluster_id").max().reset_index()
+    max_count.columns = ["cluster_id", "consensus_count_max"]
+    consensus = pd.merge(consensus.reset_index(), max_count, on="cluster_id")
+    consensus = consensus[consensus["consensus_count"] == consensus["consensus_count_max"]]
+    consensus = consensus[consensus["consensus_count"] >= min_consensus_count]
+    consensus = consensus.drop(["consensus_count_max"], axis=1)
+    return consensus
 
 def plot_mesh(mesh, transform='sqrt', figure=None):
     plt.style.use('dark_background')
@@ -506,10 +518,16 @@ def default_parameters(instrument, avg_fwhm_rt):
             #          'total_height', 'total_volume',
             #          'max_height', 'max_volume',
             'quant_features': 'max_height',
+            # Whether to remove feature annotations where the charge state of
+            # the detected feature doesn't match the one given by the
+            # identification engine.
+            'quant_features_charge_state_filter': True,
             # Options: 'theoretical_mz', 'msms_event'
             'quant_ident_linkage': 'theoretical_mz',
+            # Whether to obtain a consensus sequence and proteins on identifications.
+            'quant_consensus': True,
             # Demand a minimum number of files with identification per cluster.
-            'quant_consensus_min_ident': 2, # TODO
+            'quant_consensus_min_ident': 2,
             # Razor method:
             #     - 'none': Don't perform protein inference.
             #     - 'general_razor': All files are considered for Occam's razor inference.
@@ -1460,6 +1478,18 @@ def dda_pipeline(
         if "protein_description" in x:
             ret["protein_description"] = ".|.".join(
                 np.unique(x['protein_description'].dropna())).strip(".|.")
+        if "consensus_sequence" in x:
+            ret["consensus_sequence"] = ".|.".join(
+                np.unique(x['consensus_sequence'].dropna())).strip(".|.")
+        if "consensus_count" in x:
+            ret["consensus_count"] = ".|.".join(
+                map(str, np.unique(x['consensus_count'].dropna()))).strip(".|.")
+        if "consensus_protein_name" in x:
+            ret["consensus_protein_name"] = ".|.".join(
+                np.unique(x['consensus_protein_name'].dropna())).strip(".|.")
+        if "consensus_protein_description" in x:
+            ret["consensus_protein_description"] = ".|.".join(
+                np.unique(x['consensus_protein_description'].dropna())).strip(".|.")
         return pd.Series(ret)
 
     if (not os.path.exists(out_path_peak_clusters_metadata) or override_existing):
@@ -1509,7 +1539,7 @@ def dda_pipeline(
 
         # Cluster annotations.
         logger.info("Generating peak clusters annotations table")
-        all_cluster_annotations = pd.DataFrame()
+        annotations = pd.DataFrame()
         for stem in input_stems:
             logger.info("Reading peak annotations for: {}".format(stem))
             in_path_peak_annotations = os.path.join(output_dir, 'quant',
@@ -1523,33 +1553,45 @@ def dda_pipeline(
                 "Merging peak/clusters annotations for: {}".format(stem))
             cluster_annotations = pd.merge(
                 cluster_annotations, peak_annotations, on="peak_id", how="left")
-            all_cluster_annotations = pd.concat(
-                [all_cluster_annotations, cluster_annotations]).reset_index(drop=True)
+            annotations = pd.concat(
+                [annotations, cluster_annotations]).reset_index(drop=True)
         # Ensure these columns have the proper type.
-        if "msms_id" in all_cluster_annotations:
-            all_cluster_annotations["msms_id"] = all_cluster_annotations["msms_id"].astype(
+        if "msms_id" in annotations:
+            annotations["msms_id"] = annotations["msms_id"].astype(
                 'Int64')
-        if "psm_charge_state" in all_cluster_annotations:
-            all_cluster_annotations["psm_charge_state"] = all_cluster_annotations["psm_charge_state"].astype(
+        if "psm_charge_state" in annotations:
+            annotations["psm_charge_state"] = annotations["psm_charge_state"].astype(
                 'Int64')
-        if "psm_rank" in all_cluster_annotations:
-            all_cluster_annotations["psm_rank"] = all_cluster_annotations["psm_rank"].astype(
+        if "psm_rank" in annotations:
+            annotations["psm_rank"] = annotations["psm_rank"].astype(
                 'Int64')
-        if "psm_modifications_num" in all_cluster_annotations:
-            all_cluster_annotations["psm_modifications_num"] = all_cluster_annotations["psm_modifications_num"].astype(
+        if "psm_modifications_num" in annotations:
+            annotations["psm_modifications_num"] = annotations["psm_modifications_num"].astype(
                 'Int64')
+
+        if tapp_parameters['quant_consensus']:
+            # Find a sequence consensus
+            consensus_sequence = find_sequence_consensus(annotations, 'psm_sequence', tapp_parameters['quant_consensus_min_ident'])
+            annotations = pd.merge(
+                annotations,
+                consensus_sequence[[
+                    "cluster_id",
+                    "consensus_sequence",
+                    "consensus_count",
+                ]], on="cluster_id", how="left")
+            # Find a consensus proteins
+            proteins = annotations[annotations['psm_sequence'] == annotations['consensus_sequence']]
+            proteins = proteins[['cluster_id', 'protein_name', 'protein_description']].drop_duplicates()
+            proteins.columns = ['cluster_id', 'consensus_protein_name', 'consensus_protein_description']
+            annotations = pd.merge(annotations, proteins, on="cluster_id", how="left")
 
         # Saving annotations before aggregation.
-        all_cluster_annotations = all_cluster_annotations.sort_values(by=[
-                                                                      "cluster_id"])
-        all_cluster_annotations.to_csv(
-            out_path_peak_clusters_annotations_all, index=False)
+        annotations = annotations.sort_values(by=["cluster_id"])
+        annotations.to_csv(out_path_peak_clusters_annotations_all, index=False)
 
         logger.info("Aggregating annotations")
-        all_cluster_annotations = all_cluster_annotations.groupby(
-            'cluster_id').apply(aggregate_cluster_annotations)
-        all_cluster_annotations.to_csv(
-            out_path_peak_clusters_annotations, index=True)
+        annotations = annotations.groupby('cluster_id').apply(aggregate_cluster_annotations)
+        annotations.to_csv(out_path_peak_clusters_annotations, index=True)
 
     # Matched Features
     # ================
@@ -1643,7 +1685,7 @@ def dda_pipeline(
 
         # Cluster annotations.
         logger.info("Generating peak clusters annotations table")
-        all_cluster_annotations = pd.DataFrame()
+        annotations = pd.DataFrame()
         for stem in input_stems:
             logger.info("Reading features for: {}".format(stem))
             in_path_peak_features = os.path.join(output_dir, 'features',
@@ -1651,13 +1693,12 @@ def dda_pipeline(
             in_path_peak_annotations = os.path.join(output_dir, 'quant',
                                                     "{}_peak_annotations.csv".format(stem))
             features = tapp.read_features(in_path_peak_features)
-            features = [(feature.id, feature.peak_ids) for feature in features]
+            features = [(feature.id, feature.peak_ids, feature.charge_state) for feature in features]
             features = pd.DataFrame(
-                features, columns=["feature_id", "peak_id"]).explode("peak_id")
+                features, columns=["feature_id", "peak_id", "charge_state"]).explode("peak_id")
             peak_annotations = pd.read_csv(
                 in_path_peak_annotations, low_memory=False)
-            cluster_annotations = cluster_features[cluster_features["file_id"] == stem][[
-                "cluster_id", "feature_id"]]
+            cluster_annotations = cluster_features[cluster_features["file_id"] == stem][["cluster_id", "feature_id"]]
             cluster_annotations["file_id"] = stem
             logger.info(
                 "Merging peak/clusters annotations for: {}".format(stem))
@@ -1665,33 +1706,48 @@ def dda_pipeline(
                 cluster_annotations, features, on="feature_id", how="left")
             cluster_annotations = pd.merge(
                 cluster_annotations, peak_annotations, on="peak_id", how="left")
-            all_cluster_annotations = pd.concat(
-                [all_cluster_annotations, cluster_annotations])
+            annotations = pd.concat(
+                [annotations, cluster_annotations])
 
         # Ensure these columns have the proper type.
-        if "msms_id" in all_cluster_annotations:
-            all_cluster_annotations["msms_id"] = all_cluster_annotations["msms_id"].astype(
-                'Int64')
-        if "psm_charge_state" in all_cluster_annotations:
-            all_cluster_annotations["psm_charge_state"] = all_cluster_annotations["psm_charge_state"].astype(
-                'Int64')
-        if "psm_rank" in all_cluster_annotations:
-            all_cluster_annotations["psm_rank"] = all_cluster_annotations["psm_rank"].astype(
-                'Int64')
-        if "psm_modifications_num" in all_cluster_annotations:
-            all_cluster_annotations["psm_modifications_num"] = all_cluster_annotations["psm_modifications_num"].astype(
-                'Int64')
+        if "msms_id" in annotations:
+            annotations["msms_id"] = annotations["msms_id"].astype('Int64')
+        if "charge_state" in annotations:
+            annotations["charge_state"] = annotations["charge_state"].astype('Int64')
+        if "psm_charge_state" in annotations:
+            annotations["psm_charge_state"] = annotations["psm_charge_state"].astype('Int64')
+        if "psm_rank" in annotations:
+            annotations["psm_rank"] = annotations["psm_rank"].astype('Int64')
+        if "psm_modifications_num" in annotations:
+            annotations["psm_modifications_num"] = annotations["psm_modifications_num"].astype('Int64')
+
+        if tapp_parameters['quant_consensus']:
+            # Find a sequence consensus
+            consensus_sequence = find_sequence_consensus(annotations, 'psm_sequence', tapp_parameters['quant_consensus_min_ident'])
+            annotations = pd.merge(
+                annotations,
+                consensus_sequence[[
+                    "cluster_id",
+                    "consensus_sequence",
+                    "consensus_count",
+                ]], on="cluster_id", how="left")
+            # Find a consensus proteins
+            proteins = annotations[annotations['psm_sequence'] == annotations['consensus_sequence']]
+            proteins = proteins[['cluster_id', 'protein_name', 'protein_description']].drop_duplicates()
+            proteins.columns = ['cluster_id', 'consensus_protein_name', 'consensus_protein_description']
+            annotations = pd.merge(annotations, proteins, on="cluster_id", how="left")
 
         # Saving annotations before aggregation.
-        all_cluster_annotations = all_cluster_annotations.sort_values(by=[
-                                                                      "cluster_id"])
-        all_cluster_annotations.to_csv(
+        annotations = annotations.sort_values(by=["cluster_id"])
+        annotations.to_csv(
             out_path_feature_clusters_annotations_all, index=False)
 
         logger.info("Aggregating annotations")
-        all_cluster_annotations = all_cluster_annotations.groupby(
+        if "psm_charge_state" in annotations and tapp_parameters['quant_features_charge_state_filter']:
+            annotations = annotations[annotations["psm_charge_state"] == annotations["charge_state"]]
+        annotations = annotations.groupby(
             'cluster_id').apply(aggregate_cluster_annotations)
-        all_cluster_annotations.to_csv(
+        annotations.to_csv(
             out_path_feature_clusters_annotations, index=True)
 
     logger.info('Finished creation of quantitative tables in {}'.format(
