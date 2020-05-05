@@ -955,26 +955,6 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
                     spectrum_match.theoretical_mz = 0.0;
                 }
 
-                // Try to extract identification scores.
-                while (stream.good() && !stream.eof()) {
-                    tag = XmlReader::read_tag(stream);
-                    if (!tag) {
-                        continue;
-                    }
-                    if (tag.value().name == "SpectrumIdentificationItem" &&
-                        tag.value().closed) {
-                        break;
-                    }
-                    if (tag.value().name == "cvParam") {
-                        auto attributes = tag.value().attributes;
-                        // Comet.
-                        if (attributes["accession"] == "MS:1002252") {
-                            spectrum_match.score_comet_xcor =
-                                std::stod(attributes["value"]);
-                        }
-                    }
-                }
-
                 spectrum_matches.push_back(spectrum_match);
             }
         }

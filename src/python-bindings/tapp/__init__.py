@@ -507,7 +507,12 @@ def default_parameters(instrument, avg_fwhm_rt):
             #
             # Identification.
             #
+            # Keep only the max rank PSM.
             'ident_max_rank_only': True,
+            # Whether to filter the PSM that don't pass the FDR threshold.
+            'ident_require_threshold': True,
+            # Ignore PSMs that have been marked as decoy.
+            'ident_ignore_decoy': True,
             #
             # Quality.
             #
@@ -531,6 +536,8 @@ def default_parameters(instrument, avg_fwhm_rt):
             'quant_consensus': True,
             # Demand a minimum number of files with identification per cluster.
             'quant_consensus_min_ident': 2,
+            # Whether to store all the annotations prior to cluster aggregation.
+            'quant_save_all_annotations': True,
             # TODO: Protein inference method:
             #     - 'none': Don't perform protein inference.
             #     - 'general_razor': All files are considered for Occam's razor inference.
@@ -1152,7 +1159,10 @@ def dda_pipeline(
             continue
         logger.info('Reading mzIdentML: {}'.format(in_path))
         ident_data = tapp.read_mzidentml(
-            in_path, max_rank_only=tapp_parameters['ident_max_rank_only'])
+            in_path,
+            ignore_decoy=tapp_parameters['ident_ignore_decoy'],
+            require_threshold=tapp_parameters['ident_require_threshold'],
+            max_rank_only=tapp_parameters['ident_max_rank_only'])
         logger.info('Writing ident data: {}'.format(out_path))
         tapp.write_ident_data(ident_data, out_path)
     logger.info('Finished mzIdentML parsing in {}'.format(
@@ -1327,7 +1337,6 @@ def dda_pipeline(
                 'psm_experimental_mz': [psm.experimental_mz for psm in ident_data.spectrum_matches],
                 'psm_retention_time': [psm.retention_time for psm in ident_data.spectrum_matches],
                 'psm_rank': [psm.rank for psm in ident_data.spectrum_matches],
-                'psm_score_comet_xcor': [psm.score_comet_xcor for psm in ident_data.spectrum_matches],
                 'psm_peptide_id': [psm.match_id for psm in ident_data.spectrum_matches],
             })
             if not psms.empty:
@@ -1468,8 +1477,6 @@ def dda_pipeline(
                                                 "peak_clusters_peaks.csv")
     out_path_peak_clusters_annotations = os.path.join(output_dir, 'quant',
                                                       "peak_clusters_annotations.csv")
-    out_path_peak_clusters_annotations_all = os.path.join(output_dir, 'quant',
-                                                          "peak_clusters_annotations_all.csv")
 
     def aggregate_cluster_annotations(x):
         ret = {}
@@ -1511,8 +1518,6 @@ def dda_pipeline(
             'rt': [cluster.rt for cluster in peak_clusters],
             'avg_height': [cluster.avg_height for cluster in peak_clusters],
         })
-        peak_clusters_metadata_df.to_csv(
-            out_path_peak_clusters_metadata, index=False)
 
         logger.info("Generating peak clusters quantitative table")
         peak_clusters_df = pd.DataFrame({
@@ -1532,6 +1537,7 @@ def dda_pipeline(
                                           for cluster in peak_clusters]
         else:
             raise ValueError("unknown quant_isotopes parameter")
+        logger.info("Writing peaks quantitative table to disk")
         peak_clusters_df.to_csv(out_path_peak_clusters, index=False)
 
         # Peak associations.
@@ -1545,6 +1551,7 @@ def dda_pipeline(
         cluster_peaks["peak_id"] = cluster_peaks["peak_ids"].map(
             lambda x: x.feature_id)
         cluster_peaks = cluster_peaks.drop(["peak_ids"], axis=1)
+        logger.info("Writing cluster to peak table to disk")
         cluster_peaks.to_csv(out_path_peak_clusters_peaks, index=False)
 
         # Cluster annotations.
@@ -1601,13 +1608,22 @@ def dda_pipeline(
                                    on="cluster_id", how="left")
 
         # Saving annotations before aggregation.
-        annotations = annotations.sort_values(by=["cluster_id"])
-        annotations.to_csv(out_path_peak_clusters_annotations_all, index=False)
+        if tapp_parameters['quant_save_all_annotations']:
+            logger.info("Writing annotations to disk")
+            annotations = annotations.sort_values(by=["cluster_id"])
+            annotations.to_csv(out_path_peak_clusters_annotations, index=False)
 
         logger.info("Aggregating annotations")
         annotations = annotations.groupby(
             'cluster_id').apply(aggregate_cluster_annotations)
-        annotations.to_csv(out_path_peak_clusters_annotations, index=True)
+
+        # Metadata
+        logger.info("Merging metadata with annotations")
+        peak_clusters_metadata_df = pd.merge(
+            peak_clusters_metadata_df, annotations, how="left", on="cluster_id")
+        logger.info("Writing metadata to disk")
+        peak_clusters_metadata_df.to_csv(
+            out_path_peak_clusters_metadata, index=False)
 
     # Matched Features
     # ================
@@ -1620,11 +1636,10 @@ def dda_pipeline(
                                                       "feature_clusters_features.csv")
     out_path_feature_clusters_annotations = os.path.join(output_dir, 'quant',
                                                          "feature_clusters_annotations.csv")
-    out_path_feature_clusters_annotations_all = os.path.join(output_dir, 'quant',
-                                                             "feature_clusters_annotations_all.csv")
     if (not os.path.exists(out_path_feature_clusters_metadata) or override_existing):
         feature_clusters = tapp.read_feature_clusters(
             in_path_feature_clusters)
+
         logger.info("Generating feature clusters quantitative table")
         feature_clusters_metadata = pd.DataFrame({
             'cluster_id': [cluster.id for cluster in feature_clusters],
@@ -1633,7 +1648,6 @@ def dda_pipeline(
             'avg_height': [cluster.avg_total_height for cluster in feature_clusters],
             'charge_state': [cluster.charge_state for cluster in feature_clusters],
         })
-
         feature_clusters_df = pd.DataFrame({
             'cluster_id': [cluster.id for cluster in feature_clusters],
         })
@@ -1643,48 +1657,40 @@ def dda_pipeline(
             for i, stem in enumerate(input_stems):
                 feature_clusters_df[stem] = [cluster.monoisotopic_heights[i]
                                              for cluster in feature_clusters]
-            feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
         elif tapp_parameters['quant_features'] == 'monoisotopic_volume':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_monoisotopic_volume.csv")
             for i, stem in enumerate(input_stems):
                 feature_clusters_df[stem] = [cluster.monoisotopic_volumes[i]
                                              for cluster in feature_clusters]
-            feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
         elif tapp_parameters['quant_features'] == 'total_height':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_total_height.csv")
             for i, stem in enumerate(input_stems):
                 feature_clusters_df[stem] = [cluster.total_heights[i]
                                              for cluster in feature_clusters]
-            feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
         elif tapp_parameters['quant_features'] == 'total_volume':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_total_volume.csv")
             for i, stem in enumerate(input_stems):
                 feature_clusters_df[stem] = [cluster.total_volumes[i]
                                              for cluster in feature_clusters]
-            feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
         elif tapp_parameters['quant_features'] == 'max_height':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_max_height.csv")
             for i, stem in enumerate(input_stems):
                 feature_clusters_df[stem] = [cluster.max_heights[i]
                                              for cluster in feature_clusters]
-            feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
         elif tapp_parameters['quant_features'] == 'max_volume':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_max_volume.csv")
             for i, stem in enumerate(input_stems):
                 feature_clusters_df[stem] = [cluster.max_volumes[i]
                                              for cluster in feature_clusters]
-            feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
         else:
             raise ValueError("unknown quant_features parameter")
-
-        # Metadata.
-        feature_clusters_metadata.to_csv(
-            out_path_feature_clusters_metadata, index=False)
+        logger.info("Writing feature clusters quantitative table to disk")
+        feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
 
         # Feature associations.
         logger.info("Generating feature clusters feature associations table")
@@ -1697,6 +1703,7 @@ def dda_pipeline(
         cluster_features["feature_id"] = cluster_features["feature_ids"].map(
             lambda x: x.feature_id)
         cluster_features = cluster_features.drop(["feature_ids"], axis=1)
+        logger.info("Writing cluster to feature table to disk")
         cluster_features.to_csv(
             out_path_feature_clusters_features, index=False)
 
@@ -1764,9 +1771,11 @@ def dda_pipeline(
                                    on="cluster_id", how="left")
 
         # Saving annotations before aggregation.
-        annotations = annotations.sort_values(by=["cluster_id"])
-        annotations.to_csv(
-            out_path_feature_clusters_annotations_all, index=False)
+        if tapp_parameters['quant_save_all_annotations']:
+            logger.info("Writing annotations to disk")
+            annotations = annotations.sort_values(by=["cluster_id"])
+            annotations.to_csv(
+                out_path_feature_clusters_annotations, index=False)
 
         logger.info("Aggregating annotations")
         if "psm_charge_state" in annotations and tapp_parameters['quant_features_charge_state_filter']:
@@ -1774,8 +1783,14 @@ def dda_pipeline(
                                       == annotations["charge_state"]]
         annotations = annotations.groupby(
             'cluster_id').apply(aggregate_cluster_annotations)
-        annotations.to_csv(
-            out_path_feature_clusters_annotations, index=True)
+
+        # Metadata.
+        logger.info("Merging metadata with annotations")
+        feature_clusters_metadata = pd.merge(
+            feature_clusters_metadata, annotations, how="left", on="cluster_id")
+        logger.info("Writing metadata to disk")
+        feature_clusters_metadata.to_csv(
+            out_path_feature_clusters_metadata, index=False)
 
     logger.info('Finished creation of quantitative tables in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))

@@ -1120,8 +1120,6 @@ PYBIND11_MODULE(tapp, m) {
         .def_readonly("retention_time",
                       &IdentData::SpectrumMatch::retention_time)
         .def_readonly("rank", &IdentData::SpectrumMatch::rank)
-        .def_readonly("score_comet_xcor",
-                      &IdentData::SpectrumMatch::score_comet_xcor)
         .def("__repr__", [](const IdentData::SpectrumMatch &s) {
             return "SpectrumMatch <id: " + s.id +
                    ", pass_threshold: " + std::to_string(s.pass_threshold) +
@@ -1429,7 +1427,7 @@ PYBIND11_MODULE(tapp, m) {
              "Read identification data from the given mzIdentML file ",
              py::arg("file_name"), py::arg("ignore_decoy") = true,
              py::arg("require_threshold") = true,
-             py::arg("max_rank_only") = false)
+             py::arg("max_rank_only") = true)
         .def("read_ident_data", &PythonAPI::read_ident_data,
              "Read the ident_data from the binary ident_data file",
              py::arg("file_name"))

@@ -116,7 +116,6 @@ bool IdentData::Serialize::read_spectrum_match(std::istream &stream,
     Serialization::read_double(stream, &spectrum_match->experimental_mz);
     Serialization::read_double(stream, &spectrum_match->retention_time);
     Serialization::read_uint64(stream, &spectrum_match->rank);
-    Serialization::read_double(stream, &spectrum_match->score_comet_xcor);
     return stream.good();
 }
 
@@ -130,7 +129,6 @@ bool IdentData::Serialize::write_spectrum_match(
     Serialization::write_double(stream, spectrum_match.experimental_mz);
     Serialization::write_double(stream, spectrum_match.retention_time);
     Serialization::write_uint64(stream, spectrum_match.rank);
-    Serialization::write_double(stream, spectrum_match.score_comet_xcor);
     return stream.good();
 }
 
