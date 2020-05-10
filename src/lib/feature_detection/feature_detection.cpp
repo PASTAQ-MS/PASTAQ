@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <iostream>
 #include <map>
 
 #include "feature_detection/feature_detection.hpp"
@@ -124,38 +123,36 @@ OptimalPath rolling_cosine_sim(std::vector<double> &A, std::vector<double> &B) {
     for (size_t k = 0; k < A.size(); ++k) {
         size_t min_i = k < max_b_index ? 0 : k - max_b_index;
         size_t max_i = std::min(A.size(), B.size() - max_b_index + k);
-        size_t min_j = k < max_b_index ? max_b_index - k : 0;
-        size_t n_iter = max_i - min_i;
 
         double norm_a = 0.0;
         double dot = 0.0;
         // Center->Left.
         size_t true_min_i = min_i;
         size_t true_max_i = max_i;
-        for (size_t i = 1; i <= k; ++i) {
-            double a = A[min_i + k - i];
-            double b = B[min_j + k - i];
+        for (size_t i = 1; i < std::min(min_i, max_b_index); ++i) {
+            double a = A[min_i - i];
+            double b = B[max_b_index - i];
 
             // Check if difference between theoretical and measured is too big.
             double normalized_a = a / A[k];
             double abs_diff = b / 100.0 / normalized_a;
             if (abs_diff >= 4.0 || abs_diff < 1 / 4.0) {
-                true_min_i = min_i + k - i + 1;
+                true_min_i = min_i - i + 1;
                 break;
             }
 
             dot += a * b;
         }
         // Center->Right.
-        for (size_t i = k; i < min_i + n_iter; ++i) {
+        for (size_t i = 0; min_i + i < max_i && max_b_index + i < B.size(); ++i) {
             double a = A[min_i + i];
-            double b = B[min_j + i];
+            double b = B[max_b_index + i];
 
             // Check if difference between theoretical and measured is too big.
             double normalized_a = a / A[k];
             double abs_diff = b / 100.0 / normalized_a;
             if (abs_diff >= 4.0 || abs_diff < 1 / 4.0) {
-                true_max_i = i;
+                true_max_i = min_i + i;
                 break;
             }
 
