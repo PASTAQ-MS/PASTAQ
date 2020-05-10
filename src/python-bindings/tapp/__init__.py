@@ -491,6 +491,8 @@ def default_parameters(instrument, avg_fwhm_rt):
             # MetaMatch.
             #
             'metamatch_fraction': 0.7,
+            'metamatch_n_sig_mz': 1.5,
+            'metamatch_n_sig_rt': 1.5,
             #
             # Feature detection.
             #
@@ -1109,7 +1111,9 @@ def dda_pipeline(
 
         metamatch_results = tapp.perform_metamatch(
             metamatch_input,
-            tapp_parameters['metamatch_fraction'])
+            tapp_parameters['metamatch_fraction'],
+            tapp_parameters["metamatch_n_sig_mz"],
+            tapp_parameters["metamatch_n_sig_rt"])
 
         # Save metamatch results to disk.
         logger.info("Writing metamatch results to disk")
@@ -1246,7 +1250,11 @@ def dda_pipeline(
 
         logger.info("Finding feature clusters")
         feature_clusters = tapp.find_feature_clusters(
-            groups, features, tapp_parameters["metamatch_fraction"])
+            groups,
+            features,
+            tapp_parameters["metamatch_fraction"],
+            tapp_parameters["metamatch_n_sig_mz"],
+            tapp_parameters["metamatch_n_sig_rt"])
 
         logger.info("Writing feature clusters to disk")
         tapp.write_feature_clusters(feature_clusters, out_path)

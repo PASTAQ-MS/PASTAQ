@@ -45,7 +45,7 @@ void calculate_cluster_pos(double& cluster_mz, double& cluster_rt,
 }
 
 void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
-                              const std::vector<ClassMap>& class_maps) {
+        const std::vector<ClassMap>& class_maps, double n_sig_mz, double n_sig_rt) {
     auto sort_peaks = [](auto p1, auto p2) -> bool {
         double p1_mz = p1.fitted_mz;
         double p2_mz = p2.fitted_mz;
@@ -118,10 +118,10 @@ void MetaMatch::find_clusters(std::vector<MetaMatch::Peak>& peaks,
                     double peak_mz = peaks[index].fitted_mz;
                     double peak_rt =
                         peaks[index].fitted_rt + peaks[index].rt_delta;
-                    if (peak_mz > cluster_mz + cluster_sigma_mz ||
-                        peak_mz < cluster_mz - cluster_sigma_mz ||
-                        peak_rt > cluster_rt + cluster_sigma_rt ||
-                        peak_rt < cluster_rt - cluster_sigma_rt) {
+                    if (peak_mz > cluster_mz + n_sig_mz * cluster_sigma_mz ||
+                        peak_mz < cluster_mz - n_sig_mz * cluster_sigma_mz ||
+                        peak_rt > cluster_rt + n_sig_rt * cluster_sigma_rt ||
+                        peak_rt < cluster_rt - n_sig_rt * cluster_sigma_rt) {
                         peaks[index].cluster_id = -1;
                         metapeak_indexes.erase(metapeak_indexes.begin() + k);
                         calculate_cluster_pos(

@@ -96,7 +96,8 @@ std::vector<FeatureCluster> find_feature_clusters(
 // given peaks array in place, changing the order and the clustering
 // information.
 void find_clusters(std::vector<MetaMatch::Peak>& peaks,
-                   const std::vector<ClassMap>& class_maps);
+                   const std::vector<ClassMap>& class_maps,
+                   double n_sig_mz, double n_sig_rt);
 
 // Returns the orphan peaks and remove them from the given peaks array.
 std::vector<MetaMatch::Peak> extract_orphans(
