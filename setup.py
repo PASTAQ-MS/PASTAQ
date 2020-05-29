@@ -79,11 +79,10 @@ setup(
     ext_modules=[CMakeExtension('tapp/tapp_cpp')],
     cmdclass=dict(build_ext=CMakeBuild),
     install_requires=[
-          'scipy',
-          'numpy',
-          'pandas',
-          'seaborn',
-          'matplotlib',
+        'numpy',
+        'pandas',
+        'seaborn',
+        'matplotlib',
     ],
     zip_safe=False,
 )
