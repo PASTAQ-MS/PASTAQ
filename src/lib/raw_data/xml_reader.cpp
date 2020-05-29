@@ -92,7 +92,7 @@ RawData::Scan parse_mzxml_scan(std::istream &stream,
         // Fetch the next tag. We are interested in the contents of this scan
         // tag: precursorMz and peaks.
         auto next_tag = XmlReader::read_tag(stream);
-        while (next_tag) {
+        while (stream.good()  && !stream.eof()) {
             if (next_tag.value().name == "scan" && next_tag.value().closed) {
                 break;
             }
@@ -103,7 +103,7 @@ RawData::Scan parse_mzxml_scan(std::istream &stream,
             // recursively check child scans.
             if (next_tag.value().name == "scan" && !next_tag.value().closed) {
                 next_tag = XmlReader::read_tag(stream);
-                while (next_tag) {
+                while (stream.good()  && !stream.eof()) {
                     if (next_tag.value().name == "scan" &&
                         next_tag.value().closed) {
                         break;
@@ -248,7 +248,11 @@ RawData::Scan parse_mzxml_scan(std::istream &stream,
     if (scan_ms_level == ms_level - 1) {
         precursor_id = scan.scan_number;
         auto next_tag = XmlReader::read_tag(stream);
-        while (next_tag) {
+        while (stream.good() && next_tag) {
+            if (next_tag.value().name == "scan" &&
+                next_tag.value().closed) {
+                break;
+            }
             if (next_tag.value().name == "scan" && !next_tag.value().closed) {
                 auto child_scan =
                     parse_mzxml_scan(stream, next_tag, min_mz, max_mz, min_rt,
