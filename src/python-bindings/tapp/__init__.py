@@ -1360,7 +1360,7 @@ def dda_pipeline(
             annotations["psm_modifications_num"] = annotations["psm_modifications_num"].astype(
                 'Int64')
 
-        if tapp_parameters['quant_consensus']:
+        if tapp_parameters['quant_consensus'] and 'psm_sequence' in annotations:
             # Find a sequence consensus
             consensus_sequence = find_sequence_consensus(
                 annotations, 'psm_sequence', tapp_parameters['quant_consensus_min_ident'])
@@ -1523,7 +1523,7 @@ def dda_pipeline(
             annotations["psm_modifications_num"] = annotations["psm_modifications_num"].astype(
                 'Int64')
 
-        if tapp_parameters['quant_consensus']:
+        if tapp_parameters['quant_consensus'] and 'psm_sequence' in annotations:
             # Find a sequence consensus
             consensus_sequence = find_sequence_consensus(
                 annotations, 'psm_sequence', tapp_parameters['quant_consensus_min_ident'])
