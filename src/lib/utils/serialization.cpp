@@ -1,5 +1,6 @@
 #include <cstring>
 #include <iostream>
+#include <limits>
 
 #include "utils/serialization.hpp"
 

@@ -35,6 +35,42 @@ def find_sequence_consensus(annotations, sequence_column, min_consensus_count):
     consensus = consensus.drop(["consensus_count_max"], axis=1)
     return consensus
 
+def find_protein_groups(annotations, sequence_column,  protein_name_column, protein_description_column):
+    seq_prot = annotations.copy()
+    seq_prot = seq_prot[[sequence_column, protein_name_column, protein_description_column]]
+    seq_prot = seq_prot.drop_duplicates()
+    seq_prot = seq_prot.dropna()
+    seq_prot = seq_prot.astype(str)
+    seq_prot['combined_protein_name'] = seq_prot[protein_name_column] + "__" + seq_prot[protein_description_column]
+    seq_prot_copy = seq_prot.copy()
+    protein_groups = pd.DataFrame(columns=['protein_group', 'combined_protein_name'])
+    protein_group_index = 0
+    while not seq_prot.empty:
+        cur_target_proteins = seq_prot.iloc[0]['combined_protein_name']
+        cur_target_peptides = seq_prot['combined_protein_name'] == cur_target_proteins
+        cur_target_peptides = seq_prot[sequence_column][cur_target_peptides]
+        cur_target_peptides = cur_target_peptides.drop_duplicates()
+        cur_peptides_len = cur_target_peptides.shape[0]
+        prev_peptides_len = 0
+        while cur_peptides_len != prev_peptides_len:
+            prev_peptides_len = cur_peptides_len
+            cur_target_proteins = seq_prot[seq_prot[sequence_column].isin(cur_target_peptides)]
+            cur_target_proteins = cur_target_proteins['combined_protein_name'].drop_duplicates()
+            cur_target_peptides = seq_prot['combined_protein_name'].isin(cur_target_proteins)
+            cur_target_peptides = seq_prot[sequence_column][cur_target_peptides]
+            cur_target_peptides = cur_target_peptides.drop_duplicates()
+            cur_peptides_len = cur_target_peptides.shape[0]
+        protein_group = pd.DataFrame({
+            'protein_group': np.repeat(protein_group_index, len(cur_target_proteins)),
+            'combined_protein_name': cur_target_proteins.values,
+            })
+        protein_groups = pd.concat([protein_groups, protein_group])
+        protein_group_index += 1
+        seq_prot = seq_prot[~seq_prot['combined_protein_name'].isin(cur_target_proteins)]
+    seq_prot_copy = pd.merge(seq_prot_copy, protein_groups, on='combined_protein_name')
+    seq_prot_copy = seq_prot_copy[[sequence_column, 'protein_group']].drop_duplicates()
+    annotations = pd.merge(annotations, seq_prot_copy, on=sequence_column, how='left')
+    return annotations
 
 def plot_mesh(mesh, transform='sqrt', figure=None):
     plt.style.use('dark_background')
@@ -1281,6 +1317,9 @@ def dda_pipeline(
         if "consensus_protein_description" in x:
             ret["consensus_protein_description"] = ".|.".join(
                 np.unique(x['consensus_protein_description'].dropna())).strip(".|.")
+        if "protein_group" in x:
+            ret["protein_group"] = ".|.".join(
+                map(str, np.unique(x['protein_group'].dropna()))).strip(".|.")
         return pd.Series(ret)
 
     if (not os.path.exists(out_path_peak_clusters_metadata) or override_existing):
@@ -1415,56 +1454,56 @@ def dda_pipeline(
             in_path_feature_clusters)
 
         logger.info("Generating feature clusters quantitative table")
-        feature_clusters_metadata = pd.DataFrame({
+        metadata = pd.DataFrame({
             'cluster_id': [cluster.id for cluster in feature_clusters],
             'mz': [cluster.mz for cluster in feature_clusters],
             'rt': [cluster.rt for cluster in feature_clusters],
             'avg_height': [cluster.avg_total_height for cluster in feature_clusters],
             'charge_state': [cluster.charge_state for cluster in feature_clusters],
         })
-        feature_clusters_df = pd.DataFrame({
+        data = pd.DataFrame({
             'cluster_id': [cluster.id for cluster in feature_clusters],
         })
         if tapp_parameters['quant_features'] == 'monoisotopic_height':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_monoisotopic_height.csv")
             for i, stem in enumerate(input_stems):
-                feature_clusters_df[stem] = [cluster.monoisotopic_heights[i]
+                data[stem] = [cluster.monoisotopic_heights[i]
                                              for cluster in feature_clusters]
         elif tapp_parameters['quant_features'] == 'monoisotopic_volume':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_monoisotopic_volume.csv")
             for i, stem in enumerate(input_stems):
-                feature_clusters_df[stem] = [cluster.monoisotopic_volumes[i]
+                data[stem] = [cluster.monoisotopic_volumes[i]
                                              for cluster in feature_clusters]
         elif tapp_parameters['quant_features'] == 'total_height':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_total_height.csv")
             for i, stem in enumerate(input_stems):
-                feature_clusters_df[stem] = [cluster.total_heights[i]
+                data[stem] = [cluster.total_heights[i]
                                              for cluster in feature_clusters]
         elif tapp_parameters['quant_features'] == 'total_volume':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_total_volume.csv")
             for i, stem in enumerate(input_stems):
-                feature_clusters_df[stem] = [cluster.total_volumes[i]
+                data[stem] = [cluster.total_volumes[i]
                                              for cluster in feature_clusters]
         elif tapp_parameters['quant_features'] == 'max_height':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_max_height.csv")
             for i, stem in enumerate(input_stems):
-                feature_clusters_df[stem] = [cluster.max_heights[i]
+                data[stem] = [cluster.max_heights[i]
                                              for cluster in feature_clusters]
         elif tapp_parameters['quant_features'] == 'max_volume':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_max_volume.csv")
             for i, stem in enumerate(input_stems):
-                feature_clusters_df[stem] = [cluster.max_volumes[i]
+                data[stem] = [cluster.max_volumes[i]
                                              for cluster in feature_clusters]
         else:
             raise ValueError("unknown quant_features parameter")
         logger.info("Writing feature clusters quantitative table to disk")
-        feature_clusters_df.to_csv(out_path_feature_clusters, index=False)
+        data.to_csv(out_path_feature_clusters, index=False)
 
         # Feature associations.
         logger.info("Generating feature clusters feature associations table")
@@ -1544,6 +1583,26 @@ def dda_pipeline(
             annotations = pd.merge(annotations, proteins,
                                    on="cluster_id", how="left")
 
+        # Calculate protein groups.
+        logger.info("Calculating protein groups")
+        sequence_column = 'psm_sequence'
+        protein_name_column = 'protein_name'
+        protein_description_column = 'protein_description'
+        if tapp_parameters['quant_consensus'] and 'psm_sequence' in annotations:
+            sequence_column = 'consensus_sequence'
+            protein_name_column = 'consensus_protein_name'
+            protein_description_column = 'consensus_protein_description'
+
+        # Combine protein name/description in case
+        if (sequence_column in annotations and
+                protein_name_column in annotations and
+                protein_description_column in annotations):
+            annotations = find_protein_groups(
+                    annotations,
+                    sequence_column,
+                    protein_name_column,
+                    protein_description_column)
+
         # Saving annotations before aggregation.
         if tapp_parameters['quant_save_all_annotations']:
             logger.info("Writing annotations to disk")
@@ -1552,19 +1611,62 @@ def dda_pipeline(
                 out_path_feature_clusters_annotations, index=False)
 
         logger.info("Aggregating annotations")
-        if "psm_charge_state" in annotations and tapp_parameters['quant_features_charge_state_filter']:
+        if ("psm_charge_state" in annotations and
+                tapp_parameters['quant_features_charge_state_filter']):
             annotations = annotations[annotations["psm_charge_state"]
                                       == annotations["charge_state"]]
-        annotations = annotations.groupby(
+        annotations_agg = annotations.groupby(
             'cluster_id').apply(aggregate_cluster_annotations)
 
         # Metadata.
         logger.info("Merging metadata with annotations")
-        feature_clusters_metadata = pd.merge(
-            feature_clusters_metadata, annotations, how="left", on="cluster_id")
+        metadata = pd.merge(
+            metadata, annotations_agg, how="left", on="cluster_id")
         logger.info("Writing metadata to disk")
-        feature_clusters_metadata.to_csv(
-            out_path_feature_clusters_metadata, index=False)
+        metadata.to_csv(out_path_feature_clusters_metadata, index=False)
+
+        if 'protein_group' in metadata:
+            logger.info("Aggregating protein groups")
+            def aggregate_protein_group_annotations(x):
+                ret = {}
+                if "psm_sequence" in x:
+                    ret["psm_sequence"] = ".|.".join(
+                        np.unique(x['psm_sequence'].dropna())).strip(".|.")
+                if "protein_name" in x:
+                    ret["protein_name"] = ".|.".join(
+                        np.unique(x['protein_name'].dropna())).strip(".|.")
+                if "protein_description" in x:
+                    ret["protein_description"] = ".|.".join(
+                        np.unique(x['protein_description'].dropna())).strip(".|.")
+                if "consensus_sequence" in x:
+                    ret["consensus_sequence"] = ".|.".join(
+                        np.unique(x['consensus_sequence'].dropna())).strip(".|.")
+                if "consensus_protein_name" in x:
+                    ret["consensus_protein_name"] = ".|.".join(
+                        np.unique(x['consensus_protein_name'].dropna())).strip(".|.")
+                if "consensus_protein_description" in x:
+                    ret["consensus_protein_description"] = ".|.".join(
+                        np.unique(x['consensus_protein_description'].dropna())).strip(".|.")
+                return pd.Series(ret)
+            prot_data = data.copy()
+            prot_data = prot_data.drop(["cluster_id"], axis=1)
+            prot_data['protein_group'] = pd.to_numeric(metadata['protein_group']).astype('Int64')
+            prot_data = prot_data[~(prot_data['protein_group'].isna())]
+            prot_data = prot_data.groupby('protein_group').agg(sum)
+            prot_data = prot_data.reset_index()
+            prot_metadata = annotations.copy()
+            prot_metadata = prot_metadata[~prot_metadata['protein_group'].isna()]
+            prot_metadata = prot_metadata.groupby('protein_group')
+            prot_metadata = prot_metadata.apply(aggregate_protein_group_annotations)
+            prot_metadata = prot_metadata.reset_index()
+            out_path_protein_data = os.path.join(output_dir, 'quant',
+                    "protein_groups.csv")
+            out_path_protein_metadata = os.path.join(output_dir, 'quant',
+                    "protein_groups_metadata.csv")
+
+            logger.info("Writing protein group data/metadata to disk")
+            prot_data.to_csv(out_path_protein_data, index=False)
+            prot_metadata.to_csv(out_path_protein_metadata, index=False)
 
     logger.info('Finished creation of quantitative tables in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
