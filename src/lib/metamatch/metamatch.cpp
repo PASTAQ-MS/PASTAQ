@@ -250,9 +250,9 @@ std::vector<MetaMatch::FeatureCluster> MetaMatch::find_feature_clusters(
     size_t n_files = features.size();
 
     // We need two sets of indexes, one sorted in descending order of intensity
-    // to prioritize the seletion of a reference feature to match to, and a set
-    // of indexes per file to sort by ascending m/z order. This is
-    // done to speedup searching of features using binary search.
+    // to prioritize the selection of a reference feature to match to, and a set
+    // of indexes per file to sort by ascending m/z order. This is done to
+    // speedup searching of features using binary search.
     struct Index {
         uint64_t file_index;
         uint64_t group_id;

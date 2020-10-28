@@ -304,7 +304,7 @@ SimilarityResults find_similarity(std::vector<Centroid::Peak> &peak_list_a,
                                   size_t n_peaks) {
     auto sort_peaks = [](const Centroid::Peak &p1,
                          const Centroid::Peak &p2) -> bool {
-        return (p1.fitted_height >= p2.fitted_height);
+        return (p2.fitted_height < p1.fitted_height);
     };
     std::sort(peak_list_a.begin(), peak_list_a.end(), sort_peaks);
     std::sort(peak_list_b.begin(), peak_list_b.end(), sort_peaks);
@@ -318,13 +318,17 @@ SimilarityResults find_similarity(std::vector<Centroid::Peak> &peak_list_a,
     results.self_a = Centroid::cumulative_overlap(peak_list_a, peak_list_a);
     results.self_b = Centroid::cumulative_overlap(peak_list_b, peak_list_b);
     results.overlap = Centroid::cumulative_overlap(peak_list_a, peak_list_b);
-    // Overlap / (GeometricMean(self_a, self_b))
-    results.geometric_ratio =
-        results.overlap / std::sqrt(results.self_a * results.self_b);
-    // Harmonic mean of the ratios between
-    // self_similarity/overlap_similarity
-    results.mean_ratio =
-        2 * results.overlap / (results.self_a + results.self_b);
+    results.geometric_ratio = 0;
+    results.mean_ratio = 0;
+    if (results.self_a != 0 && results.self_b != 0) {
+        // Overlap / (GeometricMean(self_a, self_b))
+        results.geometric_ratio =
+            results.overlap / std::sqrt(results.self_a * results.self_b);
+        // Harmonic mean of the ratios between
+        // self_similarity/overlap_similarity
+        results.mean_ratio =
+            2 * results.overlap / (results.self_a + results.self_b);
+    }
     return results;
 }
 
