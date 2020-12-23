@@ -740,7 +740,11 @@ std::optional<XmlReader::Tag> XmlReader::read_tag(std::istream &stream) {
 IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
                                                bool ignore_decoy,
                                                bool require_threshold,
-                                               bool max_rank_only) {
+                                               bool max_rank_only,
+                                               double min_mz,
+                                               double max_mz,
+                                               double min_rt,
+                                               double max_rt) {
     IdentData::IdentData ident_data = {};
 
     // Find the DBSequences, Peptides and PeptideEvidence in the
@@ -979,13 +983,19 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
                     selected_spectrum = spectrum_match;
                 }
             }
-            ident_data.spectrum_matches.push_back(selected_spectrum);
+            if (selected_spectrum.experimental_mz >= min_mz && selected_spectrum.experimental_mz <= max_mz &&
+                selected_spectrum.retention_time >= min_rt && selected_spectrum.retention_time <= max_rt) {
+                ident_data.spectrum_matches.push_back(selected_spectrum);
+            }
         } else {
             // Update retention time on the provisional spectrum_matches list
             // and push each element to the list of PSM.
             for (auto &spectrum_match : spectrum_matches) {
                 spectrum_match.retention_time = retention_time;
-                ident_data.spectrum_matches.push_back(spectrum_match);
+                if (spectrum_match.experimental_mz >= min_mz && spectrum_match.experimental_mz <= max_mz &&
+                    spectrum_match.retention_time >= min_rt && spectrum_match.retention_time <= max_rt) {
+                    ident_data.spectrum_matches.push_back(spectrum_match);
+                }
             }
         }
     }

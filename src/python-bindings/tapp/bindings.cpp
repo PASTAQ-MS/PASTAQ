@@ -788,7 +788,17 @@ std::vector<Link::LinkedPsm> read_linked_psm(std::string &input_file) {
 
 IdentData::IdentData read_mzidentml(std::string &input_file, bool ignore_decoy,
                                     bool require_threshold,
-                                    bool max_rank_only) {
+                                    bool max_rank_only,
+                                    double min_mz,
+                                    double max_mz,
+                                    double min_rt,
+                                    double max_rt) {
+    // Setup infinite range if no point was specified.
+    min_rt = min_rt < 0 ? 0 : min_rt;
+    max_rt = max_rt < 0 ? std::numeric_limits<double>::infinity() : max_rt;
+    min_mz = min_mz < 0 ? 0 : min_mz;
+    max_mz = max_mz < 0 ? std::numeric_limits<double>::infinity() : max_mz;
+
     // Open file stream.
     std::ifstream stream;
     stream.open(input_file);
@@ -798,7 +808,7 @@ IdentData::IdentData read_mzidentml(std::string &input_file, bool ignore_decoy,
         throw std::invalid_argument(error_stream.str());
     }
     return XmlReader::read_mzidentml(stream, ignore_decoy, require_threshold,
-                                     max_rank_only);
+                                     max_rank_only, min_mz, max_mz, min_rt, max_rt);
 }
 
 std::vector<MetaMatch::FeatureCluster> find_feature_clusters(
@@ -1344,7 +1354,9 @@ PYBIND11_MODULE(tapp, m) {
              "Read identification data from the given mzIdentML file ",
              py::arg("file_name"), py::arg("ignore_decoy") = true,
              py::arg("require_threshold") = true,
-             py::arg("max_rank_only") = true)
+             py::arg("max_rank_only") = true,
+             py::arg("min_mz") = -1.0, py::arg("max_mz") = -1.0,
+             py::arg("min_rt") = -1.0, py::arg("max_rt") = -1.0)
         .def("read_ident_data", &PythonAPI::read_ident_data,
              "Read the ident_data from the binary ident_data file",
              py::arg("file_name"))

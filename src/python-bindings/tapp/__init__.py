@@ -1120,7 +1120,12 @@ def dda_pipeline(
             in_path,
             ignore_decoy=tapp_parameters['ident_ignore_decoy'],
             require_threshold=tapp_parameters['ident_require_threshold'],
-            max_rank_only=tapp_parameters['ident_max_rank_only'])
+            max_rank_only=tapp_parameters['ident_max_rank_only'],
+            min_mz=tapp_parameters['min_mz'],
+            max_mz=tapp_parameters['max_mz'],
+            min_rt=tapp_parameters['min_rt'],
+            max_rt=tapp_parameters['max_rt'],
+        )
         logger.info('Writing ident data: {}'.format(out_path))
         tapp.write_ident_data(ident_data, out_path)
     logger.info('Finished mzIdentML parsing in {}'.format(

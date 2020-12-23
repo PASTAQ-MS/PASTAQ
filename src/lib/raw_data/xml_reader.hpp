@@ -43,7 +43,8 @@ std::optional<RawData::RawData> read_mzml(
 
 // Read an entire mzIdentML file into a IdentData::IdentData data structure.
 IdentData::IdentData read_mzidentml(std::istream &stream, bool ignore_decoy,
-                                    bool require_threshold, bool max_rank_only);
+    bool require_threshold, bool max_rank_only, double min_mz, double max_mz, 
+    double min_rt, double max_rt);
 }  // namespace XmlReader
 
 #endif /* RAWDATA_XMLREADER_HPP */
