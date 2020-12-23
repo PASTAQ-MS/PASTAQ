@@ -352,6 +352,193 @@ def default_parameters(instrument, avg_fwhm_rt):
         return tapp_parameters
 
 
+def dda_pipeline_summary(tapp_parameters, input_stems, output_dir):
+    summary_log = logging.getLogger('summary')
+    summary_log.setLevel(logging.INFO)
+    summary_log_fh = logging.FileHandler(os.path.join(output_dir, 'summary.log'))
+    summary_log_fh.setLevel(logging.INFO)
+    summary_log_formatter = logging.Formatter('%(message)s')
+    summary_log_fh.setFormatter(summary_log_formatter)
+    summary_log.addHandler(summary_log_fh)
+
+    # Raw data
+    summary_log.info('Raw data')
+    for stem in input_stems:
+        summary_log.info('    {}'.format(stem))
+
+        # MS1
+        in_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
+        if os.path.exists(in_path):
+            raw_data = tapp.read_raw_data(in_path)
+            summary_log.info('        MS1')
+            summary_log.info('            number of scans: {}'.format(len(raw_data.scans)))
+            summary_log.info('            min_mz: {}'.format(raw_data.min_mz))
+            summary_log.info('            max_mz: {}'.format(raw_data.max_mz))
+            summary_log.info('            min_rt: {}'.format(raw_data.min_rt))
+            summary_log.info('            max_rt: {}'.format(raw_data.max_rt))
+
+        # MS2
+        in_path = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
+        if os.path.exists(in_path):
+            raw_data = tapp.read_raw_data(in_path)
+            summary_log.info('        MS2')
+            summary_log.info('            number of scans: {}'.format(len(raw_data.scans)))
+            summary_log.info('            min_mz: {}'.format(raw_data.min_mz))
+            summary_log.info('            max_mz: {}'.format(raw_data.max_mz))
+            summary_log.info('            min_rt: {}'.format(raw_data.min_rt))
+            summary_log.info('            max_rt: {}'.format(raw_data.max_rt))
+
+    # Peaks
+    summary_log.info('Peaks detected')
+    avg_peak_heights = []
+    median_peak_heights = []
+    std_peak_heights = []
+    n_peaks = []
+    for stem in input_stems:
+        summary_log.info('    {}'.format(stem))
+
+        in_path = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
+        if os.path.exists(in_path):
+            peaks = tapp.read_peaks(in_path)
+            peak_heights = np.array([peak.fitted_height for peak in peaks])
+            n_peaks += [len(peaks)]
+            mean_height = peak_heights.mean()
+            median_height = np.median(peak_heights)
+            std_height = np.std(peak_heights)
+            avg_peak_heights += [mean_height]
+            median_peak_heights += [median_height]
+            std_peak_heights += [std_height]
+            summary_log.info('        Number of peaks: {}'.format(len(peaks)))
+            summary_log.info('        Fitted height')
+            summary_log.info('            mean: {}'.format(mean_height))
+            summary_log.info('            median: {}'.format(median_height))
+            summary_log.info('            std: {}'.format(std_height))
+
+    if len(n_peaks) != 0:
+        summary_log.info('    Overall average')
+        summary_log.info('        Number of peaks: {}'.format(np.mean(n_peaks)))
+        summary_log.info('        Fitted height')
+        summary_log.info('            mean: {}'.format(np.mean(avg_peak_heights)))
+        summary_log.info('            median: {}'.format(np.mean(median_peak_heights)))
+        summary_log.info('            std: {}'.format(np.mean(std_peak_heights)))
+
+    # Feature detection
+    summary_log.info('Feature detection')
+    avg_feature_monoisotopic_heights = []
+    median_feature_monoisotopic_heights = []
+    std_feature_monoisotopic_heights = []
+    avg_feature_max_heights = []
+    median_feature_max_heights = []
+    std_feature_max_heights = []
+    avg_feature_total_heights = []
+    median_feature_total_heights = []
+    std_feature_total_heights = []
+    n_features = []
+    for stem in input_stems:
+        summary_log.info('    {}'.format(stem))
+
+        in_path = os.path.join(output_dir, 'features', "{}.features".format(stem))
+        if os.path.exists(in_path):
+            features = tapp.read_features(in_path)
+
+            feature_max_heights = np.array([feature.max_height for feature in features])
+            feature_monoisotopic_heights = np.array([feature.monoisotopic_height for feature in features])
+            feature_total_heights = np.array([feature.total_height for feature in features])
+
+            feature_mean_max_height = feature_max_heights.mean()
+            feature_median_max_height = np.median(feature_max_heights)
+            feature_std_max_height = np.std(feature_max_heights)
+
+            feature_mean_monoisotopic_height = feature_monoisotopic_heights.mean()
+            feature_median_monoisotopic_height = np.median(feature_monoisotopic_heights)
+            feature_std_monoisotopic_height = np.std(feature_monoisotopic_heights)
+
+            feature_mean_total_height = feature_total_heights.mean()
+            feature_median_total_height = np.median(feature_total_heights)
+            feature_std_total_height = np.std(feature_total_heights)
+
+            n_features += [len(features)]
+            avg_feature_max_heights += [feature_mean_max_height]
+            median_feature_max_heights += [feature_median_max_height]
+            std_feature_max_heights += [feature_std_max_height]
+
+            avg_feature_monoisotopic_heights += [feature_mean_monoisotopic_height]
+            median_feature_monoisotopic_heights += [feature_median_monoisotopic_height]
+            std_feature_monoisotopic_heights += [feature_std_monoisotopic_height]
+
+            avg_feature_total_heights += [feature_mean_total_height]
+            median_feature_total_heights += [feature_median_total_height]
+            std_feature_total_heights += [feature_std_total_height]
+
+            summary_log.info('        Number of features: {}'.format(len(features)))
+            summary_log.info('        Max height')
+            summary_log.info('            mean: {}'.format(feature_mean_max_height))
+            summary_log.info('            median: {}'.format(feature_median_max_height))
+            summary_log.info('            std: {}'.format(feature_std_max_height))
+            summary_log.info('        Monoisotopic height')
+            summary_log.info('            mean: {}'.format(feature_mean_monoisotopic_height))
+            summary_log.info('            median: {}'.format(feature_median_monoisotopic_height))
+            summary_log.info('            std: {}'.format(feature_std_monoisotopic_height))
+            summary_log.info('        Total height')
+            summary_log.info('            mean: {}'.format(feature_mean_total_height))
+            summary_log.info('            median: {}'.format(feature_median_total_height))
+            summary_log.info('            std: {}'.format(feature_std_total_height))
+
+    if len(n_features) != 0:
+        summary_log.info('    Overall average')
+        summary_log.info('        Number of features: {}'.format(np.mean(n_features)))
+        summary_log.info('        Max height')
+        summary_log.info('            mean: {}'.format(np.mean(avg_feature_max_heights)))
+        summary_log.info('            median: {}'.format(np.mean(median_feature_max_heights)))
+        summary_log.info('            std: {}'.format(np.mean(std_feature_max_heights)))
+        summary_log.info('        Monoisotopic height')
+        summary_log.info('            mean height: {}'.format(np.mean(avg_feature_monoisotopic_heights)))
+        summary_log.info('            median height: {}'.format(np.mean(median_feature_monoisotopic_heights)))
+        summary_log.info('            std height: {}'.format(np.mean(std_feature_monoisotopic_heights)))
+        summary_log.info('        Total height')
+        summary_log.info('            mean height: {}'.format(np.mean(avg_feature_total_heights)))
+        summary_log.info('            median height: {}'.format(np.mean(median_feature_total_heights)))
+        summary_log.info('            std height: {}'.format(np.mean(std_feature_total_heights)))
+
+    # Identifications and linkage
+    summary_log.info('Annotations and linkage')
+    for stem in input_stems:
+        summary_log.info('    {}'.format(stem))
+
+        in_path_raw_data = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
+        in_path_linked_msms = os.path.join(output_dir, 'linking', "{}.ms2_peak.link".format(stem))
+        if os.path.exists(in_path_raw_data) and os.path.exists(in_path_linked_msms):
+            raw_data = tapp.read_raw_data(in_path_raw_data)
+            linked_msms = tapp.read_linked_msms(in_path_linked_msms)
+            summary_log.info('        MS/MS-Peaks linkage')
+            summary_log.info('            Number of ms/ms events: {}'.format(len(raw_data.scans)))
+            summary_log.info('            Number of ms/ms events linked to peaks: {}'.format(len(linked_msms)))
+            summary_log.info('            Linking efficiency (%): {}'.format(len(linked_msms)/len(raw_data.scans) * 100.0))
+
+        in_path_ident_data = os.path.join(output_dir, 'ident', "{}.ident".format(stem))
+        if os.path.exists(in_path_ident_data):
+            ident_data = tapp.read_ident_data(in_path_ident_data)
+
+            in_path_ident_ms2 = os.path.join(output_dir, 'linking', "{}.ident_ms2.link".format(stem))
+            if os.path.exists(in_path_ident_ms2):
+                ident_ms2 = tapp.read_linked_msms(in_path_ident_ms2)
+                summary_log.info('        MS/MS-Identification linkage')
+                summary_log.info('            Number of PSMs: {}'.format(len(ident_data.spectrum_matches)))
+                summary_log.info('            Number of PSMs linked to MS/MS events: {}'.format(len(ident_ms2)))
+                summary_log.info('            PSM-peaks linking efficiency (%): {}'.format(len(ident_ms2)/len(ident_data.spectrum_matches) * 100.0))
+
+            in_path_peak_idents = os.path.join(output_dir, 'linking', "{}.ident_peak.link".format(stem))
+            if os.path.exists(in_path_peak_idents):
+                ident_peak = tapp.read_linked_psm(in_path_peak_idents)
+                summary_log.info('        MS/MS-Identification linkage')
+                summary_log.info('            Number of PSMs: {}'.format(len(ident_data.spectrum_matches)))
+                summary_log.info('            Number of PSMs linked to peaks: {}'.format(len(ident_peak)))
+                summary_log.info('            PSM-peaks linking efficiency (%): {}'.format(len(ident_peak)/len(ident_data.spectrum_matches) * 100.0))
+
+    # TODO: Metamatch stats
+    # TODO: Peptide stats
+    # TODO: Protein group stats
+
 def dda_pipeline(
     tapp_parameters,
     input_files,
@@ -445,20 +632,10 @@ def dda_pipeline(
     logger_fh.setFormatter(formatter)
     logger.addHandler(logger_fh)
 
-    summary_log = logging.getLogger('summary')
-    summary_log.addFilter(DeltaTimeFilter())
-    summary_log.setLevel(logging.INFO)
-    summary_log_fh = logging.FileHandler(os.path.join(output_dir, 'summary.log'))
-    summary_log_fh.setLevel(logging.INFO)
-    summary_log_formatter = logging.Formatter('%(message)s')
-    summary_log_fh.setFormatter(summary_log_formatter)
-    summary_log.addHandler(summary_log_fh)
-
     time_pipeline_start = time.time()
 
     # Raw data to binary conversion.
     logger.info('Starting raw data conversion')
-    summary_log.info('Raw data (MS1)')
     time_start = time.time()
     for i, file_name in enumerate(input_raw_files):
         # Check if file has already been processed.
@@ -488,15 +665,6 @@ def dda_pipeline(
         logger.info('Writing MS1: {}'.format(out_path))
         raw_data.dump(out_path)
 
-        # Summary and stats
-        summary_log.info('    {}'.format(stem))
-        summary_log.info('        number of scans: {}'.format(len(raw_data.scans)))
-        summary_log.info('        min_mz: {}'.format(raw_data.min_mz))
-        summary_log.info('        max_mz: {}'.format(raw_data.max_mz))
-        summary_log.info('        min_rt: {}'.format(raw_data.min_rt))
-        summary_log.info('        max_rt: {}'.format(raw_data.max_rt))
-
-    summary_log.info('Raw data (MS2)')
     for i, file_name in enumerate(input_raw_files):
         # Check if file has already been processed.
         stem = input_stems[i]
@@ -525,26 +693,12 @@ def dda_pipeline(
         logger.info('Writing MS2: {}'.format(out_path))
         raw_data.dump(out_path)
 
-        # Summary and stats
-        summary_log.info('    {}'.format(stem))
-        summary_log.info('        number of scans: {}'.format(len(raw_data.scans)))
-        summary_log.info('        min_mz: {}'.format(raw_data.min_mz))
-        summary_log.info('        max_mz: {}'.format(raw_data.max_mz))
-        summary_log.info('        min_rt: {}'.format(raw_data.min_rt))
-        summary_log.info('        max_rt: {}'.format(raw_data.max_rt))
-
     logger.info('Finished raw data conversion in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
     # Perform resampling/smoothing and peak detection and save results to disk.
     logger.info('Starting peak detection')
-    summary_log.info('Peak detection')
     time_start = time.time()
-    # Peak detection stats
-    avg_peak_heights = []
-    median_peak_heights = []
-    std_peak_heights = []
-    n_peaks = []
     for stem in input_stems:
         # Check if file has already been processed.
         in_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
@@ -573,29 +727,8 @@ def dda_pipeline(
         logger.info('Writing peaks:'.format(out_path))
         tapp.write_peaks(peaks, out_path)
 
-        # Summary stats
-        peak_heights = np.array([peak.fitted_height for peak in peaks])
-        n_peaks += [len(peaks)]
-        mean_height = peak_heights.mean()
-        median_height = np.median(peak_heights)
-        std_height = np.std(peak_heights)
-        avg_peak_heights += [mean_height]
-        median_peak_heights += [median_height]
-        std_peak_heights += [std_height]
-        summary_log.info('    {}'.format(stem))
-        summary_log.info('        number of peaks: {}'.format(len(peaks)))
-        summary_log.info('        mean peak height: {}'.format(mean_height))
-        summary_log.info('        median peak height: {}'.format(median_height))
-        summary_log.info('        std peak height: {}'.format(std_height))
-
     logger.info('Finished peak detection in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
-
-    summary_log.info('    Overall average')
-    summary_log.info('        number of peaks: {}'.format(np.mean(n_peaks)))
-    summary_log.info('        mean peak height: {}'.format(np.mean(avg_peak_heights)))
-    summary_log.info('        median peak height: {}'.format(np.mean(median_peak_heights)))
-    summary_log.info('        std peak height: {}'.format(np.mean(std_peak_heights)))
 
     # Calculate similarity matrix before alignment, generate heatmap and save
     # to disk.
@@ -953,18 +1086,6 @@ def dda_pipeline(
     # Perform feature detection using averagine
     logger.info('Starting feature detection')
     time_start = time.time()
-    # Feature detection stats
-    summary_log.info('Feature detection')
-    avg_feature_monoisotopic_heights = []
-    median_feature_monoisotopic_heights = []
-    std_feature_monoisotopic_heights = []
-    avg_feature_max_heights = []
-    median_feature_max_heights = []
-    std_feature_max_heights = []
-    avg_feature_total_heights = []
-    median_feature_total_heights = []
-    std_feature_total_heights = []
-    n_features = []
     for stem in input_stems:
         # Check if file has already been processed.
         in_path_peaks = os.path.join(
@@ -983,67 +1104,12 @@ def dda_pipeline(
         logger.info('Writing features: {}'.format(out_path))
         tapp.write_features(features, out_path)
 
-        # Summary stats
-        feature_max_heights = np.array([feature.max_height for feature in features])
-        feature_monoisotopic_heights = np.array([feature.monoisotopic_height for feature in features])
-        feature_total_heights = np.array([feature.total_height for feature in features])
-
-        feature_mean_max_height = feature_max_heights.mean()
-        feature_median_max_height = np.median(feature_max_heights)
-        feature_std_max_height = np.std(feature_max_heights)
-
-        feature_mean_monoisotopic_height = feature_monoisotopic_heights.mean()
-        feature_median_monoisotopic_height = np.median(feature_monoisotopic_heights)
-        feature_std_monoisotopic_height = np.std(feature_monoisotopic_heights)
-
-        feature_mean_total_height = feature_total_heights.mean()
-        feature_median_total_height = np.median(feature_total_heights)
-        feature_std_total_height = np.std(feature_total_heights)
-
-        n_features += [len(features)]
-        avg_feature_max_heights += [feature_mean_max_height]
-        median_feature_max_heights += [feature_median_max_height]
-        std_feature_max_heights += [feature_std_max_height]
-
-        avg_feature_monoisotopic_heights += [feature_mean_monoisotopic_height]
-        median_feature_monoisotopic_heights += [feature_median_monoisotopic_height]
-        std_feature_monoisotopic_heights += [feature_std_monoisotopic_height]
-
-        avg_feature_total_heights += [feature_mean_total_height]
-        median_feature_total_heights += [feature_median_total_height]
-        std_feature_total_heights += [feature_std_total_height]
-
-        summary_log.info('    {}'.format(stem))
-        summary_log.info('        number of features: {}'.format(len(features)))
-        summary_log.info('        mean feature max height: {}'.format(feature_mean_max_height))
-        summary_log.info('        median feature max height: {}'.format(feature_median_max_height))
-        summary_log.info('        std feature max height: {}'.format(feature_std_max_height))
-        summary_log.info('        mean feature monoisotopic height: {}'.format(feature_mean_monoisotopic_height))
-        summary_log.info('        median feature monoisotopic height: {}'.format(feature_median_monoisotopic_height))
-        summary_log.info('        std feature monoisotopic height: {}'.format(feature_std_monoisotopic_height))
-        summary_log.info('        mean feature total height: {}'.format(feature_mean_total_height))
-        summary_log.info('        median feature total height: {}'.format(feature_median_total_height))
-        summary_log.info('        std feature total height: {}'.format(feature_std_total_height))
-
     logger.info('Finished feature detection in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
-
-    summary_log.info('    Overall average')
-    summary_log.info('        number of features: {}'.format(np.mean(n_features)))
-    summary_log.info('        mean feature max height: {}'.format(np.mean(avg_feature_max_heights)))
-    summary_log.info('        median feature max height: {}'.format(np.mean(median_feature_max_heights)))
-    summary_log.info('        std feature max height: {}'.format(np.mean(std_feature_max_heights)))
-    summary_log.info('        mean feature monoisotopic height: {}'.format(np.mean(avg_feature_monoisotopic_heights)))
-    summary_log.info('        median feature monoisotopic height: {}'.format(np.mean(median_feature_monoisotopic_heights)))
-    summary_log.info('        std feature monoisotopic height: {}'.format(np.mean(std_feature_monoisotopic_heights)))
-    summary_log.info('        mean feature total height: {}'.format(np.mean(avg_feature_total_heights)))
-    summary_log.info('        median feature total height: {}'.format(np.mean(median_feature_total_heights)))
-    summary_log.info('        std feature total height: {}'.format(np.mean(std_feature_total_heights)))
 
     # Read mzidentdata and save binary data to disk.
     logger.info('Starting mzIdentML parsing')
     time_start = time.time()
-    summary_log.info('Identification parsing')
     for i, stem in enumerate(input_stems):
         in_path = input_ident_files[i]
         out_path = os.path.join(output_dir, 'ident', "{}.ident".format(stem))
@@ -1062,7 +1128,6 @@ def dda_pipeline(
 
     # Match ms2 events with corresponding detected peaks.
     logger.info('Starting peaks/msms linkage')
-    summary_log.info('MS/MS-Peaks linking')
     time_start = time.time()
     for stem in input_stems:
         # Check if file has already been processed.
@@ -1070,7 +1135,7 @@ def dda_pipeline(
         in_path_peaks = os.path.join(
             output_dir, 'warped_peaks', "{}.peaks".format(stem))
         out_path = os.path.join(output_dir, 'linking',
-                                "{}.ms2_peaks.link".format(stem))
+                                "{}.ms2_peak.link".format(stem))
         if os.path.exists(out_path) and not override_existing:
             continue
 
@@ -1085,19 +1150,12 @@ def dda_pipeline(
         logger.info('Writing linked_msms: {}'.format(out_path))
         tapp.write_linked_msms(linked_msms, out_path)
 
-        # Stats
-        summary_log.info('    {}'.format(stem))
-        summary_log.info('        number of ms/ms events: {}'.format(len(raw_data.scans)))
-        summary_log.info('        number of ms/ms events linked to peaks: {}'.format(len(linked_msms)))
-        summary_log.info('        linking efficiency (%): {}'.format(len(linked_msms)/len(raw_data.scans) * 100.0))
-
     logger.info('Finished peaks/msms linkage in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
     # Link ms2 events with ident information.
     logger.info('Starting ident/msms linkage')
     time_start = time.time()
-    summary_log.info('MS/MS-Identification linkage')
     for i, stem in enumerate(input_stems):
         # Check that we had identification info.
         if input_ident_files[i] == 'none':
@@ -1109,9 +1167,9 @@ def dda_pipeline(
         in_path_idents = os.path.join(
             output_dir, 'ident', "{}.ident".format(stem))
         out_path = os.path.join(output_dir, 'linking',
-                                "{}.ms2_idents.link".format(stem))
+                                "{}.ident_ms2.link".format(stem))
         out_path_psm = os.path.join(output_dir, 'linking',
-                                    "{}.peak_idents.link".format(stem))
+                                    "{}.ident_peak.link".format(stem))
         if os.path.exists(out_path) and not override_existing:
             continue
 
@@ -1133,54 +1191,14 @@ def dda_pipeline(
         logger.info('Writing linked_psm: {}'.format(out_path))
         tapp.write_linked_psm(linked_psm, out_path_psm)
 
-        # Stats
-        summary_log.info('    {}'.format(stem))
-        summary_log.info('        number of PSMs: {}'.format(len(ident_data.spectrum_matches)))
-        summary_log.info('        number of PSMs linked to peaks: {}'.format(len(linked_psm)))
-        summary_log.info('        number of PSMs linked to ms/ms events: {}'.format(len(linked_idents)))
-        summary_log.info('        PSM-peaks linking efficiency (%): {}'.format(len(linked_psm)/len(ident_data.spectrum_matches) * 100.0))
-        summary_log.info('        PSM-msms linking efficiency (%): {}'.format(len(linked_idents)/len(ident_data.spectrum_matches) * 100.0))
-
     logger.info('Finished ident/msms linkage in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
-
-#     # Use metamatch to match warped peaks.
-#     logger.info("Starting metamatch")
-#     time_start = time.time()
-#     out_path = os.path.join(output_dir, 'metamatch')
-#     if (not os.path.exists(os.path.join(out_path, "peaks.clusters"))
-#             or override_existing):
-#         metamatch_input = []
-#         for i, stem in enumerate(input_stems):
-#             in_path = os.path.join(
-#                 output_dir, 'warped_peaks', "{}.peaks".format(stem))
-#             logger.info("Reading peaks from disk: {}".format(stem))
-#             metamatch_input += [(groups[i], tapp.read_peaks(in_path))]
-
-#         metamatch_results = tapp.perform_metamatch(
-#             metamatch_input,
-#             tapp_parameters['metamatch_fraction'],
-#             tapp_parameters["metamatch_n_sig_mz"],
-#             tapp_parameters["metamatch_n_sig_rt"])
-
-#         # Save metamatch results to disk.
-#         logger.info("Writing metamatch results to disk")
-#         tapp.write_metamatch_clusters(
-#             metamatch_results.clusters,
-#             os.path.join(out_path, "peaks.clusters"))
-#         tapp.write_metamatch_peaks(
-#             metamatch_results.orphans,
-#             os.path.join(out_path, "peaks.orphans"))
-
-#     logger.info('Finished metamatch in {}'.format(
-#         datetime.timedelta(seconds=time.time()-time_start)))
 
     # Perform metamatch on detected peaks.
     logger.info('Starting metamatch on peaks')
     time_start = time.time()
     in_path_peaks = os.path.join(output_dir, 'warped_peaks')
     out_path = os.path.join(output_dir, 'metamatch', "peaks.clusters")
-    # TODO: stats on metamatched stuff
     if (not os.path.exists(out_path) or override_existing):
         logger.info("Reading peaks from disk")
         peaks = [
@@ -1207,7 +1225,6 @@ def dda_pipeline(
     time_start = time.time()
     in_path_features = os.path.join(output_dir, 'features')
     out_path = os.path.join(output_dir, 'metamatch', "features.clusters")
-    # TODO: stats on metamatched stuff
     if (not os.path.exists(out_path) or override_existing):
         logger.info("Reading features from disk")
         features = [
@@ -1238,11 +1255,11 @@ def dda_pipeline(
         in_path_peaks = os.path.join(
             output_dir, 'warped_peaks', "{}.peaks".format(stem))
         in_path_peaks_link = os.path.join(
-            output_dir, 'linking', "{}.ms2_peaks.link".format(stem))
+            output_dir, 'linking', "{}.ms2_peak.link".format(stem))
         in_path_ident_link_msms = os.path.join(
-            output_dir, 'linking', "{}.ms2_idents.link".format(stem))
+            output_dir, 'linking', "{}.ident_ms2.link".format(stem))
         in_path_ident_link_theomz = os.path.join(
-            output_dir, 'linking', "{}.peak_idents.link".format(stem))
+            output_dir, 'linking', "{}.ident_peak.link".format(stem))
         in_path_ident_data = os.path.join(
             output_dir, 'ident', "{}.ident".format(stem))
         out_path_peaks = os.path.join(output_dir, 'quant',
@@ -1317,7 +1334,7 @@ def dda_pipeline(
             if not psms.empty:
                 if tapp_parameters["quant_ident_linkage"] == 'theoretical_mz':
                     logger.info(
-                        "Reading linked peak_idents from disk: {}".format(stem))
+                        "Reading linked ident_peak from disk: {}".format(stem))
                     linked_idents = tapp.read_linked_psm(
                         in_path_ident_link_theomz)
                     linked_idents = pd.DataFrame({
@@ -1331,7 +1348,7 @@ def dda_pipeline(
                         peak_annotations, linked_idents, on="peak_id", how="left")
                 elif tapp_parameters["quant_ident_linkage"] == 'msms_event':
                     logger.info(
-                        "Reading linked peak_idents from disk: {}".format(stem))
+                        "Reading linked ident_peak from disk: {}".format(stem))
                     linked_idents = tapp.read_linked_msms(
                         in_path_ident_link_msms)
                     linked_idents = pd.DataFrame({
@@ -1835,6 +1852,9 @@ def dda_pipeline(
 
     logger.info('Finished creation of quantitative tables in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
+
+    logger.info("Performing summary")
+    dda_pipeline_summary(tapp_parameters, input_stems, output_dir)
 
     logger.info('Total time elapsed: {}'.format(
         datetime.timedelta(seconds=time.time()-time_pipeline_start)))
