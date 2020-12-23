@@ -445,10 +445,20 @@ def dda_pipeline(
     logger_fh.setFormatter(formatter)
     logger.addHandler(logger_fh)
 
+    summary_log = logging.getLogger('summary')
+    summary_log.addFilter(DeltaTimeFilter())
+    summary_log.setLevel(logging.INFO)
+    summary_log_fh = logging.FileHandler(os.path.join(output_dir, 'summary.log'))
+    summary_log_fh.setLevel(logging.INFO)
+    summary_log_formatter = logging.Formatter('%(message)s')
+    summary_log_fh.setFormatter(summary_log_formatter)
+    summary_log.addHandler(summary_log_fh)
+
     time_pipeline_start = time.time()
 
     # Raw data to binary conversion.
     logger.info('Starting raw data conversion')
+    summary_log.info('Raw data (MS1)')
     time_start = time.time()
     for i, file_name in enumerate(input_raw_files):
         # Check if file has already been processed.
@@ -478,6 +488,15 @@ def dda_pipeline(
         logger.info('Writing MS1: {}'.format(out_path))
         raw_data.dump(out_path)
 
+        # Summary and stats
+        summary_log.info('    {}'.format(stem))
+        summary_log.info('        number of scans: {}'.format(len(raw_data.scans)))
+        summary_log.info('        min_mz: {}'.format(raw_data.min_mz))
+        summary_log.info('        max_mz: {}'.format(raw_data.max_mz))
+        summary_log.info('        min_rt: {}'.format(raw_data.min_rt))
+        summary_log.info('        max_rt: {}'.format(raw_data.max_rt))
+
+    summary_log.info('Raw data (MS2)')
     for i, file_name in enumerate(input_raw_files):
         # Check if file has already been processed.
         stem = input_stems[i]
@@ -506,12 +525,26 @@ def dda_pipeline(
         logger.info('Writing MS2: {}'.format(out_path))
         raw_data.dump(out_path)
 
+        # Summary and stats
+        summary_log.info('    {}'.format(stem))
+        summary_log.info('        number of scans: {}'.format(len(raw_data.scans)))
+        summary_log.info('        min_mz: {}'.format(raw_data.min_mz))
+        summary_log.info('        max_mz: {}'.format(raw_data.max_mz))
+        summary_log.info('        min_rt: {}'.format(raw_data.min_rt))
+        summary_log.info('        max_rt: {}'.format(raw_data.max_rt))
+
     logger.info('Finished raw data conversion in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
     # Perform resampling/smoothing and peak detection and save results to disk.
     logger.info('Starting peak detection')
+    summary_log.info('Peak detection')
     time_start = time.time()
+    # Peak detection stats
+    avg_peak_heights = []
+    median_peak_heights = []
+    std_peak_heights = []
+    n_peaks = []
     for stem in input_stems:
         # Check if file has already been processed.
         in_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
@@ -540,8 +573,29 @@ def dda_pipeline(
         logger.info('Writing peaks:'.format(out_path))
         tapp.write_peaks(peaks, out_path)
 
+        # Summary stats
+        peak_heights = np.array([peak.fitted_height for peak in peaks])
+        n_peaks += [len(peaks)]
+        mean_height = peak_heights.mean()
+        median_height = np.median(peak_heights)
+        std_height = np.std(peak_heights)
+        avg_peak_heights += [mean_height]
+        median_peak_heights += [median_height]
+        std_peak_heights += [std_height]
+        summary_log.info('    {}'.format(stem))
+        summary_log.info('        number of peaks: {}'.format(len(peaks)))
+        summary_log.info('        mean peak height: {}'.format(mean_height))
+        summary_log.info('        median peak height: {}'.format(median_height))
+        summary_log.info('        std peak height: {}'.format(std_height))
+
     logger.info('Finished peak detection in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
+
+    summary_log.info('    Overall average')
+    summary_log.info('        number of peaks: {}'.format(np.mean(n_peaks)))
+    summary_log.info('        mean peak height: {}'.format(np.mean(avg_peak_heights)))
+    summary_log.info('        median peak height: {}'.format(np.mean(median_peak_heights)))
+    summary_log.info('        std peak height: {}'.format(np.mean(std_peak_heights)))
 
     # Calculate similarity matrix before alignment, generate heatmap and save
     # to disk.
@@ -850,10 +904,8 @@ def dda_pipeline(
                 "Plotting density of sigma_mz/sigma_rt: {}".format(stem))
             sigma_mzs = np.array([peak.fitted_sigma_mz for peak in peaks])
             sigma_rts = np.array([peak.fitted_sigma_rt for peak in peaks])
-            sns.distplot(sigma_rts, hist=False, ax=ax6, kde_kws={
-                         'label': stem, 'alpha': alpha})
-            sns.distplot(sigma_mzs, hist=False, ax=ax7, kde_kws={
-                         'label': stem, 'alpha': alpha})
+            sns.kdeplot(sigma_rts, ax=ax6)
+            sns.kdeplot(sigma_mzs, ax=ax7)
 
         logger.info("Saving figures to disk")
 
@@ -898,39 +950,119 @@ def dda_pipeline(
     logger.info('Finished quality control plotting in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
-    # Use metamatch to match warped peaks.
-    logger.info("Starting metamatch")
+    # Perform feature detection using averagine
+    logger.info('Starting feature detection')
     time_start = time.time()
-    out_path = os.path.join(output_dir, 'metamatch')
-    if (not os.path.exists(os.path.join(out_path, "peaks.clusters"))
-            or override_existing):
-        metamatch_input = []
-        for i, stem in enumerate(input_stems):
-            in_path = os.path.join(
-                output_dir, 'warped_peaks', "{}.peaks".format(stem))
-            logger.info("Reading peaks from disk: {}".format(stem))
-            metamatch_input += [(groups[i], tapp.read_peaks(in_path))]
+    # Feature detection stats
+    summary_log.info('Feature detection')
+    avg_feature_monoisotopic_heights = []
+    median_feature_monoisotopic_heights = []
+    std_feature_monoisotopic_heights = []
+    avg_feature_max_heights = []
+    median_feature_max_heights = []
+    std_feature_max_heights = []
+    avg_feature_total_heights = []
+    median_feature_total_heights = []
+    std_feature_total_heights = []
+    n_features = []
+    for stem in input_stems:
+        # Check if file has already been processed.
+        in_path_peaks = os.path.join(
+            output_dir, 'warped_peaks', "{}.peaks".format(stem))
+        out_path = os.path.join(output_dir, 'features',
+                                "{}.features".format(stem))
+        if os.path.exists(out_path) and not override_existing:
+            continue
 
-        metamatch_results = tapp.perform_metamatch(
-            metamatch_input,
-            tapp_parameters['metamatch_fraction'],
-            tapp_parameters["metamatch_n_sig_mz"],
-            tapp_parameters["metamatch_n_sig_rt"])
+        logger.info("Reading peaks from disk: {}".format(stem))
+        peaks = tapp.read_peaks(in_path_peaks)
 
-        # Save metamatch results to disk.
-        logger.info("Writing metamatch results to disk")
-        tapp.write_metamatch_clusters(
-            metamatch_results.clusters,
-            os.path.join(out_path, "peaks.clusters"))
-        tapp.write_metamatch_peaks(
-            metamatch_results.orphans,
-            os.path.join(out_path, "peaks.orphans"))
+        logger.info("Performing feature_detection: {}".format(stem))
+        features = tapp.detect_features(
+            peaks, tapp_parameters['feature_detection_charge_states'])
+        logger.info('Writing features: {}'.format(out_path))
+        tapp.write_features(features, out_path)
 
-    logger.info('Finished metamatch in {}'.format(
+        # Summary stats
+        feature_max_heights = np.array([feature.max_height for feature in features])
+        feature_monoisotopic_heights = np.array([feature.monoisotopic_height for feature in features])
+        feature_total_heights = np.array([feature.total_height for feature in features])
+
+        feature_mean_max_height = feature_max_heights.mean()
+        feature_median_max_height = np.median(feature_max_heights)
+        feature_std_max_height = np.std(feature_max_heights)
+
+        feature_mean_monoisotopic_height = feature_monoisotopic_heights.mean()
+        feature_median_monoisotopic_height = np.median(feature_monoisotopic_heights)
+        feature_std_monoisotopic_height = np.std(feature_monoisotopic_heights)
+
+        feature_mean_total_height = feature_total_heights.mean()
+        feature_median_total_height = np.median(feature_total_heights)
+        feature_std_total_height = np.std(feature_total_heights)
+
+        n_features += [len(features)]
+        avg_feature_max_heights += [feature_mean_max_height]
+        median_feature_max_heights += [feature_median_max_height]
+        std_feature_max_heights += [feature_std_max_height]
+
+        avg_feature_monoisotopic_heights += [feature_mean_monoisotopic_height]
+        median_feature_monoisotopic_heights += [feature_median_monoisotopic_height]
+        std_feature_monoisotopic_heights += [feature_std_monoisotopic_height]
+
+        avg_feature_total_heights += [feature_mean_total_height]
+        median_feature_total_heights += [feature_median_total_height]
+        std_feature_total_heights += [feature_std_total_height]
+
+        summary_log.info('    {}'.format(stem))
+        summary_log.info('        number of features: {}'.format(len(features)))
+        summary_log.info('        mean feature max height: {}'.format(feature_mean_max_height))
+        summary_log.info('        median feature max height: {}'.format(feature_median_max_height))
+        summary_log.info('        std feature max height: {}'.format(feature_std_max_height))
+        summary_log.info('        mean feature monoisotopic height: {}'.format(feature_mean_monoisotopic_height))
+        summary_log.info('        median feature monoisotopic height: {}'.format(feature_median_monoisotopic_height))
+        summary_log.info('        std feature monoisotopic height: {}'.format(feature_std_monoisotopic_height))
+        summary_log.info('        mean feature total height: {}'.format(feature_mean_total_height))
+        summary_log.info('        median feature total height: {}'.format(feature_median_total_height))
+        summary_log.info('        std feature total height: {}'.format(feature_std_total_height))
+
+    logger.info('Finished feature detection in {}'.format(
+        datetime.timedelta(seconds=time.time()-time_start)))
+
+    summary_log.info('    Overall average')
+    summary_log.info('        number of features: {}'.format(np.mean(n_features)))
+    summary_log.info('        mean feature max height: {}'.format(np.mean(avg_feature_max_heights)))
+    summary_log.info('        median feature max height: {}'.format(np.mean(median_feature_max_heights)))
+    summary_log.info('        std feature max height: {}'.format(np.mean(std_feature_max_heights)))
+    summary_log.info('        mean feature monoisotopic height: {}'.format(np.mean(avg_feature_monoisotopic_heights)))
+    summary_log.info('        median feature monoisotopic height: {}'.format(np.mean(median_feature_monoisotopic_heights)))
+    summary_log.info('        std feature monoisotopic height: {}'.format(np.mean(std_feature_monoisotopic_heights)))
+    summary_log.info('        mean feature total height: {}'.format(np.mean(avg_feature_total_heights)))
+    summary_log.info('        median feature total height: {}'.format(np.mean(median_feature_total_heights)))
+    summary_log.info('        std feature total height: {}'.format(np.mean(std_feature_total_heights)))
+
+    # Read mzidentdata and save binary data to disk.
+    logger.info('Starting mzIdentML parsing')
+    time_start = time.time()
+    summary_log.info('Identification parsing')
+    for i, stem in enumerate(input_stems):
+        in_path = input_ident_files[i]
+        out_path = os.path.join(output_dir, 'ident', "{}.ident".format(stem))
+        if in_path == 'none' or (os.path.exists(out_path) and not override_existing):
+            continue
+        logger.info('Reading mzIdentML: {}'.format(in_path))
+        ident_data = tapp.read_mzidentml(
+            in_path,
+            ignore_decoy=tapp_parameters['ident_ignore_decoy'],
+            require_threshold=tapp_parameters['ident_require_threshold'],
+            max_rank_only=tapp_parameters['ident_max_rank_only'])
+        logger.info('Writing ident data: {}'.format(out_path))
+        tapp.write_ident_data(ident_data, out_path)
+    logger.info('Finished mzIdentML parsing in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
     # Match ms2 events with corresponding detected peaks.
     logger.info('Starting peaks/msms linkage')
+    summary_log.info('MS/MS-Peaks linking')
     time_start = time.time()
     for stem in input_stems:
         # Check if file has already been processed.
@@ -952,31 +1084,20 @@ def dda_pipeline(
         linked_msms = tapp.link_peaks(peaks, raw_data)
         logger.info('Writing linked_msms: {}'.format(out_path))
         tapp.write_linked_msms(linked_msms, out_path)
-    logger.info('Finished peaks/msms linkage in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
 
-    # Read mzidentdata and save binary data to disk.
-    logger.info('Starting mzIdentML parsing')
-    time_start = time.time()
-    for i, stem in enumerate(input_stems):
-        in_path = input_ident_files[i]
-        out_path = os.path.join(output_dir, 'ident', "{}.ident".format(stem))
-        if in_path == 'none' or (os.path.exists(out_path) and not override_existing):
-            continue
-        logger.info('Reading mzIdentML: {}'.format(in_path))
-        ident_data = tapp.read_mzidentml(
-            in_path,
-            ignore_decoy=tapp_parameters['ident_ignore_decoy'],
-            require_threshold=tapp_parameters['ident_require_threshold'],
-            max_rank_only=tapp_parameters['ident_max_rank_only'])
-        logger.info('Writing ident data: {}'.format(out_path))
-        tapp.write_ident_data(ident_data, out_path)
-    logger.info('Finished mzIdentML parsing in {}'.format(
+        # Stats
+        summary_log.info('    {}'.format(stem))
+        summary_log.info('        number of ms/ms events: {}'.format(len(raw_data.scans)))
+        summary_log.info('        number of ms/ms events linked to peaks: {}'.format(len(linked_msms)))
+        summary_log.info('        linking efficiency (%): {}'.format(len(linked_msms)/len(raw_data.scans) * 100.0))
+
+    logger.info('Finished peaks/msms linkage in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
     # Link ms2 events with ident information.
     logger.info('Starting ident/msms linkage')
     time_start = time.time()
+    summary_log.info('MS/MS-Identification linkage')
     for i, stem in enumerate(input_stems):
         # Check that we had identification info.
         if input_ident_files[i] == 'none':
@@ -1011,31 +1132,74 @@ def dda_pipeline(
         linked_psm = tapp.link_psm(ident_data, peaks, raw_data)
         logger.info('Writing linked_psm: {}'.format(out_path))
         tapp.write_linked_psm(linked_psm, out_path_psm)
+
+        # Stats
+        summary_log.info('    {}'.format(stem))
+        summary_log.info('        number of PSMs: {}'.format(len(ident_data.spectrum_matches)))
+        summary_log.info('        number of PSMs linked to peaks: {}'.format(len(linked_psm)))
+        summary_log.info('        number of PSMs linked to ms/ms events: {}'.format(len(linked_idents)))
+        summary_log.info('        PSM-peaks linking efficiency (%): {}'.format(len(linked_psm)/len(ident_data.spectrum_matches) * 100.0))
+        summary_log.info('        PSM-msms linking efficiency (%): {}'.format(len(linked_idents)/len(ident_data.spectrum_matches) * 100.0))
+
     logger.info('Finished ident/msms linkage in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
-    # Perform feature detection using averagine or linked identification
-    # if available in ms2 linked peaks.
-    logger.info('Starting feature detection')
+#     # Use metamatch to match warped peaks.
+#     logger.info("Starting metamatch")
+#     time_start = time.time()
+#     out_path = os.path.join(output_dir, 'metamatch')
+#     if (not os.path.exists(os.path.join(out_path, "peaks.clusters"))
+#             or override_existing):
+#         metamatch_input = []
+#         for i, stem in enumerate(input_stems):
+#             in_path = os.path.join(
+#                 output_dir, 'warped_peaks', "{}.peaks".format(stem))
+#             logger.info("Reading peaks from disk: {}".format(stem))
+#             metamatch_input += [(groups[i], tapp.read_peaks(in_path))]
+
+#         metamatch_results = tapp.perform_metamatch(
+#             metamatch_input,
+#             tapp_parameters['metamatch_fraction'],
+#             tapp_parameters["metamatch_n_sig_mz"],
+#             tapp_parameters["metamatch_n_sig_rt"])
+
+#         # Save metamatch results to disk.
+#         logger.info("Writing metamatch results to disk")
+#         tapp.write_metamatch_clusters(
+#             metamatch_results.clusters,
+#             os.path.join(out_path, "peaks.clusters"))
+#         tapp.write_metamatch_peaks(
+#             metamatch_results.orphans,
+#             os.path.join(out_path, "peaks.orphans"))
+
+#     logger.info('Finished metamatch in {}'.format(
+#         datetime.timedelta(seconds=time.time()-time_start)))
+
+    # Perform metamatch on detected peaks.
+    logger.info('Starting metamatch on peaks')
     time_start = time.time()
-    for stem in input_stems:
-        # Check if file has already been processed.
-        in_path_peaks = os.path.join(
-            output_dir, 'warped_peaks', "{}.peaks".format(stem))
-        out_path = os.path.join(output_dir, 'features',
-                                "{}.features".format(stem))
-        if os.path.exists(out_path) and not override_existing:
-            continue
+    in_path_peaks = os.path.join(output_dir, 'warped_peaks')
+    out_path = os.path.join(output_dir, 'metamatch', "peaks.clusters")
+    # TODO: stats on metamatched stuff
+    if (not os.path.exists(out_path) or override_existing):
+        logger.info("Reading peaks from disk")
+        peaks = [
+            tapp.read_peaks(
+                os.path.join(in_path_peaks, "{}.peaks".format(input_stem)))
+            for input_stem in input_stems]
 
-        logger.info("Reading peaks from disk: {}".format(stem))
-        peaks = tapp.read_peaks(in_path_peaks)
+        logger.info("Finding peak clusters")
+        peak_clusters = tapp.find_peak_clusters(
+            groups,
+            peaks,
+            tapp_parameters["metamatch_fraction"],
+            tapp_parameters["metamatch_n_sig_mz"],
+            tapp_parameters["metamatch_n_sig_rt"])
 
-        logger.info("Performing feature_detection: {}".format(stem))
-        features = tapp.detect_features(
-            peaks, tapp_parameters['feature_detection_charge_states'])
-        logger.info('Writing features: {}'.format(out_path))
-        tapp.write_features(features, out_path)
-    logger.info('Finished feature detection in {}'.format(
+        logger.info("Writing peak clusters to disk")
+        tapp.write_peak_clusters(peak_clusters, out_path)
+
+    logger.info('Finished metamatch on peaks in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
     # Perform metamatch on detected features.
@@ -1043,6 +1207,7 @@ def dda_pipeline(
     time_start = time.time()
     in_path_features = os.path.join(output_dir, 'features')
     out_path = os.path.join(output_dir, 'metamatch', "features.clusters")
+    # TODO: stats on metamatched stuff
     if (not os.path.exists(out_path) or override_existing):
         logger.info("Reading features from disk")
         features = [
@@ -1323,7 +1488,7 @@ def dda_pipeline(
         return pd.Series(ret)
 
     if (not os.path.exists(out_path_peak_clusters_metadata) or override_existing):
-        peak_clusters = tapp.read_metamatch_clusters(in_path_peak_clusters)
+        peak_clusters = tapp.read_peak_clusters(in_path_peak_clusters)
         logger.info("Generating peak clusters quantitative table")
         peak_clusters_metadata_df = pd.DataFrame({
             'cluster_id': [cluster.id for cluster in peak_clusters],
@@ -1346,7 +1511,7 @@ def dda_pipeline(
             out_path_peak_clusters = os.path.join(output_dir, 'quant',
                                                   "peak_clusters_height.csv")
             for i, stem in enumerate(input_stems):
-                peak_clusters_df[stem] = [cluster.file_heights[i]
+                peak_clusters_df[stem] = [cluster.heights[i]
                                           for cluster in peak_clusters]
         else:
             raise ValueError("unknown quant_isotopes parameter")
@@ -1362,7 +1527,7 @@ def dda_pipeline(
         cluster_peaks["file_id"] = cluster_peaks["peak_ids"].map(
             lambda x: input_stems[x.file_id])
         cluster_peaks["peak_id"] = cluster_peaks["peak_ids"].map(
-            lambda x: x.feature_id)
+            lambda x: x.peak_id)
         cluster_peaks = cluster_peaks.drop(["peak_ids"], axis=1)
         logger.info("Writing cluster to peak table to disk")
         cluster_peaks.to_csv(out_path_peak_clusters_peaks, index=False)

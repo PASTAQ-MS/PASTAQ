@@ -590,6 +590,90 @@ void write_peak_clusters(
         throw std::invalid_argument(error_stream.str());
     }
 
+    if (!MetaMatch::Serialize::write_peak_clusters(stream,
+                                                      peak_clusters)) {
+        std::ostringstream error_stream;
+        error_stream
+            << "error: couldn't write the peak_clusters into the output file"
+            << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+}
+
+std::vector<MetaMatch::PeakCluster> read_peak_clusters(
+    std::string &input_file) {
+    // Open file stream.
+    std::ifstream stream;
+    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open input file" << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    std::vector<MetaMatch::PeakCluster> peak_clusters;
+    if (!MetaMatch::Serialize::read_peak_clusters(stream,
+                                                     &peak_clusters)) {
+        std::ostringstream error_stream;
+        error_stream
+            << "error: couldn't write the peak_clusters into the input file"
+            << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+    return peak_clusters;
+}
+
+void write_features(const std::vector<FeatureDetection::Feature> &features,
+                    std::string &output_file) {
+    // Open file stream.
+    std::ofstream stream;
+    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open output file" << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    if (!FeatureDetection::Serialize::write_features(stream, features)) {
+        std::ostringstream error_stream;
+        error_stream
+            << "error: couldn't write the features into the output file"
+            << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+}
+
+std::vector<FeatureDetection::Feature> read_features(std::string &input_file) {
+    // Open file stream.
+    std::ifstream stream;
+    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open input file" << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    std::vector<FeatureDetection::Feature> features;
+    if (!FeatureDetection::Serialize::read_features(stream, &features)) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't write the features into the input file"
+                     << input_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+    return features;
+}
+
+void write_ident_data(const IdentData::IdentData &ident_data,
+                      std::string &output_file) {
+    // Open file stream.
+    std::ofstream stream;
+    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
+    if (!stream) {
+        std::ostringstream error_stream;
+        error_stream << "error: couldn't open output file" << output_file;
+        throw std::invalid_argument(error_stream.str());
+    }
+
     if (!IdentData::Serialize::write_ident_data(stream, ident_data)) {
         std::ostringstream error_stream;
         error_stream
@@ -618,90 +702,6 @@ IdentData::IdentData read_ident_data(std::string &input_file) {
         throw std::invalid_argument(error_stream.str());
     }
     return ident_data;
-}
-
-void write_metamatch_clusters(
-    const std::vector<MetaMatch::Cluster> &metamatch_clusters,
-    std::string &output_file) {
-    // Open file stream.
-    std::ofstream stream;
-    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
-    if (!stream) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't open output file" << output_file;
-        throw std::invalid_argument(error_stream.str());
-    }
-
-    if (!MetaMatch::Serialize::write_clusters(stream, metamatch_clusters)) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't write the metamatch_clusters into the "
-                        "output file"
-                     << output_file;
-        throw std::invalid_argument(error_stream.str());
-    }
-}
-
-std::vector<MetaMatch::Cluster> read_metamatch_clusters(
-    std::string &input_file) {
-    // Open file stream.
-    std::ifstream stream;
-    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
-    if (!stream) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't open input file" << input_file;
-        throw std::invalid_argument(error_stream.str());
-    }
-
-    std::vector<MetaMatch::Cluster> metamatch_clusters;
-    if (!MetaMatch::Serialize::read_clusters(stream, &metamatch_clusters)) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't write the metamatch_clusters into the "
-                        "input file"
-                     << input_file;
-        throw std::invalid_argument(error_stream.str());
-    }
-    return metamatch_clusters;
-}
-
-void write_metamatch_peaks(const std::vector<MetaMatch::Peak> &metamatch_peaks,
-                           std::string &output_file) {
-    // Open file stream.
-    std::ofstream stream;
-    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
-    if (!stream) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't open output file" << output_file;
-        throw std::invalid_argument(error_stream.str());
-    }
-
-    if (!MetaMatch::Serialize::write_peaks(stream, metamatch_peaks)) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't write the metamatch_peaks into the "
-                        "output file"
-                     << output_file;
-        throw std::invalid_argument(error_stream.str());
-    }
-}
-
-std::vector<MetaMatch::Peak> read_metamatch_peaks(std::string &input_file) {
-    // Open file stream.
-    std::ifstream stream;
-    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
-    if (!stream) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't open input file" << input_file;
-        throw std::invalid_argument(error_stream.str());
-    }
-
-    std::vector<MetaMatch::Peak> metamatch_peaks;
-    if (!MetaMatch::Serialize::read_peaks(stream, &metamatch_peaks)) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't write the metamatch_peaks into the "
-                        "input file"
-                     << input_file;
-        throw std::invalid_argument(error_stream.str());
-    }
-    return metamatch_peaks;
 }
 
 void write_linked_msms(const std::vector<Link::LinkedMsms> &linked_msms,
@@ -801,49 +801,6 @@ IdentData::IdentData read_mzidentml(std::string &input_file, bool ignore_decoy,
                                      max_rank_only);
 }
 
-struct MetaMatchResults {
-    std::vector<MetaMatch::Cluster> clusters;
-    std::vector<MetaMatch::Peak> orphans;
-};
-
-MetaMatchResults perform_metamatch(
-    // NOTE: [(class_0, peaks_0),...(class_i, peaks_i)]
-    std::vector<std::tuple<uint32_t, std::vector<Centroid::Peak>>> input,
-    double fraction, double n_sig_mz, double n_sig_rt) {
-    MetaMatchResults results;
-
-    // Create the ClassMaps.
-    std::vector<MetaMatch::ClassMap> class_maps;
-    std::vector<MetaMatch::Peak> metapeaks;
-    uint32_t file_id = 0;
-    for (const auto &[class_id, peaks] : input) {
-        bool found = false;
-        for (auto &class_map : class_maps) {
-            if (class_map.id == class_id) {
-                found = true;
-                class_map.n_files++;
-                class_map.required_hits =
-                    std::ceil(class_map.n_files * fraction);
-                break;
-            }
-        }
-        if (!found) {
-            class_maps.push_back({class_id, 1, 0});
-        }
-        for (const auto &peak : peaks) {
-            metapeaks.push_back(
-                {peak, file_id, class_id, -1, peak.fitted_mz, peak.fitted_rt});
-        }
-        ++file_id;
-    }
-
-    MetaMatch::find_clusters(metapeaks, class_maps, n_sig_mz, n_sig_rt);
-    results.orphans = MetaMatch::extract_orphans(metapeaks);
-    results.clusters = MetaMatch::reduce_cluster(metapeaks, file_id);
-
-    return results;
-}
-
 std::vector<MetaMatch::FeatureCluster> find_feature_clusters(
     std::vector<uint64_t> group_ids,
     std::vector<std::vector<FeatureDetection::Feature>> features,
@@ -855,6 +812,21 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters(
         throw std::invalid_argument(error_stream.str());
     }
     return MetaMatch::find_feature_clusters(group_ids, features, keep_perc,
+                                            intensity_threshold, n_sig_mz,
+                                            n_sig_rt);
+}
+
+std::vector<MetaMatch::PeakCluster> find_peak_clusters(
+    std::vector<uint64_t> group_ids,
+    std::vector<std::vector<Centroid::Peak>> peaks,
+    double keep_perc, double intensity_threshold, double n_sig_mz,
+    double n_sig_rt) {
+    if (group_ids.size() != peaks.size()) {
+        std::ostringstream error_stream;
+        error_stream << "error: the length of groups and peaks don't match";
+        throw std::invalid_argument(error_stream.str());
+    }
+    return MetaMatch::find_peak_clusters(group_ids, peaks, keep_perc,
                                             intensity_threshold, n_sig_mz,
                                             n_sig_rt);
 }
@@ -1199,23 +1171,12 @@ PYBIND11_MODULE(tapp, m) {
             return ret;
         });
 
-    py::class_<PythonAPI::MetaMatchResults>(m, "MetaMatchResults")
-        .def_readonly("clusters", &PythonAPI::MetaMatchResults::clusters)
-        .def_readonly("orphans", &PythonAPI::MetaMatchResults::orphans);
-
-    py::class_<MetaMatch::Cluster>(m, "MetaMatchCluster")
-        .def_readonly("id", &MetaMatch::Cluster::id)
-        .def_readonly("mz", &MetaMatch::Cluster::mz)
-        .def_readonly("rt", &MetaMatch::Cluster::rt)
-        .def_readonly("file_heights", &MetaMatch::Cluster::file_heights)
-        .def_readonly("file_volumes", &MetaMatch::Cluster::file_volumes)
-        .def_readonly("avg_height", &MetaMatch::Cluster::avg_height)
-        .def_readonly("peak_ids", &MetaMatch::Cluster::peak_ids)
-        .def("__repr__", [](const MetaMatch::Cluster &c) {
-            return "MetaCluster <id: " + std::to_string(c.id) +
-                   ", mz: " + std::to_string(c.mz) +
-                   ", rt: " + std::to_string(c.rt) +
-                   ", avg_height: " + std::to_string(c.avg_height) + ">";
+    py::class_<MetaMatch::PeakId>(m, "PeakId")
+        .def_readonly("file_id", &MetaMatch::PeakId::file_id)
+        .def_readonly("peak_id", &MetaMatch::PeakId::peak_id)
+        .def("__repr__", [](const MetaMatch::PeakId &c) {
+            return "MetaClusterFileId <file_id: " + std::to_string(c.file_id) +
+                   ", peak_id: " + std::to_string(c.peak_id) + ">";
         });
 
     py::class_<MetaMatch::FeatureId>(m, "FeatureId")
@@ -1224,6 +1185,25 @@ PYBIND11_MODULE(tapp, m) {
         .def("__repr__", [](const MetaMatch::FeatureId &c) {
             return "MetaClusterFileId <file_id: " + std::to_string(c.file_id) +
                    ", feature_id: " + std::to_string(c.feature_id) + ">";
+        });
+
+    py::class_<MetaMatch::PeakCluster>(m, "PeakCluster")
+        .def_readonly("id", &MetaMatch::PeakCluster::id)
+        .def_readonly("mz", &MetaMatch::PeakCluster::mz)
+        .def_readonly("rt", &MetaMatch::PeakCluster::rt)
+        .def_readonly("avg_height",
+                      &MetaMatch::PeakCluster::avg_height)
+        .def_readonly("avg_volume",
+                      &MetaMatch::PeakCluster::avg_volume)
+        .def_readonly("heights",
+                      &MetaMatch::PeakCluster::heights)
+        .def_readonly("volumes",
+                      &MetaMatch::PeakCluster::volumes)
+        .def_readonly("peak_ids", &MetaMatch::PeakCluster::peak_ids)
+        .def("__repr__", [](const MetaMatch::PeakCluster &c) {
+            return "MetaCluster <id: " + std::to_string(c.id) +
+                   ", mz: " + std::to_string(c.mz) +
+                   ", rt: " + std::to_string(c.rt) + ">";
         });
 
     py::class_<MetaMatch::FeatureCluster>(m, "FeatureCluster")
@@ -1258,21 +1238,6 @@ PYBIND11_MODULE(tapp, m) {
             return "MetaCluster <id: " + std::to_string(c.id) +
                    ", mz: " + std::to_string(c.mz) +
                    ", rt: " + std::to_string(c.rt) + ">";
-        });
-
-    py::class_<MetaMatch::Peak>(m, "MetaMatchPeak")
-        .def_readonly("file_id", &MetaMatch::Peak::file_id)
-        .def_readonly("class_id", &MetaMatch::Peak::class_id)
-        .def_readonly("cluster_id", &MetaMatch::Peak::cluster_id)
-        .def_readonly("cluster_mz", &MetaMatch::Peak::cluster_mz)
-        .def_readonly("cluster_rt", &MetaMatch::Peak::cluster_rt)
-        .def_readonly("height", &MetaMatch::Peak::local_max_height)
-        .def_readonly("local_max_mz", &MetaMatch::Peak::local_max_mz)
-        .def_readonly("local_max_rt", &MetaMatch::Peak::local_max_rt)
-        .def("__repr__", [](const MetaMatch::Peak &p) {
-            return "MetaPeak <peak_id: " + std::to_string(p.id) +
-                   ", file_id: " + std::to_string(p.file_id) +
-                   ", class_id: " + std::to_string(p.class_id) + ">";
         });
 
     py::class_<Link::LinkedMsms>(m, "LinkedMsms")
@@ -1350,12 +1315,6 @@ PYBIND11_MODULE(tapp, m) {
         .def("write_peaks", &PythonAPI::write_peaks,
              "Write the peaks to disk in a binary format", py::arg("peaks"),
              py::arg("file_name"))
-        .def("write_metamatch_clusters", &PythonAPI::write_metamatch_clusters,
-             "Write the metamatch_clusters to disk in a binary format",
-             py::arg("metamatch_clusters"), py::arg("file_name"))
-        .def("write_metamatch_peaks", &PythonAPI::write_metamatch_peaks,
-             "Write the metamatch_peaks to disk in a binary format",
-             py::arg("metamatch_peaks"), py::arg("file_name"))
         .def("write_linked_msms", &PythonAPI::write_linked_msms,
              "Write the linked_msms to disk in a binary format",
              py::arg("linked_msms"), py::arg("file_name"))
@@ -1364,13 +1323,6 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("linked_psm"), py::arg("file_name"))
         .def("read_peaks", &PythonAPI::read_peaks,
              "Read the peaks from the binary peaks file", py::arg("file_name"))
-        .def("read_metamatch_clusters", &PythonAPI::read_metamatch_clusters,
-             "Read the metamatch_clusters from the binary metamatch_clusters "
-             "file",
-             py::arg("file_name"))
-        .def("read_metamatch_peaks", &PythonAPI::read_metamatch_peaks,
-             "Read the metamatch_peaks from the binary metamatch_peaks file",
-             py::arg("file_name"))
         .def("read_raw_data", &PythonAPI::read_raw_data,
              "Read the raw_data from the binary raw_data file",
              py::arg("file_name"))
@@ -1412,18 +1364,25 @@ PYBIND11_MODULE(tapp, m) {
         .def("write_features", &PythonAPI::write_features,
              "Write the feature to disk in a binary format", py::arg("feature"),
              py::arg("file_name"))
+        .def("read_peak_clusters", &PythonAPI::read_peak_clusters,
+             "Read the peak_clusters from the binary peak_clusters file",
+             py::arg("file_name"))
+        .def("write_peak_clusters", &PythonAPI::write_peak_clusters,
+             "Write the peak_clusters to disk in a binary format",
+             py::arg("peak_clusters"), py::arg("file_name"))
         .def("read_feature_clusters", &PythonAPI::read_feature_clusters,
              "Read the feature_clusters from the binary feature_clusters file",
              py::arg("file_name"))
         .def("write_feature_clusters", &PythonAPI::write_feature_clusters,
              "Write the feature_clusters to disk in a binary format",
              py::arg("feature_clusters"), py::arg("file_name"))
-        .def("perform_metamatch", &PythonAPI::perform_metamatch,
-             "Perform metamatch for peak matching", py::arg("input"),
-             py::arg("fraction"), py::arg("n_sig_mz") = 1.5,
-             py::arg("n_sig_rt") = 1.5)
         .def("find_feature_clusters", &PythonAPI::find_feature_clusters,
              "Perform metamatch for feature matching", py::arg("group_ids"),
+             py::arg("features"), py::arg("keep_perc"),
+             py::arg("intensity_threshold") = 0.5, py::arg("n_sig_mz") = 1.5,
+             py::arg("n_sig_rt") = 1.5)
+        .def("find_peak_clusters", &PythonAPI::find_peak_clusters,
+             "Perform metamatch for peak matching", py::arg("group_ids"),
              py::arg("features"), py::arg("keep_perc"),
              py::arg("intensity_threshold") = 0.5, py::arg("n_sig_mz") = 1.5,
              py::arg("n_sig_rt") = 1.5)
