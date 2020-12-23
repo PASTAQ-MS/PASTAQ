@@ -302,7 +302,7 @@ def default_parameters(instrument, avg_fwhm_rt):
             #
             # Other.
             #
-            'max_peaks': 100000,
+            'max_peaks': 1000000,
             'polarity': 'both',
             'min_mz': 0,
             'max_mz': 100000,

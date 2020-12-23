@@ -578,48 +578,9 @@ std::vector<MetaMatch::FeatureCluster> read_feature_clusters(
     return feature_clusters;
 }
 
-void write_features(const std::vector<FeatureDetection::Feature> &features,
-                    std::string &output_file) {
-    // Open file stream.
-    std::ofstream stream;
-    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
-    if (!stream) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't open output file" << output_file;
-        throw std::invalid_argument(error_stream.str());
-    }
-
-    if (!FeatureDetection::Serialize::write_features(stream, features)) {
-        std::ostringstream error_stream;
-        error_stream
-            << "error: couldn't write the features into the output file"
-            << output_file;
-        throw std::invalid_argument(error_stream.str());
-    }
-}
-
-std::vector<FeatureDetection::Feature> read_features(std::string &input_file) {
-    // Open file stream.
-    std::ifstream stream;
-    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
-    if (!stream) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't open input file" << input_file;
-        throw std::invalid_argument(error_stream.str());
-    }
-
-    std::vector<FeatureDetection::Feature> features;
-    if (!FeatureDetection::Serialize::read_features(stream, &features)) {
-        std::ostringstream error_stream;
-        error_stream << "error: couldn't write the features into the input file"
-                     << input_file;
-        throw std::invalid_argument(error_stream.str());
-    }
-    return features;
-}
-
-void write_ident_data(const IdentData::IdentData &ident_data,
-                      std::string &output_file) {
+void write_peak_clusters(
+    const std::vector<MetaMatch::PeakCluster> &peak_clusters,
+    std::string &output_file) {
     // Open file stream.
     std::ofstream stream;
     stream.open(output_file, std::ios_base::out | std::ios_base::binary);
