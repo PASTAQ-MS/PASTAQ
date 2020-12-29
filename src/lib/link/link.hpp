@@ -23,9 +23,9 @@ struct LinkedMsms {
 
 // NOTE: This algorithm relies on the peak vector to be sorted by id/height.
 std::vector<LinkedMsms> link_peaks(const std::vector<Centroid::Peak> &peaks,
-                                   const RawData::RawData &raw_data);
+        const RawData::RawData &raw_data, double n_sig_mz, double n_sig_rt);
 std::vector<LinkedMsms> link_idents(const IdentData::IdentData &ident_data,
-                                    const RawData::RawData &raw_data);
+        const RawData::RawData &raw_data, double n_sig_mz, double n_sig_rt);
 
 struct LinkedPsm {
     uint64_t peak_id;
@@ -33,8 +33,8 @@ struct LinkedPsm {
     double distance;
 };
 std::vector<LinkedPsm> link_psm(const IdentData::IdentData &ident_data,
-                                const std::vector<Centroid::Peak> &peaks,
-                                const RawData::RawData &raw_data);
+        const std::vector<Centroid::Peak> &peaks,
+        const RawData::RawData &raw_data, double n_sig_mz, double n_sig_rt);
 
 }  // namespace Link
 

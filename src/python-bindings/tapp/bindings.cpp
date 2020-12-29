@@ -1399,13 +1399,16 @@ PYBIND11_MODULE(tapp, m) {
              py::arg("intensity_threshold") = 0.5, py::arg("n_sig_mz") = 1.5,
              py::arg("n_sig_rt") = 1.5)
         .def("link_peaks", &Link::link_peaks, "Link msms events to peak ids",
-             py::arg("peaks"), py::arg("raw_data"))
+             py::arg("peaks"), py::arg("raw_data"), py::arg("n_sig_mz") = 3,
+             py::arg("n_sig_rt") = 3)
         .def("link_idents", &Link::link_idents,
              "Link msms events to spectrum identifications",
-             py::arg("ident_data"), py::arg("raw_data"))
+             py::arg("ident_data"), py::arg("raw_data"),
+             py::arg("n_sig_mz") = 3, py::arg("n_sig_rt") = 3)
         .def("link_psm", &Link::link_psm,
              "Link spectrum identifications with peaks",
-             py::arg("ident_data"), py::arg("peaks"), py::arg("raw_data"))
+             py::arg("ident_data"), py::arg("peaks"), py::arg("raw_data"),
+             py::arg("n_sig_mz") = 3, py::arg("n_sig_rt") = 3)
         .def("xic", &PythonAPI::xic, py::arg("raw_data"), py::arg("min_mz"),
              py::arg("max_mz"), py::arg("min_rt"), py::arg("max_rt"),
              py::arg("method") = "sum")

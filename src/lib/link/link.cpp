@@ -4,8 +4,8 @@
 #include "utils/search.hpp"
 
 std::vector<Link::LinkedMsms> Link::link_peaks(
-    const std::vector<Centroid::Peak> &peaks,
-    const RawData::RawData &raw_data) {
+        const std::vector<Centroid::Peak> &peaks,
+        const RawData::RawData &raw_data, double n_sig_mz, double n_sig_rt) {
     // Index the peak list by m/z.
     struct PeakIndex {
         uint64_t id;
@@ -45,8 +45,8 @@ std::vector<Link::LinkedMsms> Link::link_peaks(
             RawData::theoretical_fwhm(raw_data, event_mz));
 
         // Find min_mz and loop until we reach the max_mz.
-        double min_mz = event_mz - 6 * theoretical_sigma_mz;
-        double max_mz = event_mz + 6 * theoretical_sigma_mz;
+        double min_mz = event_mz - n_sig_mz * theoretical_sigma_mz;
+        double max_mz = event_mz + n_sig_mz * theoretical_sigma_mz;
         size_t min_j = Search::lower_bound(index_mzs, min_mz);
         double min_distance = std::numeric_limits<double>::infinity();
         size_t peak_id = 0;
@@ -64,16 +64,16 @@ std::vector<Link::LinkedMsms> Link::link_peaks(
             }
         }
 
-        // Check if linked event is within 3 sigma of the minimum distance
+        // Check if linked event is within n sigma of the minimum distance
         // peak.
         double roi_min_mz =
-            peaks[peak_id].fitted_mz - 6 * peaks[peak_id].fitted_sigma_mz;
+            peaks[peak_id].fitted_mz - n_sig_mz * peaks[peak_id].fitted_sigma_mz;
         double roi_max_mz =
-            peaks[peak_id].fitted_mz + 6 * peaks[peak_id].fitted_sigma_mz;
+            peaks[peak_id].fitted_mz + n_sig_mz * peaks[peak_id].fitted_sigma_mz;
         double roi_min_rt =
-            peaks[peak_id].fitted_rt - 6 * peaks[peak_id].fitted_sigma_rt;
+            peaks[peak_id].fitted_rt - n_sig_rt * peaks[peak_id].fitted_sigma_rt;
         double roi_max_rt =
-            peaks[peak_id].fitted_rt + 6 * peaks[peak_id].fitted_sigma_rt;
+            peaks[peak_id].fitted_rt + n_sig_rt * peaks[peak_id].fitted_sigma_rt;
         if (event_mz < roi_min_mz || event_mz > roi_max_mz ||
             event_rt < roi_min_rt || event_rt > roi_max_rt) {
             continue;
@@ -95,7 +95,8 @@ std::vector<Link::LinkedMsms> Link::link_peaks(
 }
 
 std::vector<Link::LinkedMsms> Link::link_idents(
-    const IdentData::IdentData &ident_data, const RawData::RawData &raw_data) {
+        const IdentData::IdentData &ident_data, 
+        const RawData::RawData &raw_data, double n_sig_mz, double n_sig_rt) {
     // Index the msms list by m/z.
     struct MsmsIndex {
         uint64_t id;
@@ -138,8 +139,8 @@ std::vector<Link::LinkedMsms> Link::link_idents(
         double theoretical_sigma_rt = RawData::fwhm_to_sigma(raw_data.fwhm_rt);
 
         // Find min_mz and loop until we reach the max_mz.
-        double min_mz = psm_mz - 6 * theoretical_sigma_mz;
-        double max_mz = psm_mz + 6 * theoretical_sigma_mz;
+        double min_mz = psm_mz - n_sig_mz * theoretical_sigma_mz;
+        double max_mz = psm_mz + n_sig_mz * theoretical_sigma_mz;
         size_t min_j = Search::lower_bound(index_mzs, min_mz);
         double min_distance = std::numeric_limits<double>::infinity();
         size_t selected_i = 0;
@@ -170,10 +171,10 @@ std::vector<Link::LinkedMsms> Link::link_idents(
         double scan_rt= scan.retention_time;
 
         // Check if linked event is within 3 sigma of the minimum distance scan.
-        double roi_min_mz = scan_mz - 6 * theoretical_sigma_mz;
-        double roi_max_mz = scan_mz + 6 * theoretical_sigma_mz;
-        double roi_min_rt = scan_rt - 6 * theoretical_sigma_rt;
-        double roi_max_rt = scan_rt + 6 * theoretical_sigma_rt;
+        double roi_min_mz = scan_mz - n_sig_mz * theoretical_sigma_mz;
+        double roi_max_mz = scan_mz + n_sig_mz * theoretical_sigma_mz;
+        double roi_min_rt = scan_rt - n_sig_rt * theoretical_sigma_rt;
+        double roi_max_rt = scan_rt + n_sig_rt * theoretical_sigma_rt;
         if (psm_mz < roi_min_mz || psm_mz > roi_max_mz ||
             psm_rt < roi_min_rt || psm_rt > roi_max_rt) {
             continue;
@@ -196,7 +197,7 @@ std::vector<Link::LinkedMsms> Link::link_idents(
 std::vector<Link::LinkedPsm> Link::link_psm(
         const IdentData::IdentData &ident_data,
         const std::vector<Centroid::Peak> &peaks,
-        const RawData::RawData &raw_data) {
+        const RawData::RawData &raw_data, double n_sig_mz, double n_sig_rt) {
     // Index the peak list by m/z.
     struct PeakIndex {
         uint64_t id;
@@ -237,8 +238,8 @@ std::vector<Link::LinkedPsm> Link::link_psm(
             RawData::theoretical_fwhm(raw_data, psm_mz));
 
         // Find min_mz and loop until we reach the max_mz.
-        double min_mz = psm_mz - 6 * theoretical_sigma_mz;
-        double max_mz = psm_mz + 6 * theoretical_sigma_mz;
+        double min_mz = psm_mz - n_sig_mz * theoretical_sigma_mz;
+        double max_mz = psm_mz + n_sig_mz * theoretical_sigma_mz;
         size_t min_j = Search::lower_bound(index_mzs, min_mz);
         double min_distance = std::numeric_limits<double>::infinity();
         size_t selected_i = 0;
@@ -259,10 +260,10 @@ std::vector<Link::LinkedPsm> Link::link_psm(
 
         // Check if linked event is within 3 sigma of the minimum distance
         // peak.
-        double roi_min_mz = peak.fitted_mz - 6 * peak.fitted_sigma_mz;
-        double roi_max_mz = peak.fitted_mz + 6 * peak.fitted_sigma_mz;
-        double roi_min_rt = peak.fitted_rt - 6 * peak.fitted_sigma_rt;
-        double roi_max_rt = peak.fitted_rt + 6 * peak.fitted_sigma_rt;
+        double roi_min_mz = peak.fitted_mz - n_sig_mz * peak.fitted_sigma_mz;
+        double roi_max_mz = peak.fitted_mz + n_sig_mz * peak.fitted_sigma_mz;
+        double roi_min_rt = peak.fitted_rt - n_sig_rt * peak.fitted_sigma_rt;
+        double roi_max_rt = peak.fitted_rt + n_sig_rt * peak.fitted_sigma_rt;
         if (psm_mz < roi_min_mz || psm_mz > roi_max_mz ||
             psm_rt < roi_min_rt || psm_rt > roi_max_rt) {
             continue;

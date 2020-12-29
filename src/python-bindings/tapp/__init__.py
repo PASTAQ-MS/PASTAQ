@@ -309,6 +309,11 @@ def default_parameters(instrument, avg_fwhm_rt):
             'min_rt': 0,
             'max_rt': 100000,
             #
+            # Annotation linking.
+            #
+            'link_n_sig_mz': 3,
+            'link_n_sig_rt': 3,
+            #
             # Identification.
             #
             # Keep only the max rank PSM.
@@ -335,7 +340,7 @@ def default_parameters(instrument, avg_fwhm_rt):
             # identification engine.
             'quant_features_charge_state_filter': True,
             # Options: 'theoretical_mz', 'msms_event'
-            'quant_ident_linkage': 'theoretical_mz',
+            'quant_ident_linkage': 'msms_event',
             # Whether to obtain a consensus sequence and proteins on identifications.
             'quant_consensus': True,
             # Demand a minimum number of files with identification per cluster.
@@ -530,10 +535,12 @@ def dda_pipeline_summary(tapp_parameters, input_stems, output_dir):
             in_path_peak_idents = os.path.join(output_dir, 'linking', "{}.ident_peak.link".format(stem))
             if os.path.exists(in_path_peak_idents):
                 ident_peak = tapp.read_linked_psm(in_path_peak_idents)
-                summary_log.info('        MS/MS-Identification linkage')
+                summary_log.info('        Peaks-Identification linkage')
                 summary_log.info('            Number of PSMs: {}'.format(len(ident_data.spectrum_matches)))
                 summary_log.info('            Number of PSMs linked to peaks: {}'.format(len(ident_peak)))
                 summary_log.info('            PSM-peaks linking efficiency (%): {}'.format(len(ident_peak)/len(ident_data.spectrum_matches) * 100.0))
+
+    # TODO: Average identification linkage stats.
 
     # TODO: Metamatch stats
     # TODO: Peptide stats
@@ -1151,7 +1158,12 @@ def dda_pipeline(
         peaks = tapp.read_peaks(in_path_peaks)
 
         logger.info("Performing linkage: {}".format(stem))
-        linked_msms = tapp.link_peaks(peaks, raw_data)
+        linked_msms = tapp.link_peaks(
+                peaks,
+                raw_data,
+                tapp_parameters['link_n_sig_mz'],
+                tapp_parameters['link_n_sig_rt'],
+        )
         logger.info('Writing linked_msms: {}'.format(out_path))
         tapp.write_linked_msms(linked_msms, out_path)
 
@@ -1188,11 +1200,22 @@ def dda_pipeline(
         peaks = tapp.read_peaks(in_path_peaks)
 
         logger.info("Performing linkage: {}".format(stem))
-        linked_idents = tapp.link_idents(ident_data, raw_data)
+        linked_idents = tapp.link_idents(
+                ident_data,
+                raw_data,
+                tapp_parameters['link_n_sig_mz'],
+                tapp_parameters['link_n_sig_rt'],
+        )
         logger.info('Writing linked_msms: {}'.format(out_path))
         tapp.write_linked_msms(linked_idents, out_path)
         logger.info("Performing psm linkage: {}".format(stem))
-        linked_psm = tapp.link_psm(ident_data, peaks, raw_data)
+        linked_psm = tapp.link_psm(
+                ident_data,
+                peaks,
+                raw_data,
+                tapp_parameters['link_n_sig_mz'],
+                tapp_parameters['link_n_sig_rt'],
+        )
         logger.info('Writing linked_psm: {}'.format(out_path))
         tapp.write_linked_psm(linked_psm, out_path_psm)
 
