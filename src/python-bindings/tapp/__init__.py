@@ -31,46 +31,244 @@ def find_sequence_consensus(annotations, sequence_column, min_consensus_count):
     consensus = pd.merge(consensus.reset_index(), max_count, on="cluster_id")
     consensus = consensus[consensus["consensus_count"]
                           == consensus["consensus_count_max"]]
+    # NOTE: Should we ignore annotations when the consensus is ambiguous? For
+    # example, if we have sequence A for 3 samples and sequence B for another 3,
+    # the consensus is "unclear". Furthermore, we might choose to ignore it or
+    # to choose a suitable one. For now we are keeping all annotations even if
+    # that means having ambiguity about the sequence being assigned to a given
+    # isotope/feature cluster.
     consensus = consensus[consensus["consensus_count"] >= min_consensus_count]
     consensus = consensus.drop(["consensus_count_max"], axis=1)
     return consensus
 
-def find_protein_groups(annotations, sequence_column,  protein_name_column, protein_description_column):
-    seq_prot = annotations.copy()
-    seq_prot = seq_prot[[sequence_column, protein_name_column, protein_description_column]]
-    seq_prot = seq_prot.drop_duplicates()
-    seq_prot = seq_prot.dropna()
-    seq_prot = seq_prot.astype(str)
-    seq_prot['combined_protein_name'] = seq_prot[protein_name_column] + "__" + seq_prot[protein_description_column]
-    seq_prot_copy = seq_prot.copy()
-    protein_groups = pd.DataFrame(columns=['protein_group', 'combined_protein_name'])
-    protein_group_index = 0
-    while not seq_prot.empty:
-        cur_target_proteins = seq_prot.iloc[0]['combined_protein_name']
-        cur_target_peptides = seq_prot['combined_protein_name'] == cur_target_proteins
-        cur_target_peptides = seq_prot[sequence_column][cur_target_peptides]
-        cur_target_peptides = cur_target_peptides.drop_duplicates()
-        cur_peptides_len = cur_target_peptides.shape[0]
-        prev_peptides_len = 0
-        while cur_peptides_len != prev_peptides_len:
-            prev_peptides_len = cur_peptides_len
-            cur_target_proteins = seq_prot[seq_prot[sequence_column].isin(cur_target_peptides)]
-            cur_target_proteins = cur_target_proteins['combined_protein_name'].drop_duplicates()
-            cur_target_peptides = seq_prot['combined_protein_name'].isin(cur_target_proteins)
-            cur_target_peptides = seq_prot[sequence_column][cur_target_peptides]
-            cur_target_peptides = cur_target_peptides.drop_duplicates()
-            cur_peptides_len = cur_target_peptides.shape[0]
-        protein_group = pd.DataFrame({
-            'protein_group': np.repeat(protein_group_index, len(cur_target_proteins)),
-            'combined_protein_name': cur_target_proteins.values,
-            })
-        protein_groups = pd.concat([protein_groups, protein_group])
-        protein_group_index += 1
-        seq_prot = seq_prot[~seq_prot['combined_protein_name'].isin(cur_target_proteins)]
-    seq_prot_copy = pd.merge(seq_prot_copy, protein_groups, on='combined_protein_name')
-    seq_prot_copy = seq_prot_copy[[sequence_column, 'protein_group']].drop_duplicates()
-    annotations = pd.merge(annotations, seq_prot_copy, on=sequence_column, how='left')
-    return annotations
+def find_protein_groups(
+        feature_data,
+        feature_annotations,
+        sequence_col,
+        protein_col,
+        protein_description_col,
+        min_peptides_number,
+        remove_subset_proteins,
+        ignore_ambiguous_peptides,
+        protein_quant_type,
+        ):
+
+
+    # Create a list of annotations only with the info we need for protein groups.
+    protein_annotations = feature_annotations[['cluster_id', sequence_col, protein_col, protein_description_col]].copy()
+    protein_annotations = protein_annotations.drop_duplicates().dropna()
+
+    # Assign a unique numeric id for peptide and proteins for faster comparisons.
+    peptide_map = dict(zip(range(0, len(protein_annotations[sequence_col].unique())), protein_annotations[sequence_col].unique()))
+    protein_map = dict(zip(range(0, len(protein_annotations[protein_col].unique())), protein_annotations[protein_col].unique()))
+    peptide_map_df = pd.DataFrame({'peptide_id': peptide_map.keys(), sequence_col: peptide_map.values()})
+    protein_map_df = pd.DataFrame({'protein_id': protein_map.keys(), protein_col: protein_map.values()})
+    protein_annotations = pd.merge(protein_annotations, peptide_map_df)
+    protein_annotations = pd.merge(protein_annotations, protein_map_df)
+    protein_annotations = pd.merge(protein_annotations, protein_annotations)
+
+    # Create a copy of the feature data for aggregation.
+    protein_group_data = feature_data.copy()
+    protein_group_data['protein_group_id'] = -1
+    protein_group_metadata = protein_annotations.copy()
+    protein_group_metadata['protein_group_id'] = -1
+
+    # Initialize graph of protein-peptide nodes.
+    protein_nodes = {} # protein_id -> [peptide_1, peptide_2...]
+    peptide_nodes = {} # peptide_id -> [protein_1, protein_2...]
+    for index, row in protein_annotations.iterrows():
+        if row.protein_id not in protein_nodes:
+            protein_nodes[row.protein_id] = set()
+        protein_nodes[row.protein_id].add(row.peptide_id)
+        if row.peptide_id not in peptide_nodes:
+            peptide_nodes[row.peptide_id] = set()
+        peptide_nodes[row.peptide_id].add(row.protein_id)
+
+    def remove_proteins_from_graph(to_be_removed, protein_nodes, peptide_nodes):
+        for protein_id in to_be_removed:
+            for peptide_id in protein_nodes[protein_id]:
+                peptide_nodes[peptide_id] = set([
+                        this_id
+                        for this_id in peptide_nodes[peptide_id]
+                        if this_id != protein_id
+                    ])
+            if len(peptide_nodes[peptide_id]) == 0:
+                del peptide_nodes[peptide_id]
+            del protein_nodes[protein_id]
+
+    # Filter out proteins that don't meet the minimum number of peptides requirement.
+    if min_peptides_number > 1:
+        to_be_removed = []
+        for protein_id, peptide_ids in protein_nodes.items():
+            if len(peptide_ids) < min_peptides_number:
+                to_be_removed += [protein_id]
+        remove_proteins_from_graph(to_be_removed, protein_nodes, peptide_nodes)
+
+    # Remove fully subset proteins.
+    if remove_subset_proteins:
+        subset_proteins = []
+        for protein_id, peptide_ids in protein_nodes.items():
+
+            # Find proteins that share some peptide with this one.
+            target_proteins = set()
+            for peptide_id in peptide_ids:
+                for target_protein in peptide_nodes[peptide_id]:
+                    if target_protein != protein_id:
+                        target_proteins.add(target_protein)
+
+            # Check target proteins to check if peptides are fully contained within
+            # another group.
+            for target_protein in target_proteins:
+                target_peptides = protein_nodes[target_protein]
+                if set(peptide_ids).issubset(target_peptides) and len(peptide_ids) < len(target_peptides):
+                    subset_proteins += [protein_id]
+                    break
+        remove_proteins_from_graph(subset_proteins, protein_nodes, peptide_nodes)
+
+    #
+    # Identify the type of peptide (Unique vs shared) and if razor principle is
+    # applied, to which protein(s) will they be assigned.
+    # - Unique: Only appears on a single protein.
+    # - Shared: The peptide is shared by one or more proteins.
+    # - Razor: Appears on multiple proteins, assigned to the protein with the
+    #          largest number of peptides.
+    # - Ambiguous: When multiple proteins have the exact same number of peptides.
+    #              Has more than one assigned protein.
+    #
+
+    # Initialize protein_peptides
+    protein_peptides = {}
+    for protein_id in protein_nodes.keys():
+        protein_peptides[protein_id] = {
+                'unique': set(),
+                'shared': set(),
+                'razor': set(),
+                'ambiguous': set(),
+            }
+
+    for peptide_id, protein_ids in peptide_nodes.items():
+        if len(protein_ids) == 1:
+            protein_id = list(protein_ids)[0]
+            if protein_id not in protein_peptides:
+                protein_peptides[protein_id] = {
+                        'unique': [peptide_id],
+                        'razor': [],
+                        'ambiguous': [],
+                }
+            else:
+                protein_peptides[protein_id]['unique'].add(peptide_id)
+            continue
+
+        cur_assigned_proteins = []
+        cur_assigned_peptide_count = 0
+        for protein_id in protein_ids:
+            protein_peptides[protein_id]['shared'].add(peptide_id)
+            if len(protein_nodes[protein_id]) == cur_assigned_peptide_count:
+                cur_assigned_proteins += [protein_id]
+            if len(protein_nodes[protein_id]) > cur_assigned_peptide_count:
+                cur_assigned_proteins = [protein_id]
+                cur_assigned_peptide_count = len(protein_nodes[protein_id])
+
+        for protein_id in cur_assigned_proteins:
+            if len(cur_assigned_proteins) > 1:
+                protein_peptides[protein_id]['ambiguous'].add(peptide_id)
+            else:
+                protein_peptides[protein_id]['razor'].add(peptide_id)
+
+    # Find protein groups that contain unique peptides
+    protein_groups = {}
+    protein_group_counter = 0
+    unique_protein_ids = []
+    non_unique_protein_ids = []
+    for protein_id, peptide_ids in protein_nodes.items():
+        unique_found = False
+        for peptide_id in peptide_ids:
+            if len(peptide_nodes[peptide_id]) == 1:
+                unique_protein_ids += [protein_id]
+                unique_found = True
+                protein_groups[protein_group_counter] = set([protein_id])
+                protein_group_counter += 1
+                break
+        if not unique_found:
+                non_unique_protein_ids += [protein_id]
+
+    # Remove unique protein groups from the graph.
+    remove_proteins_from_graph(unique_protein_ids, protein_nodes, peptide_nodes)
+
+    # Group proteins with shared peptides only.
+    explored_proteins = set()
+    for protein_id in non_unique_protein_ids:
+        if protein_id in explored_proteins:
+            continue
+
+        previous_protein_group_size = 0
+        protein_group = set()
+        protein_group.add(protein_id)
+        while previous_protein_group_size != len(protein_group):
+            previous_protein_group_size = len(protein_group)
+            proteins_to_explore = [id for id in protein_group if id not in explored_proteins]
+
+            # Find all proteins associated with all peptides for unexplored proteins.
+            for id in proteins_to_explore:
+                for peptide_id in protein_nodes[id]:
+                    for new_protein in peptide_nodes[peptide_id]:
+                        protein_group.add(new_protein)
+                explored_proteins.add(id)
+
+        # Update protein group list and remove them from the available list.
+        protein_groups[protein_group_counter] = protein_group
+        protein_group_counter += 1
+        remove_proteins_from_graph(list(protein_group), protein_nodes, peptide_nodes)
+
+    # Depending on the selected quantification type, find which peptides should be
+    # used for quantification for each protein group.
+    for protein_group_id, protein_ids in protein_groups.items():
+        selected_peptides = set()
+        for protein_id in protein_ids:
+            for peptide_id in protein_peptides[protein_id]['unique']:
+                selected_peptides.add(peptide_id)
+            if protein_quant_type == 'all':
+                for peptide_id in protein_peptides[protein_id]['shared']:
+                    selected_peptides.add(peptide_id)
+            elif protein_quant_type == 'razor':
+                for peptide_id in protein_peptides[protein_id]['razor']:
+                    selected_peptides.add(peptide_id)
+                if ignore_ambiguous_peptides:
+                    for peptide_id in protein_peptides[protein_id]['ambiguous']:
+                        selected_peptides.add(peptide_id)
+        selected_cluster_ids = protein_annotations.cluster_id[protein_annotations.peptide_id.isin(selected_peptides)].unique()
+        protein_group_data.loc[protein_group_data.cluster_id.isin(selected_cluster_ids), 'protein_group_id'] = protein_group_id
+        protein_group_metadata.loc[protein_group_metadata.peptide_id.isin(selected_peptides) & protein_group_metadata.protein_id.isin(protein_ids) , 'protein_group_id'] = protein_group_id
+
+    def aggregate_protein_group_annotations(x):
+        ret = {}
+        if "consensus_sequence" in x:
+            ret["consensus_sequence"] = ".|.".join(
+                np.unique(x['consensus_sequence'].dropna())).strip(".|.")
+        if "consensus_protein_name" in x:
+            ret["consensus_protein_name"] = ".|.".join(
+                np.unique(x['consensus_protein_name'].dropna())).strip(".|.")
+        if "consensus_protein_description" in x:
+            ret["consensus_protein_description"] = ".|.".join(
+                np.unique(x['consensus_protein_description'].dropna())).strip(".|.")
+        return pd.Series(ret)
+
+    protein_group_data = protein_group_data[protein_group_data.protein_group_id != -1]
+    del protein_group_data['cluster_id']
+    protein_group_data = protein_group_data.groupby('protein_group_id').sum().reset_index()
+
+    protein_group_metadata = protein_group_metadata[protein_group_metadata.protein_group_id != -1]
+    del protein_group_metadata['cluster_id']
+    del protein_group_metadata['peptide_id']
+    del protein_group_metadata['protein_id']
+    protein_group_metdata = protein_group_metadata.drop_duplicates()
+    protein_group_metadata = protein_group_metadata.groupby('protein_group_id')
+    protein_group_metadata = protein_group_metadata.apply(aggregate_protein_group_annotations)
+    protein_group_metadata = protein_group_metadata.reset_index()
+
+    # TODO: Save protein groups and shared peptides in separate table.
+
+    return protein_group_data, protein_group_metadata
 
 def plot_mesh(mesh, transform='sqrt', figure=None):
     plt.style.use('dark_background')
@@ -347,12 +545,25 @@ def default_parameters(instrument, avg_fwhm_rt):
             'quant_consensus_min_ident': 2,
             # Whether to store all the annotations prior to cluster aggregation.
             'quant_save_all_annotations': True,
-            # TODO: Protein inference method:
-            #     - 'none': Don't perform protein inference.
-            #     - 'general_razor': All files are considered for Occam's razor inference.
-            #     - 'group_razor': Occam's razor inference is performed per group.
-            #     - 'file_razor': Occam's razor inference is performed per file.
-            'quant_inference_type': 'group_razor',
+            # Minimum number of peptides necessary to consider a protein for
+            # quantification.
+            'quant_proteins_min_peptides': 1,
+            # Wether to remove proteins whose peptides are entirely contined
+            # within another with a longest number of evidence peptides.
+            'quant_proteins_remove_subset_proteins': True,
+            # In case a peptide can't be assigned to a unique protein as 'razor'
+            # we can choose to use them regardless in all instances where they
+            # would if they were to be considered razor or to ignore them.
+            'quant_proteins_ignore_ambiguous_peptides': True,
+            # Protein inference method:
+            #     - 'unique': Only unique peptides will be used for
+            #                 quantification.
+            #     - 'razor': Unique and peptides assigned as most likely through
+            #                the Occam's razor constrain.
+            #     - 'all': All peptides will be used for quantification for all
+            #              protein groups. Thus shared peptides will be used more
+            #              than once.
+            'quant_proteins_quant_type': 'razor',
         }
         return tapp_parameters
 
@@ -1132,6 +1343,9 @@ def dda_pipeline(
             max_mz=tapp_parameters['max_mz'],
             min_rt=tapp_parameters['min_rt'],
             max_rt=tapp_parameters['max_rt'],
+            # TODO: Should we add an option to pass a prefix for ignoring decoys
+            # when they are not properly annotated, for example in msfragger
+            # + idconvert?
         )
         logger.info('Writing ident data: {}'.format(out_path))
         tapp.write_ident_data(ident_data, out_path)
@@ -1807,11 +2021,26 @@ def dda_pipeline(
         if (sequence_column in annotations and
                 protein_name_column in annotations and
                 protein_description_column in annotations):
-            annotations = find_protein_groups(
+            prot_data, prot_metadata = find_protein_groups(
+                    data,
                     annotations,
                     sequence_column,
                     protein_name_column,
-                    protein_description_column)
+                    protein_description_column,
+                    tapp_parameters['quant_proteins_min_peptides'],
+                    tapp_parameters['quant_proteins_remove_subset_proteins'],
+                    tapp_parameters['quant_proteins_ignore_ambiguous_peptides'],
+                    tapp_parameters['quant_proteins_quant_type'],
+                    )
+            out_path_protein_data = os.path.join(output_dir, 'quant',
+                    "protein_groups.csv")
+            out_path_protein_metadata = os.path.join(output_dir, 'quant',
+                    "protein_groups_metadata.csv")
+
+            logger.info("Writing protein group data/metadata to disk")
+            prot_data.to_csv(out_path_protein_data, index=False)
+            prot_metadata.to_csv(out_path_protein_metadata, index=False)
+
 
         # Saving annotations before aggregation.
         if tapp_parameters['quant_save_all_annotations']:
@@ -1835,9 +2064,14 @@ def dda_pipeline(
         logger.info("Writing metadata to disk")
         metadata.to_csv(out_path_feature_clusters_metadata, index=False)
 
-        if 'protein_group' in metadata:
-            logger.info("Aggregating protein groups")
-            def aggregate_protein_group_annotations(x):
+        # Aggregate peptides.
+        sequence_column = 'psm_sequence'
+        if tapp_parameters['quant_consensus'] and 'psm_sequence' in annotations:
+            sequence_column = 'consensus_sequence'
+
+        if sequence_column in annotations:
+            logger.info("Aggregating peptide charge states")
+            def aggregate_peptide_annotations(x):
                 ret = {}
                 if "psm_sequence" in x:
                     ret["psm_sequence"] = ".|.".join(
@@ -1858,25 +2092,26 @@ def dda_pipeline(
                     ret["consensus_protein_description"] = ".|.".join(
                         np.unique(x['consensus_protein_description'].dropna())).strip(".|.")
                 return pd.Series(ret)
-            prot_data = data.copy()
-            prot_data = prot_data.drop(["cluster_id"], axis=1)
-            prot_data['protein_group'] = pd.to_numeric(metadata['protein_group']).astype('Int64')
-            prot_data = prot_data[~(prot_data['protein_group'].isna())]
-            prot_data = prot_data.groupby('protein_group').agg(sum)
-            prot_data = prot_data.reset_index()
-            prot_metadata = annotations.copy()
-            prot_metadata = prot_metadata[~prot_metadata['protein_group'].isna()]
-            prot_metadata = prot_metadata.groupby('protein_group')
-            prot_metadata = prot_metadata.apply(aggregate_protein_group_annotations)
-            prot_metadata = prot_metadata.reset_index()
-            out_path_protein_data = os.path.join(output_dir, 'quant',
-                    "protein_groups.csv")
-            out_path_protein_metadata = os.path.join(output_dir, 'quant',
-                    "protein_groups_metadata.csv")
+            peptide_data = data.copy()
+            peptide_data = peptide_data.drop(["cluster_id"], axis=1)
+            peptide_data[sequence_column] = metadata[sequence_column]
+            peptide_data = peptide_data[~peptide_data[sequence_column].isna()]
+            peptide_data = peptide_data[peptide_data[sequence_column] != '']
+            peptide_data = peptide_data[~peptide_data[sequence_column].str.contains('\.\|\.')]
+            peptide_data = peptide_data.groupby(sequence_column).agg(sum)
+            peptide_data = peptide_data.reset_index()
+            peptide_metadata = annotations.copy()
+            peptide_metadata = peptide_metadata[peptide_metadata[sequence_column].isin(peptide_data[sequence_column])]
+            peptide_metadata = peptide_metadata.groupby(sequence_column)
+            peptide_metadata = peptide_metadata.apply(aggregate_peptide_annotations)
+            out_path_peptide_data = os.path.join(output_dir, 'quant',
+                    "peptides_data.csv")
+            out_path_peptide_metadata = os.path.join(output_dir, 'quant',
+                    "peptides_metadata.csv")
 
-            logger.info("Writing protein group data/metadata to disk")
-            prot_data.to_csv(out_path_protein_data, index=False)
-            prot_metadata.to_csv(out_path_protein_metadata, index=False)
+            logger.info("Writing peptide data/metadata to disk")
+            peptide_data.to_csv(out_path_peptide_data, index=False)
+            peptide_metadata.to_csv(out_path_peptide_metadata, index=False)
 
     logger.info('Finished creation of quantitative tables in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
