@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1)
 
-project(tapp VERSION "0.0.0")
+project(pastaq VERSION "0.0.0")
 
 # Set project properties.
 set(CMAKE_CXX_STANDARD 17)
@@ -16,14 +16,14 @@ if (MSVC)
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} /W4")
 endif()
 
-# Build the tapplib c++ library.
+# Build the pastaqlib c++ library.
 # ------------------------------
 # Threads.
 find_package(Threads REQUIRED)
 # Eigen.
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/eigen" ${CMAKE_CURRENT_BINARY_DIR}/eigen)
-# Build TAPPs library.
-add_library(tapplib
+# Build pastaqs library.
+add_library(pastaqlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid_serialize.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/feature_detection/feature_detection.cpp"
@@ -46,19 +46,19 @@ add_library(tapplib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d_serialize.cpp"
     )
-target_include_directories(tapplib PUBLIC src/lib)
-target_link_libraries(tapplib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen)
+target_include_directories(pastaqlib PUBLIC src/lib)
+target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen)
 
 # Build the python bindings.
 # --------------------------
 # PyBind.
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/pybind11" ${CMAKE_CURRENT_BINARY_DIR}/pybind11)
-pybind11_add_module(tapp src/python-bindings/tapp/bindings.cpp)
-target_link_libraries(tapp PRIVATE tapplib)
+pybind11_add_module(pastaq src/python-bindings/pastaq/bindings.cpp)
+target_link_libraries(pastaq PRIVATE pastaqlib)
 
 # Include tests if testing library is present.
 # --------------------------------------------
-if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} AND (${TAPP_ENABLE_TESTS}))
+if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} AND (${PASTAQ_ENABLE_TESTS}))
     unset(DOCTEST_LIBRARY_PATH CACHE)
     find_path(
         DOCTEST_LIBRARY_PATH
@@ -75,7 +75,7 @@ if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} AND (${TAPP_ENABLE_T
         enable_testing()
         # Add tests.
         add_executable(
-            tapplib_test
+            pastaqlib_test
             tests/centroid_test.cpp
             tests/feature_detection_test.cpp
             tests/grid_test.cpp
@@ -86,8 +86,8 @@ if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR} AND (${TAPP_ENABLE_T
             tests/warp2d_test.cpp
             tests/xml_reader_test.cpp
             )
-        add_test(NAME tapplib_test COMMAND tapplib_test)
-        target_link_libraries(tapplib_test stdc++ doctest tapplib)
+        add_test(NAME pastaqlib_test COMMAND pastaqlib_test)
+        target_link_libraries(pastaqlib_test stdc++ doctest pastaqlib)
     else()
         message("-- [${PROJECT_NAME}] Testing library not found. Ignoring tests...")
     endif()

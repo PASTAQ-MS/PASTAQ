@@ -843,9 +843,9 @@ std::vector<MetaMatch::PeakCluster> find_peak_clusters(
 
 }  // namespace PythonAPI
 
-PYBIND11_MODULE(tapp, m) {
+PYBIND11_MODULE(pastaq, m) {
     // Documentation.
-    m.doc() = "tapp documentation";
+    m.doc() = "pastaq documentation";
 
     // Structs.
     py::class_<RawData::PrecursorInformation>(m, "PrecursorInformation")

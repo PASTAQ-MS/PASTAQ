@@ -68,7 +68,7 @@ class CMakeBuild(build_ext):
 
 
 setup(
-    name='tapp',
+    name='pastaq',
     version='0.1',
     author='Alejandro Sanchez Brotons',
     author_email='a.sanchez.brotons@rug.nl',
@@ -76,7 +76,7 @@ setup(
     long_description='',
     packages=find_packages('src/python-bindings'),
     package_dir={'': 'src/python-bindings'},
-    ext_modules=[CMakeExtension('tapp/tapp_cpp')],
+    ext_modules=[CMakeExtension('pastaq/pastaq_cpp')],
     cmdclass=dict(build_ext=CMakeBuild),
     install_requires=[
         'numpy',

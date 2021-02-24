@@ -1,5 +1,5 @@
-from .tapp import *
-import tapp
+from .pastaq import *
+import pastaq
 import os
 import json
 import logging
@@ -463,7 +463,7 @@ def plot_raw_points(
 # modify it later as needed.
 def default_parameters(instrument, avg_fwhm_rt):
     if instrument == 'orbitrap':
-        tapp_parameters = {
+        pastaq_parameters = {
             #
             # Instrument configuration.
             #
@@ -565,10 +565,10 @@ def default_parameters(instrument, avg_fwhm_rt):
             #              than once.
             'quant_proteins_quant_type': 'razor',
         }
-        return tapp_parameters
+        return pastaq_parameters
 
 
-def dda_pipeline_summary(tapp_parameters, input_stems, output_dir):
+def dda_pipeline_summary(pastaq_parameters, input_stems, output_dir):
     summary_log = logging.getLogger('summary')
     summary_log.setLevel(logging.INFO)
     summary_log_fh = logging.FileHandler(os.path.join(output_dir, 'summary.log'))
@@ -585,7 +585,7 @@ def dda_pipeline_summary(tapp_parameters, input_stems, output_dir):
         # MS1
         in_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
         if os.path.exists(in_path):
-            raw_data = tapp.read_raw_data(in_path)
+            raw_data = pastaq.read_raw_data(in_path)
             summary_log.info('        MS1')
             summary_log.info('            number of scans: {}'.format(len(raw_data.scans)))
             summary_log.info('            min_mz: {}'.format(raw_data.min_mz))
@@ -596,7 +596,7 @@ def dda_pipeline_summary(tapp_parameters, input_stems, output_dir):
         # MS2
         in_path = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
         if os.path.exists(in_path):
-            raw_data = tapp.read_raw_data(in_path)
+            raw_data = pastaq.read_raw_data(in_path)
             summary_log.info('        MS2')
             summary_log.info('            number of scans: {}'.format(len(raw_data.scans)))
             summary_log.info('            min_mz: {}'.format(raw_data.min_mz))
@@ -615,7 +615,7 @@ def dda_pipeline_summary(tapp_parameters, input_stems, output_dir):
 
         in_path = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
         if os.path.exists(in_path):
-            peaks = tapp.read_peaks(in_path)
+            peaks = pastaq.read_peaks(in_path)
             peak_heights = np.array([peak.fitted_height for peak in peaks])
             n_peaks += [len(peaks)]
             mean_height = peak_heights.mean()
@@ -655,7 +655,7 @@ def dda_pipeline_summary(tapp_parameters, input_stems, output_dir):
 
         in_path = os.path.join(output_dir, 'features', "{}.features".format(stem))
         if os.path.exists(in_path):
-            features = tapp.read_features(in_path)
+            features = pastaq.read_features(in_path)
 
             feature_max_heights = np.array([feature.max_height for feature in features])
             feature_monoisotopic_heights = np.array([feature.monoisotopic_height for feature in features])
@@ -724,8 +724,8 @@ def dda_pipeline_summary(tapp_parameters, input_stems, output_dir):
         in_path_raw_data = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
         in_path_linked_msms = os.path.join(output_dir, 'linking', "{}.ms2_peak.link".format(stem))
         if os.path.exists(in_path_raw_data) and os.path.exists(in_path_linked_msms):
-            raw_data = tapp.read_raw_data(in_path_raw_data)
-            linked_msms = tapp.read_linked_msms(in_path_linked_msms)
+            raw_data = pastaq.read_raw_data(in_path_raw_data)
+            linked_msms = pastaq.read_linked_msms(in_path_linked_msms)
             summary_log.info('        MS/MS-Peaks linkage')
             summary_log.info('            Number of ms/ms events: {}'.format(len(raw_data.scans)))
             summary_log.info('            Number of ms/ms events linked to peaks: {}'.format(len(linked_msms)))
@@ -733,11 +733,11 @@ def dda_pipeline_summary(tapp_parameters, input_stems, output_dir):
 
         in_path_ident_data = os.path.join(output_dir, 'ident', "{}.ident".format(stem))
         if os.path.exists(in_path_ident_data):
-            ident_data = tapp.read_ident_data(in_path_ident_data)
+            ident_data = pastaq.read_ident_data(in_path_ident_data)
 
             in_path_ident_ms2 = os.path.join(output_dir, 'linking', "{}.ident_ms2.link".format(stem))
             if os.path.exists(in_path_ident_ms2):
-                ident_ms2 = tapp.read_linked_msms(in_path_ident_ms2)
+                ident_ms2 = pastaq.read_linked_msms(in_path_ident_ms2)
                 summary_log.info('        MS/MS-Identification linkage')
                 summary_log.info('            Number of PSMs: {}'.format(len(ident_data.spectrum_matches)))
                 summary_log.info('            Number of PSMs linked to MS/MS events: {}'.format(len(ident_ms2)))
@@ -745,7 +745,7 @@ def dda_pipeline_summary(tapp_parameters, input_stems, output_dir):
 
             in_path_peak_idents = os.path.join(output_dir, 'linking', "{}.ident_peak.link".format(stem))
             if os.path.exists(in_path_peak_idents):
-                ident_peak = tapp.read_linked_psm(in_path_peak_idents)
+                ident_peak = pastaq.read_linked_psm(in_path_peak_idents)
                 summary_log.info('        Peaks-Identification linkage')
                 summary_log.info('            Number of PSMs: {}'.format(len(ident_data.spectrum_matches)))
                 summary_log.info('            Number of PSMs linked to peaks: {}'.format(len(ident_peak)))
@@ -758,9 +758,9 @@ def dda_pipeline_summary(tapp_parameters, input_stems, output_dir):
     # TODO: Protein group stats
 
 def dda_pipeline(
-    tapp_parameters,
+    pastaq_parameters,
     input_files,
-    output_dir="TAPP",
+    output_dir="pastaq",
     override_existing=False,
     save_mesh=False,
 ):
@@ -828,7 +828,7 @@ def dda_pipeline(
     # Initialize log and parameters files.
     parameters_file_name = os.path.join(output_dir, 'parameters.json')
     with open(parameters_file_name, 'w') as json_file:
-        json.dump(tapp_parameters, json_file)
+        json.dump(pastaq_parameters, json_file)
 
     class DeltaTimeFilter(logging.Filter):
         def filter(self, record):
@@ -864,18 +864,18 @@ def dda_pipeline(
 
         # Read raw files (MS1).
         logger.info('Reading MS1: {}'.format(file_name))
-        raw_data = tapp.read_mzxml(
+        raw_data = pastaq.read_mzxml(
             file_name,
-            min_mz=tapp_parameters['min_mz'],
-            max_mz=tapp_parameters['max_mz'],
-            min_rt=tapp_parameters['min_rt'],
-            max_rt=tapp_parameters['max_rt'],
-            instrument_type=tapp_parameters['instrument_type'],
-            resolution_ms1=tapp_parameters['resolution_ms1'],
-            resolution_msn=tapp_parameters['resolution_msn'],
-            reference_mz=tapp_parameters['reference_mz'],
-            fwhm_rt=tapp_parameters['avg_fwhm_rt'],
-            polarity=tapp_parameters['polarity'],
+            min_mz=pastaq_parameters['min_mz'],
+            max_mz=pastaq_parameters['max_mz'],
+            min_rt=pastaq_parameters['min_rt'],
+            max_rt=pastaq_parameters['max_rt'],
+            instrument_type=pastaq_parameters['instrument_type'],
+            resolution_ms1=pastaq_parameters['resolution_ms1'],
+            resolution_msn=pastaq_parameters['resolution_msn'],
+            reference_mz=pastaq_parameters['reference_mz'],
+            fwhm_rt=pastaq_parameters['avg_fwhm_rt'],
+            polarity=pastaq_parameters['polarity'],
             ms_level=1,
         )
 
@@ -892,18 +892,18 @@ def dda_pipeline(
 
         # Read raw files (MS2).
         logger.info('Reading MS2: {}'.format(file_name))
-        raw_data = tapp.read_mzxml(
+        raw_data = pastaq.read_mzxml(
             file_name,
-            min_mz=tapp_parameters['min_mz'],
-            max_mz=tapp_parameters['max_mz'],
-            min_rt=tapp_parameters['min_rt'],
-            max_rt=tapp_parameters['max_rt'],
-            instrument_type=tapp_parameters['instrument_type'],
-            resolution_ms1=tapp_parameters['resolution_ms1'],
-            resolution_msn=tapp_parameters['resolution_msn'],
-            reference_mz=tapp_parameters['reference_mz'],
-            fwhm_rt=tapp_parameters['avg_fwhm_rt'],
-            polarity=tapp_parameters['polarity'],
+            min_mz=pastaq_parameters['min_mz'],
+            max_mz=pastaq_parameters['max_mz'],
+            min_rt=pastaq_parameters['min_rt'],
+            max_rt=pastaq_parameters['max_rt'],
+            instrument_type=pastaq_parameters['instrument_type'],
+            resolution_ms1=pastaq_parameters['resolution_ms1'],
+            resolution_msn=pastaq_parameters['resolution_msn'],
+            reference_mz=pastaq_parameters['reference_mz'],
+            fwhm_rt=pastaq_parameters['avg_fwhm_rt'],
+            polarity=pastaq_parameters['polarity'],
             ms_level=2,
         )
 
@@ -925,15 +925,15 @@ def dda_pipeline(
             continue
 
         logger.info("Reading raw_data from disk: {}".format(stem))
-        raw_data = tapp.read_raw_data(in_path)
+        raw_data = pastaq.read_raw_data(in_path)
 
         logger.info("Resampling: {}".format(stem))
-        mesh = tapp.resample(
+        mesh = pastaq.resample(
             raw_data,
-            tapp_parameters['num_samples_mz'],
-            tapp_parameters['num_samples_rt'],
-            tapp_parameters['smoothing_coefficient_mz'],
-            tapp_parameters['smoothing_coefficient_rt'],
+            pastaq_parameters['num_samples_mz'],
+            pastaq_parameters['num_samples_rt'],
+            pastaq_parameters['smoothing_coefficient_mz'],
+            pastaq_parameters['smoothing_coefficient_rt'],
         )
 
         if save_mesh:
@@ -941,9 +941,9 @@ def dda_pipeline(
             mesh.dump(out_path)
 
         logger.info("Finding peaks: {}".format(stem))
-        peaks = tapp.find_peaks(raw_data, mesh, tapp_parameters['max_peaks'])
+        peaks = pastaq.find_peaks(raw_data, mesh, pastaq_parameters['max_peaks'])
         logger.info('Writing peaks:'.format(out_path))
-        tapp.write_peaks(peaks, out_path)
+        pastaq.write_peaks(peaks, out_path)
 
     logger.info('Finished peak detection in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
@@ -959,19 +959,19 @@ def dda_pipeline(
         for i in range(0, len(input_stems)):
             stem_a = input_stems[i]
             logger.info("Reading peaks_a from disk: {}".format(stem_a))
-            peaks_a = tapp.read_peaks(os.path.join(
+            peaks_a = pastaq.read_peaks(os.path.join(
                 output_dir, 'peaks', '{}.peaks'.format(stem_a)))
             for j in range(i, len(input_stems)):
                 stem_b = input_stems[j]
                 logger.info("Reading peaks_b from disk: {}".format(stem_b))
-                peaks_b = tapp.read_peaks(os.path.join(
+                peaks_b = pastaq.read_peaks(os.path.join(
                     output_dir, 'peaks', '{}.peaks'.format(stem_b)))
                 logger.info(
                     "Calculating similarity of {} vs {}".format(
                         stem_a, stem_b))
-                similarity_matrix[j, i] = tapp.find_similarity(
+                similarity_matrix[j, i] = pastaq.find_similarity(
                     peaks_a, peaks_b,
-                    tapp_parameters['similarity_num_peaks']).geometric_ratio
+                    pastaq_parameters['similarity_num_peaks']).geometric_ratio
                 similarity_matrix[i, j] = similarity_matrix[j, i]
         similarity_matrix = pd.DataFrame(similarity_matrix)
         similarity_matrix_names = [input_stem.split(
@@ -1011,28 +1011,28 @@ def dda_pipeline(
         for i in range(0, len(input_stems)):
             stem_a = input_stems[i]
             logger.info("Reading peaks_a from disk: {}".format(stem_a))
-            peaks_a = tapp.read_peaks(os.path.join(
+            peaks_a = pastaq.read_peaks(os.path.join(
                 output_dir, 'peaks', '{}.peaks'.format(stem_a)))
             for j in range(i, len(input_stems)):
                 stem_b = input_stems[j]
                 logger.info("Reading peaks_b from disk: {}".format(stem_b))
-                peaks_b = tapp.read_peaks(os.path.join(
+                peaks_b = pastaq.read_peaks(os.path.join(
                     output_dir, 'peaks', '{}.peaks'.format(stem_b)))
                 logger.info("Warping {} peaks to {}".format(stem_b, stem_a))
-                time_map = tapp.calculate_time_map(
+                time_map = pastaq.calculate_time_map(
                     peaks_a, peaks_b,
-                    tapp_parameters['warp2d_slack'],
-                    tapp_parameters['warp2d_window_size'],
-                    tapp_parameters['warp2d_num_points'],
-                    tapp_parameters['warp2d_rt_expand_factor'],
-                    tapp_parameters['warp2d_peaks_per_window'])
-                peaks_b = tapp.warp_peaks(peaks_b, time_map)
+                    pastaq_parameters['warp2d_slack'],
+                    pastaq_parameters['warp2d_window_size'],
+                    pastaq_parameters['warp2d_num_points'],
+                    pastaq_parameters['warp2d_rt_expand_factor'],
+                    pastaq_parameters['warp2d_peaks_per_window'])
+                peaks_b = pastaq.warp_peaks(peaks_b, time_map)
                 logger.info(
                     "Calculating similarity of {} vs {} (warped)".format(
                         stem_a, stem_b))
-                similarity_matrix[j, i] = tapp.find_similarity(
+                similarity_matrix[j, i] = pastaq.find_similarity(
                     peaks_a, peaks_b,
-                    tapp_parameters['similarity_num_peaks']).geometric_ratio
+                    pastaq_parameters['similarity_num_peaks']).geometric_ratio
                 similarity_matrix[i, j] = similarity_matrix[j, i]
         similarity_matrix = pd.DataFrame(similarity_matrix)
         similarity_matrix_names = [input_stem.split(
@@ -1069,7 +1069,7 @@ def dda_pipeline(
         reference_stem))
     time_start = time.time()
     logger.info("Reading reference peaks")
-    reference_peaks = tapp.read_peaks(os.path.join(
+    reference_peaks = pastaq.read_peaks(os.path.join(
         output_dir, 'peaks', '{}.peaks'.format(reference_stem)))
     for stem in input_stems:
         # Check if file has already been processed.
@@ -1083,28 +1083,28 @@ def dda_pipeline(
 
         logger.info("Warping peaks: {}".format(stem))
         if stem == reference_stem:
-            tapp.write_peaks(reference_peaks, out_path)
-            time_map = tapp.calculate_time_map(
+            pastaq.write_peaks(reference_peaks, out_path)
+            time_map = pastaq.calculate_time_map(
                 reference_peaks, reference_peaks,
-                tapp_parameters['warp2d_slack'],
-                tapp_parameters['warp2d_window_size'],
-                tapp_parameters['warp2d_num_points'],
-                tapp_parameters['warp2d_rt_expand_factor'],
-                tapp_parameters['warp2d_peaks_per_window'])
-            tapp.write_time_map(time_map, out_path_tmap)
+                pastaq_parameters['warp2d_slack'],
+                pastaq_parameters['warp2d_window_size'],
+                pastaq_parameters['warp2d_num_points'],
+                pastaq_parameters['warp2d_rt_expand_factor'],
+                pastaq_parameters['warp2d_peaks_per_window'])
+            pastaq.write_time_map(time_map, out_path_tmap)
         else:
             logger.info("Reading peaks from disk: {}".format(stem))
-            peaks = tapp.read_peaks(in_path)
-            time_map = tapp.calculate_time_map(
+            peaks = pastaq.read_peaks(in_path)
+            time_map = pastaq.calculate_time_map(
                 reference_peaks, peaks,
-                tapp_parameters['warp2d_slack'],
-                tapp_parameters['warp2d_window_size'],
-                tapp_parameters['warp2d_num_points'],
-                tapp_parameters['warp2d_rt_expand_factor'],
-                tapp_parameters['warp2d_peaks_per_window'])
-            peaks = tapp.warp_peaks(peaks, time_map)
-            tapp.write_peaks(peaks, out_path)
-            tapp.write_time_map(time_map, out_path_tmap)
+                pastaq_parameters['warp2d_slack'],
+                pastaq_parameters['warp2d_window_size'],
+                pastaq_parameters['warp2d_num_points'],
+                pastaq_parameters['warp2d_rt_expand_factor'],
+                pastaq_parameters['warp2d_peaks_per_window'])
+            peaks = pastaq.warp_peaks(peaks, time_map)
+            pastaq.write_peaks(peaks, out_path)
+            pastaq.write_time_map(time_map, out_path_tmap)
     logger.info('Finished peak warping to reference ({}) in {}'.format(
         reference_stem, datetime.timedelta(seconds=time.time()-time_start)))
 
@@ -1119,19 +1119,19 @@ def dda_pipeline(
         for i in range(0, len(input_stems)):
             stem_a = input_stems[i]
             logger.info("Reading peaks_a from disk: {}".format(stem_a))
-            peaks_a = tapp.read_peaks(os.path.join(
+            peaks_a = pastaq.read_peaks(os.path.join(
                 output_dir, 'warped_peaks', '{}.peaks'.format(stem_a)))
             for j in range(i, len(input_stems)):
                 stem_b = input_stems[j]
                 logger.info("Reading peaks_b from disk: {}".format(stem_b))
-                peaks_b = tapp.read_peaks(os.path.join(
+                peaks_b = pastaq.read_peaks(os.path.join(
                     output_dir, 'warped_peaks', '{}.peaks'.format(stem_b)))
                 logger.info(
                     "Calculating similarity of {} vs {}".format(
                         stem_a, stem_b))
-                similarity_matrix[j, i] = tapp.find_similarity(
+                similarity_matrix[j, i] = pastaq.find_similarity(
                     peaks_a, peaks_b,
-                    tapp_parameters['similarity_num_peaks']).geometric_ratio
+                    pastaq_parameters['similarity_num_peaks']).geometric_ratio
                 similarity_matrix[i, j] = similarity_matrix[j, i]
         similarity_matrix = pd.DataFrame(similarity_matrix)
         similarity_matrix_names = [input_stem.split(
@@ -1190,15 +1190,15 @@ def dda_pipeline(
             in_path_peaks = os.path.join(
                 output_dir, 'warped_peaks', "{}.peaks".format(stem))
             logger.info("Reading raw_data from disk: {}".format(stem))
-            raw_data = tapp.read_raw_data(in_path_raw_data)
+            raw_data = pastaq.read_raw_data(in_path_raw_data)
             logger.info("Reading tmap from disk: {}".format(stem))
-            tmap = tapp.read_time_map(in_path_tmap)
+            tmap = pastaq.read_time_map(in_path_tmap)
             logger.info("Reading peaks from disk: {}".format(stem))
-            peaks = tapp.read_peaks(in_path_peaks)
+            peaks = pastaq.read_peaks(in_path_peaks)
 
             # Plot the unwarped TIC/Base peak.
             logger.info("Plotting unwarped TIC/Base peak: {}".format(stem))
-            xic = tapp.xic(
+            xic = pastaq.xic(
                 raw_data,
                 raw_data.min_mz,
                 raw_data.max_mz,
@@ -1214,7 +1214,7 @@ def dda_pipeline(
 
             # Plot the warped TIC/Base peak.
             logger.info("Plotting warped TIC/Base peak: {}".format(stem))
-            xic = tapp.xic(
+            xic = pastaq.xic(
                 raw_data,
                 raw_data.min_mz,
                 raw_data.max_mz,
@@ -1314,13 +1314,13 @@ def dda_pipeline(
             continue
 
         logger.info("Reading peaks from disk: {}".format(stem))
-        peaks = tapp.read_peaks(in_path_peaks)
+        peaks = pastaq.read_peaks(in_path_peaks)
 
         logger.info("Performing feature_detection: {}".format(stem))
-        features = tapp.detect_features(
-            peaks, tapp_parameters['feature_detection_charge_states'])
+        features = pastaq.detect_features(
+            peaks, pastaq_parameters['feature_detection_charge_states'])
         logger.info('Writing features: {}'.format(out_path))
-        tapp.write_features(features, out_path)
+        pastaq.write_features(features, out_path)
 
     logger.info('Finished feature detection in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
@@ -1334,21 +1334,21 @@ def dda_pipeline(
         if in_path == 'none' or (os.path.exists(out_path) and not override_existing):
             continue
         logger.info('Reading mzIdentML: {}'.format(in_path))
-        ident_data = tapp.read_mzidentml(
+        ident_data = pastaq.read_mzidentml(
             in_path,
-            ignore_decoy=tapp_parameters['ident_ignore_decoy'],
-            require_threshold=tapp_parameters['ident_require_threshold'],
-            max_rank_only=tapp_parameters['ident_max_rank_only'],
-            min_mz=tapp_parameters['min_mz'],
-            max_mz=tapp_parameters['max_mz'],
-            min_rt=tapp_parameters['min_rt'],
-            max_rt=tapp_parameters['max_rt'],
+            ignore_decoy=pastaq_parameters['ident_ignore_decoy'],
+            require_threshold=pastaq_parameters['ident_require_threshold'],
+            max_rank_only=pastaq_parameters['ident_max_rank_only'],
+            min_mz=pastaq_parameters['min_mz'],
+            max_mz=pastaq_parameters['max_mz'],
+            min_rt=pastaq_parameters['min_rt'],
+            max_rt=pastaq_parameters['max_rt'],
             # TODO: Should we add an option to pass a prefix for ignoring decoys
             # when they are not properly annotated, for example in msfragger
             # + idconvert?
         )
         logger.info('Writing ident data: {}'.format(out_path))
-        tapp.write_ident_data(ident_data, out_path)
+        pastaq.write_ident_data(ident_data, out_path)
     logger.info('Finished mzIdentML parsing in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
 
@@ -1366,20 +1366,20 @@ def dda_pipeline(
             continue
 
         logger.info("Reading raw_data from disk (MS2): {}".format(stem))
-        raw_data = tapp.read_raw_data(in_path_raw)
+        raw_data = pastaq.read_raw_data(in_path_raw)
 
         logger.info("Reading peaks from disk: {}".format(stem))
-        peaks = tapp.read_peaks(in_path_peaks)
+        peaks = pastaq.read_peaks(in_path_peaks)
 
         logger.info("Performing linkage: {}".format(stem))
-        linked_msms = tapp.link_peaks(
+        linked_msms = pastaq.link_peaks(
                 peaks,
                 raw_data,
-                tapp_parameters['link_n_sig_mz'],
-                tapp_parameters['link_n_sig_rt'],
+                pastaq_parameters['link_n_sig_mz'],
+                pastaq_parameters['link_n_sig_rt'],
         )
         logger.info('Writing linked_msms: {}'.format(out_path))
-        tapp.write_linked_msms(linked_msms, out_path)
+        pastaq.write_linked_msms(linked_msms, out_path)
 
     logger.info('Finished peaks/msms linkage in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
@@ -1405,33 +1405,33 @@ def dda_pipeline(
             continue
 
         logger.info("Reading raw_data from disk (MS2): {}".format(stem))
-        raw_data = tapp.read_raw_data(in_path_raw)
+        raw_data = pastaq.read_raw_data(in_path_raw)
 
         logger.info("Reading ident from disk: {}".format(stem))
-        ident_data = tapp.read_ident_data(in_path_idents)
+        ident_data = pastaq.read_ident_data(in_path_idents)
 
         logger.info("Reading peaks from disk: {}".format(stem))
-        peaks = tapp.read_peaks(in_path_peaks)
+        peaks = pastaq.read_peaks(in_path_peaks)
 
         logger.info("Performing linkage: {}".format(stem))
-        linked_idents = tapp.link_idents(
+        linked_idents = pastaq.link_idents(
                 ident_data,
                 raw_data,
-                tapp_parameters['link_n_sig_mz'],
-                tapp_parameters['link_n_sig_rt'],
+                pastaq_parameters['link_n_sig_mz'],
+                pastaq_parameters['link_n_sig_rt'],
         )
         logger.info('Writing linked_msms: {}'.format(out_path))
-        tapp.write_linked_msms(linked_idents, out_path)
+        pastaq.write_linked_msms(linked_idents, out_path)
         logger.info("Performing psm linkage: {}".format(stem))
-        linked_psm = tapp.link_psm(
+        linked_psm = pastaq.link_psm(
                 ident_data,
                 peaks,
                 raw_data,
-                tapp_parameters['link_n_sig_mz'],
-                tapp_parameters['link_n_sig_rt'],
+                pastaq_parameters['link_n_sig_mz'],
+                pastaq_parameters['link_n_sig_rt'],
         )
         logger.info('Writing linked_psm: {}'.format(out_path))
-        tapp.write_linked_psm(linked_psm, out_path_psm)
+        pastaq.write_linked_psm(linked_psm, out_path_psm)
 
     logger.info('Finished ident/msms linkage in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
@@ -1444,20 +1444,20 @@ def dda_pipeline(
     if (not os.path.exists(out_path) or override_existing):
         logger.info("Reading peaks from disk")
         peaks = [
-            tapp.read_peaks(
+            pastaq.read_peaks(
                 os.path.join(in_path_peaks, "{}.peaks".format(input_stem)))
             for input_stem in input_stems]
 
         logger.info("Finding peak clusters")
-        peak_clusters = tapp.find_peak_clusters(
+        peak_clusters = pastaq.find_peak_clusters(
             groups,
             peaks,
-            tapp_parameters["metamatch_fraction"],
-            tapp_parameters["metamatch_n_sig_mz"],
-            tapp_parameters["metamatch_n_sig_rt"])
+            pastaq_parameters["metamatch_fraction"],
+            pastaq_parameters["metamatch_n_sig_mz"],
+            pastaq_parameters["metamatch_n_sig_rt"])
 
         logger.info("Writing peak clusters to disk")
-        tapp.write_peak_clusters(peak_clusters, out_path)
+        pastaq.write_peak_clusters(peak_clusters, out_path)
 
     logger.info('Finished metamatch on peaks in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
@@ -1470,20 +1470,20 @@ def dda_pipeline(
     if (not os.path.exists(out_path) or override_existing):
         logger.info("Reading features from disk")
         features = [
-            tapp.read_features(
+            pastaq.read_features(
                 os.path.join(in_path_features, "{}.features".format(input_stem)))
             for input_stem in input_stems]
 
         logger.info("Finding feature clusters")
-        feature_clusters = tapp.find_feature_clusters(
+        feature_clusters = pastaq.find_feature_clusters(
             groups,
             features,
-            tapp_parameters["metamatch_fraction"],
-            tapp_parameters["metamatch_n_sig_mz"],
-            tapp_parameters["metamatch_n_sig_rt"])
+            pastaq_parameters["metamatch_fraction"],
+            pastaq_parameters["metamatch_n_sig_mz"],
+            pastaq_parameters["metamatch_n_sig_rt"])
 
         logger.info("Writing feature clusters to disk")
-        tapp.write_feature_clusters(feature_clusters, out_path)
+        pastaq.write_feature_clusters(feature_clusters, out_path)
 
     logger.info('Finished metamatch on features in {}'.format(
         datetime.timedelta(seconds=time.time()-time_start)))
@@ -1515,7 +1515,7 @@ def dda_pipeline(
             continue
 
         logger.info("Reading peaks from disk: {}".format(stem))
-        peaks = tapp.read_peaks(in_path_peaks)
+        peaks = pastaq.read_peaks(in_path_peaks)
 
         logger.info("Generating peaks quantitative table")
         peaks_df = pd.DataFrame({
@@ -1551,7 +1551,7 @@ def dda_pipeline(
         # =================
         logger.info("Reading linked peaks from disk: {}".format(stem))
         peak_annotations = peaks_df[["peak_id"]]
-        linked_peaks = tapp.read_linked_msms(in_path_peaks_link)
+        linked_peaks = pastaq.read_linked_msms(in_path_peaks_link)
         linked_peaks = pd.DataFrame({
             'peak_id': [linked_peak.entity_id for linked_peak in linked_peaks],
             'msms_id': [linked_peak.msms_id for linked_peak in linked_peaks],
@@ -1561,7 +1561,7 @@ def dda_pipeline(
 
         if os.path.isfile(in_path_ident_data):
             logger.info("Reading ident_data from disk: {}".format(stem))
-            ident_data = tapp.read_ident_data(in_path_ident_data)
+            ident_data = pastaq.read_ident_data(in_path_ident_data)
             psms = pd.DataFrame({
                 'psm_index': [i for i in range(0, len(ident_data.spectrum_matches))],
                 'psm_id': [psm.id for psm in ident_data.spectrum_matches],
@@ -1574,10 +1574,10 @@ def dda_pipeline(
                 'psm_peptide_id': [psm.match_id for psm in ident_data.spectrum_matches],
             })
             if not psms.empty:
-                if tapp_parameters["quant_ident_linkage"] == 'theoretical_mz':
+                if pastaq_parameters["quant_ident_linkage"] == 'theoretical_mz':
                     logger.info(
                         "Reading linked ident_peak from disk: {}".format(stem))
-                    linked_idents = tapp.read_linked_psm(
+                    linked_idents = pastaq.read_linked_psm(
                         in_path_ident_link_theomz)
                     linked_idents = pd.DataFrame({
                         'peak_id': [linked_ident.peak_id for linked_ident in linked_idents],
@@ -1588,10 +1588,10 @@ def dda_pipeline(
                         linked_idents, psms, on="psm_index")
                     peak_annotations = pd.merge(
                         peak_annotations, linked_idents, on="peak_id", how="left")
-                elif tapp_parameters["quant_ident_linkage"] == 'msms_event':
+                elif pastaq_parameters["quant_ident_linkage"] == 'msms_event':
                     logger.info(
                         "Reading linked ident_peak from disk: {}".format(stem))
-                    linked_idents = tapp.read_linked_msms(
+                    linked_idents = pastaq.read_linked_msms(
                         in_path_ident_link_msms)
                     linked_idents = pd.DataFrame({
                         'msms_id': [linked_ident.msms_id for linked_ident in linked_idents],
@@ -1670,7 +1670,7 @@ def dda_pipeline(
                                                         "{}_feature_annotations.csv".format(stem))
 
             logger.info("Reading features from disk: {}".format(stem))
-            features = tapp.read_features(in_path_features)
+            features = pastaq.read_features(in_path_features)
 
             logger.info("Generating features quantitative table")
             features_df = pd.DataFrame({
@@ -1747,7 +1747,7 @@ def dda_pipeline(
         return pd.Series(ret)
 
     if (not os.path.exists(out_path_peak_clusters_metadata) or override_existing):
-        peak_clusters = tapp.read_peak_clusters(in_path_peak_clusters)
+        peak_clusters = pastaq.read_peak_clusters(in_path_peak_clusters)
         logger.info("Generating peak clusters quantitative table")
         peak_clusters_metadata_df = pd.DataFrame({
             'cluster_id': [cluster.id for cluster in peak_clusters],
@@ -1760,13 +1760,13 @@ def dda_pipeline(
         peak_clusters_df = pd.DataFrame({
             'cluster_id': [cluster.id for cluster in peak_clusters],
         })
-        if tapp_parameters['quant_isotopes'] == 'volume':
+        if pastaq_parameters['quant_isotopes'] == 'volume':
             out_path_peak_clusters = os.path.join(output_dir, 'quant',
                                                   "peak_clusters_volume.csv")
             for i, stem in enumerate(input_stems):
                 peak_clusters_df[stem] = [cluster.file_volumes[i]
                                           for cluster in peak_clusters]
-        elif tapp_parameters['quant_isotopes'] == 'height':
+        elif pastaq_parameters['quant_isotopes'] == 'height':
             out_path_peak_clusters = os.path.join(output_dir, 'quant',
                                                   "peak_clusters_height.csv")
             for i, stem in enumerate(input_stems):
@@ -1823,10 +1823,10 @@ def dda_pipeline(
             annotations["psm_modifications_num"] = annotations["psm_modifications_num"].astype(
                 'Int64')
 
-        if tapp_parameters['quant_consensus'] and 'psm_sequence' in annotations:
+        if pastaq_parameters['quant_consensus'] and 'psm_sequence' in annotations:
             # Find a sequence consensus
             consensus_sequence = find_sequence_consensus(
-                annotations, 'psm_sequence', tapp_parameters['quant_consensus_min_ident'])
+                annotations, 'psm_sequence', pastaq_parameters['quant_consensus_min_ident'])
             annotations = pd.merge(
                 annotations,
                 consensus_sequence[[
@@ -1845,7 +1845,7 @@ def dda_pipeline(
                                    on="cluster_id", how="left")
 
         # Saving annotations before aggregation.
-        if tapp_parameters['quant_save_all_annotations']:
+        if pastaq_parameters['quant_save_all_annotations']:
             logger.info("Writing annotations to disk")
             annotations = annotations.sort_values(by=["cluster_id"])
             annotations.to_csv(out_path_peak_clusters_annotations, index=False)
@@ -1874,7 +1874,7 @@ def dda_pipeline(
     out_path_feature_clusters_annotations = os.path.join(output_dir, 'quant',
                                                          "feature_clusters_annotations.csv")
     if (not os.path.exists(out_path_feature_clusters_metadata) or override_existing):
-        feature_clusters = tapp.read_feature_clusters(
+        feature_clusters = pastaq.read_feature_clusters(
             in_path_feature_clusters)
 
         logger.info("Generating feature clusters quantitative table")
@@ -1888,37 +1888,37 @@ def dda_pipeline(
         data = pd.DataFrame({
             'cluster_id': [cluster.id for cluster in feature_clusters],
         })
-        if tapp_parameters['quant_features'] == 'monoisotopic_height':
+        if pastaq_parameters['quant_features'] == 'monoisotopic_height':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_monoisotopic_height.csv")
             for i, stem in enumerate(input_stems):
                 data[stem] = [cluster.monoisotopic_heights[i]
                                              for cluster in feature_clusters]
-        elif tapp_parameters['quant_features'] == 'monoisotopic_volume':
+        elif pastaq_parameters['quant_features'] == 'monoisotopic_volume':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_monoisotopic_volume.csv")
             for i, stem in enumerate(input_stems):
                 data[stem] = [cluster.monoisotopic_volumes[i]
                                              for cluster in feature_clusters]
-        elif tapp_parameters['quant_features'] == 'total_height':
+        elif pastaq_parameters['quant_features'] == 'total_height':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_total_height.csv")
             for i, stem in enumerate(input_stems):
                 data[stem] = [cluster.total_heights[i]
                                              for cluster in feature_clusters]
-        elif tapp_parameters['quant_features'] == 'total_volume':
+        elif pastaq_parameters['quant_features'] == 'total_volume':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_total_volume.csv")
             for i, stem in enumerate(input_stems):
                 data[stem] = [cluster.total_volumes[i]
                                              for cluster in feature_clusters]
-        elif tapp_parameters['quant_features'] == 'max_height':
+        elif pastaq_parameters['quant_features'] == 'max_height':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_max_height.csv")
             for i, stem in enumerate(input_stems):
                 data[stem] = [cluster.max_heights[i]
                                              for cluster in feature_clusters]
-        elif tapp_parameters['quant_features'] == 'max_volume':
+        elif pastaq_parameters['quant_features'] == 'max_volume':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_max_volume.csv")
             for i, stem in enumerate(input_stems):
@@ -1953,7 +1953,7 @@ def dda_pipeline(
                                                  "{}.features".format(stem))
             in_path_peak_annotations = os.path.join(output_dir, 'quant',
                                                     "{}_peak_annotations.csv".format(stem))
-            features = tapp.read_features(in_path_peak_features)
+            features = pastaq.read_features(in_path_peak_features)
             features = [(feature.id, feature.peak_ids, feature.charge_state)
                         for feature in features]
             features = pd.DataFrame(
@@ -1986,10 +1986,10 @@ def dda_pipeline(
             annotations["psm_modifications_num"] = annotations["psm_modifications_num"].astype(
                 'Int64')
 
-        if tapp_parameters['quant_consensus'] and 'psm_sequence' in annotations:
+        if pastaq_parameters['quant_consensus'] and 'psm_sequence' in annotations:
             # Find a sequence consensus
             consensus_sequence = find_sequence_consensus(
-                annotations, 'psm_sequence', tapp_parameters['quant_consensus_min_ident'])
+                annotations, 'psm_sequence', pastaq_parameters['quant_consensus_min_ident'])
             annotations = pd.merge(
                 annotations,
                 consensus_sequence[[
@@ -2012,7 +2012,7 @@ def dda_pipeline(
         sequence_column = 'psm_sequence'
         protein_name_column = 'protein_name'
         protein_description_column = 'protein_description'
-        if tapp_parameters['quant_consensus'] and 'psm_sequence' in annotations:
+        if pastaq_parameters['quant_consensus'] and 'psm_sequence' in annotations:
             sequence_column = 'consensus_sequence'
             protein_name_column = 'consensus_protein_name'
             protein_description_column = 'consensus_protein_description'
@@ -2027,10 +2027,10 @@ def dda_pipeline(
                     sequence_column,
                     protein_name_column,
                     protein_description_column,
-                    tapp_parameters['quant_proteins_min_peptides'],
-                    tapp_parameters['quant_proteins_remove_subset_proteins'],
-                    tapp_parameters['quant_proteins_ignore_ambiguous_peptides'],
-                    tapp_parameters['quant_proteins_quant_type'],
+                    pastaq_parameters['quant_proteins_min_peptides'],
+                    pastaq_parameters['quant_proteins_remove_subset_proteins'],
+                    pastaq_parameters['quant_proteins_ignore_ambiguous_peptides'],
+                    pastaq_parameters['quant_proteins_quant_type'],
                     )
             out_path_protein_data = os.path.join(output_dir, 'quant',
                     "protein_groups.csv")
@@ -2043,7 +2043,7 @@ def dda_pipeline(
 
 
         # Saving annotations before aggregation.
-        if tapp_parameters['quant_save_all_annotations']:
+        if pastaq_parameters['quant_save_all_annotations']:
             logger.info("Writing annotations to disk")
             annotations = annotations.sort_values(by=["cluster_id"])
             annotations.to_csv(
@@ -2051,7 +2051,7 @@ def dda_pipeline(
 
         logger.info("Aggregating annotations")
         if ("psm_charge_state" in annotations and
-                tapp_parameters['quant_features_charge_state_filter']):
+                pastaq_parameters['quant_features_charge_state_filter']):
             annotations = annotations[annotations["psm_charge_state"]
                                       == annotations["charge_state"]]
         annotations_agg = annotations.groupby(
@@ -2066,7 +2066,7 @@ def dda_pipeline(
 
         # Aggregate peptides.
         sequence_column = 'psm_sequence'
-        if tapp_parameters['quant_consensus'] and 'psm_sequence' in annotations:
+        if pastaq_parameters['quant_consensus'] and 'psm_sequence' in annotations:
             sequence_column = 'consensus_sequence'
 
         if sequence_column in annotations:
@@ -2117,7 +2117,7 @@ def dda_pipeline(
         datetime.timedelta(seconds=time.time()-time_start)))
 
     logger.info("Performing summary")
-    dda_pipeline_summary(tapp_parameters, input_stems, output_dir)
+    dda_pipeline_summary(pastaq_parameters, input_stems, output_dir)
 
     logger.info('Total time elapsed: {}'.format(
         datetime.timedelta(seconds=time.time()-time_pipeline_start)))
