@@ -12,13 +12,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.colors as colors
-plt.rcParams.update({
-    'font.family': 'sans-serif',
-    'figure.figsize': (7.08661, 7.08661/1.618034),
-    'legend.fontsize': 6,
-    'font.size': 7,
-})
-
 
 def find_sequence_consensus(annotations, sequence_column, min_consensus_count):
     consensus = annotations[["cluster_id", "file_id", sequence_column]]
@@ -266,8 +259,6 @@ def find_protein_groups(
     protein_group_metadata = protein_group_metadata.apply(aggregate_protein_group_annotations)
     protein_group_metadata = protein_group_metadata.reset_index()
 
-    # TODO: Save protein groups and shared peptides in separate table.
-
     return protein_group_data, protein_group_metadata
 
 def plot_mesh(mesh, transform='sqrt', figure=None):
@@ -359,15 +350,12 @@ def plot_xic(peak, raw_data, figure=None, method="max"):
     return figure
 
 
-Peak.plot_xic = plot_xic
-
-
-def plot_raw_points(
-    peak,
-    raw_data,
-    img_plot=None,
-    rt_plot=None,
-    mz_plot=None,
+def plot_peak_raw_points(
+        peak,
+        raw_data,
+        img_plot=None,
+        rt_plot=None,
+        mz_plot=None,
         xic_method="max"):
     data_points = raw_data.raw_points(
         peak.roi_min_mz,
@@ -483,7 +471,7 @@ def default_parameters(instrument, avg_fwhm_rt):
             # Warp2D.
             #
             'warp2d_slack': 30,
-            'warp2d_window_size': 50,
+            'warp2d_window_size': 100,
             'warp2d_num_points': 2000,
             'warp2d_rt_expand_factor': 0.2,
             'warp2d_peaks_per_window': 100,
@@ -524,6 +512,27 @@ def default_parameters(instrument, avg_fwhm_rt):
             # Quality.
             #
             'similarity_num_peaks': 2000,
+            # Options: Any 'seaborn' supported palette style, like:
+            #          'husl', 'crest', 'Spectral', 'flare', 'mako', etc.
+            'qc_plot_palette': 'husl',
+            # Options: 'png', 'pdf', 'eps'...
+            'qc_plot_extension': 'png',
+            # Options: 'dynamic', [0.0-1.0]
+            'qc_plot_fill_alpha': 'dynamic',
+            'qc_plot_line_alpha': 0.5,
+            'qc_plot_scatter_alpha': 0.01,
+            'qc_plot_scatter_size': 1,
+            'qc_plot_min_dynamic_alpha': 0.1,
+            # Options: 'fill', 'line'
+            'qc_plot_line_style': 'fill',
+            # Plot style config.
+            'qc_plot_dpi': 300,
+            'qc_plot_font_family': 'sans-serif',
+            'qc_plot_font_size': 7,
+            'qc_plot_fig_size_x': 7.08661,
+            'qc_plot_fig_size_y': 7.08661/1.618034,
+            'qc_plot_fig_legend': False,
+            'qc_plot_mz_vs_sigma_mz_max_peaks': 200000,
             #
             # Quantitative table generation.
             #
@@ -568,7 +577,1074 @@ def default_parameters(instrument, avg_fwhm_rt):
         return pastaq_parameters
 
 
-def dda_pipeline_summary(pastaq_parameters, input_stems, output_dir):
+def _custom_log(msg, logger):
+    if logger:
+        logger.info(msg)
+    print(msg)
+
+def parse_raw_files(params, output_dir, logger=None, force_override=False):
+    _custom_log('Starting raw data conversion', logger)
+    time_start = time.time()
+
+    for file in params['input_files']:
+        raw_path = file['raw_path']
+        stem = file['stem']
+
+        # Check if file has already been processed.
+        out_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
+        if os.path.exists(out_path) and not force_override:
+            continue
+
+        # Read raw files (MS1).
+        _custom_log('Reading MS1: {}'.format(raw_path), logger)
+        raw_data = pastaq.read_mzxml(
+            raw_path,
+            min_mz=params['min_mz'],
+            max_mz=params['max_mz'],
+            min_rt=params['min_rt'],
+            max_rt=params['max_rt'],
+            instrument_type=params['instrument_type'],
+            resolution_ms1=params['resolution_ms1'],
+            resolution_msn=params['resolution_msn'],
+            reference_mz=params['reference_mz'],
+            fwhm_rt=params['avg_fwhm_rt'],
+            polarity=params['polarity'],
+            ms_level=1,
+        )
+
+        # Write raw_data to disk (MS1).
+        _custom_log('Writing MS1: {}'.format(out_path), logger)
+        raw_data.dump(out_path)
+
+    for file in params['input_files']:
+        raw_path = file['raw_path']
+        stem = file['stem']
+
+        # Check if file has already been processed.
+        out_path = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
+        if os.path.exists(out_path) and not force_override:
+            continue
+
+        # Read raw files (MS2).
+        _custom_log('Reading MS2: {}'.format(raw_path), logger)
+        raw_data = pastaq.read_mzxml(
+            raw_path,
+            min_mz=params['min_mz'],
+            max_mz=params['max_mz'],
+            min_rt=params['min_rt'],
+            max_rt=params['max_rt'],
+            instrument_type=params['instrument_type'],
+            resolution_ms1=params['resolution_ms1'],
+            resolution_msn=params['resolution_msn'],
+            reference_mz=params['reference_mz'],
+            fwhm_rt=params['avg_fwhm_rt'],
+            polarity=params['polarity'],
+            ms_level=2,
+        )
+
+        # Write raw_data to disk (MS2).
+        _custom_log('Writing MS2: {}'.format(out_path), logger)
+        raw_data.dump(out_path)
+
+    elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
+    _custom_log('Finished raw data parsing in {}'.format(elapsed_time), logger)
+
+def detect_peaks(params, output_dir, save_grid=False, logger=None, force_override=False):
+    # Perform resampling/smoothing and peak detection and save results to disk.
+    _custom_log('Starting peak detection', logger)
+    time_start = time.time()
+
+    for file in params['input_files']:
+        stem = file['stem']
+
+        # Check if file has already been processed.
+        in_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
+        out_path = os.path.join(output_dir, 'peaks', "{}.peaks".format(stem))
+        if os.path.exists(out_path) and not force_override:
+            continue
+
+        _custom_log("Reading raw_data from disk: {}".format(stem), logger)
+        raw_data = pastaq.read_raw_data(in_path)
+
+        _custom_log("Resampling: {}".format(stem), logger)
+        grid = pastaq.resample(
+            raw_data,
+            params['num_samples_mz'],
+            params['num_samples_rt'],
+            params['smoothing_coefficient_mz'],
+            params['smoothing_coefficient_rt'],
+        )
+
+        if save_grid:
+            mesh_path = os.path.join(output_dir, 'grid', "{}.grid".format(stem))
+            _custom_log('Writing grid: {}'.format(mesh_path), logger)
+            grid.dump(mesh_path)
+
+        _custom_log("Finding peaks: {}".format(stem), logger)
+        peaks = pastaq.find_peaks(raw_data, grid, params['max_peaks'])
+        _custom_log('Writing peaks:'.format(out_path), logger)
+        pastaq.write_peaks(peaks, out_path)
+
+    elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
+    _custom_log('Finished peak detection in {}'.format(elapsed_time), logger)
+
+def calculate_similarity_matrix(params, output_dir, peak_dir, logger=None, force_override=False):
+    out_path = os.path.join(output_dir, 'quality', 'similarity_{}.csv'.format(peak_dir))
+    if os.path.exists(out_path) and not force_override:
+        return
+
+    _custom_log("Starting similarity matrix calculation for {}".format(peak_dir), logger)
+    time_start = time.time()
+    if not os.path.exists("{}.csv".format(out_path)) or force_override:
+        input_files = params['input_files']
+        n_files = len(input_files)
+        similarity_matrix = np.zeros(n_files ** 2).reshape(n_files, n_files)
+        for i in range(0, n_files):
+            stem_a = input_files[i]['stem']
+            peaks_a = pastaq.read_peaks(os.path.join(
+                output_dir, peak_dir, '{}.peaks'.format(stem_a)))
+            for j in range(i, n_files):
+                stem_b = input_files[j]['stem']
+                peaks_b = pastaq.read_peaks(os.path.join(output_dir, peak_dir, '{}.peaks'.format(stem_b)))
+                _custom_log("Calculating similarity of {} vs {}".format(stem_a, stem_b), logger)
+                similarity_matrix[j, i] = pastaq.find_similarity(
+                    peaks_a, peaks_b,
+                    params['similarity_num_peaks']).geometric_ratio
+                similarity_matrix[i, j] = similarity_matrix[j, i]
+        similarity_matrix = pd.DataFrame(similarity_matrix)
+        similarity_matrix_names = [input_file['stem'] for input_file in input_files]
+        similarity_matrix.columns = similarity_matrix_names
+        similarity_matrix.rename(index=dict(zip(range(0, len(similarity_matrix_names), 1), similarity_matrix_names)), inplace=True)
+
+        # Save similarity matrix to disk.
+        _custom_log("Saving similarity matrix for {}: {}".format(peak_dir, out_path), logger)
+        similarity_matrix.to_csv(out_path)
+
+    elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
+    _custom_log('Finished similarity matrix calculation from {} in {}'.format(peak_dir, elapsed_time), logger)
+
+def perform_rt_alignment(params, output_dir, logger=None, force_override=False):
+    warped_sim_path = os.path.join(output_dir, 'quality', 'similarity_warped_peaks.csv')
+    if os.path.exists(warped_sim_path) and not force_override:
+        return
+    input_files = params['input_files']
+    # Find selected reference samples.
+    ref_candidates = []
+    for input_file in input_files:
+        if 'reference' in input_file and input_file['reference']:
+            ref_candidates += [input_file]
+
+    if len(ref_candidates) == 1:
+        # If only a reference sample is marked, it will be used.
+        ref = ref_candidates[0]
+        _custom_log("Using selected reference: {}".format(ref['stem']), logger)
+    else:
+        # If no samples are selected, exhaustive search will be performed.
+        if len(ref_candidates) == 0:
+            _custom_log("No reference selected, performing exhaustive search", logger)
+            ref_candidates = input_files
+
+        # Find optimal reference sample from the list of candidates.
+        _custom_log("Starting optimal reference search", logger)
+        time_start = time.time()
+        n_ref = len(ref_candidates)
+        n_files = len(input_files)
+        similarity_matrix = np.zeros(n_ref * n_files).reshape(n_ref, n_files)
+        for i in range(0, n_ref):
+            stem_a = ref_candidates[i]['stem']
+            peaks_a = pastaq.read_peaks(os.path.join(
+                output_dir, 'peaks', '{}.peaks'.format(stem_a)))
+            for j in range(0, n_files):
+                if i == j:
+                    similarity_matrix[i, j] = 1
+                    continue
+                stem_b = input_files[j]['stem']
+                peaks_b = pastaq.read_peaks(os.path.join(output_dir, 'peaks', '{}.peaks'.format(stem_b)))
+                _custom_log("Warping {} peaks to {}".format(stem_b, stem_a), logger)
+                time_map = pastaq.calculate_time_map(
+                    peaks_a, peaks_b,
+                    params['warp2d_slack'],
+                    params['warp2d_window_size'],
+                    params['warp2d_num_points'],
+                    params['warp2d_rt_expand_factor'],
+                    params['warp2d_peaks_per_window'])
+                peaks_b = pastaq.warp_peaks(peaks_b, time_map)
+                _custom_log("Calculating similarity of {} vs {} (warped)".format(stem_a, stem_b), logger)
+                similarity_matrix[i, j] = pastaq.find_similarity(
+                    peaks_a, peaks_b,
+                    params['similarity_num_peaks']).geometric_ratio
+
+        elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
+        _custom_log('Finished optimal reference search in {}'.format(elapsed_time), logger)
+
+        # Find the reference with maximum similarity overall.
+        ref_index = similarity_matrix.sum(axis=1).argmax()
+        ref = ref_candidates[ref_index]
+        _custom_log("Selected reference: {}".format(ref['stem']), logger)
+
+    _custom_log("Starting peak warping to reference", logger)
+    time_start = time.time()
+    ref_stem = ref['stem']
+    ref_peaks = pastaq.read_peaks(os.path.join(output_dir, 'peaks', '{}.peaks'.format(ref_stem)))
+    for input_file in input_files:
+        stem = input_file['stem']
+        # Check if file has already been processed.
+        in_path = os.path.join(output_dir, 'peaks', "{}.peaks".format(stem))
+        out_path = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
+        out_path_tmap = os.path.join(output_dir, 'time_map', "{}.tmap".format(stem))
+
+        peaks = pastaq.read_peaks(in_path)
+
+        if not os.path.exists(out_path_tmap) or force_override:
+            _custom_log("Calculating time_map for {}".format(stem), logger)
+            time_map = pastaq.calculate_time_map(
+                ref_peaks, peaks,
+                params['warp2d_slack'],
+                params['warp2d_window_size'],
+                params['warp2d_num_points'],
+                params['warp2d_rt_expand_factor'],
+                params['warp2d_peaks_per_window'])
+            pastaq.write_time_map(time_map, out_path_tmap)
+
+        if os.path.exists(out_path) and not force_override:
+            continue
+        if stem != ref_stem:
+            _custom_log("Warping {} peaks to reference {}".format(stem, ref_stem), logger)
+            peaks = pastaq.warp_peaks(peaks, time_map)
+        pastaq.write_peaks(peaks, out_path)
+
+    elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
+    _custom_log('Finished peak warping to reference in {}'.format(elapsed_time), logger)
+
+def perform_feature_detection(params, output_dir, logger=None, force_override=False):
+    _custom_log('Starting feature detection', logger)
+    time_start = time.time()
+    for input_file in params['input_files']:
+        stem = input_file['stem']
+        # Check if file has already been processed.
+        in_path_peaks = os.path.join(output_dir, 'warped_peaks', '{}.peaks'.format(stem))
+        out_path = os.path.join(output_dir, 'features', '{}.features'.format(stem))
+        if os.path.exists(out_path) and not force_override:
+            continue
+
+        _custom_log("Reading peaks from disk: {}".format(stem), logger)
+        peaks = pastaq.read_peaks(in_path_peaks)
+
+        _custom_log("Performing feature_detection: {}".format(stem), logger)
+        features = pastaq.detect_features(
+            peaks, params['feature_detection_charge_states'])
+        _custom_log('Writing features: {}'.format(out_path), logger)
+        pastaq.write_features(features, out_path)
+
+    elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
+    _custom_log('Finished feature detection in {}'.format(elapsed_time), logger)
+
+def parse_mzidentml_files(params, output_dir, logger=None, force_override=False):
+    _custom_log('Starting mzIdentML parsing', logger)
+    time_start = time.time()
+    for input_file in params['input_files']:
+        stem = input_file['stem']
+        in_path = input_file['ident_path']
+        out_path = os.path.join(output_dir, 'ident', "{}.ident".format(stem))
+        if in_path == 'none' or (os.path.exists(out_path) and not force_override):
+            continue
+        _custom_log('Reading mzIdentML: {}'.format(in_path), logger)
+        # TODO: We may want to add an option to pass a prefix for ignoring
+        # decoys when they are not properly annotated, for example in msfragger
+        # + idconvert
+        ident_data = pastaq.read_mzidentml(
+            in_path,
+            ignore_decoy=params['ident_ignore_decoy'],
+            require_threshold=params['ident_require_threshold'],
+            max_rank_only=params['ident_max_rank_only'],
+            min_mz=params['min_mz'],
+            max_mz=params['max_mz'],
+            min_rt=params['min_rt'],
+            max_rt=params['max_rt'],
+        )
+        _custom_log('Writing ident data: {}'.format(out_path), logger)
+        pastaq.write_ident_data(ident_data, out_path)
+
+    elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
+    _custom_log('Finished mzIdentML parsing in {}'.format(elapsed_time), logger)
+
+def link_peaks_msms_idents(params, output_dir, logger=None, force_override=False):
+    _custom_log('Starting ident/msms linkage', logger)
+    time_start = time.time()
+    for input_file in params['input_files']:
+        stem = input_file['stem']
+
+        # Check if file has already been processed.
+        in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
+        in_path_peaks = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
+        in_path_idents = os.path.join(output_dir, 'ident', "{}.ident".format(stem))
+        out_path_peak_ms2 = os.path.join(output_dir, 'linking', "{}.peak_ms2.link".format(stem))
+        out_path_ident_ms2 = os.path.join(output_dir, 'linking', "{}.ident_ms2.link".format(stem))
+        out_path_psm = os.path.join(output_dir, 'linking', "{}.ident_peak.link".format(stem))
+
+        raw_data = None
+        peaks = None
+        ident_data = None
+
+        if not os.path.exists(out_path_peak_ms2) or force_override:
+            _custom_log("Performing peaks-msms linkage: {}".format(stem), logger)
+            if raw_data is None:
+                raw_data = pastaq.read_raw_data(in_path_raw)
+            if peaks is None:
+                peaks = pastaq.read_peaks(in_path_peaks)
+            linked_msms = pastaq.link_peaks(
+                    peaks,
+                    raw_data,
+                    params['link_n_sig_mz'],
+                    params['link_n_sig_rt'],
+            )
+            _custom_log('Writing linked_msms: {}'.format(out_path_peak_ms2), logger)
+            pastaq.write_linked_msms(linked_msms, out_path_peak_ms2)
+
+        # Check that we had identification info.
+        if input_file['ident_path'] == 'none':
+            continue
+
+        if not os.path.exists(out_path_ident_ms2) or force_override:
+            _custom_log("Performing ident-msms linkage: {}".format(stem), logger)
+            if ident_data is None:
+                ident_data = pastaq.read_ident_data(in_path_idents)
+            if raw_data is None:
+                raw_data = pastaq.read_raw_data(in_path_raw)
+
+            linked_idents = pastaq.link_idents(
+                    ident_data,
+                    raw_data,
+                    params['link_n_sig_mz'],
+                    params['link_n_sig_rt'],
+            )
+            _custom_log('Writing linked_msms: {}'.format(out_path_ident_ms2), logger)
+            pastaq.write_linked_msms(linked_idents, out_path_ident_ms2)
+
+        if not os.path.exists(out_path_psm) or force_override:
+            _custom_log("Performing ident-peaks linkage: {}".format(stem), logger)
+            if ident_data is None:
+                ident_data = pastaq.read_ident_data(in_path_idents)
+            if raw_data is None:
+                raw_data = pastaq.read_raw_data(in_path_raw)
+            if peaks is None:
+                peaks = pastaq.read_peaks(in_path_peaks)
+            linked_psm = pastaq.link_psm(
+                    ident_data,
+                    peaks,
+                    raw_data,
+                    params['link_n_sig_mz'],
+                    params['link_n_sig_rt'],
+            )
+            _custom_log('Writing linked_psm: {}'.format(out_path_psm), logger)
+            pastaq.write_linked_psm(linked_psm, out_path_psm)
+
+    elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
+    _custom_log('Finished ident/msms linkage in {}'.format(elapsed_time), logger)
+
+def match_peaks_and_features(params, output_dir, logger=None, force_override=False):
+    input_files = params['input_files']
+
+    # Transform groups from string into an integer list.
+    groups = []
+    group_map = {}
+    group_counter = 0
+    for input_file in input_files:
+        group = input_file['group']
+        if group in group_map:
+            groups += [group_map[group]]
+            continue
+        group_map[group] = group_counter
+        groups += [group_counter]
+        group_counter += 1
+
+    # Peak matching.
+    _custom_log('Starting peak matching', logger)
+    time_start = time.time()
+    in_path_peaks = os.path.join(output_dir, 'warped_peaks')
+    out_path = os.path.join(output_dir, 'metamatch', "peaks.clusters")
+    if (not os.path.exists(out_path) or force_override):
+        _custom_log("Reading peaks from disk", logger)
+        peaks = [
+            pastaq.read_peaks(os.path.join(in_path_peaks, "{}.peaks".format(input_file['stem'])))
+            for input_file in input_files
+        ]
+        _custom_log("Finding peak clusters", logger)
+        peak_clusters = pastaq.find_peak_clusters(
+            groups,
+            peaks,
+            params["metamatch_fraction"],
+            params["metamatch_n_sig_mz"],
+            params["metamatch_n_sig_rt"])
+        _custom_log("Writing peak clusters to disk", logger)
+        pastaq.write_peak_clusters(peak_clusters, out_path)
+    elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
+    _custom_log('Finished peak matching in {}'.format(elapsed_time), logger)
+
+    # Feature matching.
+    _custom_log('Starting feature matching', logger)
+    time_start = time.time()
+    in_path_features = os.path.join(output_dir, 'features')
+    out_path = os.path.join(output_dir, 'metamatch', "features.clusters")
+    if (not os.path.exists(out_path) or force_override):
+        _custom_log("Reading features from disk", logger)
+        features = [
+            pastaq.read_features(os.path.join(in_path_features, "{}.features".format(input_file['stem'])))
+            for input_file in input_files
+        ]
+        _custom_log("Finding feature clusters", logger)
+        feature_clusters = pastaq.find_feature_clusters(
+            groups,
+            features,
+            params["metamatch_fraction"],
+            params["metamatch_n_sig_mz"],
+            params["metamatch_n_sig_rt"])
+        _custom_log("Writing feature clusters to disk", logger)
+        pastaq.write_feature_clusters(feature_clusters, out_path)
+    elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
+    _custom_log('Finished feature matching in {}'.format(elapsed_time), logger)
+
+# NOTE: This is a giant ball of spaghetti and could use some love.
+def create_quantitative_tables(params, output_dir, logger=None, force_override=False):
+    input_files = params['input_files']
+
+    _custom_log('Starting creation of quantitative tables', logger)
+    time_start = time.time()
+    for input_file in input_files:
+        stem = input_file['stem']
+        # Peak quantification.
+        # ====================
+        in_path_peaks = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
+        in_path_peaks_link = os.path.join(output_dir, 'linking', "{}.peak_ms2.link".format(stem))
+        in_path_ident_link_msms = os.path.join(output_dir, 'linking', "{}.ident_ms2.link".format(stem))
+        in_path_ident_link_theomz = os.path.join(output_dir, 'linking', "{}.ident_peak.link".format(stem))
+        in_path_ident_data = os.path.join(output_dir, 'ident', "{}.ident".format(stem))
+        out_path_peaks = os.path.join(output_dir, 'quant',"{}_peaks.csv".format(stem))
+        out_path_peak_annotations = os.path.join(output_dir, 'quant',"{}_peak_annotations.csv".format(stem))
+
+        # TODO: This is probably not necessary or needs to be changed if we are
+        # doing all per-peak quantification in a single loop.
+        if os.path.exists(out_path_peaks) and not force_override:
+            continue
+
+        _custom_log("Reading peaks from disk: {}".format(stem), logger)
+        peaks = pastaq.read_peaks(in_path_peaks)
+
+        _custom_log("Generating peaks quantitative table", logger)
+        peaks_df = pd.DataFrame({
+            'peak_id': [peak.id for peak in peaks],
+            'mz': [peak.fitted_mz for peak in peaks],
+            'rt': [peak.fitted_rt for peak in peaks],
+            'rt_delta': [peak.rt_delta for peak in peaks],
+            'height': [peak.fitted_height for peak in peaks],
+            'sigma_mz': [peak.fitted_sigma_mz for peak in peaks],
+            'sigma_rt': [peak.fitted_sigma_rt for peak in peaks],
+            'volume': [peak.fitted_volume for peak in peaks],
+            'smooth_height': [peak.local_max_height for peak in peaks],
+            'smooth_mz': [peak.local_max_mz for peak in peaks],
+            'smooth_rt': [peak.local_max_rt for peak in peaks],
+            'roi_min_mz': [peak.roi_min_mz for peak in peaks],
+            'roi_max_mz': [peak.roi_max_mz for peak in peaks],
+            'roi_min_rt': [peak.roi_min_rt for peak in peaks],
+            'roi_max_rt': [peak.roi_max_rt for peak in peaks],
+            'raw_mean_mz': [peak.raw_roi_mean_mz for peak in peaks],
+            'raw_mean_rt': [peak.raw_roi_mean_rt for peak in peaks],
+            'raw_std_mz': [peak.raw_roi_sigma_mz for peak in peaks],
+            'raw_std_rt': [peak.raw_roi_sigma_rt for peak in peaks],
+            'raw_skewness_mz': [peak.raw_roi_skewness_mz for peak in peaks],
+            'raw_skewness_rt': [peak.raw_roi_skewness_rt for peak in peaks],
+            'raw_kurtosis_mz': [peak.raw_roi_kurtosis_mz for peak in peaks],
+            'raw_kurtosis_rt': [peak.raw_roi_kurtosis_rt for peak in peaks],
+            'raw_total_intensity': [peak.raw_roi_total_intensity for peak in peaks],
+            'num_points': [peak.raw_roi_num_points for peak in peaks],
+            'num_scans': [peak.raw_roi_num_scans for peak in peaks],
+        })
+
+        # Peak Annotations.
+        # =================
+        _custom_log("Reading linked peaks from disk: {}".format(stem), logger)
+        peak_annotations = peaks_df[["peak_id"]]
+        linked_peaks = pastaq.read_linked_msms(in_path_peaks_link)
+        linked_peaks = pd.DataFrame({
+            'peak_id': [linked_peak.entity_id for linked_peak in linked_peaks],
+            'msms_id': [linked_peak.msms_id for linked_peak in linked_peaks],
+        })
+        peak_annotations = pd.merge(
+            peak_annotations, linked_peaks, on="peak_id", how="left")
+
+        if os.path.isfile(in_path_ident_data):
+            _custom_log("Reading ident_data from disk: {}".format(stem), logger)
+            ident_data = pastaq.read_ident_data(in_path_ident_data)
+            psms = pd.DataFrame({
+                'psm_index': [i for i in range(0, len(ident_data.spectrum_matches))],
+                'psm_id': [psm.id for psm in ident_data.spectrum_matches],
+                'psm_pass_threshold': [psm.pass_threshold for psm in ident_data.spectrum_matches],
+                'psm_charge_state': [psm.charge_state for psm in ident_data.spectrum_matches],
+                'psm_theoretical_mz': [psm.theoretical_mz for psm in ident_data.spectrum_matches],
+                'psm_experimental_mz': [psm.experimental_mz for psm in ident_data.spectrum_matches],
+                'psm_retention_time': [psm.retention_time for psm in ident_data.spectrum_matches],
+                'psm_rank': [psm.rank for psm in ident_data.spectrum_matches],
+                'psm_peptide_id': [psm.match_id for psm in ident_data.spectrum_matches],
+            })
+            if not psms.empty:
+                if params["quant_ident_linkage"] == 'theoretical_mz':
+                    _custom_log(
+                        "Reading linked ident_peak from disk: {}".format(stem), logger)
+                    linked_idents = pastaq.read_linked_psm(
+                        in_path_ident_link_theomz)
+                    linked_idents = pd.DataFrame({
+                        'peak_id': [linked_ident.peak_id for linked_ident in linked_idents],
+                        'psm_index': [linked_ident.psm_index for linked_ident in linked_idents],
+                        'psm_link_distance': [linked_ident.distance for linked_ident in linked_idents],
+                    })
+                    linked_idents = pd.merge(
+                        linked_idents, psms, on="psm_index")
+                    peak_annotations = pd.merge(
+                        peak_annotations, linked_idents, on="peak_id", how="left")
+                elif params["quant_ident_linkage"] == 'msms_event':
+                    _custom_log(
+                        "Reading linked ident_peak from disk: {}".format(stem), logger)
+                    linked_idents = pastaq.read_linked_msms(
+                        in_path_ident_link_msms)
+                    linked_idents = pd.DataFrame({
+                        'msms_id': [linked_ident.msms_id for linked_ident in linked_idents],
+                        'psm_index': [linked_ident.entity_id for linked_ident in linked_idents],
+                        'psm_link_distance': [linked_ident.distance for linked_ident in linked_idents],
+                    })
+                    linked_idents = pd.merge(
+                        linked_idents, psms, on="psm_index")
+                    peak_annotations = pd.merge(
+                        peak_annotations, linked_idents, on="msms_id", how="left")
+                else:
+                    raise ValueError("unknown quant_ident_linkage parameter")
+
+                # Get the peptide information per psm.
+                def format_modification(mod):
+                    ret = "monoisotopic_mass_delta: {}, ".format(
+                        mod.monoisotopic_mass_delta)
+                    ret += "average_mass_delta: {}, ".format(
+                        mod.average_mass_delta)
+                    ret += "residues: {}, ".format(mod.residues)
+                    ret += "location: {}, ".format(mod.location)
+                    ret += "id: {}".format("; ".join(mod.id))
+                    return ret
+                peptides = pd.DataFrame({
+                    'psm_peptide_id': [pep.id for pep in ident_data.peptides],
+                    'psm_sequence': [pep.sequence for pep in ident_data.peptides],
+                    'psm_modifications_num': [len(pep.modifications) for pep in ident_data.peptides],
+                    'psm_modifications_info': [" / ".join(map(format_modification, pep.modifications)) for pep in ident_data.peptides],
+                })
+                peak_annotations = pd.merge(
+                    peak_annotations, peptides, on="psm_peptide_id", how="left")
+
+                # Get the protein information per peptide.
+                db_sequences = pd.DataFrame({
+                    'db_seq_id': [db_seq.id for db_seq in ident_data.db_sequences],
+                    'protein_name': [db_seq.accession for db_seq in ident_data.db_sequences],
+                    'protein_description': [db_seq.description for db_seq in ident_data.db_sequences],
+                })
+                peptide_evidence = pd.DataFrame({
+                    'db_seq_id': [pe.db_sequence_id for pe in ident_data.peptide_evidence],
+                    'psm_peptide_id': [pe.peptide_id for pe in ident_data.peptide_evidence],
+                    'psm_decoy': [pe.decoy for pe in ident_data.peptide_evidence],
+                })
+                peptide_evidence = pd.merge(
+                    peptide_evidence, db_sequences, on="db_seq_id").drop(["db_seq_id"], axis=1)
+
+                # Get the protein information per psm.
+                peak_annotations = pd.merge(
+                    peak_annotations, peptide_evidence, on="psm_peptide_id")
+
+        _custom_log("Saving peaks quantitative table to disk: {}".format(stem), logger)
+        peaks_df.to_csv(out_path_peaks, index=False)
+
+        _custom_log("Saving peaks annotations table to disk: {}".format(stem), logger)
+        if "msms_id" in peak_annotations:
+            peak_annotations["msms_id"] = peak_annotations["msms_id"].astype(
+                'Int64')
+        if "psm_charge_state" in peak_annotations:
+            peak_annotations["psm_charge_state"] = peak_annotations["psm_charge_state"].astype(
+                'Int64')
+        if "psm_rank" in peak_annotations:
+            peak_annotations["psm_rank"] = peak_annotations["psm_rank"].astype(
+                'Int64')
+        if "psm_modifications_num" in peak_annotations:
+            peak_annotations["psm_modifications_num"] = peak_annotations["psm_modifications_num"].astype(
+                'Int64')
+        peak_annotations = peak_annotations.sort_values("peak_id")
+        peak_annotations.to_csv(out_path_peak_annotations, index=False)
+
+        in_path_features = os.path.join(
+            output_dir, 'features', "{}.features".format(stem))
+        if os.path.isfile(in_path_features):
+            out_path_features = os.path.join(output_dir, 'quant',
+                                             "{}_features.csv".format(stem))
+            out_path_feature_annotations = os.path.join(output_dir, 'quant',
+                                                        "{}_feature_annotations.csv".format(stem))
+
+            _custom_log("Reading features from disk: {}".format(stem), logger)
+            features = pastaq.read_features(in_path_features)
+
+            _custom_log("Generating features quantitative table", logger)
+            features_df = pd.DataFrame({
+                'feature_id': [feature.id for feature in features],
+                'average_mz': [feature.average_mz for feature in features],
+                'average_mz_sigma': [feature.average_mz_sigma for feature in features],
+                'average_rt': [feature.average_rt for feature in features],
+                'average_rt_sigma': [feature.average_rt_sigma for feature in features],
+                'average_rt_delta': [feature.average_rt_delta for feature in features],
+                'total_height': [feature.total_height for feature in features],
+                'monoisotopic_mz': [feature.monoisotopic_mz for feature in features],
+                'monoisotopic_height': [feature.monoisotopic_height for feature in features],
+                'charge_state': [feature.charge_state for feature in features],
+                'peak_id': [feature.peak_ids for feature in features],
+            })
+            # Find the peak annotations that belong to each feature.
+            feature_annotations = features_df[[
+                "feature_id", "peak_id"]].explode("peak_id")
+
+            # TODO: It's possible that we want to regenerate the feature table
+            # without doing the same with the peak tables.
+            feature_annotations = pd.merge(
+                feature_annotations, peak_annotations,
+                on="peak_id", how="left")
+
+            features_df.to_csv(out_path_features, index=False)
+            feature_annotations.to_csv(
+                out_path_feature_annotations, index=False)
+
+    # Matched Peaks
+    # =============
+    _custom_log("Reading peak clusters from disk", logger)
+    in_path_peak_clusters = os.path.join(
+        output_dir, 'metamatch', 'peaks.clusters')
+    out_path_peak_clusters_metadata = os.path.join(output_dir, 'quant',
+                                                   "peak_clusters_metadata.csv")
+    out_path_peak_clusters_peaks = os.path.join(output_dir, 'quant',
+                                                "peak_clusters_peaks.csv")
+    out_path_peak_clusters_annotations = os.path.join(output_dir, 'quant',
+                                                      "peak_clusters_annotations.csv")
+
+    def aggregate_cluster_annotations(x):
+        ret = {}
+        if "psm_sequence" in x:
+            ret["psm_sequence"] = ".|.".join(
+                np.unique(x['psm_sequence'].dropna())).strip(".|.")
+        if "psm_charge_state" in x:
+            ret["psm_charge_state"] = ".|.".join(
+                map(str, np.unique(x['psm_charge_state'].dropna()))).strip(".|.")
+        if "psm_modifications_num" in x:
+            ret["psm_modifications_num"] = ".|.".join(
+                map(str, np.unique(x['psm_modifications_num'].dropna()))).strip(".|.")
+        if "protein_name" in x:
+            ret["protein_name"] = ".|.".join(
+                np.unique(x['protein_name'].dropna())).strip(".|.")
+        if "protein_description" in x:
+            ret["protein_description"] = ".|.".join(
+                np.unique(x['protein_description'].dropna())).strip(".|.")
+        if "consensus_sequence" in x:
+            ret["consensus_sequence"] = ".|.".join(
+                np.unique(x['consensus_sequence'].dropna())).strip(".|.")
+        if "consensus_count" in x:
+            ret["consensus_count"] = ".|.".join(
+                map(str, np.unique(x['consensus_count'].dropna()))).strip(".|.")
+        if "consensus_protein_name" in x:
+            ret["consensus_protein_name"] = ".|.".join(
+                np.unique(x['consensus_protein_name'].dropna())).strip(".|.")
+        if "consensus_protein_description" in x:
+            ret["consensus_protein_description"] = ".|.".join(
+                np.unique(x['consensus_protein_description'].dropna())).strip(".|.")
+        if "protein_group" in x:
+            ret["protein_group"] = ".|.".join(
+                map(str, np.unique(x['protein_group'].dropna()))).strip(".|.")
+        return pd.Series(ret)
+
+    if (not os.path.exists(out_path_peak_clusters_metadata) or force_override):
+        peak_clusters = pastaq.read_peak_clusters(in_path_peak_clusters)
+        _custom_log("Generating peak clusters quantitative table", logger)
+        peak_clusters_metadata_df = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in peak_clusters],
+            'mz': [cluster.mz for cluster in peak_clusters],
+            'rt': [cluster.rt for cluster in peak_clusters],
+            'avg_height': [cluster.avg_height for cluster in peak_clusters],
+        })
+
+        _custom_log("Generating peak clusters quantitative table", logger)
+        peak_clusters_df = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in peak_clusters],
+        })
+        if params['quant_isotopes'] == 'volume':
+            out_path_peak_clusters = os.path.join(output_dir, 'quant',
+                                                  "peak_clusters_volume.csv")
+            for i, input_file in enumerate(input_files):
+                stem = input_file['stem']
+                peak_clusters_df[stem] = [cluster.file_volumes[i]
+                                          for cluster in peak_clusters]
+        elif params['quant_isotopes'] == 'height':
+            out_path_peak_clusters = os.path.join(output_dir, 'quant',
+                                                  "peak_clusters_height.csv")
+            for i, input_file in enumerate(input_files):
+                stem = input_file['stem']
+                peak_clusters_df[stem] = [cluster.heights[i]
+                                          for cluster in peak_clusters]
+        else:
+            raise ValueError("unknown quant_isotopes parameter")
+        _custom_log("Writing peaks quantitative table to disk", logger)
+        peak_clusters_df.to_csv(out_path_peak_clusters, index=False)
+
+        # Peak associations.
+        _custom_log("Generating peak clusters peak associations table", logger)
+        cluster_peaks = [(cluster.id, cluster.peak_ids)
+                         for cluster in peak_clusters]
+        cluster_peaks = pd.DataFrame(cluster_peaks, columns=[
+                                     "cluster_id", "peak_ids"]).explode("peak_ids")
+        cluster_peaks["file_id"] = cluster_peaks["peak_ids"].map(
+            lambda x: input_files[x.file_id]['stem'])
+        cluster_peaks["peak_id"] = cluster_peaks["peak_ids"].map(
+            lambda x: x.peak_id)
+        cluster_peaks = cluster_peaks.drop(["peak_ids"], axis=1)
+        _custom_log("Writing cluster to peak table to disk", logger)
+        cluster_peaks.to_csv(out_path_peak_clusters_peaks, index=False)
+
+        # Cluster annotations.
+        _custom_log("Generating peak clusters annotations table", logger)
+        annotations = pd.DataFrame()
+        for input_file in input_files:
+            stem = input_file['stem']
+            _custom_log("Reading peak annotations for: {}".format(stem), logger)
+            in_path_peak_annotations = os.path.join(output_dir, 'quant',
+                                                    "{}_peak_annotations.csv".format(stem))
+            peak_annotations = pd.read_csv(
+                in_path_peak_annotations, low_memory=False)
+            cluster_annotations = cluster_peaks[cluster_peaks["file_id"] == stem][[
+                "cluster_id", "peak_id"]]
+            cluster_annotations["file_id"] = stem
+            _custom_log(
+                "Merging peak/clusters annotations for: {}".format(stem), logger)
+            cluster_annotations = pd.merge(
+                cluster_annotations, peak_annotations, on="peak_id", how="left")
+            annotations = pd.concat(
+                [annotations, cluster_annotations]).reset_index(drop=True)
+        # Ensure these columns have the proper type.
+        if "msms_id" in annotations:
+            annotations["msms_id"] = annotations["msms_id"].astype(
+                'Int64')
+        if "psm_charge_state" in annotations:
+            annotations["psm_charge_state"] = annotations["psm_charge_state"].astype(
+                'Int64')
+        if "psm_rank" in annotations:
+            annotations["psm_rank"] = annotations["psm_rank"].astype(
+                'Int64')
+        if "psm_modifications_num" in annotations:
+            annotations["psm_modifications_num"] = annotations["psm_modifications_num"].astype(
+                'Int64')
+
+        if params['quant_consensus'] and 'psm_sequence' in annotations:
+            # Find a sequence consensus
+            consensus_sequence = find_sequence_consensus(
+                annotations, 'psm_sequence', params['quant_consensus_min_ident'])
+            annotations = pd.merge(
+                annotations,
+                consensus_sequence[[
+                    "cluster_id",
+                    "consensus_sequence",
+                    "consensus_count",
+                ]], on="cluster_id", how="left")
+            # Find a consensus proteins
+            proteins = annotations[annotations['psm_sequence']
+                                   == annotations['consensus_sequence']]
+            proteins = proteins[['cluster_id', 'protein_name',
+                                 'protein_description']].drop_duplicates()
+            proteins.columns = [
+                'cluster_id', 'consensus_protein_name', 'consensus_protein_description']
+            annotations = pd.merge(annotations, proteins,
+                                   on="cluster_id", how="left")
+
+        # Saving annotations before aggregation.
+        if params['quant_save_all_annotations']:
+            _custom_log("Writing annotations to disk", logger)
+            annotations = annotations.sort_values(by=["cluster_id"])
+            annotations.to_csv(out_path_peak_clusters_annotations, index=False)
+
+        _custom_log("Aggregating annotations", logger)
+        annotations = annotations.groupby(
+            'cluster_id').apply(aggregate_cluster_annotations)
+
+        # Metadata
+        _custom_log("Merging metadata with annotations", logger)
+        peak_clusters_metadata_df = pd.merge(
+            peak_clusters_metadata_df, annotations, how="left", on="cluster_id")
+        _custom_log("Writing metadata to disk", logger)
+        peak_clusters_metadata_df.to_csv(
+            out_path_peak_clusters_metadata, index=False)
+
+    # Matched Features
+    # ================
+    _custom_log("Reading feature clusters from disk", logger)
+    in_path_feature_clusters = os.path.join(
+        output_dir, 'metamatch', 'features.clusters')
+    out_path_feature_clusters_metadata = os.path.join(output_dir, 'quant',
+                                                      "feature_clusters_metadata.csv")
+    out_path_feature_clusters_features = os.path.join(output_dir, 'quant',
+                                                      "feature_clusters_features.csv")
+    out_path_feature_clusters_annotations = os.path.join(output_dir, 'quant',
+                                                         "feature_clusters_annotations.csv")
+    if (not os.path.exists(out_path_feature_clusters_metadata) or force_override):
+        feature_clusters = pastaq.read_feature_clusters(
+            in_path_feature_clusters)
+
+        _custom_log("Generating feature clusters quantitative table", logger)
+        metadata = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in feature_clusters],
+            'mz': [cluster.mz for cluster in feature_clusters],
+            'rt': [cluster.rt for cluster in feature_clusters],
+            'avg_height': [cluster.avg_total_height for cluster in feature_clusters],
+            'charge_state': [cluster.charge_state for cluster in feature_clusters],
+        })
+        data = pd.DataFrame({
+            'cluster_id': [cluster.id for cluster in feature_clusters],
+        })
+        if params['quant_features'] == 'monoisotopic_height':
+            out_path_feature_clusters = os.path.join(output_dir, 'quant',
+                                                     "feature_clusters_monoisotopic_height.csv")
+            for i, input_file in enumerate(input_files):
+                stem = input_file['stem']
+                data[stem] = [cluster.monoisotopic_heights[i]
+                                             for cluster in feature_clusters]
+        elif params['quant_features'] == 'monoisotopic_volume':
+            out_path_feature_clusters = os.path.join(output_dir, 'quant',
+                                                     "feature_clusters_monoisotopic_volume.csv")
+            for i, input_file in enumerate(input_files):
+                stem = input_file['stem']
+                data[stem] = [cluster.monoisotopic_volumes[i]
+                                             for cluster in feature_clusters]
+        elif params['quant_features'] == 'total_height':
+            out_path_feature_clusters = os.path.join(output_dir, 'quant',
+                                                     "feature_clusters_total_height.csv")
+            for i, input_file in enumerate(input_files):
+                stem = input_file['stem']
+                data[stem] = [cluster.total_heights[i]
+                                             for cluster in feature_clusters]
+        elif params['quant_features'] == 'total_volume':
+            out_path_feature_clusters = os.path.join(output_dir, 'quant',
+                                                     "feature_clusters_total_volume.csv")
+            for i, input_file in enumerate(input_files):
+                stem = input_file['stem']
+                data[stem] = [cluster.total_volumes[i]
+                                             for cluster in feature_clusters]
+        elif params['quant_features'] == 'max_height':
+            out_path_feature_clusters = os.path.join(output_dir, 'quant',
+                                                     "feature_clusters_max_height.csv")
+            for i, input_file in enumerate(input_files):
+                stem = input_file['stem']
+                data[stem] = [cluster.max_heights[i]
+                                             for cluster in feature_clusters]
+        elif params['quant_features'] == 'max_volume':
+            out_path_feature_clusters = os.path.join(output_dir, 'quant',
+                                                     "feature_clusters_max_volume.csv")
+            for i, input_file in enumerate(input_files):
+                stem = input_file['stem']
+                data[stem] = [cluster.max_volumes[i]
+                                             for cluster in feature_clusters]
+        else:
+            raise ValueError("unknown quant_features parameter")
+        _custom_log("Writing feature clusters quantitative table to disk", logger)
+        data.to_csv(out_path_feature_clusters, index=False)
+
+        # Feature associations.
+        _custom_log("Generating feature clusters feature associations table", logger)
+        cluster_features = [(cluster.id, cluster.feature_ids)
+                            for cluster in feature_clusters]
+        cluster_features = pd.DataFrame(cluster_features, columns=[
+                                        "cluster_id", "feature_ids"]).explode("feature_ids")
+        cluster_features["file_id"] = cluster_features["feature_ids"].map(
+            lambda x: input_files[x.file_id]['stem'])
+        cluster_features["feature_id"] = cluster_features["feature_ids"].map(
+            lambda x: x.feature_id)
+        cluster_features = cluster_features.drop(["feature_ids"], axis=1)
+        _custom_log("Writing cluster to feature table to disk", logger)
+        cluster_features.to_csv(
+            out_path_feature_clusters_features, index=False)
+
+        # Cluster annotations.
+        _custom_log("Generating peak clusters annotations table", logger)
+        annotations = pd.DataFrame()
+        for input_file in input_files:
+            stem = input_file['stem']
+            _custom_log("Reading features for: {}".format(stem), logger)
+            in_path_peak_features = os.path.join(output_dir, 'features',
+                                                 "{}.features".format(stem))
+            in_path_peak_annotations = os.path.join(output_dir, 'quant',
+                                                    "{}_peak_annotations.csv".format(stem))
+            features = pastaq.read_features(in_path_peak_features)
+            features = [(feature.id, feature.peak_ids, feature.charge_state)
+                        for feature in features]
+            features = pd.DataFrame(
+                features, columns=["feature_id", "peak_id", "charge_state"]).explode("peak_id")
+            peak_annotations = pd.read_csv(
+                in_path_peak_annotations, low_memory=False)
+            cluster_annotations = cluster_features[cluster_features["file_id"] == stem][[
+                "cluster_id", "feature_id"]]
+            cluster_annotations["file_id"] = stem
+            _custom_log(
+                "Merging peak/clusters annotations for: {}".format(stem), logger)
+            cluster_annotations = pd.merge(
+                cluster_annotations, features, on="feature_id", how="left")
+            cluster_annotations = pd.merge(
+                cluster_annotations, peak_annotations, on="peak_id", how="left")
+            annotations = pd.concat([annotations, cluster_annotations])
+
+        # Ensure these columns have the proper type.
+        if "msms_id" in annotations:
+            annotations["msms_id"] = annotations["msms_id"].astype('Int64')
+        if "charge_state" in annotations:
+            annotations["charge_state"] = annotations["charge_state"].astype(
+                'Int64')
+        if "psm_charge_state" in annotations:
+            annotations["psm_charge_state"] = annotations["psm_charge_state"].astype(
+                'Int64')
+        if "psm_rank" in annotations:
+            annotations["psm_rank"] = annotations["psm_rank"].astype('Int64')
+        if "psm_modifications_num" in annotations:
+            annotations["psm_modifications_num"] = annotations["psm_modifications_num"].astype(
+                'Int64')
+
+        if params['quant_consensus'] and 'psm_sequence' in annotations:
+            # Find a sequence consensus
+            consensus_sequence = find_sequence_consensus(
+                annotations, 'psm_sequence', params['quant_consensus_min_ident'])
+            annotations = pd.merge(
+                annotations,
+                consensus_sequence[[
+                    "cluster_id",
+                    "consensus_sequence",
+                    "consensus_count",
+                ]], on="cluster_id", how="left")
+            # Find a consensus proteins
+            proteins = annotations[annotations['psm_sequence']
+                                   == annotations['consensus_sequence']]
+            proteins = proteins[['cluster_id', 'protein_name',
+                                 'protein_description']].drop_duplicates()
+            proteins.columns = [
+                'cluster_id', 'consensus_protein_name', 'consensus_protein_description']
+            annotations = pd.merge(annotations, proteins,
+                                   on="cluster_id", how="left")
+
+        # Calculate protein groups.
+        _custom_log("Calculating protein groups", logger)
+        sequence_column = 'psm_sequence'
+        protein_name_column = 'protein_name'
+        protein_description_column = 'protein_description'
+        if params['quant_consensus'] and 'psm_sequence' in annotations:
+            sequence_column = 'consensus_sequence'
+            protein_name_column = 'consensus_protein_name'
+            protein_description_column = 'consensus_protein_description'
+
+        # Combine protein name/description in case
+        if (sequence_column in annotations and
+                protein_name_column in annotations and
+                protein_description_column in annotations):
+            prot_data, prot_metadata = find_protein_groups(
+                    data,
+                    annotations,
+                    sequence_column,
+                    protein_name_column,
+                    protein_description_column,
+                    params['quant_proteins_min_peptides'],
+                    params['quant_proteins_remove_subset_proteins'],
+                    params['quant_proteins_ignore_ambiguous_peptides'],
+                    params['quant_proteins_quant_type'],
+                    )
+            out_path_protein_data = os.path.join(output_dir, 'quant',
+                    "protein_groups.csv")
+            out_path_protein_metadata = os.path.join(output_dir, 'quant',
+                    "protein_groups_metadata.csv")
+
+            _custom_log("Writing protein group data/metadata to disk", logger)
+            prot_data.to_csv(out_path_protein_data, index=False)
+            prot_metadata.to_csv(out_path_protein_metadata, index=False)
+
+
+        # Saving annotations before aggregation.
+        if params['quant_save_all_annotations']:
+            _custom_log("Writing annotations to disk", logger)
+            annotations = annotations.sort_values(by=["cluster_id"])
+            annotations.to_csv(
+                out_path_feature_clusters_annotations, index=False)
+
+        _custom_log("Aggregating annotations", logger)
+        if ("psm_charge_state" in annotations and
+                params['quant_features_charge_state_filter']):
+            annotations = annotations[annotations["psm_charge_state"]
+                                      == annotations["charge_state"]]
+        annotations_agg = annotations.groupby(
+            'cluster_id').apply(aggregate_cluster_annotations)
+
+        # Metadata.
+        _custom_log("Merging metadata with annotations", logger)
+        metadata = pd.merge(
+            metadata, annotations_agg, how="left", on="cluster_id")
+        _custom_log("Writing metadata to disk", logger)
+        metadata.to_csv(out_path_feature_clusters_metadata, index=False)
+
+        # Aggregate peptides.
+        sequence_column = 'psm_sequence'
+        if params['quant_consensus'] and 'psm_sequence' in annotations:
+            sequence_column = 'consensus_sequence'
+
+        if sequence_column in annotations:
+            _custom_log("Aggregating peptide charge states", logger)
+            def aggregate_peptide_annotations(x):
+                ret = {}
+                if "psm_sequence" in x:
+                    ret["psm_sequence"] = ".|.".join(
+                        np.unique(x['psm_sequence'].dropna())).strip(".|.")
+                if "protein_name" in x:
+                    ret["protein_name"] = ".|.".join(
+                        np.unique(x['protein_name'].dropna())).strip(".|.")
+                if "protein_description" in x:
+                    ret["protein_description"] = ".|.".join(
+                        np.unique(x['protein_description'].dropna())).strip(".|.")
+                if "consensus_sequence" in x:
+                    ret["consensus_sequence"] = ".|.".join(
+                        np.unique(x['consensus_sequence'].dropna())).strip(".|.")
+                if "consensus_protein_name" in x:
+                    ret["consensus_protein_name"] = ".|.".join(
+                        np.unique(x['consensus_protein_name'].dropna())).strip(".|.")
+                if "consensus_protein_description" in x:
+                    ret["consensus_protein_description"] = ".|.".join(
+                        np.unique(x['consensus_protein_description'].dropna())).strip(".|.")
+                return pd.Series(ret)
+            peptide_data = data.copy()
+            peptide_data = peptide_data.drop(["cluster_id"], axis=1)
+            peptide_data[sequence_column] = metadata[sequence_column]
+            peptide_data = peptide_data[~peptide_data[sequence_column].isna()]
+            peptide_data = peptide_data[peptide_data[sequence_column] != '']
+            peptide_data = peptide_data[~peptide_data[sequence_column].str.contains('\.\|\.')]
+            peptide_data = peptide_data.groupby(sequence_column).agg(sum)
+            peptide_data = peptide_data.reset_index()
+            peptide_metadata = annotations.copy()
+            peptide_metadata = peptide_metadata[peptide_metadata[sequence_column].isin(peptide_data[sequence_column])]
+            peptide_metadata = peptide_metadata.groupby(sequence_column)
+            peptide_metadata = peptide_metadata.apply(aggregate_peptide_annotations)
+            out_path_peptide_data = os.path.join(output_dir, 'quant',
+                    "peptides_data.csv")
+            out_path_peptide_metadata = os.path.join(output_dir, 'quant',
+                    "peptides_metadata.csv")
+
+            _custom_log("Writing peptide data/metadata to disk", logger)
+            peptide_data.to_csv(out_path_peptide_data, index=False)
+            peptide_metadata.to_csv(out_path_peptide_metadata, index=False)
+
+    elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
+    _custom_log('Finished creation of quantitative tables in {}'.format(elapsed_time), logger)
+
+def dda_pipeline_summary(params, output_dir, logger):
+    _custom_log("Starting summary stats", logger)
+    time_start = time.time()
+
+    input_files = params['input_files']
+
     summary_log = logging.getLogger('summary')
     summary_log.setLevel(logging.INFO)
     summary_log_fh = logging.FileHandler(os.path.join(output_dir, 'summary.log'))
@@ -579,7 +1655,8 @@ def dda_pipeline_summary(pastaq_parameters, input_stems, output_dir):
 
     # Raw data
     summary_log.info('Raw data')
-    for stem in input_stems:
+    for input_file in input_files:
+        stem = input_file['stem']
         summary_log.info('    {}'.format(stem))
 
         # MS1
@@ -610,7 +1687,8 @@ def dda_pipeline_summary(pastaq_parameters, input_stems, output_dir):
     median_peak_heights = []
     std_peak_heights = []
     n_peaks = []
-    for stem in input_stems:
+    for input_file in input_files:
+        stem = input_file['stem']
         summary_log.info('    {}'.format(stem))
 
         in_path = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
@@ -650,7 +1728,8 @@ def dda_pipeline_summary(pastaq_parameters, input_stems, output_dir):
     median_feature_total_heights = []
     std_feature_total_heights = []
     n_features = []
-    for stem in input_stems:
+    for input_file in input_files:
+        stem = input_file['stem']
         summary_log.info('    {}'.format(stem))
 
         in_path = os.path.join(output_dir, 'features', "{}.features".format(stem))
@@ -718,11 +1797,12 @@ def dda_pipeline_summary(pastaq_parameters, input_stems, output_dir):
 
     # Identifications and linkage
     summary_log.info('Annotations and linkage')
-    for stem in input_stems:
+    for input_file in input_files:
+        stem = input_file['stem']
         summary_log.info('    {}'.format(stem))
 
         in_path_raw_data = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
-        in_path_linked_msms = os.path.join(output_dir, 'linking', "{}.ms2_peak.link".format(stem))
+        in_path_linked_msms = os.path.join(output_dir, 'linking', "{}.peak_ms2.link".format(stem))
         if os.path.exists(in_path_raw_data) and os.path.exists(in_path_linked_msms):
             raw_data = pastaq.read_raw_data(in_path_raw_data)
             linked_msms = pastaq.read_linked_msms(in_path_linked_msms)
@@ -752,52 +1832,322 @@ def dda_pipeline_summary(pastaq_parameters, input_stems, output_dir):
                 summary_log.info('            PSM-peaks linking efficiency (%): {}'.format(len(ident_peak)/len(ident_data.spectrum_matches) * 100.0))
 
     # TODO: Average identification linkage stats.
-
     # TODO: Metamatch stats
     # TODO: Peptide stats
     # TODO: Protein group stats
+    summary_log.removeHandler(summary_log_fh)
+    summary_log_fh.close()
+
+    elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
+    _custom_log('Finished summary stats in {}'.format(elapsed_time), logger)
+
+def generate_qc_plots(params, output_dir, logger=None, force_override=False):
+    input_files = params['input_files']
+
+    #
+    # General plot config.
+    #
+
+    # Font and figure size
+    plt.rcParams.update({
+        'font.family': params['qc_plot_font_family'],
+        'font.size': params['qc_plot_font_size'],
+        'figure.figsize': (params['qc_plot_fig_size_x'], params['qc_plot_fig_size_y']),
+    })
+
+    # Alpha parameters.
+    fill_alpha = params['qc_plot_fill_alpha']
+    line_alpha = params['qc_plot_line_alpha']
+    scatter_alpha = params['qc_plot_scatter_alpha']
+    if line_alpha == 'dynamic':
+        line_alpha = max(params['qc_plot_min_dynamic_alpha'], 1.0 / len(input_files))
+    if fill_alpha == 'dynamic':
+        fill_alpha = max(params['qc_plot_min_dynamic_alpha'], 1.0 / len(input_files))
+
+    # Colorscheme.
+    palette = sns.color_palette(params['qc_plot_palette'], len(input_files))
+
+    _custom_log("Starting quality control plotting", logger)
+    time_start = time.time()
+
+    #
+    # Peak sigma density
+    #
+    out_path = os.path.join(output_dir, 'quality', 'peak_sigma_mz_rt_density.{}'.format(params['qc_plot_extension']))
+    if not os.path.exists(out_path) or force_override:
+        fig, (ax_left, ax_right) = plt.subplots(1, 2)
+        for input_file, color in zip(input_files, palette):
+            stem = input_file['stem']
+            _custom_log("Plotting density of sigma_mz/sigma_rt: {}".format(stem), logger)
+            peaks_path = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
+            peaks = pastaq.read_peaks(peaks_path)
+
+            sigma_mzs = np.array([peak.fitted_sigma_mz for peak in peaks])
+            sigma_rts = np.array([peak.fitted_sigma_rt for peak in peaks])
+
+            if params['qc_plot_line_style'] == 'fill':
+                sns.kdeplot(sigma_rts, label=stem, ax=ax_left, fill=True, linewidth=0, alpha=fill_alpha, color=color)
+                sns.kdeplot(sigma_mzs, label=stem, ax=ax_right, fill=True, linewidth=0, alpha=fill_alpha, color=color)
+            else:
+                sns.kdeplot(sigma_rts, label=stem, ax=ax_left, alpha=line_alpha, color=color)
+                sns.kdeplot(sigma_mzs, label=stem, ax=ax_right, alpha=line_alpha, color=color)
+
+        if params['qc_plot_fig_legend']:
+            plt.legend()
+        ax_left.set_xlabel('$\\sigma_{rt}$')
+        ax_right.set_xlabel('$\\sigma_{mz}$')
+        ax_left.set_ylabel('Density')
+        ax_right.set_ylabel('')
+        _custom_log("Saving figure: {}".format(out_path), logger)
+        plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+        plt.close(fig)
+
+    #
+    # Peak rt vs rt_delta
+    #
+    out_path = os.path.join(output_dir, 'quality', 'peak_rt_vs_rt_delta.{}'.format(params['qc_plot_extension']))
+    if not os.path.exists(out_path) or force_override:
+        fig, ax = plt.subplots(1, 1)
+
+        for input_file, color in zip(input_files, palette):
+            stem = input_file['stem']
+            _custom_log("Plotting rt vs rt_delta: {}".format(stem), logger)
+            peaks_path = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
+            peaks = pastaq.read_peaks(peaks_path)
+
+            rts = np.array([peak.fitted_rt for peak in peaks])
+            rt_deltas = np.array([peak.rt_delta for peak in peaks])
+
+            idx = np.argsort(rts)
+            rts = rts[idx]
+            rt_deltas = rt_deltas[idx]
+            ax.plot(rts, rt_deltas, label=stem, alpha=line_alpha, color=color)
+
+        if params['qc_plot_fig_legend']:
+            plt.legend()
+        ax.set_xlabel('Retention time (s)')
+        ax.set_ylabel('Retention time delta (s)')
+        _custom_log("Saving figure: {}".format(out_path), logger)
+        plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+        plt.close(fig)
+
+    #
+    # Peak sigma_mz vs m/z scatterplot.
+    #
+    out_path = os.path.join(output_dir, 'quality', 'peak_mz_vs_sigma_mz.{}'.format(params['qc_plot_extension']))
+    if not os.path.exists(out_path) or force_override:
+        fig, ax = plt.subplots(1, 1)
+
+        for input_file, color in zip(input_files, palette):
+            stem = input_file['stem']
+            _custom_log("Plotting mz vs sigma_mz: {}".format(stem), logger)
+            peaks_path = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
+            peaks = pastaq.read_peaks(peaks_path)
+
+            mz = np.array([peak.fitted_mz for peak in peaks])[0:params['qc_plot_mz_vs_sigma_mz_max_peaks']]
+            sigma_mz = np.array([peak.fitted_sigma_mz for peak in peaks])[0:params['qc_plot_mz_vs_sigma_mz_max_peaks']]
+
+            ax.scatter(mz, sigma_mz, s=params['qc_plot_scatter_size'], label=stem, edgecolors='none', alpha=scatter_alpha, color=color)
+
+        if params['qc_plot_fig_legend']:
+            plt.legend()
+        ax.set_xlabel('m/z')
+        ax.set_ylabel('$\\sigma_{mz}$')
+        _custom_log("Saving figure: {}".format(out_path), logger)
+        plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+        plt.close(fig)
+
+    #
+    # Extracted Ion Chromatogram (XIC) before and after alignment.
+    #
+    out_path = os.path.join(output_dir, 'quality', 'xic_unaligned.{}'.format(params['qc_plot_extension']))
+    if not os.path.exists(out_path) or force_override:
+        fig, ax = plt.subplots(1, 1)
+
+        for input_file, color in zip(input_files, palette):
+            stem = input_file['stem']
+            _custom_log("Plotting XIC (unaligned): {}".format(stem), logger)
+
+            raw_data_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
+            raw_data = pastaq.read_raw_data(raw_data_path)
+            xic = pastaq.xic(
+                raw_data,
+                raw_data.min_mz,
+                raw_data.max_mz,
+                raw_data.min_rt,
+                raw_data.max_rt,
+                "sum"
+            )
+            x = xic.retention_time
+            y = xic.intensity
+
+            if params['qc_plot_line_style'] == 'fill':
+                ax.fill_between(x, 0, y, lw=0, color=color, alpha=fill_alpha, label=stem)
+            else:
+                ax.plot(x, y, label=stem, alpha=line_alpha, color=color)
+
+        if params['qc_plot_fig_legend']:
+            plt.legend()
+        ax.set_xlabel('Retention time (s)')
+        ax.set_ylabel('Intensity')
+        _custom_log("Saving figure: {}".format(out_path), logger)
+        plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+        plt.close(fig)
+
+    out_path = os.path.join(output_dir, 'quality', 'xic_aligned.{}'.format(params['qc_plot_extension']))
+    if not os.path.exists(out_path) or force_override:
+        fig, ax = plt.subplots(1, 1)
+
+        for input_file, color in zip(input_files, palette):
+            stem = input_file['stem']
+            _custom_log("Plotting XIC (aligned): {}".format(stem), logger)
+
+            raw_data_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
+            tmap_path = os.path.join(output_dir, 'time_map', "{}.tmap".format(stem))
+
+            raw_data = pastaq.read_raw_data(raw_data_path)
+            tmap = pastaq.read_time_map(tmap_path)
+
+            xic = pastaq.xic(
+                raw_data,
+                raw_data.min_mz,
+                raw_data.max_mz,
+                raw_data.min_rt,
+                raw_data.max_rt,
+                "sum"
+            )
+            x = [tmap.warp(rt) for rt in xic.retention_time]
+            y = xic.intensity
+
+            if params['qc_plot_line_style'] == 'fill':
+                ax.fill_between(x, 0, y, lw=0, color=color, alpha=fill_alpha, label=stem)
+            else:
+                ax.plot(x, y, label=stem, alpha=line_alpha, color=color)
+
+        if params['qc_plot_fig_legend']:
+            plt.legend()
+        ax.set_xlabel('Retention time (s)')
+        ax.set_ylabel('Intensity')
+        _custom_log("Saving figure: {}".format(out_path), logger)
+        plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+        plt.close(fig)
+
+    #
+    # Base Peak chromatogram before and after alignment.
+    #
+    out_path = os.path.join(output_dir, 'quality', 'bpc_unaligned.{}'.format(params['qc_plot_extension']))
+    if not os.path.exists(out_path) or force_override:
+        fig, ax = plt.subplots(1, 1)
+
+        for input_file, color in zip(input_files, palette):
+            stem = input_file['stem']
+            _custom_log("Plotting Base Peak Chromatogram (unaligned): {}".format(stem), logger)
+
+            raw_data_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
+            raw_data = pastaq.read_raw_data(raw_data_path)
+            xic = pastaq.xic(
+                raw_data,
+                raw_data.min_mz,
+                raw_data.max_mz,
+                raw_data.min_rt,
+                raw_data.max_rt,
+                "max"
+            )
+            x = xic.retention_time
+            y = xic.intensity
+
+            if params['qc_plot_line_style'] == 'fill':
+                ax.fill_between(x, 0, y, lw=0, color=color, alpha=fill_alpha, label=stem)
+            else:
+                ax.plot(x, y, label=stem, alpha=line_alpha, color=color)
+
+        if params['qc_plot_fig_legend']:
+            plt.legend()
+        ax.set_xlabel('Retention time (s)')
+        ax.set_ylabel('Intensity')
+        _custom_log("Saving figure: {}".format(out_path), logger)
+        plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+        plt.close(fig)
+
+    out_path = os.path.join(output_dir, 'quality', 'bpc_aligned.{}'.format(params['qc_plot_extension']))
+    if not os.path.exists(out_path) or force_override:
+        fig, ax = plt.subplots(1, 1)
+
+        for input_file, color in zip(input_files, palette):
+            stem = input_file['stem']
+            _custom_log("Plotting Base Peak Chromatogram (aligned): {}".format(stem), logger)
+
+            raw_data_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
+            tmap_path = os.path.join(output_dir, 'time_map', "{}.tmap".format(stem))
+
+            raw_data = pastaq.read_raw_data(raw_data_path)
+            tmap = pastaq.read_time_map(tmap_path)
+
+            xic = pastaq.xic(
+                raw_data,
+                raw_data.min_mz,
+                raw_data.max_mz,
+                raw_data.min_rt,
+                raw_data.max_rt,
+                "max"
+            )
+            x = [tmap.warp(rt) for rt in xic.retention_time]
+            y = xic.intensity
+
+            if params['qc_plot_line_style'] == 'fill':
+                ax.fill_between(x, 0, y, lw=0, color=color, alpha=fill_alpha, label=stem)
+            else:
+                ax.plot(x, y, label=stem, alpha=line_alpha, color=color)
+
+        if params['qc_plot_fig_legend']:
+            plt.legend()
+        ax.set_xlabel('Retention time (s)')
+        ax.set_ylabel('Intensity')
+        _custom_log("Saving figure: {}".format(out_path), logger)
+        plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+        plt.close(fig)
+
+    #
+    # Similarity matrix before/after alignment.
+    #
+    out_path = os.path.join(output_dir, 'quality', 'similarity_unaligned.{}'.format(params['qc_plot_extension']))
+    if not os.path.exists(out_path) or force_override:
+        fig, ax = plt.subplots(1, 1)
+        _custom_log("Plotting similarity matrix before alignment", logger)
+        matrix_path = os.path.join(output_dir, 'quality', 'similarity_{}.csv'.format('peaks'))
+        similarity_matrix = pd.read_csv(matrix_path, index_col=0)
+        sns.heatmap(similarity_matrix, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
+        _custom_log("Saving figure: {}".format(out_path), logger)
+        plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+        plt.close(fig)
+
+    out_path = os.path.join(output_dir, 'quality', 'similarity_aligned.{}'.format(params['qc_plot_extension']))
+    if not os.path.exists(out_path) or force_override:
+        fig, ax = plt.subplots(1, 1)
+        _custom_log("Plotting similarity matrix after alignment", logger)
+        matrix_path = os.path.join(output_dir, 'quality', 'similarity_{}.csv'.format('warped_peaks'))
+        similarity_matrix = pd.read_csv(matrix_path, index_col=0)
+        sns.heatmap(similarity_matrix, xticklabels=True, yticklabels=True, square=True, vmin=0, vmax=1)
+        _custom_log("Saving figure: {}".format(out_path), logger)
+        plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+        plt.close(fig)
+
+    elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
+    _custom_log('Finished quality control plotting in {}'.format(elapsed_time), logger)
+
 
 def dda_pipeline(
     pastaq_parameters,
     input_files,
     output_dir="pastaq",
-    override_existing=False,
-    save_mesh=False,
+    force_override=False,
+    save_grid=False,
 ):
     # TODO: Logger should have different levels and user can configure the
     # verbosity of output.
     # TODO: Sanitize parameters.
     # TODO: Sanitize input/outputs.
-    # TODO:     - Check if file names exist.
     # TODO:     - Check if there are name conflicts.
-    # TODO:     - Check that input extension is valid.
-    # TODO:     - Check if we have permission to write on output directory.
-    # Create lists of files, and groups.
-    input_raw_files = []
-    input_stems = []
-    input_ident_files = []
-    groups = []
-    for key in (input_files.keys()):
-        input_raw_files += [key]
-        base_name = os.path.basename(key)
-        base_name = os.path.splitext(base_name)
-        stem = base_name[0]
-        input_stems += [stem]
-
-        # TODO: Check that all files contain a group, if not, assign a default
-        # group distinct from the rest.
-        groups += [input_files[key]['group']]
-
-        # Check that all files contain a ident_path, if not, assign 'none'.
-        if input_files[key]['ident_path']:
-            input_ident_files += [input_files[key]['ident_path']]
-        else:
-            input_ident_files += ['none']
-
-    # Sort input files by groups and stems.
-    groups, input_stems, input_ident_files, input_raw_files = list(
-        zip(*sorted(zip(
-            groups, input_stems, input_ident_files, input_raw_files))))
 
     # Create output directory and subdirectoreis if necessary.
     if not os.path.exists(output_dir):
@@ -806,8 +2156,9 @@ def dda_pipeline(
         os.makedirs(os.path.join(output_dir, 'raw'))
     if not os.path.exists(os.path.join(output_dir, 'quality')):
         os.makedirs(os.path.join(output_dir, 'quality'))
-    if not os.path.exists(os.path.join(output_dir, 'mesh') and save_mesh):
-        os.makedirs(os.path.join(output_dir, 'mesh'))
+    if save_grid:
+        if not os.path.exists(os.path.join(output_dir, 'grid')):
+            os.makedirs(os.path.join(output_dir, 'grid'))
     if not os.path.exists(os.path.join(output_dir, 'peaks')):
         os.makedirs(os.path.join(output_dir, 'peaks'))
     if not os.path.exists(os.path.join(output_dir, 'time_map')):
@@ -825,11 +2176,8 @@ def dda_pipeline(
     if not os.path.exists(os.path.join(output_dir, 'quant')):
         os.makedirs(os.path.join(output_dir, 'quant'))
 
-    # Initialize log and parameters files.
-    parameters_file_name = os.path.join(output_dir, 'parameters.json')
-    with open(parameters_file_name, 'w') as json_file:
-        json.dump(pastaq_parameters, json_file)
-
+    # Initialize logger.
+    # TODO: Log to file and cout simultaneously if the user asks for it.
     class DeltaTimeFilter(logging.Filter):
         def filter(self, record):
             current_time = time.time()
@@ -850,1274 +2198,51 @@ def dda_pipeline(
     logger_fh.setFormatter(formatter)
     logger.addHandler(logger_fh)
 
+    # Prepare input files.
+    for file in input_files:
+        # TODO: Check if the input path for raw files exist.
+        # TODO: Check if the input path for identifications exist.
+
+        # If there is no identification, make sure it is set as none.
+        if 'ident_path' not in file:
+            file['ident_path'] = 'none'
+
+        # Obtain the stem for this file if not manually specified.
+        if 'stem' not in file:
+            base_name = os.path.basename(file['raw_path'])
+            base_name = os.path.splitext(base_name)
+            file['stem'] = base_name[0]
+
+        # Check that all files contain a group, if not, assign the default
+        # 'none' group.
+        if 'group' not in file:
+            file['group'] = 'none'
+
+    # Make sure the input files are in the parameters list before saving them to
+    # disk.
+    pastaq_parameters['input_files'] = input_files
+
+    # Save parameters file.
+    parameters_file_name = os.path.join(output_dir, 'parameters.json')
+    with open(parameters_file_name, 'w') as json_file:
+        json.dump(pastaq_parameters, json_file)
+
+    # Store current time for logging the total elapsed time for the entire run.
     time_pipeline_start = time.time()
 
-    # Raw data to binary conversion.
-    logger.info('Starting raw data conversion')
-    time_start = time.time()
-    for i, file_name in enumerate(input_raw_files):
-        # Check if file has already been processed.
-        stem = input_stems[i]
-        out_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
-        if os.path.exists(out_path) and not override_existing:
-            continue
-
-        # Read raw files (MS1).
-        logger.info('Reading MS1: {}'.format(file_name))
-        raw_data = pastaq.read_mzxml(
-            file_name,
-            min_mz=pastaq_parameters['min_mz'],
-            max_mz=pastaq_parameters['max_mz'],
-            min_rt=pastaq_parameters['min_rt'],
-            max_rt=pastaq_parameters['max_rt'],
-            instrument_type=pastaq_parameters['instrument_type'],
-            resolution_ms1=pastaq_parameters['resolution_ms1'],
-            resolution_msn=pastaq_parameters['resolution_msn'],
-            reference_mz=pastaq_parameters['reference_mz'],
-            fwhm_rt=pastaq_parameters['avg_fwhm_rt'],
-            polarity=pastaq_parameters['polarity'],
-            ms_level=1,
-        )
-
-        # Write raw_data to disk (MS1).
-        logger.info('Writing MS1: {}'.format(out_path))
-        raw_data.dump(out_path)
-
-    for i, file_name in enumerate(input_raw_files):
-        # Check if file has already been processed.
-        stem = input_stems[i]
-        out_path = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
-        if os.path.exists(out_path) and not override_existing:
-            continue
-
-        # Read raw files (MS2).
-        logger.info('Reading MS2: {}'.format(file_name))
-        raw_data = pastaq.read_mzxml(
-            file_name,
-            min_mz=pastaq_parameters['min_mz'],
-            max_mz=pastaq_parameters['max_mz'],
-            min_rt=pastaq_parameters['min_rt'],
-            max_rt=pastaq_parameters['max_rt'],
-            instrument_type=pastaq_parameters['instrument_type'],
-            resolution_ms1=pastaq_parameters['resolution_ms1'],
-            resolution_msn=pastaq_parameters['resolution_msn'],
-            reference_mz=pastaq_parameters['reference_mz'],
-            fwhm_rt=pastaq_parameters['avg_fwhm_rt'],
-            polarity=pastaq_parameters['polarity'],
-            ms_level=2,
-        )
-
-        # Write raw_data to disk (MS2).
-        logger.info('Writing MS2: {}'.format(out_path))
-        raw_data.dump(out_path)
-
-    logger.info('Finished raw data conversion in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
-
-    # Perform resampling/smoothing and peak detection and save results to disk.
-    logger.info('Starting peak detection')
-    time_start = time.time()
-    for stem in input_stems:
-        # Check if file has already been processed.
-        in_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
-        out_path = os.path.join(output_dir, 'peaks', "{}.peaks".format(stem))
-        if os.path.exists(out_path) and not override_existing:
-            continue
-
-        logger.info("Reading raw_data from disk: {}".format(stem))
-        raw_data = pastaq.read_raw_data(in_path)
-
-        logger.info("Resampling: {}".format(stem))
-        mesh = pastaq.resample(
-            raw_data,
-            pastaq_parameters['num_samples_mz'],
-            pastaq_parameters['num_samples_rt'],
-            pastaq_parameters['smoothing_coefficient_mz'],
-            pastaq_parameters['smoothing_coefficient_rt'],
-        )
-
-        if save_mesh:
-            logger.info('Writing mesh: {}'.format(out_path))
-            mesh.dump(out_path)
-
-        logger.info("Finding peaks: {}".format(stem))
-        peaks = pastaq.find_peaks(raw_data, mesh, pastaq_parameters['max_peaks'])
-        logger.info('Writing peaks:'.format(out_path))
-        pastaq.write_peaks(peaks, out_path)
-
-    logger.info('Finished peak detection in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
-
-    # Calculate similarity matrix before alignment, generate heatmap and save
-    # to disk.
-    out_path = os.path.join(output_dir, 'quality', 'similarity_unwarped')
-    logger.info("Starting unwarped similarity matrix calculation")
-    time_start = time.time()
-    if not os.path.exists("{}.csv".format(out_path)) or override_existing:
-        similarity_matrix = np.zeros(
-            len(input_stems) ** 2).reshape(len(input_stems), len(input_stems))
-        for i in range(0, len(input_stems)):
-            stem_a = input_stems[i]
-            logger.info("Reading peaks_a from disk: {}".format(stem_a))
-            peaks_a = pastaq.read_peaks(os.path.join(
-                output_dir, 'peaks', '{}.peaks'.format(stem_a)))
-            for j in range(i, len(input_stems)):
-                stem_b = input_stems[j]
-                logger.info("Reading peaks_b from disk: {}".format(stem_b))
-                peaks_b = pastaq.read_peaks(os.path.join(
-                    output_dir, 'peaks', '{}.peaks'.format(stem_b)))
-                logger.info(
-                    "Calculating similarity of {} vs {}".format(
-                        stem_a, stem_b))
-                similarity_matrix[j, i] = pastaq.find_similarity(
-                    peaks_a, peaks_b,
-                    pastaq_parameters['similarity_num_peaks']).geometric_ratio
-                similarity_matrix[i, j] = similarity_matrix[j, i]
-        similarity_matrix = pd.DataFrame(similarity_matrix)
-        similarity_matrix_names = [input_stem.split(
-            '.')[0] for input_stem in input_stems]
-        similarity_matrix.columns = similarity_matrix_names
-        similarity_matrix.rename(index=dict(zip(
-            range(0, len(similarity_matrix_names), 1),
-            similarity_matrix_names)), inplace=True)
-        plt.ioff()
-        fig = plt.figure()
-        sns.heatmap(similarity_matrix, xticklabels=True,
-                    yticklabels=True, square=True, vmin=0, vmax=1)
-        # Save similarity matrix and figure to disk.
-        logger.info("Saving similarity matrix: {}.csv".format(out_path))
-        similarity_matrix.to_csv("{}.csv".format(out_path))
-        # TODO: Use plot saving from utilities library.
-        fig.set_size_inches(7.08661, 7.08661)
-        plt.savefig("{}.pdf".format(out_path), dpi=300)
-        plt.savefig("{}.png".format(out_path), dpi=300)
-        plt.close(fig)
-        logger.info(
-            "Saving similarity matrix plot: {}.pdf/png".format(out_path))
-    logger.info('Finished unwarped similarity matrix calculation in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
-
-    # Correct retention time. If a reference sample is selected it will be
-    # used, otherwise, exhaustive warping will be performed.
-    # TODO: Allow usage of reference sample.
-    out_path = os.path.join(output_dir, 'quality',
-                            'similarity_exhaustive_warping')
-    reference_index = 0
-    similarity_matrix = np.zeros(
-        len(input_stems) ** 2).reshape(len(input_stems), len(input_stems))
-    logger.info("Starting exhaustive warping similarity calculation")
-    time_start = time.time()
-    if not os.path.exists("{}.csv".format(out_path)) or override_existing:
-        for i in range(0, len(input_stems)):
-            stem_a = input_stems[i]
-            logger.info("Reading peaks_a from disk: {}".format(stem_a))
-            peaks_a = pastaq.read_peaks(os.path.join(
-                output_dir, 'peaks', '{}.peaks'.format(stem_a)))
-            for j in range(i, len(input_stems)):
-                stem_b = input_stems[j]
-                logger.info("Reading peaks_b from disk: {}".format(stem_b))
-                peaks_b = pastaq.read_peaks(os.path.join(
-                    output_dir, 'peaks', '{}.peaks'.format(stem_b)))
-                logger.info("Warping {} peaks to {}".format(stem_b, stem_a))
-                time_map = pastaq.calculate_time_map(
-                    peaks_a, peaks_b,
-                    pastaq_parameters['warp2d_slack'],
-                    pastaq_parameters['warp2d_window_size'],
-                    pastaq_parameters['warp2d_num_points'],
-                    pastaq_parameters['warp2d_rt_expand_factor'],
-                    pastaq_parameters['warp2d_peaks_per_window'])
-                peaks_b = pastaq.warp_peaks(peaks_b, time_map)
-                logger.info(
-                    "Calculating similarity of {} vs {} (warped)".format(
-                        stem_a, stem_b))
-                similarity_matrix[j, i] = pastaq.find_similarity(
-                    peaks_a, peaks_b,
-                    pastaq_parameters['similarity_num_peaks']).geometric_ratio
-                similarity_matrix[i, j] = similarity_matrix[j, i]
-        similarity_matrix = pd.DataFrame(similarity_matrix)
-        similarity_matrix_names = [input_stem.split(
-            '.')[0] for input_stem in input_stems]
-        similarity_matrix.columns = similarity_matrix_names
-        similarity_matrix.rename(index=dict(zip(
-            range(0, len(similarity_matrix_names), 1),
-            similarity_matrix_names)), inplace=True)
-        plt.ioff()
-        fig = plt.figure()
-        sns.heatmap(similarity_matrix, xticklabels=True,
-                    yticklabels=True, square=True, vmin=0, vmax=1)
-        # Save similarity matrix and figure to disk.
-        logger.info("Saving similarity matrix: {}.csv".format(out_path))
-        similarity_matrix.to_csv("{}.csv".format(out_path))
-        # TODO: Use plot saving from utilities library.
-        fig.set_size_inches(7.08661, 7.08661)
-        plt.savefig("{}.pdf".format(out_path), dpi=300)
-        plt.savefig("{}.png".format(out_path), dpi=300)
-        plt.close(fig)
-        logger.info(
-            "Saving similarity matrix plot: {}.pdf/png".format(out_path))
-    else:
-        # Load exhaustive_warping_similarity to calculate the reference idx.
-        similarity_matrix = pd.read_csv("{}.csv".format(out_path), index_col=0)
-        reference_index = similarity_matrix.sum(axis=0).values.argmax()
-    logger.info(
-        'Finished exhaustive warping similarity calculation in {}'.format(
-            datetime.timedelta(seconds=time.time()-time_start)))
-
-    # Warp all peaks to the reference file.
-    reference_stem = input_stems[reference_index]
-    logger.info("Starting peak warping to reference ({})".format(
-        reference_stem))
-    time_start = time.time()
-    logger.info("Reading reference peaks")
-    reference_peaks = pastaq.read_peaks(os.path.join(
-        output_dir, 'peaks', '{}.peaks'.format(reference_stem)))
-    for stem in input_stems:
-        # Check if file has already been processed.
-        in_path = os.path.join(output_dir, 'peaks', "{}.peaks".format(stem))
-        out_path = os.path.join(output_dir, 'warped_peaks',
-                                "{}.peaks".format(stem))
-        out_path_tmap = os.path.join(output_dir, 'time_map',
-                                     "{}.tmap".format(stem))
-        if os.path.exists(out_path) and not override_existing:
-            continue
-
-        logger.info("Warping peaks: {}".format(stem))
-        if stem == reference_stem:
-            pastaq.write_peaks(reference_peaks, out_path)
-            time_map = pastaq.calculate_time_map(
-                reference_peaks, reference_peaks,
-                pastaq_parameters['warp2d_slack'],
-                pastaq_parameters['warp2d_window_size'],
-                pastaq_parameters['warp2d_num_points'],
-                pastaq_parameters['warp2d_rt_expand_factor'],
-                pastaq_parameters['warp2d_peaks_per_window'])
-            pastaq.write_time_map(time_map, out_path_tmap)
-        else:
-            logger.info("Reading peaks from disk: {}".format(stem))
-            peaks = pastaq.read_peaks(in_path)
-            time_map = pastaq.calculate_time_map(
-                reference_peaks, peaks,
-                pastaq_parameters['warp2d_slack'],
-                pastaq_parameters['warp2d_window_size'],
-                pastaq_parameters['warp2d_num_points'],
-                pastaq_parameters['warp2d_rt_expand_factor'],
-                pastaq_parameters['warp2d_peaks_per_window'])
-            peaks = pastaq.warp_peaks(peaks, time_map)
-            pastaq.write_peaks(peaks, out_path)
-            pastaq.write_time_map(time_map, out_path_tmap)
-    logger.info('Finished peak warping to reference ({}) in {}'.format(
-        reference_stem, datetime.timedelta(seconds=time.time()-time_start)))
-
-    # Calculate similarity matrix after alignment, generate heatmap and save to
-    # disk.
-    out_path = os.path.join(output_dir, 'quality', 'similarity_warped')
-    logger.info("Starting warped similarity matrix calculation")
-    time_start = time.time()
-    if not os.path.exists("{}.csv".format(out_path)) or override_existing:
-        similarity_matrix = np.zeros(
-            len(input_stems) ** 2).reshape(len(input_stems), len(input_stems))
-        for i in range(0, len(input_stems)):
-            stem_a = input_stems[i]
-            logger.info("Reading peaks_a from disk: {}".format(stem_a))
-            peaks_a = pastaq.read_peaks(os.path.join(
-                output_dir, 'warped_peaks', '{}.peaks'.format(stem_a)))
-            for j in range(i, len(input_stems)):
-                stem_b = input_stems[j]
-                logger.info("Reading peaks_b from disk: {}".format(stem_b))
-                peaks_b = pastaq.read_peaks(os.path.join(
-                    output_dir, 'warped_peaks', '{}.peaks'.format(stem_b)))
-                logger.info(
-                    "Calculating similarity of {} vs {}".format(
-                        stem_a, stem_b))
-                similarity_matrix[j, i] = pastaq.find_similarity(
-                    peaks_a, peaks_b,
-                    pastaq_parameters['similarity_num_peaks']).geometric_ratio
-                similarity_matrix[i, j] = similarity_matrix[j, i]
-        similarity_matrix = pd.DataFrame(similarity_matrix)
-        similarity_matrix_names = [input_stem.split(
-            '.')[0] for input_stem in input_stems]
-        similarity_matrix.columns = similarity_matrix_names
-        similarity_matrix.rename(index=dict(zip(
-            range(0, len(similarity_matrix_names), 1),
-            similarity_matrix_names)), inplace=True)
-        plt.ioff()
-        fig = plt.figure()
-        sns.heatmap(similarity_matrix, xticklabels=True,
-                    yticklabels=True, square=True, vmin=0, vmax=1)
-        # Save similarity matrix and figure to disk.
-        logger.info("Saving similarity matrix: {}.csv".format(out_path))
-        similarity_matrix.to_csv("{}.csv".format(out_path))
-        # TODO: Use plot saving from utilities library.
-        fig.set_size_inches(7.08661, 7.08661)
-        plt.savefig("{}.pdf".format(out_path), dpi=300)
-        plt.savefig("{}.png".format(out_path), dpi=300)
-        plt.close(fig)
-        logger.info(
-            "Saving similarity matrix plot: {}.pdf/png".format(out_path))
-    logger.info('Finished warped similarity matrix calculation in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
-
-    logger.info("Starting quality control plotting")
-    time_start = time.time()
-    out_path_tic_bpc = os.path.join(output_dir, 'quality', 'tic_base_peak')
-    out_path_rt_vs_delta = os.path.join(
-        output_dir, 'quality', 'rt_vs_rt_delta')
-    out_path_sigmas_density = os.path.join(
-        output_dir, 'quality', 'density_sigma')
-    if (not os.path.exists("{}.png".format(out_path_tic_bpc))
-            or not os.path.exists("{}.png".format(out_path_rt_vs_delta))
-            or not os.path.exists("{}.png".format(out_path_sigmas_density))
-            or not os.path.exists("{}.pdf".format(out_path_tic_bpc))
-            or not os.path.exists("{}.pdf".format(out_path_rt_vs_delta))
-            or not os.path.exists("{}.pdf".format(out_path_sigmas_density))
-            or override_existing):
-        plt.ioff()
-
-        fig_tic_bpc, axes = plt.subplots(2, 2, sharex=True)
-        ax1, ax2 = axes[0]
-        ax3, ax4 = axes[1]
-
-        fig_rt_vs_delta, ax5 = plt.subplots(1, 1)
-
-        fig_sigmas_density, (ax6, ax7) = plt.subplots(1, 2)
-
-        alpha = 0.5
-        for i, stem in enumerate(input_stems):
-            in_path_raw_data = os.path.join(
-                output_dir, 'raw', "{}.ms1".format(stem))
-            in_path_tmap = os.path.join(
-                output_dir, 'time_map', "{}.tmap".format(stem))
-            in_path_peaks = os.path.join(
-                output_dir, 'warped_peaks', "{}.peaks".format(stem))
-            logger.info("Reading raw_data from disk: {}".format(stem))
-            raw_data = pastaq.read_raw_data(in_path_raw_data)
-            logger.info("Reading tmap from disk: {}".format(stem))
-            tmap = pastaq.read_time_map(in_path_tmap)
-            logger.info("Reading peaks from disk: {}".format(stem))
-            peaks = pastaq.read_peaks(in_path_peaks)
-
-            # Plot the unwarped TIC/Base peak.
-            logger.info("Plotting unwarped TIC/Base peak: {}".format(stem))
-            xic = pastaq.xic(
-                raw_data,
-                raw_data.min_mz,
-                raw_data.max_mz,
-                raw_data.min_rt,
-                raw_data.max_rt,
-                "sum"
-            )
-            x = xic.retention_time
-            y = xic.intensity
-            x_warped = [tmap.warp(rt) for rt in x]
-            ax1.plot(x, y, label=stem, alpha=alpha)
-            ax3.plot(x_warped, y, label=stem, alpha=alpha)
-
-            # Plot the warped TIC/Base peak.
-            logger.info("Plotting warped TIC/Base peak: {}".format(stem))
-            xic = pastaq.xic(
-                raw_data,
-                raw_data.min_mz,
-                raw_data.max_mz,
-                raw_data.min_rt,
-                raw_data.max_rt,
-                "max"
-            )
-            x = xic.retention_time
-            y = xic.intensity
-            x_warped = [tmap.warp(rt) for rt in x]
-            ax2.plot(x, y, label=stem, alpha=alpha)
-            ax4.plot(x_warped, y, label=stem, alpha=alpha)
-
-            # Plot the warping markers for each window.
-            logger.info("Plotting warping markers: {}".format(stem))
-            markers_not_warped = tmap.rt_start[1:]
-            markers_warped = tmap.sample_rt_start[1:]
-            ax1.scatter(markers_not_warped, np.repeat(
-                0, len(markers_not_warped)), alpha=alpha, marker='^', edgecolor='none')
-            ax2.scatter(markers_not_warped, np.repeat(
-                0, len(markers_not_warped)), alpha=alpha, marker='^', edgecolor='none')
-            ax3.scatter(markers_warped, np.repeat(
-                0, len(markers_warped)), alpha=alpha, marker='^', edgecolor='none')
-            ax4.scatter(markers_warped, np.repeat(
-                0, len(markers_warped)), alpha=alpha, marker='^', edgecolor='none')
-
-            # Plot rt vs delta.
-            logger.info("Plotting rt vs rt_delta: {}".format(stem))
-            rts = np.array([peak.fitted_rt for peak in peaks])
-            rt_deltas = np.array([peak.rt_delta for peak in peaks])
-            idx = np.argsort(rts)
-            rts = rts[idx]
-            rt_deltas = rt_deltas[idx]
-            ax5.plot(rts, rt_deltas, label=stem, alpha=alpha)
-
-            # Plot sigma mz/rt ditributions.
-            logger.info(
-                "Plotting density of sigma_mz/sigma_rt: {}".format(stem))
-            sigma_mzs = np.array([peak.fitted_sigma_mz for peak in peaks])
-            sigma_rts = np.array([peak.fitted_sigma_rt for peak in peaks])
-            sns.kdeplot(sigma_rts, ax=ax6)
-            sns.kdeplot(sigma_mzs, ax=ax7)
-
-        logger.info("Saving figures to disk")
-
-        # Save TIC/Base peak figure.
-        ax1.set_title('Total Ion Chromatogram (TIC)')
-        ax2.set_title('Base Peak Chromatogram')
-        ax2.yaxis.set_label_position("right")
-        ax4.yaxis.set_label_position("right")
-        ax2.set_ylabel('Unwarped', rotation=-90, labelpad=20)
-        ax4.set_ylabel('Warped', rotation=-90, labelpad=20)
-        fig_tic_bpc.text(0.5, 0.04, 'Retention time (s)', ha='center')
-        fig_tic_bpc.text(0.04, 0.5, 'Intensity',
-                         va='center', rotation='vertical')
-        handles, labels = ax4.get_legend_handles_labels()
-        fig_tic_bpc.legend(handles, labels, loc='upper right')
-        fig_tic_bpc.set_size_inches(7.08661, 7.08661/1.618034)
-        plt.figure(fig_tic_bpc.number)
-        plt.savefig("{}.pdf".format(out_path_tic_bpc), dpi=300)
-        plt.savefig("{}.png".format(out_path_tic_bpc), dpi=300)
-        plt.close(fig_tic_bpc)
-
-        # Save rt vs rt_delta figure.
-        ax5.set_xlabel('Retention time (s)')
-        ax5.set_ylabel('Retention time delta (s)')
-        plt.figure(fig_rt_vs_delta.number)
-        fig_rt_vs_delta.legend(handles, labels, loc='upper right')
-        fig_rt_vs_delta.set_size_inches(7.08661, 7.08661/1.618034)
-        plt.savefig("{}.pdf".format(out_path_rt_vs_delta), dpi=300)
-        plt.savefig("{}.png".format(out_path_rt_vs_delta), dpi=300)
-        plt.close(fig_rt_vs_delta)
-
-        # Save sigma density figure.
-        ax6.set_xlabel('$\\sigma_{rt}$')
-        ax7.set_xlabel('$\\sigma_{mz}$')
-        ax6.set_ylabel('Density')
-        plt.figure(fig_sigmas_density.number)
-        fig_sigmas_density.set_size_inches(7.08661, 7.08661/1.618034)
-        plt.savefig("{}.pdf".format(out_path_sigmas_density), dpi=300)
-        plt.savefig("{}.png".format(out_path_sigmas_density), dpi=300)
-        plt.close(fig_sigmas_density)
-
-    logger.info('Finished quality control plotting in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
-
-    # Perform feature detection using averagine
-    logger.info('Starting feature detection')
-    time_start = time.time()
-    for stem in input_stems:
-        # Check if file has already been processed.
-        in_path_peaks = os.path.join(
-            output_dir, 'warped_peaks', "{}.peaks".format(stem))
-        out_path = os.path.join(output_dir, 'features',
-                                "{}.features".format(stem))
-        if os.path.exists(out_path) and not override_existing:
-            continue
-
-        logger.info("Reading peaks from disk: {}".format(stem))
-        peaks = pastaq.read_peaks(in_path_peaks)
-
-        logger.info("Performing feature_detection: {}".format(stem))
-        features = pastaq.detect_features(
-            peaks, pastaq_parameters['feature_detection_charge_states'])
-        logger.info('Writing features: {}'.format(out_path))
-        pastaq.write_features(features, out_path)
-
-    logger.info('Finished feature detection in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
-
-    # Read mzidentdata and save binary data to disk.
-    logger.info('Starting mzIdentML parsing')
-    time_start = time.time()
-    for i, stem in enumerate(input_stems):
-        in_path = input_ident_files[i]
-        out_path = os.path.join(output_dir, 'ident', "{}.ident".format(stem))
-        if in_path == 'none' or (os.path.exists(out_path) and not override_existing):
-            continue
-        logger.info('Reading mzIdentML: {}'.format(in_path))
-        ident_data = pastaq.read_mzidentml(
-            in_path,
-            ignore_decoy=pastaq_parameters['ident_ignore_decoy'],
-            require_threshold=pastaq_parameters['ident_require_threshold'],
-            max_rank_only=pastaq_parameters['ident_max_rank_only'],
-            min_mz=pastaq_parameters['min_mz'],
-            max_mz=pastaq_parameters['max_mz'],
-            min_rt=pastaq_parameters['min_rt'],
-            max_rt=pastaq_parameters['max_rt'],
-            # TODO: Should we add an option to pass a prefix for ignoring decoys
-            # when they are not properly annotated, for example in msfragger
-            # + idconvert?
-        )
-        logger.info('Writing ident data: {}'.format(out_path))
-        pastaq.write_ident_data(ident_data, out_path)
-    logger.info('Finished mzIdentML parsing in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
-
-    # Match ms2 events with corresponding detected peaks.
-    logger.info('Starting peaks/msms linkage')
-    time_start = time.time()
-    for stem in input_stems:
-        # Check if file has already been processed.
-        in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
-        in_path_peaks = os.path.join(
-            output_dir, 'warped_peaks', "{}.peaks".format(stem))
-        out_path = os.path.join(output_dir, 'linking',
-                                "{}.ms2_peak.link".format(stem))
-        if os.path.exists(out_path) and not override_existing:
-            continue
-
-        logger.info("Reading raw_data from disk (MS2): {}".format(stem))
-        raw_data = pastaq.read_raw_data(in_path_raw)
-
-        logger.info("Reading peaks from disk: {}".format(stem))
-        peaks = pastaq.read_peaks(in_path_peaks)
-
-        logger.info("Performing linkage: {}".format(stem))
-        linked_msms = pastaq.link_peaks(
-                peaks,
-                raw_data,
-                pastaq_parameters['link_n_sig_mz'],
-                pastaq_parameters['link_n_sig_rt'],
-        )
-        logger.info('Writing linked_msms: {}'.format(out_path))
-        pastaq.write_linked_msms(linked_msms, out_path)
-
-    logger.info('Finished peaks/msms linkage in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
-
-    # Link ms2 events with ident information.
-    logger.info('Starting ident/msms linkage')
-    time_start = time.time()
-    for i, stem in enumerate(input_stems):
-        # Check that we had identification info.
-        if input_ident_files[i] == 'none':
-            continue
-        # Check if file has already been processed.
-        in_path_raw = os.path.join(output_dir, 'raw', "{}.ms2".format(stem))
-        in_path_peaks = os.path.join(
-            output_dir, 'warped_peaks', "{}.peaks".format(stem))
-        in_path_idents = os.path.join(
-            output_dir, 'ident', "{}.ident".format(stem))
-        out_path = os.path.join(output_dir, 'linking',
-                                "{}.ident_ms2.link".format(stem))
-        out_path_psm = os.path.join(output_dir, 'linking',
-                                    "{}.ident_peak.link".format(stem))
-        if os.path.exists(out_path) and not override_existing:
-            continue
-
-        logger.info("Reading raw_data from disk (MS2): {}".format(stem))
-        raw_data = pastaq.read_raw_data(in_path_raw)
-
-        logger.info("Reading ident from disk: {}".format(stem))
-        ident_data = pastaq.read_ident_data(in_path_idents)
-
-        logger.info("Reading peaks from disk: {}".format(stem))
-        peaks = pastaq.read_peaks(in_path_peaks)
-
-        logger.info("Performing linkage: {}".format(stem))
-        linked_idents = pastaq.link_idents(
-                ident_data,
-                raw_data,
-                pastaq_parameters['link_n_sig_mz'],
-                pastaq_parameters['link_n_sig_rt'],
-        )
-        logger.info('Writing linked_msms: {}'.format(out_path))
-        pastaq.write_linked_msms(linked_idents, out_path)
-        logger.info("Performing psm linkage: {}".format(stem))
-        linked_psm = pastaq.link_psm(
-                ident_data,
-                peaks,
-                raw_data,
-                pastaq_parameters['link_n_sig_mz'],
-                pastaq_parameters['link_n_sig_rt'],
-        )
-        logger.info('Writing linked_psm: {}'.format(out_path))
-        pastaq.write_linked_psm(linked_psm, out_path_psm)
-
-    logger.info('Finished ident/msms linkage in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
-
-    # Perform metamatch on detected peaks.
-    logger.info('Starting metamatch on peaks')
-    time_start = time.time()
-    in_path_peaks = os.path.join(output_dir, 'warped_peaks')
-    out_path = os.path.join(output_dir, 'metamatch', "peaks.clusters")
-    if (not os.path.exists(out_path) or override_existing):
-        logger.info("Reading peaks from disk")
-        peaks = [
-            pastaq.read_peaks(
-                os.path.join(in_path_peaks, "{}.peaks".format(input_stem)))
-            for input_stem in input_stems]
-
-        logger.info("Finding peak clusters")
-        peak_clusters = pastaq.find_peak_clusters(
-            groups,
-            peaks,
-            pastaq_parameters["metamatch_fraction"],
-            pastaq_parameters["metamatch_n_sig_mz"],
-            pastaq_parameters["metamatch_n_sig_rt"])
-
-        logger.info("Writing peak clusters to disk")
-        pastaq.write_peak_clusters(peak_clusters, out_path)
-
-    logger.info('Finished metamatch on peaks in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
-
-    # Perform metamatch on detected features.
-    logger.info('Starting metamatch on features')
-    time_start = time.time()
-    in_path_features = os.path.join(output_dir, 'features')
-    out_path = os.path.join(output_dir, 'metamatch', "features.clusters")
-    if (not os.path.exists(out_path) or override_existing):
-        logger.info("Reading features from disk")
-        features = [
-            pastaq.read_features(
-                os.path.join(in_path_features, "{}.features".format(input_stem)))
-            for input_stem in input_stems]
-
-        logger.info("Finding feature clusters")
-        feature_clusters = pastaq.find_feature_clusters(
-            groups,
-            features,
-            pastaq_parameters["metamatch_fraction"],
-            pastaq_parameters["metamatch_n_sig_mz"],
-            pastaq_parameters["metamatch_n_sig_rt"])
-
-        logger.info("Writing feature clusters to disk")
-        pastaq.write_feature_clusters(feature_clusters, out_path)
-
-    logger.info('Finished metamatch on features in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
-
-    # Create final quantitative tables.
-    logger.info('Starting creation of quantitative tables')
-    time_start = time.time()
-    for stem in input_stems:
-        # Peak quantification.
-        # ====================
-        in_path_peaks = os.path.join(
-            output_dir, 'warped_peaks', "{}.peaks".format(stem))
-        in_path_peaks_link = os.path.join(
-            output_dir, 'linking', "{}.ms2_peak.link".format(stem))
-        in_path_ident_link_msms = os.path.join(
-            output_dir, 'linking', "{}.ident_ms2.link".format(stem))
-        in_path_ident_link_theomz = os.path.join(
-            output_dir, 'linking', "{}.ident_peak.link".format(stem))
-        in_path_ident_data = os.path.join(
-            output_dir, 'ident', "{}.ident".format(stem))
-        out_path_peaks = os.path.join(output_dir, 'quant',
-                                      "{}_peaks.csv".format(stem))
-        out_path_peak_annotations = os.path.join(output_dir, 'quant',
-                                                 "{}_peak_annotations.csv".format(stem))
-
-        # TODO: This is probably not necessary or needs to be changed if we are
-        # doing all per-peak quantification in a single loop.
-        if os.path.exists(out_path_peaks) and not override_existing:
-            continue
-
-        logger.info("Reading peaks from disk: {}".format(stem))
-        peaks = pastaq.read_peaks(in_path_peaks)
-
-        logger.info("Generating peaks quantitative table")
-        peaks_df = pd.DataFrame({
-            'peak_id': [peak.id for peak in peaks],
-            'mz': [peak.fitted_mz for peak in peaks],
-            'rt': [peak.fitted_rt for peak in peaks],
-            'rt_delta': [peak.rt_delta for peak in peaks],
-            'height': [peak.fitted_height for peak in peaks],
-            'sigma_mz': [peak.fitted_sigma_mz for peak in peaks],
-            'sigma_rt': [peak.fitted_sigma_rt for peak in peaks],
-            'volume': [peak.fitted_volume for peak in peaks],
-            'smooth_height': [peak.local_max_height for peak in peaks],
-            'smooth_mz': [peak.local_max_mz for peak in peaks],
-            'smooth_rt': [peak.local_max_rt for peak in peaks],
-            'roi_min_mz': [peak.roi_min_mz for peak in peaks],
-            'roi_max_mz': [peak.roi_max_mz for peak in peaks],
-            'roi_min_rt': [peak.roi_min_rt for peak in peaks],
-            'roi_max_rt': [peak.roi_max_rt for peak in peaks],
-            'raw_mean_mz': [peak.raw_roi_mean_mz for peak in peaks],
-            'raw_mean_rt': [peak.raw_roi_mean_rt for peak in peaks],
-            'raw_std_mz': [peak.raw_roi_sigma_mz for peak in peaks],
-            'raw_std_rt': [peak.raw_roi_sigma_rt for peak in peaks],
-            'raw_skewness_mz': [peak.raw_roi_skewness_mz for peak in peaks],
-            'raw_skewness_rt': [peak.raw_roi_skewness_rt for peak in peaks],
-            'raw_kurtosis_mz': [peak.raw_roi_kurtosis_mz for peak in peaks],
-            'raw_kurtosis_rt': [peak.raw_roi_kurtosis_rt for peak in peaks],
-            'raw_total_intensity': [peak.raw_roi_total_intensity for peak in peaks],
-            'num_points': [peak.raw_roi_num_points for peak in peaks],
-            'num_scans': [peak.raw_roi_num_scans for peak in peaks],
-        })
-
-        # Peak Annotations.
-        # =================
-        logger.info("Reading linked peaks from disk: {}".format(stem))
-        peak_annotations = peaks_df[["peak_id"]]
-        linked_peaks = pastaq.read_linked_msms(in_path_peaks_link)
-        linked_peaks = pd.DataFrame({
-            'peak_id': [linked_peak.entity_id for linked_peak in linked_peaks],
-            'msms_id': [linked_peak.msms_id for linked_peak in linked_peaks],
-        })
-        peak_annotations = pd.merge(
-            peak_annotations, linked_peaks, on="peak_id", how="left")
-
-        if os.path.isfile(in_path_ident_data):
-            logger.info("Reading ident_data from disk: {}".format(stem))
-            ident_data = pastaq.read_ident_data(in_path_ident_data)
-            psms = pd.DataFrame({
-                'psm_index': [i for i in range(0, len(ident_data.spectrum_matches))],
-                'psm_id': [psm.id for psm in ident_data.spectrum_matches],
-                'psm_pass_threshold': [psm.pass_threshold for psm in ident_data.spectrum_matches],
-                'psm_charge_state': [psm.charge_state for psm in ident_data.spectrum_matches],
-                'psm_theoretical_mz': [psm.theoretical_mz for psm in ident_data.spectrum_matches],
-                'psm_experimental_mz': [psm.experimental_mz for psm in ident_data.spectrum_matches],
-                'psm_retention_time': [psm.retention_time for psm in ident_data.spectrum_matches],
-                'psm_rank': [psm.rank for psm in ident_data.spectrum_matches],
-                'psm_peptide_id': [psm.match_id for psm in ident_data.spectrum_matches],
-            })
-            if not psms.empty:
-                if pastaq_parameters["quant_ident_linkage"] == 'theoretical_mz':
-                    logger.info(
-                        "Reading linked ident_peak from disk: {}".format(stem))
-                    linked_idents = pastaq.read_linked_psm(
-                        in_path_ident_link_theomz)
-                    linked_idents = pd.DataFrame({
-                        'peak_id': [linked_ident.peak_id for linked_ident in linked_idents],
-                        'psm_index': [linked_ident.psm_index for linked_ident in linked_idents],
-                        'psm_link_distance': [linked_ident.distance for linked_ident in linked_idents],
-                    })
-                    linked_idents = pd.merge(
-                        linked_idents, psms, on="psm_index")
-                    peak_annotations = pd.merge(
-                        peak_annotations, linked_idents, on="peak_id", how="left")
-                elif pastaq_parameters["quant_ident_linkage"] == 'msms_event':
-                    logger.info(
-                        "Reading linked ident_peak from disk: {}".format(stem))
-                    linked_idents = pastaq.read_linked_msms(
-                        in_path_ident_link_msms)
-                    linked_idents = pd.DataFrame({
-                        'msms_id': [linked_ident.msms_id for linked_ident in linked_idents],
-                        'psm_index': [linked_ident.entity_id for linked_ident in linked_idents],
-                        'psm_link_distance': [linked_ident.distance for linked_ident in linked_idents],
-                    })
-                    linked_idents = pd.merge(
-                        linked_idents, psms, on="psm_index")
-                    peak_annotations = pd.merge(
-                        peak_annotations, linked_idents, on="msms_id", how="left")
-                else:
-                    raise ValueError("unknown quant_ident_linkage parameter")
-
-                # Get the peptide information per psm.
-                def format_modification(mod):
-                    ret = "monoisotopic_mass_delta: {}, ".format(
-                        mod.monoisotopic_mass_delta)
-                    ret += "average_mass_delta: {}, ".format(
-                        mod.average_mass_delta)
-                    ret += "residues: {}, ".format(mod.residues)
-                    ret += "location: {}, ".format(mod.location)
-                    ret += "id: {}".format("; ".join(mod.id))
-                    return ret
-                peptides = pd.DataFrame({
-                    'psm_peptide_id': [pep.id for pep in ident_data.peptides],
-                    'psm_sequence': [pep.sequence for pep in ident_data.peptides],
-                    'psm_modifications_num': [len(pep.modifications) for pep in ident_data.peptides],
-                    'psm_modifications_info': [" / ".join(map(format_modification, pep.modifications)) for pep in ident_data.peptides],
-                })
-                peak_annotations = pd.merge(
-                    peak_annotations, peptides, on="psm_peptide_id", how="left")
-
-                # Get the protein information per peptide.
-                db_sequences = pd.DataFrame({
-                    'db_seq_id': [db_seq.id for db_seq in ident_data.db_sequences],
-                    'protein_name': [db_seq.accession for db_seq in ident_data.db_sequences],
-                    'protein_description': [db_seq.description for db_seq in ident_data.db_sequences],
-                })
-                peptide_evidence = pd.DataFrame({
-                    'db_seq_id': [pe.db_sequence_id for pe in ident_data.peptide_evidence],
-                    'psm_peptide_id': [pe.peptide_id for pe in ident_data.peptide_evidence],
-                    'psm_decoy': [pe.decoy for pe in ident_data.peptide_evidence],
-                })
-                peptide_evidence = pd.merge(
-                    peptide_evidence, db_sequences, on="db_seq_id").drop(["db_seq_id"], axis=1)
-
-                # Get the protein information per psm.
-                peak_annotations = pd.merge(
-                    peak_annotations, peptide_evidence, on="psm_peptide_id")
-
-        logger.info("Saving peaks quantitative table to disk: {}".format(stem))
-        peaks_df.to_csv(out_path_peaks, index=False)
-
-        logger.info("Saving peaks annotations table to disk: {}".format(stem))
-        if "msms_id" in peak_annotations:
-            peak_annotations["msms_id"] = peak_annotations["msms_id"].astype(
-                'Int64')
-        if "psm_charge_state" in peak_annotations:
-            peak_annotations["psm_charge_state"] = peak_annotations["psm_charge_state"].astype(
-                'Int64')
-        if "psm_rank" in peak_annotations:
-            peak_annotations["psm_rank"] = peak_annotations["psm_rank"].astype(
-                'Int64')
-        if "psm_modifications_num" in peak_annotations:
-            peak_annotations["psm_modifications_num"] = peak_annotations["psm_modifications_num"].astype(
-                'Int64')
-        peak_annotations = peak_annotations.sort_values("peak_id")
-        peak_annotations.to_csv(out_path_peak_annotations, index=False)
-
-        in_path_features = os.path.join(
-            output_dir, 'features', "{}.features".format(stem))
-        if os.path.isfile(in_path_features):
-            out_path_features = os.path.join(output_dir, 'quant',
-                                             "{}_features.csv".format(stem))
-            out_path_feature_annotations = os.path.join(output_dir, 'quant',
-                                                        "{}_feature_annotations.csv".format(stem))
-
-            logger.info("Reading features from disk: {}".format(stem))
-            features = pastaq.read_features(in_path_features)
-
-            logger.info("Generating features quantitative table")
-            features_df = pd.DataFrame({
-                'feature_id': [feature.id for feature in features],
-                'average_mz': [feature.average_mz for feature in features],
-                'average_mz_sigma': [feature.average_mz_sigma for feature in features],
-                'average_rt': [feature.average_rt for feature in features],
-                'average_rt_sigma': [feature.average_rt_sigma for feature in features],
-                'average_rt_delta': [feature.average_rt_delta for feature in features],
-                'total_height': [feature.total_height for feature in features],
-                'monoisotopic_mz': [feature.monoisotopic_mz for feature in features],
-                'monoisotopic_height': [feature.monoisotopic_height for feature in features],
-                'charge_state': [feature.charge_state for feature in features],
-                'peak_id': [feature.peak_ids for feature in features],
-            })
-            # Find the peak annotations that belong to each feature.
-            feature_annotations = features_df[[
-                "feature_id", "peak_id"]].explode("peak_id")
-
-            # TODO: It's possible that we want to regenerate the feature table
-            # without doing the same with the peak tables.
-            feature_annotations = pd.merge(
-                feature_annotations, peak_annotations,
-                on="peak_id", how="left")
-
-            features_df.to_csv(out_path_features, index=False)
-            feature_annotations.to_csv(
-                out_path_feature_annotations, index=False)
-
-    # Matched Peaks
-    # =============
-    logger.info("Reading peak clusters from disk")
-    in_path_peak_clusters = os.path.join(
-        output_dir, 'metamatch', 'peaks.clusters')
-    out_path_peak_clusters_metadata = os.path.join(output_dir, 'quant',
-                                                   "peak_clusters_metadata.csv")
-    out_path_peak_clusters_peaks = os.path.join(output_dir, 'quant',
-                                                "peak_clusters_peaks.csv")
-    out_path_peak_clusters_annotations = os.path.join(output_dir, 'quant',
-                                                      "peak_clusters_annotations.csv")
-
-    def aggregate_cluster_annotations(x):
-        ret = {}
-        if "psm_sequence" in x:
-            ret["psm_sequence"] = ".|.".join(
-                np.unique(x['psm_sequence'].dropna())).strip(".|.")
-        if "psm_charge_state" in x:
-            ret["psm_charge_state"] = ".|.".join(
-                map(str, np.unique(x['psm_charge_state'].dropna()))).strip(".|.")
-        if "psm_modifications_num" in x:
-            ret["psm_modifications_num"] = ".|.".join(
-                map(str, np.unique(x['psm_modifications_num'].dropna()))).strip(".|.")
-        if "protein_name" in x:
-            ret["protein_name"] = ".|.".join(
-                np.unique(x['protein_name'].dropna())).strip(".|.")
-        if "protein_description" in x:
-            ret["protein_description"] = ".|.".join(
-                np.unique(x['protein_description'].dropna())).strip(".|.")
-        if "consensus_sequence" in x:
-            ret["consensus_sequence"] = ".|.".join(
-                np.unique(x['consensus_sequence'].dropna())).strip(".|.")
-        if "consensus_count" in x:
-            ret["consensus_count"] = ".|.".join(
-                map(str, np.unique(x['consensus_count'].dropna()))).strip(".|.")
-        if "consensus_protein_name" in x:
-            ret["consensus_protein_name"] = ".|.".join(
-                np.unique(x['consensus_protein_name'].dropna())).strip(".|.")
-        if "consensus_protein_description" in x:
-            ret["consensus_protein_description"] = ".|.".join(
-                np.unique(x['consensus_protein_description'].dropna())).strip(".|.")
-        if "protein_group" in x:
-            ret["protein_group"] = ".|.".join(
-                map(str, np.unique(x['protein_group'].dropna()))).strip(".|.")
-        return pd.Series(ret)
-
-    if (not os.path.exists(out_path_peak_clusters_metadata) or override_existing):
-        peak_clusters = pastaq.read_peak_clusters(in_path_peak_clusters)
-        logger.info("Generating peak clusters quantitative table")
-        peak_clusters_metadata_df = pd.DataFrame({
-            'cluster_id': [cluster.id for cluster in peak_clusters],
-            'mz': [cluster.mz for cluster in peak_clusters],
-            'rt': [cluster.rt for cluster in peak_clusters],
-            'avg_height': [cluster.avg_height for cluster in peak_clusters],
-        })
-
-        logger.info("Generating peak clusters quantitative table")
-        peak_clusters_df = pd.DataFrame({
-            'cluster_id': [cluster.id for cluster in peak_clusters],
-        })
-        if pastaq_parameters['quant_isotopes'] == 'volume':
-            out_path_peak_clusters = os.path.join(output_dir, 'quant',
-                                                  "peak_clusters_volume.csv")
-            for i, stem in enumerate(input_stems):
-                peak_clusters_df[stem] = [cluster.file_volumes[i]
-                                          for cluster in peak_clusters]
-        elif pastaq_parameters['quant_isotopes'] == 'height':
-            out_path_peak_clusters = os.path.join(output_dir, 'quant',
-                                                  "peak_clusters_height.csv")
-            for i, stem in enumerate(input_stems):
-                peak_clusters_df[stem] = [cluster.heights[i]
-                                          for cluster in peak_clusters]
-        else:
-            raise ValueError("unknown quant_isotopes parameter")
-        logger.info("Writing peaks quantitative table to disk")
-        peak_clusters_df.to_csv(out_path_peak_clusters, index=False)
-
-        # Peak associations.
-        logger.info("Generating peak clusters peak associations table")
-        cluster_peaks = [(cluster.id, cluster.peak_ids)
-                         for cluster in peak_clusters]
-        cluster_peaks = pd.DataFrame(cluster_peaks, columns=[
-                                     "cluster_id", "peak_ids"]).explode("peak_ids")
-        cluster_peaks["file_id"] = cluster_peaks["peak_ids"].map(
-            lambda x: input_stems[x.file_id])
-        cluster_peaks["peak_id"] = cluster_peaks["peak_ids"].map(
-            lambda x: x.peak_id)
-        cluster_peaks = cluster_peaks.drop(["peak_ids"], axis=1)
-        logger.info("Writing cluster to peak table to disk")
-        cluster_peaks.to_csv(out_path_peak_clusters_peaks, index=False)
-
-        # Cluster annotations.
-        logger.info("Generating peak clusters annotations table")
-        annotations = pd.DataFrame()
-        for stem in input_stems:
-            logger.info("Reading peak annotations for: {}".format(stem))
-            in_path_peak_annotations = os.path.join(output_dir, 'quant',
-                                                    "{}_peak_annotations.csv".format(stem))
-            peak_annotations = pd.read_csv(
-                in_path_peak_annotations, low_memory=False)
-            cluster_annotations = cluster_peaks[cluster_peaks["file_id"] == stem][[
-                "cluster_id", "peak_id"]]
-            cluster_annotations["file_id"] = stem
-            logger.info(
-                "Merging peak/clusters annotations for: {}".format(stem))
-            cluster_annotations = pd.merge(
-                cluster_annotations, peak_annotations, on="peak_id", how="left")
-            annotations = pd.concat(
-                [annotations, cluster_annotations]).reset_index(drop=True)
-        # Ensure these columns have the proper type.
-        if "msms_id" in annotations:
-            annotations["msms_id"] = annotations["msms_id"].astype(
-                'Int64')
-        if "psm_charge_state" in annotations:
-            annotations["psm_charge_state"] = annotations["psm_charge_state"].astype(
-                'Int64')
-        if "psm_rank" in annotations:
-            annotations["psm_rank"] = annotations["psm_rank"].astype(
-                'Int64')
-        if "psm_modifications_num" in annotations:
-            annotations["psm_modifications_num"] = annotations["psm_modifications_num"].astype(
-                'Int64')
-
-        if pastaq_parameters['quant_consensus'] and 'psm_sequence' in annotations:
-            # Find a sequence consensus
-            consensus_sequence = find_sequence_consensus(
-                annotations, 'psm_sequence', pastaq_parameters['quant_consensus_min_ident'])
-            annotations = pd.merge(
-                annotations,
-                consensus_sequence[[
-                    "cluster_id",
-                    "consensus_sequence",
-                    "consensus_count",
-                ]], on="cluster_id", how="left")
-            # Find a consensus proteins
-            proteins = annotations[annotations['psm_sequence']
-                                   == annotations['consensus_sequence']]
-            proteins = proteins[['cluster_id', 'protein_name',
-                                 'protein_description']].drop_duplicates()
-            proteins.columns = [
-                'cluster_id', 'consensus_protein_name', 'consensus_protein_description']
-            annotations = pd.merge(annotations, proteins,
-                                   on="cluster_id", how="left")
-
-        # Saving annotations before aggregation.
-        if pastaq_parameters['quant_save_all_annotations']:
-            logger.info("Writing annotations to disk")
-            annotations = annotations.sort_values(by=["cluster_id"])
-            annotations.to_csv(out_path_peak_clusters_annotations, index=False)
-
-        logger.info("Aggregating annotations")
-        annotations = annotations.groupby(
-            'cluster_id').apply(aggregate_cluster_annotations)
-
-        # Metadata
-        logger.info("Merging metadata with annotations")
-        peak_clusters_metadata_df = pd.merge(
-            peak_clusters_metadata_df, annotations, how="left", on="cluster_id")
-        logger.info("Writing metadata to disk")
-        peak_clusters_metadata_df.to_csv(
-            out_path_peak_clusters_metadata, index=False)
-
-    # Matched Features
-    # ================
-    logger.info("Reading feature clusters from disk")
-    in_path_feature_clusters = os.path.join(
-        output_dir, 'metamatch', 'features.clusters')
-    out_path_feature_clusters_metadata = os.path.join(output_dir, 'quant',
-                                                      "feature_clusters_metadata.csv")
-    out_path_feature_clusters_features = os.path.join(output_dir, 'quant',
-                                                      "feature_clusters_features.csv")
-    out_path_feature_clusters_annotations = os.path.join(output_dir, 'quant',
-                                                         "feature_clusters_annotations.csv")
-    if (not os.path.exists(out_path_feature_clusters_metadata) or override_existing):
-        feature_clusters = pastaq.read_feature_clusters(
-            in_path_feature_clusters)
-
-        logger.info("Generating feature clusters quantitative table")
-        metadata = pd.DataFrame({
-            'cluster_id': [cluster.id for cluster in feature_clusters],
-            'mz': [cluster.mz for cluster in feature_clusters],
-            'rt': [cluster.rt for cluster in feature_clusters],
-            'avg_height': [cluster.avg_total_height for cluster in feature_clusters],
-            'charge_state': [cluster.charge_state for cluster in feature_clusters],
-        })
-        data = pd.DataFrame({
-            'cluster_id': [cluster.id for cluster in feature_clusters],
-        })
-        if pastaq_parameters['quant_features'] == 'monoisotopic_height':
-            out_path_feature_clusters = os.path.join(output_dir, 'quant',
-                                                     "feature_clusters_monoisotopic_height.csv")
-            for i, stem in enumerate(input_stems):
-                data[stem] = [cluster.monoisotopic_heights[i]
-                                             for cluster in feature_clusters]
-        elif pastaq_parameters['quant_features'] == 'monoisotopic_volume':
-            out_path_feature_clusters = os.path.join(output_dir, 'quant',
-                                                     "feature_clusters_monoisotopic_volume.csv")
-            for i, stem in enumerate(input_stems):
-                data[stem] = [cluster.monoisotopic_volumes[i]
-                                             for cluster in feature_clusters]
-        elif pastaq_parameters['quant_features'] == 'total_height':
-            out_path_feature_clusters = os.path.join(output_dir, 'quant',
-                                                     "feature_clusters_total_height.csv")
-            for i, stem in enumerate(input_stems):
-                data[stem] = [cluster.total_heights[i]
-                                             for cluster in feature_clusters]
-        elif pastaq_parameters['quant_features'] == 'total_volume':
-            out_path_feature_clusters = os.path.join(output_dir, 'quant',
-                                                     "feature_clusters_total_volume.csv")
-            for i, stem in enumerate(input_stems):
-                data[stem] = [cluster.total_volumes[i]
-                                             for cluster in feature_clusters]
-        elif pastaq_parameters['quant_features'] == 'max_height':
-            out_path_feature_clusters = os.path.join(output_dir, 'quant',
-                                                     "feature_clusters_max_height.csv")
-            for i, stem in enumerate(input_stems):
-                data[stem] = [cluster.max_heights[i]
-                                             for cluster in feature_clusters]
-        elif pastaq_parameters['quant_features'] == 'max_volume':
-            out_path_feature_clusters = os.path.join(output_dir, 'quant',
-                                                     "feature_clusters_max_volume.csv")
-            for i, stem in enumerate(input_stems):
-                data[stem] = [cluster.max_volumes[i]
-                                             for cluster in feature_clusters]
-        else:
-            raise ValueError("unknown quant_features parameter")
-        logger.info("Writing feature clusters quantitative table to disk")
-        data.to_csv(out_path_feature_clusters, index=False)
-
-        # Feature associations.
-        logger.info("Generating feature clusters feature associations table")
-        cluster_features = [(cluster.id, cluster.feature_ids)
-                            for cluster in feature_clusters]
-        cluster_features = pd.DataFrame(cluster_features, columns=[
-                                        "cluster_id", "feature_ids"]).explode("feature_ids")
-        cluster_features["file_id"] = cluster_features["feature_ids"].map(
-            lambda x: input_stems[x.file_id])
-        cluster_features["feature_id"] = cluster_features["feature_ids"].map(
-            lambda x: x.feature_id)
-        cluster_features = cluster_features.drop(["feature_ids"], axis=1)
-        logger.info("Writing cluster to feature table to disk")
-        cluster_features.to_csv(
-            out_path_feature_clusters_features, index=False)
-
-        # Cluster annotations.
-        logger.info("Generating peak clusters annotations table")
-        annotations = pd.DataFrame()
-        for stem in input_stems:
-            logger.info("Reading features for: {}".format(stem))
-            in_path_peak_features = os.path.join(output_dir, 'features',
-                                                 "{}.features".format(stem))
-            in_path_peak_annotations = os.path.join(output_dir, 'quant',
-                                                    "{}_peak_annotations.csv".format(stem))
-            features = pastaq.read_features(in_path_peak_features)
-            features = [(feature.id, feature.peak_ids, feature.charge_state)
-                        for feature in features]
-            features = pd.DataFrame(
-                features, columns=["feature_id", "peak_id", "charge_state"]).explode("peak_id")
-            peak_annotations = pd.read_csv(
-                in_path_peak_annotations, low_memory=False)
-            cluster_annotations = cluster_features[cluster_features["file_id"] == stem][[
-                "cluster_id", "feature_id"]]
-            cluster_annotations["file_id"] = stem
-            logger.info(
-                "Merging peak/clusters annotations for: {}".format(stem))
-            cluster_annotations = pd.merge(
-                cluster_annotations, features, on="feature_id", how="left")
-            cluster_annotations = pd.merge(
-                cluster_annotations, peak_annotations, on="peak_id", how="left")
-            annotations = pd.concat([annotations, cluster_annotations])
-
-        # Ensure these columns have the proper type.
-        if "msms_id" in annotations:
-            annotations["msms_id"] = annotations["msms_id"].astype('Int64')
-        if "charge_state" in annotations:
-            annotations["charge_state"] = annotations["charge_state"].astype(
-                'Int64')
-        if "psm_charge_state" in annotations:
-            annotations["psm_charge_state"] = annotations["psm_charge_state"].astype(
-                'Int64')
-        if "psm_rank" in annotations:
-            annotations["psm_rank"] = annotations["psm_rank"].astype('Int64')
-        if "psm_modifications_num" in annotations:
-            annotations["psm_modifications_num"] = annotations["psm_modifications_num"].astype(
-                'Int64')
-
-        if pastaq_parameters['quant_consensus'] and 'psm_sequence' in annotations:
-            # Find a sequence consensus
-            consensus_sequence = find_sequence_consensus(
-                annotations, 'psm_sequence', pastaq_parameters['quant_consensus_min_ident'])
-            annotations = pd.merge(
-                annotations,
-                consensus_sequence[[
-                    "cluster_id",
-                    "consensus_sequence",
-                    "consensus_count",
-                ]], on="cluster_id", how="left")
-            # Find a consensus proteins
-            proteins = annotations[annotations['psm_sequence']
-                                   == annotations['consensus_sequence']]
-            proteins = proteins[['cluster_id', 'protein_name',
-                                 'protein_description']].drop_duplicates()
-            proteins.columns = [
-                'cluster_id', 'consensus_protein_name', 'consensus_protein_description']
-            annotations = pd.merge(annotations, proteins,
-                                   on="cluster_id", how="left")
-
-        # Calculate protein groups.
-        logger.info("Calculating protein groups")
-        sequence_column = 'psm_sequence'
-        protein_name_column = 'protein_name'
-        protein_description_column = 'protein_description'
-        if pastaq_parameters['quant_consensus'] and 'psm_sequence' in annotations:
-            sequence_column = 'consensus_sequence'
-            protein_name_column = 'consensus_protein_name'
-            protein_description_column = 'consensus_protein_description'
-
-        # Combine protein name/description in case
-        if (sequence_column in annotations and
-                protein_name_column in annotations and
-                protein_description_column in annotations):
-            prot_data, prot_metadata = find_protein_groups(
-                    data,
-                    annotations,
-                    sequence_column,
-                    protein_name_column,
-                    protein_description_column,
-                    pastaq_parameters['quant_proteins_min_peptides'],
-                    pastaq_parameters['quant_proteins_remove_subset_proteins'],
-                    pastaq_parameters['quant_proteins_ignore_ambiguous_peptides'],
-                    pastaq_parameters['quant_proteins_quant_type'],
-                    )
-            out_path_protein_data = os.path.join(output_dir, 'quant',
-                    "protein_groups.csv")
-            out_path_protein_metadata = os.path.join(output_dir, 'quant',
-                    "protein_groups_metadata.csv")
-
-            logger.info("Writing protein group data/metadata to disk")
-            prot_data.to_csv(out_path_protein_data, index=False)
-            prot_metadata.to_csv(out_path_protein_metadata, index=False)
-
-
-        # Saving annotations before aggregation.
-        if pastaq_parameters['quant_save_all_annotations']:
-            logger.info("Writing annotations to disk")
-            annotations = annotations.sort_values(by=["cluster_id"])
-            annotations.to_csv(
-                out_path_feature_clusters_annotations, index=False)
-
-        logger.info("Aggregating annotations")
-        if ("psm_charge_state" in annotations and
-                pastaq_parameters['quant_features_charge_state_filter']):
-            annotations = annotations[annotations["psm_charge_state"]
-                                      == annotations["charge_state"]]
-        annotations_agg = annotations.groupby(
-            'cluster_id').apply(aggregate_cluster_annotations)
-
-        # Metadata.
-        logger.info("Merging metadata with annotations")
-        metadata = pd.merge(
-            metadata, annotations_agg, how="left", on="cluster_id")
-        logger.info("Writing metadata to disk")
-        metadata.to_csv(out_path_feature_clusters_metadata, index=False)
-
-        # Aggregate peptides.
-        sequence_column = 'psm_sequence'
-        if pastaq_parameters['quant_consensus'] and 'psm_sequence' in annotations:
-            sequence_column = 'consensus_sequence'
-
-        if sequence_column in annotations:
-            logger.info("Aggregating peptide charge states")
-            def aggregate_peptide_annotations(x):
-                ret = {}
-                if "psm_sequence" in x:
-                    ret["psm_sequence"] = ".|.".join(
-                        np.unique(x['psm_sequence'].dropna())).strip(".|.")
-                if "protein_name" in x:
-                    ret["protein_name"] = ".|.".join(
-                        np.unique(x['protein_name'].dropna())).strip(".|.")
-                if "protein_description" in x:
-                    ret["protein_description"] = ".|.".join(
-                        np.unique(x['protein_description'].dropna())).strip(".|.")
-                if "consensus_sequence" in x:
-                    ret["consensus_sequence"] = ".|.".join(
-                        np.unique(x['consensus_sequence'].dropna())).strip(".|.")
-                if "consensus_protein_name" in x:
-                    ret["consensus_protein_name"] = ".|.".join(
-                        np.unique(x['consensus_protein_name'].dropna())).strip(".|.")
-                if "consensus_protein_description" in x:
-                    ret["consensus_protein_description"] = ".|.".join(
-                        np.unique(x['consensus_protein_description'].dropna())).strip(".|.")
-                return pd.Series(ret)
-            peptide_data = data.copy()
-            peptide_data = peptide_data.drop(["cluster_id"], axis=1)
-            peptide_data[sequence_column] = metadata[sequence_column]
-            peptide_data = peptide_data[~peptide_data[sequence_column].isna()]
-            peptide_data = peptide_data[peptide_data[sequence_column] != '']
-            peptide_data = peptide_data[~peptide_data[sequence_column].str.contains('\.\|\.')]
-            peptide_data = peptide_data.groupby(sequence_column).agg(sum)
-            peptide_data = peptide_data.reset_index()
-            peptide_metadata = annotations.copy()
-            peptide_metadata = peptide_metadata[peptide_metadata[sequence_column].isin(peptide_data[sequence_column])]
-            peptide_metadata = peptide_metadata.groupby(sequence_column)
-            peptide_metadata = peptide_metadata.apply(aggregate_peptide_annotations)
-            out_path_peptide_data = os.path.join(output_dir, 'quant',
-                    "peptides_data.csv")
-            out_path_peptide_metadata = os.path.join(output_dir, 'quant',
-                    "peptides_metadata.csv")
-
-            logger.info("Writing peptide data/metadata to disk")
-            peptide_data.to_csv(out_path_peptide_data, index=False)
-            peptide_metadata.to_csv(out_path_peptide_metadata, index=False)
-
-    logger.info('Finished creation of quantitative tables in {}'.format(
-        datetime.timedelta(seconds=time.time()-time_start)))
-
-    logger.info("Performing summary")
-    dda_pipeline_summary(pastaq_parameters, input_stems, output_dir)
+    parse_raw_files(pastaq_parameters, output_dir, logger, force_override)
+    detect_peaks(pastaq_parameters, output_dir, save_grid, logger, force_override)
+    calculate_similarity_matrix(pastaq_parameters, output_dir, 'peaks', logger, force_override)
+    perform_rt_alignment(pastaq_parameters, output_dir, logger, force_override)
+    calculate_similarity_matrix(pastaq_parameters, output_dir, 'warped_peaks', logger, force_override)
+    perform_feature_detection(pastaq_parameters, output_dir, logger, force_override)
+    parse_mzidentml_files(pastaq_parameters, output_dir, logger, force_override)
+    link_peaks_msms_idents(pastaq_parameters, output_dir, logger, force_override)
+    match_peaks_and_features(pastaq_parameters, output_dir, logger, force_override)
+    create_quantitative_tables(pastaq_parameters, output_dir, logger, force_override)
+    force_override=True
+    generate_qc_plots(pastaq_parameters, output_dir, logger, force_override)
+    dda_pipeline_summary(pastaq_parameters, output_dir, logger)
 
     logger.info('Total time elapsed: {}'.format(
         datetime.timedelta(seconds=time.time()-time_pipeline_start)))
