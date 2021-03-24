@@ -520,9 +520,10 @@ def default_parameters(instrument, avg_fwhm_rt):
             # Options: 'dynamic', [0.0-1.0]
             'qc_plot_fill_alpha': 'dynamic',
             'qc_plot_line_alpha': 0.5,
-            'qc_plot_scatter_alpha': 0.01,
-            'qc_plot_scatter_size': 1,
+            'qc_plot_scatter_alpha': 0.3,
+            'qc_plot_scatter_size': 2,
             'qc_plot_min_dynamic_alpha': 0.1,
+            'qc_plot_per_file': False,
             # Options: 'fill', 'line'
             'qc_plot_line_style': 'fill',
             # Plot style config.
@@ -1873,11 +1874,42 @@ def generate_qc_plots(params, output_dir, logger=None, force_override=False):
     #
     # Peak sigma density
     #
-    out_path = os.path.join(output_dir, 'quality', 'peak_sigma_mz_rt_density.{}'.format(params['qc_plot_extension']))
-    if not os.path.exists(out_path) or force_override:
-        fig, (ax_left, ax_right) = plt.subplots(1, 2)
+    if not params['qc_plot_per_file']:
+        out_path = os.path.join(output_dir, 'quality', 'peak_sigma_mz_rt_density.{}'.format(params['qc_plot_extension']))
+        if not os.path.exists(out_path) or force_override:
+            fig, (ax_left, ax_right) = plt.subplots(1, 2)
+            for input_file, color in zip(input_files, palette):
+                stem = input_file['stem']
+                _custom_log("Plotting density of sigma_mz/sigma_rt: {}".format(stem), logger)
+                peaks_path = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
+                peaks = pastaq.read_peaks(peaks_path)
+
+                sigma_mzs = np.array([peak.fitted_sigma_mz for peak in peaks])
+                sigma_rts = np.array([peak.fitted_sigma_rt for peak in peaks])
+
+                if params['qc_plot_line_style'] == 'fill':
+                    sns.kdeplot(sigma_rts, label=stem, ax=ax_left, fill=True, linewidth=0, alpha=fill_alpha, color=color)
+                    sns.kdeplot(sigma_mzs, label=stem, ax=ax_right, fill=True, linewidth=0, alpha=fill_alpha, color=color)
+                else:
+                    sns.kdeplot(sigma_rts, label=stem, ax=ax_left, alpha=line_alpha, color=color)
+                    sns.kdeplot(sigma_mzs, label=stem, ax=ax_right, alpha=line_alpha, color=color)
+
+            if params['qc_plot_fig_legend']:
+                plt.legend()
+            ax_left.set_xlabel('$\\sigma_{rt}$')
+            ax_right.set_xlabel('$\\sigma_{mz}$')
+            ax_left.set_ylabel('Density')
+            ax_right.set_ylabel('')
+            _custom_log("Saving figure: {}".format(out_path), logger)
+            plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+            plt.close(fig)
+    else:
         for input_file, color in zip(input_files, palette):
             stem = input_file['stem']
+            out_path = os.path.join(output_dir, 'quality', '{}_peak_sigma_mz_rt_density.{}'.format(stem, params['qc_plot_extension']))
+            if os.path.exists(out_path) and not force_override:
+                continue
+            fig, (ax_left, ax_right) = plt.subplots(1, 2)
             _custom_log("Plotting density of sigma_mz/sigma_rt: {}".format(stem), logger)
             peaks_path = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
             peaks = pastaq.read_peaks(peaks_path)
@@ -1892,25 +1924,52 @@ def generate_qc_plots(params, output_dir, logger=None, force_override=False):
                 sns.kdeplot(sigma_rts, label=stem, ax=ax_left, alpha=line_alpha, color=color)
                 sns.kdeplot(sigma_mzs, label=stem, ax=ax_right, alpha=line_alpha, color=color)
 
-        if params['qc_plot_fig_legend']:
-            plt.legend()
-        ax_left.set_xlabel('$\\sigma_{rt}$')
-        ax_right.set_xlabel('$\\sigma_{mz}$')
-        ax_left.set_ylabel('Density')
-        ax_right.set_ylabel('')
-        _custom_log("Saving figure: {}".format(out_path), logger)
-        plt.savefig(out_path, dpi=params['qc_plot_dpi'])
-        plt.close(fig)
+            if params['qc_plot_fig_legend']:
+                plt.legend()
+            ax_left.set_xlabel('$\\sigma_{rt}$')
+            ax_right.set_xlabel('$\\sigma_{mz}$')
+            ax_left.set_ylabel('Density')
+            ax_right.set_ylabel('')
+            _custom_log("Saving figure: {}".format(out_path), logger)
+            plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+            plt.close(fig)
 
     #
     # Peak rt vs rt_delta
     #
-    out_path = os.path.join(output_dir, 'quality', 'peak_rt_vs_rt_delta.{}'.format(params['qc_plot_extension']))
-    if not os.path.exists(out_path) or force_override:
-        fig, ax = plt.subplots(1, 1)
+    if not params['qc_plot_per_file']:
+        out_path = os.path.join(output_dir, 'quality', 'peak_rt_vs_rt_delta.{}'.format(params['qc_plot_extension']))
+        if not os.path.exists(out_path) or force_override:
+            fig, ax = plt.subplots(1, 1)
 
+            for input_file, color in zip(input_files, palette):
+                stem = input_file['stem']
+                _custom_log("Plotting rt vs rt_delta: {}".format(stem), logger)
+                peaks_path = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
+                peaks = pastaq.read_peaks(peaks_path)
+
+                rts = np.array([peak.fitted_rt for peak in peaks])
+                rt_deltas = np.array([peak.rt_delta for peak in peaks])
+
+                idx = np.argsort(rts)
+                rts = rts[idx]
+                rt_deltas = rt_deltas[idx]
+                ax.plot(rts, rt_deltas, label=stem, alpha=line_alpha, color=color)
+
+            if params['qc_plot_fig_legend']:
+                plt.legend()
+            ax.set_xlabel('Retention time (s)')
+            ax.set_ylabel('Retention time delta (s)')
+            _custom_log("Saving figure: {}".format(out_path), logger)
+            plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+            plt.close(fig)
+    else:
         for input_file, color in zip(input_files, palette):
             stem = input_file['stem']
+            out_path = os.path.join(output_dir, 'quality', '{}_peak_rt_vs_rt_delta.{}'.format(stem, params['qc_plot_extension']))
+            if os.path.exists(out_path) and not force_override:
+                continue
+            fig, ax = plt.subplots(1, 1)
             _custom_log("Plotting rt vs rt_delta: {}".format(stem), logger)
             peaks_path = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
             peaks = pastaq.read_peaks(peaks_path)
@@ -1923,23 +1982,47 @@ def generate_qc_plots(params, output_dir, logger=None, force_override=False):
             rt_deltas = rt_deltas[idx]
             ax.plot(rts, rt_deltas, label=stem, alpha=line_alpha, color=color)
 
-        if params['qc_plot_fig_legend']:
-            plt.legend()
-        ax.set_xlabel('Retention time (s)')
-        ax.set_ylabel('Retention time delta (s)')
-        _custom_log("Saving figure: {}".format(out_path), logger)
-        plt.savefig(out_path, dpi=params['qc_plot_dpi'])
-        plt.close(fig)
+            if params['qc_plot_fig_legend']:
+                plt.legend()
+            ax.set_xlabel('Retention time (s)')
+            ax.set_ylabel('Retention time delta (s)')
+            _custom_log("Saving figure: {}".format(out_path), logger)
+            plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+            plt.close(fig)
 
     #
     # Peak sigma_mz vs m/z scatterplot.
     #
-    out_path = os.path.join(output_dir, 'quality', 'peak_mz_vs_sigma_mz.{}'.format(params['qc_plot_extension']))
-    if not os.path.exists(out_path) or force_override:
-        fig, ax = plt.subplots(1, 1)
+    if not params['qc_plot_per_file']:
+        out_path = os.path.join(output_dir, 'quality', 'peak_mz_vs_sigma_mz.{}'.format(params['qc_plot_extension']))
+        if not os.path.exists(out_path) or force_override:
+            fig, ax = plt.subplots(1, 1)
 
+            for input_file, color in zip(input_files, palette):
+                stem = input_file['stem']
+                _custom_log("Plotting mz vs sigma_mz: {}".format(stem), logger)
+                peaks_path = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
+                peaks = pastaq.read_peaks(peaks_path)
+
+                mz = np.array([peak.fitted_mz for peak in peaks])[0:params['qc_plot_mz_vs_sigma_mz_max_peaks']]
+                sigma_mz = np.array([peak.fitted_sigma_mz for peak in peaks])[0:params['qc_plot_mz_vs_sigma_mz_max_peaks']]
+
+                ax.scatter(mz, sigma_mz, s=params['qc_plot_scatter_size'], label=stem, edgecolors='none', alpha=scatter_alpha, color=color)
+
+            if params['qc_plot_fig_legend']:
+                plt.legend()
+            ax.set_xlabel('m/z')
+            ax.set_ylabel('$\\sigma_{mz}$')
+            _custom_log("Saving figure: {}".format(out_path), logger)
+            plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+            plt.close(fig)
+    else:
         for input_file, color in zip(input_files, palette):
             stem = input_file['stem']
+            out_path = os.path.join(output_dir, 'quality', '{}_peak_mz_vs_sigma_mz.{}'.format(stem, params['qc_plot_extension']))
+            if os.path.exists(out_path) and not force_override:
+                continue
+            fig, ax = plt.subplots(1, 1)
             _custom_log("Plotting mz vs sigma_mz: {}".format(stem), logger)
             peaks_path = os.path.join(output_dir, 'warped_peaks', "{}.peaks".format(stem))
             peaks = pastaq.read_peaks(peaks_path)
@@ -1949,23 +2032,58 @@ def generate_qc_plots(params, output_dir, logger=None, force_override=False):
 
             ax.scatter(mz, sigma_mz, s=params['qc_plot_scatter_size'], label=stem, edgecolors='none', alpha=scatter_alpha, color=color)
 
-        if params['qc_plot_fig_legend']:
-            plt.legend()
-        ax.set_xlabel('m/z')
-        ax.set_ylabel('$\\sigma_{mz}$')
-        _custom_log("Saving figure: {}".format(out_path), logger)
-        plt.savefig(out_path, dpi=params['qc_plot_dpi'])
-        plt.close(fig)
+            if params['qc_plot_fig_legend']:
+                plt.legend()
+            ax.set_xlabel('m/z')
+            ax.set_ylabel('$\\sigma_{mz}$')
+            _custom_log("Saving figure: {}".format(out_path), logger)
+            plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+            plt.close(fig)
 
     #
     # Extracted Ion Chromatogram (XIC) before and after alignment.
     #
-    out_path = os.path.join(output_dir, 'quality', 'xic_unaligned.{}'.format(params['qc_plot_extension']))
-    if not os.path.exists(out_path) or force_override:
-        fig, ax = plt.subplots(1, 1)
+    if not params['qc_plot_per_file']:
+        out_path = os.path.join(output_dir, 'quality', 'xic_unaligned.{}'.format(params['qc_plot_extension']))
+        if not os.path.exists(out_path) or force_override:
+            fig, ax = plt.subplots(1, 1)
 
+            for input_file, color in zip(input_files, palette):
+                stem = input_file['stem']
+                _custom_log("Plotting XIC (unaligned): {}".format(stem), logger)
+
+                raw_data_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
+                raw_data = pastaq.read_raw_data(raw_data_path)
+                xic = pastaq.xic(
+                    raw_data,
+                    raw_data.min_mz,
+                    raw_data.max_mz,
+                    raw_data.min_rt,
+                    raw_data.max_rt,
+                    "sum"
+                )
+                x = xic.retention_time
+                y = xic.intensity
+
+                if params['qc_plot_line_style'] == 'fill':
+                    ax.fill_between(x, 0, y, lw=0, color=color, alpha=fill_alpha, label=stem)
+                else:
+                    ax.plot(x, y, label=stem, alpha=line_alpha, color=color)
+
+            if params['qc_plot_fig_legend']:
+                plt.legend()
+            ax.set_xlabel('Retention time (s)')
+            ax.set_ylabel('Intensity')
+            _custom_log("Saving figure: {}".format(out_path), logger)
+            plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+            plt.close(fig)
+    else:
         for input_file, color in zip(input_files, palette):
             stem = input_file['stem']
+            out_path = os.path.join(output_dir, 'quality', '{}_xic_unaligned.{}'.format(stem, params['qc_plot_extension']))
+            if os.path.exists(out_path) and not force_override:
+                continue
+            fig, ax = plt.subplots(1, 1)
             _custom_log("Plotting XIC (unaligned): {}".format(stem), logger)
 
             raw_data_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
@@ -1986,20 +2104,59 @@ def generate_qc_plots(params, output_dir, logger=None, force_override=False):
             else:
                 ax.plot(x, y, label=stem, alpha=line_alpha, color=color)
 
-        if params['qc_plot_fig_legend']:
-            plt.legend()
-        ax.set_xlabel('Retention time (s)')
-        ax.set_ylabel('Intensity')
-        _custom_log("Saving figure: {}".format(out_path), logger)
-        plt.savefig(out_path, dpi=params['qc_plot_dpi'])
-        plt.close(fig)
+            if params['qc_plot_fig_legend']:
+                plt.legend()
+            ax.set_xlabel('Retention time (s)')
+            ax.set_ylabel('Intensity')
+            _custom_log("Saving figure: {}".format(out_path), logger)
+            plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+            plt.close(fig)
 
-    out_path = os.path.join(output_dir, 'quality', 'xic_aligned.{}'.format(params['qc_plot_extension']))
-    if not os.path.exists(out_path) or force_override:
-        fig, ax = plt.subplots(1, 1)
+    if not params['qc_plot_per_file']:
+        out_path = os.path.join(output_dir, 'quality', 'xic_aligned.{}'.format(params['qc_plot_extension']))
+        if not os.path.exists(out_path) or force_override:
+            fig, ax = plt.subplots(1, 1)
 
+            for input_file, color in zip(input_files, palette):
+                stem = input_file['stem']
+                _custom_log("Plotting XIC (aligned): {}".format(stem), logger)
+
+                raw_data_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
+                tmap_path = os.path.join(output_dir, 'time_map', "{}.tmap".format(stem))
+
+                raw_data = pastaq.read_raw_data(raw_data_path)
+                tmap = pastaq.read_time_map(tmap_path)
+
+                xic = pastaq.xic(
+                    raw_data,
+                    raw_data.min_mz,
+                    raw_data.max_mz,
+                    raw_data.min_rt,
+                    raw_data.max_rt,
+                    "sum"
+                )
+                x = [tmap.warp(rt) for rt in xic.retention_time]
+                y = xic.intensity
+
+                if params['qc_plot_line_style'] == 'fill':
+                    ax.fill_between(x, 0, y, lw=0, color=color, alpha=fill_alpha, label=stem)
+                else:
+                    ax.plot(x, y, label=stem, alpha=line_alpha, color=color)
+
+            if params['qc_plot_fig_legend']:
+                plt.legend()
+            ax.set_xlabel('Retention time (s)')
+            ax.set_ylabel('Intensity')
+            _custom_log("Saving figure: {}".format(out_path), logger)
+            plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+            plt.close(fig)
+    else:
         for input_file, color in zip(input_files, palette):
             stem = input_file['stem']
+            out_path = os.path.join(output_dir, 'quality', '{}_xic_aligned.{}'.format(stem, params['qc_plot_extension']))
+            if os.path.exists(out_path) and not force_override:
+                continue
+            fig, ax = plt.subplots(1, 1)
             _custom_log("Plotting XIC (aligned): {}".format(stem), logger)
 
             raw_data_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
@@ -2024,23 +2181,58 @@ def generate_qc_plots(params, output_dir, logger=None, force_override=False):
             else:
                 ax.plot(x, y, label=stem, alpha=line_alpha, color=color)
 
-        if params['qc_plot_fig_legend']:
-            plt.legend()
-        ax.set_xlabel('Retention time (s)')
-        ax.set_ylabel('Intensity')
-        _custom_log("Saving figure: {}".format(out_path), logger)
-        plt.savefig(out_path, dpi=params['qc_plot_dpi'])
-        plt.close(fig)
+            if params['qc_plot_fig_legend']:
+                plt.legend()
+            ax.set_xlabel('Retention time (s)')
+            ax.set_ylabel('Intensity')
+            _custom_log("Saving figure: {}".format(out_path), logger)
+            plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+            plt.close(fig)
 
     #
     # Base Peak chromatogram before and after alignment.
     #
-    out_path = os.path.join(output_dir, 'quality', 'bpc_unaligned.{}'.format(params['qc_plot_extension']))
-    if not os.path.exists(out_path) or force_override:
-        fig, ax = plt.subplots(1, 1)
+    if not params['qc_plot_per_file']:
+        out_path = os.path.join(output_dir, 'quality', 'bpc_unaligned.{}'.format(params['qc_plot_extension']))
+        if not os.path.exists(out_path) or force_override:
+            fig, ax = plt.subplots(1, 1)
 
+            for input_file, color in zip(input_files, palette):
+                stem = input_file['stem']
+                _custom_log("Plotting Base Peak Chromatogram (unaligned): {}".format(stem), logger)
+
+                raw_data_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
+                raw_data = pastaq.read_raw_data(raw_data_path)
+                xic = pastaq.xic(
+                    raw_data,
+                    raw_data.min_mz,
+                    raw_data.max_mz,
+                    raw_data.min_rt,
+                    raw_data.max_rt,
+                    "max"
+                )
+                x = xic.retention_time
+                y = xic.intensity
+
+                if params['qc_plot_line_style'] == 'fill':
+                    ax.fill_between(x, 0, y, lw=0, color=color, alpha=fill_alpha, label=stem)
+                else:
+                    ax.plot(x, y, label=stem, alpha=line_alpha, color=color)
+
+            if params['qc_plot_fig_legend']:
+                plt.legend()
+            ax.set_xlabel('Retention time (s)')
+            ax.set_ylabel('Intensity')
+            _custom_log("Saving figure: {}".format(out_path), logger)
+            plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+            plt.close(fig)
+    else:
         for input_file, color in zip(input_files, palette):
             stem = input_file['stem']
+            out_path = os.path.join(output_dir, 'quality', '{}_bpc_unaligned.{}'.format(stem, params['qc_plot_extension']))
+            if os.path.exists(out_path) and not force_override:
+                continue
+            fig, ax = plt.subplots(1, 1)
             _custom_log("Plotting Base Peak Chromatogram (unaligned): {}".format(stem), logger)
 
             raw_data_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
@@ -2061,20 +2253,59 @@ def generate_qc_plots(params, output_dir, logger=None, force_override=False):
             else:
                 ax.plot(x, y, label=stem, alpha=line_alpha, color=color)
 
-        if params['qc_plot_fig_legend']:
-            plt.legend()
-        ax.set_xlabel('Retention time (s)')
-        ax.set_ylabel('Intensity')
-        _custom_log("Saving figure: {}".format(out_path), logger)
-        plt.savefig(out_path, dpi=params['qc_plot_dpi'])
-        plt.close(fig)
+            if params['qc_plot_fig_legend']:
+                plt.legend()
+            ax.set_xlabel('Retention time (s)')
+            ax.set_ylabel('Intensity')
+            _custom_log("Saving figure: {}".format(out_path), logger)
+            plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+            plt.close(fig)
 
-    out_path = os.path.join(output_dir, 'quality', 'bpc_aligned.{}'.format(params['qc_plot_extension']))
-    if not os.path.exists(out_path) or force_override:
-        fig, ax = plt.subplots(1, 1)
+    if not params['qc_plot_per_file']:
+        out_path = os.path.join(output_dir, 'quality', 'bpc_aligned.{}'.format(params['qc_plot_extension']))
+        if not os.path.exists(out_path) or force_override:
+            fig, ax = plt.subplots(1, 1)
 
+            for input_file, color in zip(input_files, palette):
+                stem = input_file['stem']
+                _custom_log("Plotting Base Peak Chromatogram (aligned): {}".format(stem), logger)
+
+                raw_data_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
+                tmap_path = os.path.join(output_dir, 'time_map', "{}.tmap".format(stem))
+
+                raw_data = pastaq.read_raw_data(raw_data_path)
+                tmap = pastaq.read_time_map(tmap_path)
+
+                xic = pastaq.xic(
+                    raw_data,
+                    raw_data.min_mz,
+                    raw_data.max_mz,
+                    raw_data.min_rt,
+                    raw_data.max_rt,
+                    "max"
+                )
+                x = [tmap.warp(rt) for rt in xic.retention_time]
+                y = xic.intensity
+
+                if params['qc_plot_line_style'] == 'fill':
+                    ax.fill_between(x, 0, y, lw=0, color=color, alpha=fill_alpha, label=stem)
+                else:
+                    ax.plot(x, y, label=stem, alpha=line_alpha, color=color)
+
+            if params['qc_plot_fig_legend']:
+                plt.legend()
+            ax.set_xlabel('Retention time (s)')
+            ax.set_ylabel('Intensity')
+            _custom_log("Saving figure: {}".format(out_path), logger)
+            plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+            plt.close(fig)
+    else:
         for input_file, color in zip(input_files, palette):
             stem = input_file['stem']
+            out_path = os.path.join(output_dir, 'quality', '{}_bpc_aligned.{}'.format(stem, params['qc_plot_extension']))
+            if os.path.exists(out_path) and not force_override:
+                continue
+            fig, ax = plt.subplots(1, 1)
             _custom_log("Plotting Base Peak Chromatogram (aligned): {}".format(stem), logger)
 
             raw_data_path = os.path.join(output_dir, 'raw', "{}.ms1".format(stem))
@@ -2099,13 +2330,13 @@ def generate_qc_plots(params, output_dir, logger=None, force_override=False):
             else:
                 ax.plot(x, y, label=stem, alpha=line_alpha, color=color)
 
-        if params['qc_plot_fig_legend']:
-            plt.legend()
-        ax.set_xlabel('Retention time (s)')
-        ax.set_ylabel('Intensity')
-        _custom_log("Saving figure: {}".format(out_path), logger)
-        plt.savefig(out_path, dpi=params['qc_plot_dpi'])
-        plt.close(fig)
+            if params['qc_plot_fig_legend']:
+                plt.legend()
+            ax.set_xlabel('Retention time (s)')
+            ax.set_ylabel('Intensity')
+            _custom_log("Saving figure: {}".format(out_path), logger)
+            plt.savefig(out_path, dpi=params['qc_plot_dpi'])
+            plt.close(fig)
 
     #
     # Similarity matrix before/after alignment.
@@ -2240,7 +2471,6 @@ def dda_pipeline(
     link_peaks_msms_idents(pastaq_parameters, output_dir, logger, force_override)
     match_peaks_and_features(pastaq_parameters, output_dir, logger, force_override)
     create_quantitative_tables(pastaq_parameters, output_dir, logger, force_override)
-    force_override=True
     generate_qc_plots(pastaq_parameters, output_dir, logger, force_override)
     dda_pipeline_summary(pastaq_parameters, output_dir, logger)
 
