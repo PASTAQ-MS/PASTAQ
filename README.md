@@ -1,6 +1,10 @@
 # Installation
 
-Clone this repository and initialize git submodules:
+To install from source, you will need to install a suitable C++ compiler for
+your platform as well as CMake. The instructions listed here refer to the
+installation of PASTAQ's Python bindings. Currently the only external
+dependencies are included as git submodules. To get started, clone this
+repository and initialize git submodules:
 
 ```
 git clone git@git.horvatovichlab.com:PASTAQ/pastaq.git
@@ -37,7 +41,8 @@ make
 ```
 
 If you wish to enable the compilation of the tests you need to set up the
-`PASTAQ_ENABLE_TESTS` flag to 1.
+`PASTAQ_ENABLE_TESTS` flag to 1. A limited number of automated test are
+currently available but we are looking forward to improve this in the future.
 
 ```sh
 mkdir build
@@ -47,7 +52,7 @@ make
 make test
 ```
 
-You can use the Ninja building tool for faster compilation times.
+Additionally, you can use the Ninja building tool for faster compilation times.
 
 ```sh
 mkdir build

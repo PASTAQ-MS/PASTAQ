@@ -1226,6 +1226,9 @@ def create_quantitative_tables(params, output_dir, logger=None, force_override=F
     out_path_peak_clusters_annotations = os.path.join(output_dir, 'quant',
                                                       "peak_clusters_annotations.csv")
 
+    # TODO: This is clearly suboptimal and will take a long time if the
+    # number of clusters is very high. Needs a rewrite for optimal
+    # performance.
     def aggregate_cluster_annotations(x):
         ret = {}
         if "psm_sequence" in x:
@@ -1368,6 +1371,9 @@ def create_quantitative_tables(params, output_dir, logger=None, force_override=F
             annotations.to_csv(out_path_peak_clusters_annotations, index=False)
 
         _custom_log("Aggregating annotations", logger)
+        # TODO: This is clearly suboptimal and will take a long time if the
+        # number of clusters is very high. Needs a rewrite for optimal
+        # performance.
         annotations = annotations.groupby(
             'cluster_id').apply(aggregate_cluster_annotations)
 
@@ -1578,6 +1584,9 @@ def create_quantitative_tables(params, output_dir, logger=None, force_override=F
                 params['quant_features_charge_state_filter']):
             annotations = annotations[annotations["psm_charge_state"]
                                       == annotations["charge_state"]]
+        # TODO: This is clearly suboptimal and will take a long time if the
+        # number of clusters is very high. Needs a rewrite for optimal
+        # performance.
         annotations_agg = annotations.groupby(
             'cluster_id').apply(aggregate_cluster_annotations)
 
