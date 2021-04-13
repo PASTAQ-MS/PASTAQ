@@ -1,4 +1,6 @@
 import pastaq
+import os
+import matplotlib.pyplot as plt
 
 # Only the first two chromatogram will be considered for retention time
 # alignment.
@@ -34,3 +36,16 @@ params['warp2d_peaks_per_window'] = 20
 # Run the DDA pipeline. Since the mz-rt range is small, We also enable saving
 # the smoothed 2D map for further visualization.
 pastaq.dda_pipeline(params, input_files, 'small_range', save_grid=True)
+
+# Visualize the smoothed map for each file in a 2D image. The images will be
+# saved in the quality directory with the rest of quality control plots.
+for file in input_files:
+    base_name = os.path.basename(file['raw_path'])
+    base_name = os.path.splitext(base_name)
+    stem = base_name[0]
+    grid = pastaq.read_grid('small_range/grid/{}.grid'.format(stem))
+    fig = plt.figure()
+    pastaq.plot_mesh(grid, figure=fig)
+    plt.savefig('small_range/quality/{}_grid.png'.format(stem), dpi=300)
+    plt.close(fig)
+
