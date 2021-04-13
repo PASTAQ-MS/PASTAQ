@@ -29,6 +29,28 @@ import pastaq
 raw_data = pastaq.read_mzxml(...)
 ```
 
+# Usage
+
+Examples of the usage of the PASTAQ can be found in the `examples` folder. To
+run them, install pastaq as previously described, update the input path of the
+mzXML and mzID files, change any necessary parameters and run it with:
+
+```
+python examples/small_range.py
+```
+
+You can use any mzXML files and identifications in mzIdentML v1.1+. If no
+identifications are available, remove the `ident_path` from the input files
+array or set it to `'none'`. You can find the files we used for testing and
+development via ProteomeXchange, with identifier PXD024584.
+
+Processing of mzML files is in an early stage and may lead to some issues.
+
+For more information about PASTAQ and the configuration of the parameters,
+please visit [the official website][website].
+
+[website]: https://pastaq.horvatovichlab.com
+
 # Compile the pastaq library from source
 
 For an out of source build of the library, create a build directory and run cmake:
