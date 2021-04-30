@@ -47,7 +47,7 @@ void Base64::decode_base64(const std::string &input, std::vector<uint8_t> &outpu
 
 // Read four bytes from the stream from the start index, order bytes
 // based on byte order.
-uint32_t Base64::interpret_uint32(std::vector<uint8_t> &data, size_t const &offset,
+uint32_t Base64::interpret_uint32(std::vector<uint8_t> &data, size_t offset,
                           bool little_endian) {
     if (data.size() < offset + 4) {
         return uint32_t{};
@@ -69,7 +69,7 @@ uint32_t Base64::interpret_uint32(std::vector<uint8_t> &data, size_t const &offs
     return ret;
 }
 
-uint64_t Base64::interpret_uint64(std::vector<uint8_t> &data, size_t const &offset,
+uint64_t Base64::interpret_uint64(std::vector<uint8_t> &data, size_t offset,
                           bool little_endian) {
     if (data.size() < offset + 8) {
         return uint64_t{};
@@ -101,7 +101,7 @@ uint64_t Base64::interpret_uint64(std::vector<uint8_t> &data, size_t const &offs
 
 // Returns the float represented by the data vector at offset, interpreted using
 // the specified byte order.
-float Base64::interpret_float(std::vector<uint8_t> &data, size_t const &offset,
+float Base64::interpret_float(std::vector<uint8_t> &data, size_t offset,
                       bool little_endian) {
     uint32_t bytes = interpret_uint32(data, offset, little_endian);
     float ret;
@@ -111,7 +111,7 @@ float Base64::interpret_float(std::vector<uint8_t> &data, size_t const &offset,
 
 // Returns the double represented by the data vector at offset, interpreted
 // using the specified byte order.
-double Base64::interpret_double(std::vector<uint8_t> &data, size_t const &offset,
+double Base64::interpret_double(std::vector<uint8_t> &data, size_t offset,
                         bool little_endian) {
     uint64_t bytes = interpret_uint64(data, offset, little_endian);
     double ret;
