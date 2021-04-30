@@ -20,6 +20,8 @@ endif()
 # ------------------------------
 # Threads.
 find_package(Threads REQUIRED)
+# Zlib
+find_package(ZLIB)
 # Eigen.
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/eigen" ${CMAKE_CURRENT_BINARY_DIR}/eigen)
 # Build pastaqs library.
@@ -47,7 +49,7 @@ add_library(pastaqlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d_serialize.cpp"
     )
 target_include_directories(pastaqlib PUBLIC src/lib)
-target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen)
+target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen ZLIB::ZLIB)
 
 # Build the python bindings.
 # --------------------------

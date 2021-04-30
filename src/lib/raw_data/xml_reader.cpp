@@ -1,7 +1,9 @@
+#include <zlib.h>
 #include <regex>
 #include <sstream>
 
 #include "utils/base64.hpp"
+#include "utils/compression.hpp"
 #include "xml_reader.hpp"
 
 RawData::Scan parse_mzxml_scan(std::istream &stream,
@@ -92,7 +94,7 @@ RawData::Scan parse_mzxml_scan(std::istream &stream,
         // Fetch the next tag. We are interested in the contents of this scan
         // tag: precursorMz and peaks.
         auto next_tag = XmlReader::read_tag(stream);
-        while (stream.good()  && !stream.eof()) {
+        while (stream.good() && !stream.eof()) {
             if (next_tag.value().name == "scan" && next_tag.value().closed) {
                 break;
             }
@@ -103,7 +105,7 @@ RawData::Scan parse_mzxml_scan(std::istream &stream,
             // recursively check child scans.
             if (next_tag.value().name == "scan" && !next_tag.value().closed) {
                 next_tag = XmlReader::read_tag(stream);
-                while (stream.good()  && !stream.eof()) {
+                while (stream.good() && !stream.eof()) {
                     if (next_tag.value().name == "scan" &&
                         next_tag.value().closed) {
                         break;
@@ -150,22 +152,63 @@ RawData::Scan parse_mzxml_scan(std::istream &stream,
                     pair_order = peak_attributes["pairOrder"];
                 }
 
+                // Find whether or not the data is compressed.
+                bool compressed = peak_attributes["compressionType"] == "zlib";
+
                 // Extract the peaks from the data.
                 auto data = XmlReader::read_data(stream);
                 if (!data) {
                     return {};
                 }
 
-                // Decode the points from the base 64 string.
-                // Initialize Base64 decoder.
-                Base64 decoder(
-                    reinterpret_cast<unsigned char *>(&data.value()[0]),
-                    precision, little_endian);
+                // Decode base64-encoded string to raw data.
+                std::vector<uint8_t> raw_data;
+                Base64::decode_base64(data.value(), raw_data);
+
+                if (compressed) {
+                    // Calculate amount of bytes in decompressed data.
+                    size_t decompressed_len = num_points * 2 * (precision / 8);
+                    std::vector<uint8_t> decompressed_data;
+
+                    // Decompress data.
+                    int status = Compression::inflate(
+                        raw_data, decompressed_data, decompressed_len);
+
+                    // Check status after decompression.
+                    if (status != Z_OK) {
+                        return {};
+                    }
+
+                    raw_data = decompressed_data;
+                }
+
+                // Interpret raw data.
                 double intensity_sum = 0;
                 double max_intensity = 0;
+
+                scan.mz.resize(num_points);
+                scan.intensity.resize(num_points);
+                size_t scan_size = 0;
                 for (size_t i = 0; i < num_points; ++i) {
-                    auto mz = decoder.get_double();
-                    auto intensity = decoder.get_double();
+                    double mz;
+                    double intensity;
+                    // Interpret mz and intensity values.
+                    size_t offset = 0;
+                    if (precision == 32) {
+                        mz = Base64::interpret_float(raw_data, offset,
+                                                     little_endian);
+                        offset += 4;
+                        intensity = base64::interpret_float(raw_data, offset,
+                                                            little_endian);
+                        offset += 4;
+                    } else if (precision == 64) {
+                        mz = base64::interpret_double(raw_data, offset,
+                                                      little_endian);
+                        offset += 8;
+                        intensity = base64::interpret_double(raw_data, offset,
+                                                             little_endian);
+                        offset += 8;
+                    }
 
                     // We don't need to extract the peaks when we are not
                     // inside the mz bounds or contain no value.
@@ -178,12 +221,18 @@ RawData::Scan parse_mzxml_scan(std::istream &stream,
                     }
                     intensity_sum += intensity;
 
-                    // NOTE(alex): Not the most efficient way. It would be
-                    // better to preallocate but we don't know at this point
-                    // how many peaks from peak_count are inside our bounds.
-                    scan.mz.push_back(mz);
-                    scan.intensity.push_back(intensity);
+                    scan.mz[scan_size] = mz;
+                    scan.intensity[scan_size] = intensity;
+                    ++scan_size;
                 }
+                // Resize to number of elements that are actually included.
+                scan.mz.resize(scan_size);
+                scan.intensity.resize(scan_size);
+
+                // Shrink capacity
+                scan.mz.shrink_to_fit();
+                scan.intensity.shrink_to_fit();
+
                 scan.num_points = scan.mz.size();
                 scan.max_intensity = max_intensity;
                 scan.total_intensity = intensity_sum;
@@ -249,8 +298,7 @@ RawData::Scan parse_mzxml_scan(std::istream &stream,
         precursor_id = scan.scan_number;
         auto next_tag = XmlReader::read_tag(stream);
         while (stream.good() && next_tag) {
-            if (next_tag.value().name == "scan" &&
-                next_tag.value().closed) {
+            if (next_tag.value().name == "scan" && next_tag.value().closed) {
                 break;
             }
             if (next_tag.value().name == "scan" && !next_tag.value().closed) {
@@ -302,7 +350,6 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
             break;
         }
         if (tag.value().name == "scan" && !tag.value().closed) {
-
             auto scan = parse_mzxml_scan(stream, tag, min_mz, max_mz, min_rt,
                                          max_rt, polarity, ms_level);
             if (scan.num_points != 0) {
@@ -522,9 +569,6 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
                         }
                     }
                     if (data) {
-                        Base64 decoder(
-                            reinterpret_cast<unsigned char *>(&data.value()[0]),
-                            precision, true);
                         num_points = num_points / (precision / 8) / 4 * 3;
                         if (type == 0) {  // mz
                             mzs = std::vector<double>(num_points);
@@ -536,8 +580,24 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
                             filter_points =
                                 std::vector<bool>(num_points, false);
                         }
+
+                        // decode data.
+                        std::vector<uint8_t> raw_data;
+                        Base64::decode_base64(data.value(), raw_data);
+
+                        // offset for interpretation.
+                        size_t offset = 0;
                         for (size_t i = 0; i < num_points; ++i) {
-                            auto value = decoder.get_double();
+                            double value = 0;
+                            if (precision == 32) {
+                                value = Compression::interpret_float(
+                                    raw_data, offset, true);
+                                offset += 4;
+                            } else if (precision == 64) {
+                                value = Compression::interpret_double(
+                                    raw_data, offset, true);
+                                offset += 8;
+                            }
                             if (type == 0) {  // mz
                                 mzs[i] = value;
                                 if (value < min_mz || value > max_mz) {
@@ -636,7 +696,8 @@ std::optional<XmlReader::Tag> XmlReader::read_tag(std::istream &stream) {
     // Store the tag contents in a buffer for further processing.
     std::string buffer;
 
-    while (stream.good() && !stream.eof() && stream.get() != '<') {}
+    while (stream.good() && !stream.eof() && stream.get() != '<')
+        ;
     std::getline(stream, buffer, '>');
 
     if (buffer.empty()) {
@@ -741,10 +802,8 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
                                                bool ignore_decoy,
                                                bool require_threshold,
                                                bool max_rank_only,
-                                               double min_mz,
-                                               double max_mz,
-                                               double min_rt,
-                                               double max_rt) {
+                                               double min_mz, double max_mz,
+                                               double min_rt, double max_rt) {
     IdentData::IdentData ident_data = {};
 
     // Find the DBSequences, Peptides and PeptideEvidence in the
@@ -983,8 +1042,10 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
                     selected_spectrum = spectrum_match;
                 }
             }
-            if (selected_spectrum.experimental_mz >= min_mz && selected_spectrum.experimental_mz <= max_mz &&
-                selected_spectrum.retention_time >= min_rt && selected_spectrum.retention_time <= max_rt) {
+            if (selected_spectrum.experimental_mz >= min_mz &&
+                selected_spectrum.experimental_mz <= max_mz &&
+                selected_spectrum.retention_time >= min_rt &&
+                selected_spectrum.retention_time <= max_rt) {
                 ident_data.spectrum_matches.push_back(selected_spectrum);
             }
         } else {
@@ -992,8 +1053,10 @@ IdentData::IdentData XmlReader::read_mzidentml(std::istream &stream,
             // and push each element to the list of PSM.
             for (auto &spectrum_match : spectrum_matches) {
                 spectrum_match.retention_time = retention_time;
-                if (spectrum_match.experimental_mz >= min_mz && spectrum_match.experimental_mz <= max_mz &&
-                    spectrum_match.retention_time >= min_rt && spectrum_match.retention_time <= max_rt) {
+                if (spectrum_match.experimental_mz >= min_mz &&
+                    spectrum_match.experimental_mz <= max_mz &&
+                    spectrum_match.retention_time >= min_rt &&
+                    spectrum_match.retention_time <= max_rt) {
                     ident_data.spectrum_matches.push_back(spectrum_match);
                 }
             }
