@@ -263,8 +263,6 @@ def find_protein_groups(
 
 def plot_mesh(mesh, transform='sqrt', figure=None):
     plt.style.use('dark_background')
-    plt.ion()
-    plt.show()
 
     if figure is None:
         figure = plt.figure()
@@ -340,8 +338,6 @@ def plot_xic(peak, raw_data, figure=None, method="max"):
     if not figure:
         figure = plt.figure()
 
-    plt.ion()
-    plt.show()
     plt.plot(x, y, label='peak_id = {}'.format(peak.id))
     plt.xlabel('Retention time (s)')
     plt.ylabel('Intensity')
@@ -375,8 +371,6 @@ def plot_peak_raw_points(
 
     if not img_plot and not rt_plot and not mz_plot:
         plt.style.use('dark_background')
-        plt.ion()
-        plt.show()
         plt.figure()
         plt.clf()
         gs = gridspec.GridSpec(5, 5)
