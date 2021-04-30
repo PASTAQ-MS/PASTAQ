@@ -190,22 +190,22 @@ RawData::Scan parse_mzxml_scan(std::istream &stream,
                 scan.intensity.resize(num_points);
                 size_t scan_size = 0;
                 for (size_t i = 0; i < num_points; ++i) {
-                    double mz;
-                    double intensity;
+                    double mz = 0;
+                    double intensity = 0;
                     // Interpret mz and intensity values.
                     size_t offset = 0;
                     if (precision == 32) {
                         mz = Base64::interpret_float(raw_data, offset,
                                                      little_endian);
                         offset += 4;
-                        intensity = base64::interpret_float(raw_data, offset,
+                        intensity = Base64::interpret_float(raw_data, offset,
                                                             little_endian);
                         offset += 4;
                     } else if (precision == 64) {
-                        mz = base64::interpret_double(raw_data, offset,
+                        mz = Base64::interpret_double(raw_data, offset,
                                                       little_endian);
                         offset += 8;
-                        intensity = base64::interpret_double(raw_data, offset,
+                        intensity = Base64::interpret_double(raw_data, offset,
                                                              little_endian);
                         offset += 8;
                     }
@@ -590,11 +590,11 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
                         for (size_t i = 0; i < num_points; ++i) {
                             double value = 0;
                             if (precision == 32) {
-                                value = Compression::interpret_float(
+                                value = Base64::interpret_float(
                                     raw_data, offset, true);
                                 offset += 4;
                             } else if (precision == 64) {
-                                value = Compression::interpret_double(
+                                value = Base64::interpret_double(
                                     raw_data, offset, true);
                                 offset += 8;
                             }

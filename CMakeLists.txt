@@ -42,6 +42,7 @@ add_library(pastaqlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/raw_data_serialize.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/xml_reader.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/base64.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/compression.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/interpolation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/search.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/serialization.cpp"

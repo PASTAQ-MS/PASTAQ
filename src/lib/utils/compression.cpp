@@ -13,7 +13,7 @@
 // Decompress raw memory from the in_data vector into the out_data vector.
 // Function allocates memory for the output vector. Function takes the length of
 // the data after decompression.
-int inflate(std::vector<uint8_t> &in_data, std::vector<uint8_t> &out_data,
+int Compression::inflate(std::vector<uint8_t> &in_data, std::vector<uint8_t> &out_data,
             size_t decompressed_len) {
     int ret;
     z_stream strm;
@@ -66,7 +66,11 @@ int inflate(std::vector<uint8_t> &in_data, std::vector<uint8_t> &out_data,
             switch (ret) {
                 case Z_NEED_DICT:
                     ret = Z_DATA_ERROR;
+                    (void)inflateEnd(&strm);
+                    return ret;
                 case Z_DATA_ERROR:
+                    (void)inflateEnd(&strm);
+                    return ret;
                 case Z_MEM_ERROR:
                     (void)inflateEnd(&strm);
                     return ret;

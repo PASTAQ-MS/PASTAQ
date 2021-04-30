@@ -8,7 +8,7 @@
 namespace Base64 {
 
 // Translation table used in decoding function.
-static constexpr unsigned char m_translation_table[] = {
+static constexpr unsigned char translation_table[] = {
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     64, 64, 64, 64, 64, 62, 64, 64, 64, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60,
@@ -27,11 +27,12 @@ static constexpr unsigned char m_translation_table[] = {
 // Decode input string containing base64-encoded data into bytes, result is
 // returned in the output vector. This function allocates the appropriate amount
 // of memory for the output vector.
-std::string decode_base64(std::string const &input,
-                          std::vector<uint8_t> &output);
+void decode_base64(std::string const &input, std::vector<uint8_t> &output);
 
 // Interpreting raw data into floating-point values.
 uint32_t interpret_uint32(std::vector<uint8_t> &data, size_t const &offset,
+                          bool little_endian);
+uint64_t interpret_uint64(std::vector<uint8_t> &data, size_t const &offset,
                           bool little_endian);
 float interpret_float(std::vector<uint8_t> &data, size_t const &offset,
                       bool little_endian);
