@@ -1,112 +1,120 @@
 #include <cstring>
+#include <string>
+#include <vector>
 
 #include "base64.hpp"
 
-inline uint32_t swap_uint32(const uint32_t &b, bool little_endian) {
+void decode_base64(const std::string &input, std::vector<uint8_t> &output) {
+    size_t in_len = input.size();
+
+    size_t out_len = in_len / 4 * 3;
+    if (input[in_len - 1] == '=') {
+        --out_len;
+    }
+    if (input[in_len - 2] == '=') {
+        --out_len;
+    }
+
+    output.resize(out_len);
+
+    for (size_t i = 0, j = 0; i < in_len; i += 4, j += 3) {
+        uint8_t a = input[i] == '='
+                        ? 0
+                        : m_translation_table[static_cast<int>(input[i])];
+        uint8_t b = input[i + 1] == '='
+                        ? 0
+                        : m_translation_table[static_cast<int>(input[i + 1])];
+        uint8_t c = input[i + 2] == '='
+                        ? 0
+                        : m_translation_table[static_cast<int>(input[i + 2])];
+        uint8_t d = input[i + 3] == '='
+                        ? 0
+                        : m_translation_table[static_cast<int>(input[i + 3])];
+
+        if (j < out_len) {
+            output[j] = (a << 2) + (b >> 4);
+        }
+        if (j + 1 < out_len) {
+            output[j + 1] = (b << 4) + (c >> 2);
+        }
+        if (j + 2 < out_len) {
+            output[j + 2] = (c << 6) + d;
+        }
+    }
+}
+
+// Interpreting functions.
+
+// Read four bytes from the stream from the start index, order bytes
+// based on byte order.
+uint32_t interpret_uint32(std::vector<uint8_t> &data, size_t const &offset,
+                          bool little_endian) {
+    if (data.size() < offset + 4) {
+        return uint32_t{};
+    }
+
     uint32_t ret;
-    uint8_t *data = reinterpret_cast<uint8_t *>(&ret);
-
+    uint8_t *bytes = reinterpret_cast<uint8_t *>(&ret);
     if (little_endian) {
-        data[0] = b >> 24;
-        data[1] = b >> 16;
-        data[2] = b >> 8;
-        data[3] = b >> 0;
+        bytes[0] = data[offset];
+        bytes[1] = data[offset + 1];
+        bytes[2] = data[offset + 2];
+        bytes[3] = data[offset + 3];
     } else {
-        data[3] = b >> 24;
-        data[2] = b >> 16;
-        data[1] = b >> 8;
-        data[0] = b >> 0;
+        bytes[0] = data[offset + 3];
+        bytes[1] = data[offset + 2];
+        bytes[2] = data[offset + 1];
+        bytes[3] = data[offset];
     }
     return ret;
 }
 
-inline uint64_t swap_uint64(const uint64_t &b, bool little_endian) {
+uint64_t interpret_uint64(std::vector<uint8_t> &data, size_t const &offset,
+                          bool little_endian) {
+    if (data.size() < offset + 8) {
+        return uint64_t{};
+    }
+
     uint64_t ret;
-    uint8_t *data = reinterpret_cast<uint8_t *>(&ret);
-
+    uint8_t *bytes = reinterpret_cast<uint8_t *>(&ret);
     if (little_endian) {
-        data[0] = b >> 56;
-        data[1] = b >> 48;
-        data[2] = b >> 40;
-        data[3] = b >> 32;
-        data[4] = b >> 24;
-        data[5] = b >> 16;
-        data[6] = b >> 8;
-        data[7] = b >> 0;
+        bytes[0] = data[offset];
+        bytes[1] = data[offset + 1];
+        bytes[2] = data[offset + 2];
+        bytes[3] = data[offset + 3];
+        bytes[4] = data[offset + 4];
+        bytes[5] = data[offset + 5];
+        bytes[6] = data[offset + 6];
+        bytes[7] = data[offset + 7];
     } else {
-        data[7] = b >> 56;
-        data[6] = b >> 48;
-        data[5] = b >> 40;
-        data[4] = b >> 32;
-        data[3] = b >> 24;
-        data[2] = b >> 16;
-        data[1] = b >> 8;
-        data[0] = b >> 0;
+        bytes[0] = data[offset + 7];
+        bytes[1] = data[offset + 6];
+        bytes[2] = data[offset + 5];
+        bytes[3] = data[offset + 4];
+        bytes[4] = data[offset + 3];
+        bytes[5] = data[offset + 2];
+        bytes[6] = data[offset + 1];
+        bytes[7] = data[offset];
     }
     return ret;
 }
 
-Base64::Base64(unsigned char *string_pointer, int precision, bool little_endian)
-    : m_string_pointer(string_pointer),
-      m_precision(precision),
-      m_little_endian(little_endian) {}
-
-uint32_t Base64::get_uint32() {
-    uint32_t b = 0;
-    switch (m_bit) {
-        case 0:
-            b = m_translation_table[*m_string_pointer++] << 26;
-            b |= m_translation_table[*m_string_pointer++] << 20;
-            b |= m_translation_table[*m_string_pointer++] << 14;
-            b |= m_translation_table[*m_string_pointer++] << 8;
-            b |= m_translation_table[*m_string_pointer++] << 2;
-            b |= m_translation_table[*m_string_pointer] >> 4;
-            m_bit = 2;
-            break;
-        case 2:
-            b = m_translation_table[*m_string_pointer++] << 28;
-            b |= m_translation_table[*m_string_pointer++] << 22;
-            b |= m_translation_table[*m_string_pointer++] << 16;
-            b |= m_translation_table[*m_string_pointer++] << 10;
-            b |= m_translation_table[*m_string_pointer++] << 4;
-            b |= m_translation_table[*m_string_pointer] >> 2;
-            m_bit = 4;
-            break;
-        case 4:
-            b = m_translation_table[*m_string_pointer++] << 30;
-            b |= m_translation_table[*m_string_pointer++] << 24;
-            b |= m_translation_table[*m_string_pointer++] << 18;
-            b |= m_translation_table[*m_string_pointer++] << 12;
-            b |= m_translation_table[*m_string_pointer++] << 6;
-            b |= m_translation_table[*m_string_pointer++];
-            m_bit = 0;
-            break;
-    }
-    return b;
+// Returns the float represented by the data vector at offset, interpreted using
+// the specified byte order.
+float interpret_float(std::vector<uint8_t> &data, size_t const &offset,
+                      bool little_endian) {
+    uint32_t bytes = interpret_uint32(data, offset, little_endian);
+    float ret;
+    std::memcpy(&ret, &bytes, sizeof(bytes));
+    return ret;
 }
 
-uint64_t Base64::get_uint64() {
-    uint64_t b1 = get_uint32();
-    uint64_t b2 = get_uint32();
-    b1 <<= 32;
-    b1 |= b2;
-    return b1;
-}
-
-double Base64::get_double() {
-    if (m_precision == 32) {
-        uint32_t b = get_uint32();
-        b = swap_uint32(b, m_little_endian);
-        float ret;
-        std::memcpy(&ret, &b, sizeof(b));
-        return ret;
-    }
-    if (m_precision == 64) {
-        uint64_t b = get_uint64();
-        b = swap_uint64(b, m_little_endian);
-        double ret;
-        std::memcpy(&ret, &b, sizeof(b));
-        return ret;
-    }
-    return 0;
+// Returns the double represented by the data vector at offset, interpreted
+// using the specified byte order.
+double interpret_double(std::vector<uint8_t> &data, size_t const &offset,
+                        bool little_endian) {
+    uint64_t bytes = interpret_uint64(data, offset, little_endian);
+    double ret;
+    std::memcpy(&ret, &bytes, sizeof(bytes));
+    return ret;
 }
