@@ -189,11 +189,12 @@ RawData::Scan parse_mzxml_scan(std::istream &stream,
                 scan.mz.resize(num_points);
                 scan.intensity.resize(num_points);
                 size_t scan_size = 0;
+
+                size_t offset = 0;
                 for (size_t i = 0; i < num_points; ++i) {
                     double mz = 0;
                     double intensity = 0;
                     // Interpret mz and intensity values.
-                    size_t offset = 0;
                     if (precision == 32) {
                         mz = Base64::interpret_float(raw_data, offset,
                                                      little_endian);
