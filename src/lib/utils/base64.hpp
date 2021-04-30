@@ -30,13 +30,13 @@ static constexpr unsigned char translation_table[] = {
 void decode_base64(std::string const &input, std::vector<uint8_t> &output);
 
 // Interpreting raw data into floating-point values.
-uint32_t interpret_uint32(std::vector<uint8_t> &data, size_t const &offset,
+uint32_t interpret_uint32(std::vector<uint8_t> &data, size_t offset,
                           bool little_endian);
-uint64_t interpret_uint64(std::vector<uint8_t> &data, size_t const &offset,
+uint64_t interpret_uint64(std::vector<uint8_t> &data, size_t offset,
                           bool little_endian);
-float interpret_float(std::vector<uint8_t> &data, size_t const &offset,
+float interpret_float(std::vector<uint8_t> &data, size_t offset,
                       bool little_endian);
-double interpret_double(std::vector<uint8_t> &data, size_t const &offset,
+double interpret_double(std::vector<uint8_t> &data, size_t offset,
                         bool little_endian);
 
 }  // namespace Base64
