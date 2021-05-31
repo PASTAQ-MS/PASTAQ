@@ -23,6 +23,7 @@
 #include "raw_data/raw_data.hpp"
 #include "raw_data/raw_data_serialize.hpp"
 #include "raw_data/xml_reader.hpp"
+#include "utils/compression.hpp"
 #include "utils/search.hpp"
 #include "utils/serialization.hpp"
 #include "warp2d/warp2d.hpp"
@@ -335,8 +336,8 @@ SimilarityResults find_similarity(std::vector<Centroid::Peak> &peak_list_a,
 void write_raw_data(const RawData::RawData &raw_data,
                     std::string &output_file) {
     // Open file stream.
-    std::ofstream stream;
-    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
+    Compression::DeflateStream stream;
+    stream.open(output_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -354,8 +355,8 @@ void write_raw_data(const RawData::RawData &raw_data,
 
 RawData::RawData read_raw_data(std::string &input_file) {
     // Open file stream.
-    std::ifstream stream;
-    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
+    Compression::InflateStream stream;
+    stream.open(input_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -374,8 +375,8 @@ RawData::RawData read_raw_data(std::string &input_file) {
 
 void write_grid(const Grid::Grid &grid, std::string &output_file) {
     // Open file stream.
-    std::ofstream stream;
-    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
+    Compression::DeflateStream stream;
+    stream.open(output_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -392,8 +393,8 @@ void write_grid(const Grid::Grid &grid, std::string &output_file) {
 
 Grid::Grid read_grid(std::string &input_file) {
     // Open file stream.
-    std::ifstream stream;
-    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
+    Compression::InflateStream stream;
+    stream.open(input_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -412,8 +413,8 @@ Grid::Grid read_grid(std::string &input_file) {
 
 void write_time_map(const Warp2D::TimeMap &time_map, std::string &output_file) {
     // Open file stream.
-    std::ofstream stream;
-    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
+    Compression::DeflateStream stream;
+    stream.open(output_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -431,8 +432,8 @@ void write_time_map(const Warp2D::TimeMap &time_map, std::string &output_file) {
 
 Warp2D::TimeMap read_time_map(std::string &input_file) {
     // Open file stream.
-    std::ifstream stream;
-    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
+    Compression::InflateStream stream;
+    stream.open(input_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -452,8 +453,8 @@ Warp2D::TimeMap read_time_map(std::string &input_file) {
 void write_peaks(const std::vector<Centroid::Peak> &peaks,
                  std::string &output_file) {
     // Open file stream.
-    std::ofstream stream;
-    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
+    Compression::DeflateStream stream;
+    stream.open(output_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -470,8 +471,8 @@ void write_peaks(const std::vector<Centroid::Peak> &peaks,
 
 std::vector<Centroid::Peak> read_peaks(std::string &input_file) {
     // Open file stream.
-    std::ifstream stream;
-    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
+    Compression::InflateStream stream;
+    stream.open(input_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -491,8 +492,8 @@ std::vector<Centroid::Peak> read_peaks(std::string &input_file) {
 std::vector<ProteinInference::InferredProtein> read_inferred_proteins(
     std::string &input_file) {
     // Open file stream.
-    std::ifstream stream;
-    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
+    Compression::InflateStream stream;
+    stream.open(input_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -515,8 +516,8 @@ void write_inferred_proteins(
     const std::vector<ProteinInference::InferredProtein> &inferred_proteins,
     std::string &output_file) {
     // Open file stream.
-    std::ofstream stream;
-    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
+    Compression::DeflateStream stream;
+    stream.open(output_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -537,8 +538,8 @@ void write_feature_clusters(
     const std::vector<MetaMatch::FeatureCluster> &feature_clusters,
     std::string &output_file) {
     // Open file stream.
-    std::ofstream stream;
-    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
+    Compression::DeflateStream stream;
+    stream.open(output_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -558,8 +559,8 @@ void write_feature_clusters(
 std::vector<MetaMatch::FeatureCluster> read_feature_clusters(
     std::string &input_file) {
     // Open file stream.
-    std::ifstream stream;
-    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
+    Compression::InflateStream stream;
+    stream.open(input_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -582,16 +583,15 @@ void write_peak_clusters(
     const std::vector<MetaMatch::PeakCluster> &peak_clusters,
     std::string &output_file) {
     // Open file stream.
-    std::ofstream stream;
-    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
+    Compression::DeflateStream stream;
+    stream.open(output_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
         throw std::invalid_argument(error_stream.str());
     }
 
-    if (!MetaMatch::Serialize::write_peak_clusters(stream,
-                                                      peak_clusters)) {
+    if (!MetaMatch::Serialize::write_peak_clusters(stream, peak_clusters)) {
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the peak_clusters into the output file"
@@ -603,8 +603,8 @@ void write_peak_clusters(
 std::vector<MetaMatch::PeakCluster> read_peak_clusters(
     std::string &input_file) {
     // Open file stream.
-    std::ifstream stream;
-    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
+    Compression::InflateStream stream;
+    stream.open(input_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -612,8 +612,7 @@ std::vector<MetaMatch::PeakCluster> read_peak_clusters(
     }
 
     std::vector<MetaMatch::PeakCluster> peak_clusters;
-    if (!MetaMatch::Serialize::read_peak_clusters(stream,
-                                                     &peak_clusters)) {
+    if (!MetaMatch::Serialize::read_peak_clusters(stream, &peak_clusters)) {
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the peak_clusters into the input file"
@@ -626,8 +625,8 @@ std::vector<MetaMatch::PeakCluster> read_peak_clusters(
 void write_features(const std::vector<FeatureDetection::Feature> &features,
                     std::string &output_file) {
     // Open file stream.
-    std::ofstream stream;
-    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
+    Compression::DeflateStream stream;
+    stream.open(output_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -645,8 +644,8 @@ void write_features(const std::vector<FeatureDetection::Feature> &features,
 
 std::vector<FeatureDetection::Feature> read_features(std::string &input_file) {
     // Open file stream.
-    std::ifstream stream;
-    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
+    Compression::InflateStream stream;
+    stream.open(input_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -666,8 +665,8 @@ std::vector<FeatureDetection::Feature> read_features(std::string &input_file) {
 void write_ident_data(const IdentData::IdentData &ident_data,
                       std::string &output_file) {
     // Open file stream.
-    std::ofstream stream;
-    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
+    Compression::DeflateStream stream;
+    stream.open(output_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -685,8 +684,8 @@ void write_ident_data(const IdentData::IdentData &ident_data,
 
 IdentData::IdentData read_ident_data(std::string &input_file) {
     // Open file stream.
-    std::ifstream stream;
-    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
+    Compression::InflateStream stream;
+    stream.open(input_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -707,8 +706,8 @@ IdentData::IdentData read_ident_data(std::string &input_file) {
 void write_linked_msms(const std::vector<Link::LinkedMsms> &linked_msms,
                        std::string &output_file) {
     // Open file stream.
-    std::ofstream stream;
-    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
+    Compression::DeflateStream stream;
+    stream.open(output_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -726,8 +725,8 @@ void write_linked_msms(const std::vector<Link::LinkedMsms> &linked_msms,
 
 std::vector<Link::LinkedMsms> read_linked_msms(std::string &input_file) {
     // Open file stream.
-    std::ifstream stream;
-    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
+    Compression::InflateStream stream;
+    stream.open(input_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
@@ -746,10 +745,10 @@ std::vector<Link::LinkedMsms> read_linked_msms(std::string &input_file) {
 }
 
 void write_linked_psm(const std::vector<Link::LinkedPsm> &linked_psm,
-                       std::string &output_file) {
+                      std::string &output_file) {
     // Open file stream.
-    std::ofstream stream;
-    stream.open(output_file, std::ios_base::out | std::ios_base::binary);
+    Compression::DeflateStream stream;
+    stream.open(output_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
@@ -767,8 +766,8 @@ void write_linked_psm(const std::vector<Link::LinkedPsm> &linked_psm,
 
 std::vector<Link::LinkedPsm> read_linked_psm(std::string &input_file) {
     // Open file stream.
-    std::ifstream stream;
-    stream.open(input_file, std::ios_base::in | std::ios_base::binary);
+    Compression::InflateStream stream;
+    stream.open(input_file);
     if (!stream) {
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
