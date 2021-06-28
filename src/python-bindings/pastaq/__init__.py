@@ -1813,7 +1813,8 @@ def dda_pipeline_summary(params, output_dir, logger):
             summary_log.info('        MS/MS-Peaks linkage')
             summary_log.info('            Number of ms/ms events: {}'.format(len(raw_data.scans)))
             summary_log.info('            Number of ms/ms events linked to peaks: {}'.format(len(linked_msms)))
-            summary_log.info('            Linking efficiency (%): {}'.format(len(linked_msms)/len(raw_data.scans) * 100.0))
+            if len(raw_data.scans) > 0:
+                summary_log.info('            Linking efficiency (%): {}'.format(len(linked_msms)/len(raw_data.scans) * 100.0))
 
         in_path_ident_data = os.path.join(output_dir, 'ident', "{}.ident".format(stem))
         if os.path.exists(in_path_ident_data):
@@ -1825,7 +1826,8 @@ def dda_pipeline_summary(params, output_dir, logger):
                 summary_log.info('        MS/MS-Identification linkage')
                 summary_log.info('            Number of PSMs: {}'.format(len(ident_data.spectrum_matches)))
                 summary_log.info('            Number of PSMs linked to MS/MS events: {}'.format(len(ident_ms2)))
-                summary_log.info('            PSM-peaks linking efficiency (%): {}'.format(len(ident_ms2)/len(ident_data.spectrum_matches) * 100.0))
+                if len(ident_data.spectrum_matches) > 0:
+                    summary_log.info('            PSM-peaks linking efficiency (%): {}'.format(len(ident_ms2)/len(ident_data.spectrum_matches) * 100.0))
 
             in_path_peak_idents = os.path.join(output_dir, 'linking', "{}.ident_peak.link".format(stem))
             if os.path.exists(in_path_peak_idents):
@@ -1833,7 +1835,8 @@ def dda_pipeline_summary(params, output_dir, logger):
                 summary_log.info('        Peaks-Identification linkage')
                 summary_log.info('            Number of PSMs: {}'.format(len(ident_data.spectrum_matches)))
                 summary_log.info('            Number of PSMs linked to peaks: {}'.format(len(ident_peak)))
-                summary_log.info('            PSM-peaks linking efficiency (%): {}'.format(len(ident_peak)/len(ident_data.spectrum_matches) * 100.0))
+                if len(ident_data.spectrum_matches) > 0:
+                    summary_log.info('            PSM-peaks linking efficiency (%): {}'.format(len(ident_peak)/len(ident_data.spectrum_matches) * 100.0))
 
     # TODO: Average identification linkage stats.
     # TODO: Metamatch stats
