@@ -38,6 +38,7 @@ RawData::RawData read_mzxml(std::string &input_file, double min_mz,
                             double resolution_ms1, double resolution_msn,
                             double reference_mz, double fwhm_rt,
                             std::string polarity_str, size_t ms_level) {
+    pybind11::gil_scoped_release release;
     // Setup infinite range if no point was specified.
     min_rt = min_rt < 0 ? 0 : min_rt;
     max_rt = max_rt < 0 ? std::numeric_limits<double>::infinity() : max_rt;
@@ -58,6 +59,7 @@ RawData::RawData read_mzxml(std::string &input_file, double min_mz,
     } else if (instrument_type_str == "fticr") {
         instrument_type = Instrument::FTICR;
     } else {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "the given instrument is not supported";
         throw std::invalid_argument(error_stream.str());
@@ -77,6 +79,7 @@ RawData::RawData read_mzxml(std::string &input_file, double min_mz,
                polarity_str == "negative") {
         polarity = Polarity::NEGATIVE;
     } else {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "the given polarity is not supported. choose "
                         "between '+', '-', 'both' (default)";
@@ -85,12 +88,14 @@ RawData::RawData read_mzxml(std::string &input_file, double min_mz,
 
     // Sanity check the min/max rt/mz.
     if (min_rt >= max_rt) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: min_rt >= max_rt (min_rt: " << min_rt
                      << ", max_rt: " << max_rt << ")";
         throw std::invalid_argument(error_stream.str());
     }
     if (min_mz >= max_mz) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: min_mz >= max_mz (min_mz: " << min_mz
                      << ", max_mz: " << max_mz << ")";
@@ -101,6 +106,7 @@ RawData::RawData read_mzxml(std::string &input_file, double min_mz,
     std::ifstream stream;
     stream.open(input_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
         throw std::invalid_argument(error_stream.str());
@@ -110,12 +116,14 @@ RawData::RawData read_mzxml(std::string &input_file, double min_mz,
         stream, min_mz, max_mz, min_rt, max_rt, instrument_type, resolution_ms1,
         resolution_msn, reference_mz, polarity, ms_level);
     if (!raw_data) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: an error occurred when reading the file"
                      << input_file;
         throw std::invalid_argument(error_stream.str());
     }
     raw_data.value().fwhm_rt = fwhm_rt;
+    pybind11::gil_scoped_acquire acquire;
 
     return raw_data.value();
 }
@@ -126,6 +134,7 @@ RawData::RawData read_mzml(std::string &input_file, double min_mz,
                            double resolution_ms1, double resolution_msn,
                            double reference_mz, double fwhm_rt,
                            std::string polarity_str, size_t ms_level) {
+    pybind11::gil_scoped_release release;
     // Setup infinite range if no point was specified.
     min_rt = min_rt < 0 ? 0 : min_rt;
     max_rt = max_rt < 0 ? std::numeric_limits<double>::infinity() : max_rt;
@@ -146,6 +155,7 @@ RawData::RawData read_mzml(std::string &input_file, double min_mz,
     } else if (instrument_type_str == "fticr") {
         instrument_type = Instrument::FTICR;
     } else {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "the given instrument is not supported";
         throw std::invalid_argument(error_stream.str());
@@ -165,6 +175,7 @@ RawData::RawData read_mzml(std::string &input_file, double min_mz,
                polarity_str == "negative") {
         polarity = Polarity::NEGATIVE;
     } else {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "the given polarity is not supported. choose "
                         "between '+', '-', 'both' (default)";
@@ -173,12 +184,14 @@ RawData::RawData read_mzml(std::string &input_file, double min_mz,
 
     // Sanity check the min/max rt/mz.
     if (min_rt >= max_rt) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: min_rt >= max_rt (min_rt: " << min_rt
                      << ", max_rt: " << max_rt << ")";
         throw std::invalid_argument(error_stream.str());
     }
     if (min_mz >= max_mz) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: min_mz >= max_mz (min_mz: " << min_mz
                      << ", max_mz: " << max_mz << ")";
@@ -189,6 +202,7 @@ RawData::RawData read_mzml(std::string &input_file, double min_mz,
     std::ifstream stream;
     stream.open(input_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
         throw std::invalid_argument(error_stream.str());
@@ -198,6 +212,7 @@ RawData::RawData read_mzml(std::string &input_file, double min_mz,
         stream, min_mz, max_mz, min_rt, max_rt, instrument_type, resolution_ms1,
         resolution_msn, reference_mz, polarity, ms_level);
     if (!raw_data) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: an error occurred when reading the file"
                      << input_file;
@@ -205,11 +220,13 @@ RawData::RawData read_mzml(std::string &input_file, double min_mz,
     }
     raw_data.value().fwhm_rt = fwhm_rt;
 
+    pybind11::gil_scoped_acquire acquire;
     return raw_data.value();
 }
 
 Xic::Xic xic(const RawData::RawData &raw_data, double min_mz, double max_mz,
              double min_rt, double max_rt, std::string method_str) {
+    pybind11::gil_scoped_release release;
     // Parse the instrument type.
     auto method = Xic::UNKNOWN;
     for (auto &ch : method_str) {
@@ -220,22 +237,27 @@ Xic::Xic xic(const RawData::RawData &raw_data, double min_mz, double max_mz,
     } else if (method_str == "sum") {
         method = Xic::SUM;
     } else {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "the given xic method is not supported";
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
     return RawData::xic(raw_data, min_mz, max_mz, min_rt, max_rt, method);
 }
 
 Grid::Grid resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
                     uint64_t num_samples_rt, double smoothing_coef_mz,
                     double smoothing_coef_rt) {
+    pybind11::gil_scoped_release release;
     auto params = Grid::ResampleParams{};
     params.num_samples_mz = num_samples_mz;
     params.num_samples_rt = num_samples_rt;
     params.smoothing_coef_mz = smoothing_coef_mz;
     params.smoothing_coef_rt = smoothing_coef_rt;
-    return Grid::resample(raw_data, params);
+    auto grid =  Grid::resample(raw_data, params);
+    pybind11::gil_scoped_acquire acquire;
+    return grid;
 }
 
 std::string to_string(const Instrument::Type &instrument_type) {
@@ -282,6 +304,7 @@ Warp2D::TimeMap calculate_time_map(
     const std::vector<Centroid::Peak> &source_peaks, int64_t slack,
     int64_t window_size, int64_t num_points, double rt_expand_factor,
     int64_t peaks_per_window) {
+    pybind11::gil_scoped_release release;
     // TODO(alex): Validate the parameters and throw an error if
     // appropriate.
     Warp2D::Parameters parameters = {slack, window_size, num_points,
@@ -289,6 +312,7 @@ Warp2D::TimeMap calculate_time_map(
     auto time_map =
         Warp2D::calculate_time_map(ref_peaks, source_peaks, parameters,
                                    std::thread::hardware_concurrency());
+    pybind11::gil_scoped_acquire acquire;
     return time_map;
 }
 
@@ -303,6 +327,7 @@ struct SimilarityResults {
 SimilarityResults find_similarity(std::vector<Centroid::Peak> &peak_list_a,
                                   std::vector<Centroid::Peak> &peak_list_b,
                                   size_t n_peaks) {
+    pybind11::gil_scoped_release release;
     auto sort_peaks = [](const Centroid::Peak &p1,
                          const Centroid::Peak &p2) -> bool {
         return (p2.fitted_height < p1.fitted_height);
@@ -330,34 +355,41 @@ SimilarityResults find_similarity(std::vector<Centroid::Peak> &peak_list_a,
         results.mean_ratio =
             2 * results.overlap / (results.self_a + results.self_b);
     }
+    pybind11::gil_scoped_acquire acquire;
     return results;
 }
 
 void write_raw_data(const RawData::RawData &raw_data,
                     std::string &output_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::DeflateStream stream;
     stream.open(output_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
         throw std::invalid_argument(error_stream.str());
     }
 
     if (!RawData::Serialize::write_raw_data(stream, raw_data)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the raw_data into the output file"
             << output_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
 }
 
 RawData::RawData read_raw_data(std::string &input_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::InflateStream stream;
     stream.open(input_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
         throw std::invalid_argument(error_stream.str());
@@ -365,37 +397,45 @@ RawData::RawData read_raw_data(std::string &input_file) {
 
     RawData::RawData raw_data;
     if (!RawData::Serialize::read_raw_data(stream, &raw_data)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't write the raw_data into the input file"
                      << input_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
     return raw_data;
 }
 
 void write_grid(const Grid::Grid &grid, std::string &output_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::DeflateStream stream;
     stream.open(output_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
         throw std::invalid_argument(error_stream.str());
     }
 
     if (!Grid::Serialize::write_grid(stream, grid)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't write the grid into the output file"
                      << output_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
 }
 
 Grid::Grid read_grid(std::string &input_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::InflateStream stream;
     stream.open(input_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
         throw std::invalid_argument(error_stream.str());
@@ -403,38 +443,46 @@ Grid::Grid read_grid(std::string &input_file) {
 
     Grid::Grid grid;
     if (!Grid::Serialize::read_grid(stream, &grid)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't write the grid into the input file"
                      << input_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
     return grid;
 }
 
 void write_time_map(const Warp2D::TimeMap &time_map, std::string &output_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::DeflateStream stream;
     stream.open(output_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
         throw std::invalid_argument(error_stream.str());
     }
 
     if (!Warp2D::Serialize::write_time_map(stream, time_map)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the time_map into the output file"
             << output_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
 }
 
 Warp2D::TimeMap read_time_map(std::string &input_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::InflateStream stream;
     stream.open(input_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
         throw std::invalid_argument(error_stream.str());
@@ -442,38 +490,46 @@ Warp2D::TimeMap read_time_map(std::string &input_file) {
 
     Warp2D::TimeMap time_map;
     if (!Warp2D::Serialize::read_time_map(stream, &time_map)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't write the time_map into the input file"
                      << input_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
     return time_map;
 }
 
 void write_peaks(const std::vector<Centroid::Peak> &peaks,
                  std::string &output_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::DeflateStream stream;
     stream.open(output_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
         throw std::invalid_argument(error_stream.str());
     }
 
     if (!Centroid::Serialize::write_peaks(stream, peaks)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't write the peaks into the output file"
                      << output_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
 }
 
 std::vector<Centroid::Peak> read_peaks(std::string &input_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::InflateStream stream;
     stream.open(input_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
         throw std::invalid_argument(error_stream.str());
@@ -481,20 +537,24 @@ std::vector<Centroid::Peak> read_peaks(std::string &input_file) {
 
     std::vector<Centroid::Peak> peaks;
     if (!Centroid::Serialize::read_peaks(stream, &peaks)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't write the peaks into the input file"
                      << input_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
     return peaks;
 }
 
 std::vector<ProteinInference::InferredProtein> read_inferred_proteins(
     std::string &input_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::InflateStream stream;
     stream.open(input_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
         throw std::invalid_argument(error_stream.str());
@@ -503,22 +563,26 @@ std::vector<ProteinInference::InferredProtein> read_inferred_proteins(
     std::vector<ProteinInference::InferredProtein> inferred_proteins;
     if (!ProteinInference::Serialize::read_inferred_proteins(
             stream, &inferred_proteins)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the inferred_proteins into the input file"
             << input_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
     return inferred_proteins;
 }
 
 void write_inferred_proteins(
     const std::vector<ProteinInference::InferredProtein> &inferred_proteins,
     std::string &output_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::DeflateStream stream;
     stream.open(output_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
         throw std::invalid_argument(error_stream.str());
@@ -526,21 +590,25 @@ void write_inferred_proteins(
 
     if (!ProteinInference::Serialize::write_inferred_proteins(
             stream, inferred_proteins)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't write the inferred_proteins into the "
                         "output file"
                      << output_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
 }
 
 void write_feature_clusters(
     const std::vector<MetaMatch::FeatureCluster> &feature_clusters,
     std::string &output_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::DeflateStream stream;
     stream.open(output_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
         throw std::invalid_argument(error_stream.str());
@@ -548,20 +616,24 @@ void write_feature_clusters(
 
     if (!MetaMatch::Serialize::write_feature_clusters(stream,
                                                       feature_clusters)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the feature_clusters into the output file"
             << output_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
 }
 
 std::vector<MetaMatch::FeatureCluster> read_feature_clusters(
     std::string &input_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::InflateStream stream;
     stream.open(input_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
         throw std::invalid_argument(error_stream.str());
@@ -570,42 +642,50 @@ std::vector<MetaMatch::FeatureCluster> read_feature_clusters(
     std::vector<MetaMatch::FeatureCluster> feature_clusters;
     if (!MetaMatch::Serialize::read_feature_clusters(stream,
                                                      &feature_clusters)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the feature_clusters into the input file"
             << input_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
     return feature_clusters;
 }
 
 void write_peak_clusters(
     const std::vector<MetaMatch::PeakCluster> &peak_clusters,
     std::string &output_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::DeflateStream stream;
     stream.open(output_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
         throw std::invalid_argument(error_stream.str());
     }
 
     if (!MetaMatch::Serialize::write_peak_clusters(stream, peak_clusters)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the peak_clusters into the output file"
             << output_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
 }
 
 std::vector<MetaMatch::PeakCluster> read_peak_clusters(
     std::string &input_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::InflateStream stream;
     stream.open(input_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
         throw std::invalid_argument(error_stream.str());
@@ -613,40 +693,48 @@ std::vector<MetaMatch::PeakCluster> read_peak_clusters(
 
     std::vector<MetaMatch::PeakCluster> peak_clusters;
     if (!MetaMatch::Serialize::read_peak_clusters(stream, &peak_clusters)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the peak_clusters into the input file"
             << input_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
     return peak_clusters;
 }
 
 void write_features(const std::vector<FeatureDetection::Feature> &features,
                     std::string &output_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::DeflateStream stream;
     stream.open(output_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
         throw std::invalid_argument(error_stream.str());
     }
 
     if (!FeatureDetection::Serialize::write_features(stream, features)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the features into the output file"
             << output_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
 }
 
 std::vector<FeatureDetection::Feature> read_features(std::string &input_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::InflateStream stream;
     stream.open(input_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
         throw std::invalid_argument(error_stream.str());
@@ -654,39 +742,47 @@ std::vector<FeatureDetection::Feature> read_features(std::string &input_file) {
 
     std::vector<FeatureDetection::Feature> features;
     if (!FeatureDetection::Serialize::read_features(stream, &features)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't write the features into the input file"
                      << input_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
     return features;
 }
 
 void write_ident_data(const IdentData::IdentData &ident_data,
                       std::string &output_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::DeflateStream stream;
     stream.open(output_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
         throw std::invalid_argument(error_stream.str());
     }
 
     if (!IdentData::Serialize::write_ident_data(stream, ident_data)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the ident_data into the output file"
             << output_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
 }
 
 IdentData::IdentData read_ident_data(std::string &input_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::InflateStream stream;
     stream.open(input_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
         throw std::invalid_argument(error_stream.str());
@@ -694,40 +790,48 @@ IdentData::IdentData read_ident_data(std::string &input_file) {
 
     IdentData::IdentData ident_data;
     if (!IdentData::Serialize::read_ident_data(stream, &ident_data)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the ident_data into the input file"
             << input_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
     return ident_data;
 }
 
 void write_linked_msms(const std::vector<Link::LinkedMsms> &linked_msms,
                        std::string &output_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::DeflateStream stream;
     stream.open(output_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
         throw std::invalid_argument(error_stream.str());
     }
 
     if (!Link::Serialize::write_linked_msms_table(stream, linked_msms)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the linked_msms into the output file"
             << output_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
 }
 
 std::vector<Link::LinkedMsms> read_linked_msms(std::string &input_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::InflateStream stream;
     stream.open(input_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
         throw std::invalid_argument(error_stream.str());
@@ -735,40 +839,48 @@ std::vector<Link::LinkedMsms> read_linked_msms(std::string &input_file) {
 
     std::vector<Link::LinkedMsms> linked_msms;
     if (!Link::Serialize::read_linked_msms_table(stream, &linked_msms)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the linked_msms into the input file"
             << input_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
     return linked_msms;
 }
 
 void write_linked_psm(const std::vector<Link::LinkedPsm> &linked_psm,
                       std::string &output_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::DeflateStream stream;
     stream.open(output_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open output file" << output_file;
         throw std::invalid_argument(error_stream.str());
     }
 
     if (!Link::Serialize::write_linked_psm_table(stream, linked_psm)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the linked_psm into the output file"
             << output_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
 }
 
 std::vector<Link::LinkedPsm> read_linked_psm(std::string &input_file) {
+    pybind11::gil_scoped_release release;
     // Open file stream.
     Compression::InflateStream stream;
     stream.open(input_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
         throw std::invalid_argument(error_stream.str());
@@ -776,12 +888,14 @@ std::vector<Link::LinkedPsm> read_linked_psm(std::string &input_file) {
 
     std::vector<Link::LinkedPsm> linked_psm;
     if (!Link::Serialize::read_linked_psm_table(stream, &linked_psm)) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream
             << "error: couldn't write the linked_psm into the input file"
             << input_file;
         throw std::invalid_argument(error_stream.str());
     }
+    pybind11::gil_scoped_acquire acquire;
     return linked_psm;
 }
 
@@ -792,6 +906,7 @@ IdentData::IdentData read_mzidentml(std::string &input_file, bool ignore_decoy,
                                     double max_mz,
                                     double min_rt,
                                     double max_rt) {
+    pybind11::gil_scoped_release release;
     // Setup infinite range if no point was specified.
     min_rt = min_rt < 0 ? 0 : min_rt;
     max_rt = max_rt < 0 ? std::numeric_limits<double>::infinity() : max_rt;
@@ -802,12 +917,15 @@ IdentData::IdentData read_mzidentml(std::string &input_file, bool ignore_decoy,
     std::ifstream stream;
     stream.open(input_file);
     if (!stream) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: couldn't open input file" << input_file;
         throw std::invalid_argument(error_stream.str());
     }
-    return XmlReader::read_mzidentml(stream, ignore_decoy, require_threshold,
+    auto ident_data = XmlReader::read_mzidentml(stream, ignore_decoy, require_threshold,
                                      max_rank_only, min_mz, max_mz, min_rt, max_rt);
+    pybind11::gil_scoped_acquire acquire;
+    return ident_data;
 }
 
 std::vector<MetaMatch::FeatureCluster> find_feature_clusters(
@@ -815,14 +933,18 @@ std::vector<MetaMatch::FeatureCluster> find_feature_clusters(
     std::vector<std::vector<FeatureDetection::Feature>> features,
     double keep_perc, double intensity_threshold, double n_sig_mz,
     double n_sig_rt) {
+    pybind11::gil_scoped_release release;
     if (group_ids.size() != features.size()) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: the length of groups and features don't match";
         throw std::invalid_argument(error_stream.str());
     }
-    return MetaMatch::find_feature_clusters(group_ids, features, keep_perc,
+    auto clusters = MetaMatch::find_feature_clusters(group_ids, features, keep_perc,
                                             intensity_threshold, n_sig_mz,
                                             n_sig_rt);
+    pybind11::gil_scoped_acquire acquire;
+    return clusters;
 }
 
 std::vector<MetaMatch::PeakCluster> find_peak_clusters(
@@ -830,14 +952,18 @@ std::vector<MetaMatch::PeakCluster> find_peak_clusters(
     std::vector<std::vector<Centroid::Peak>> peaks,
     double keep_perc, double intensity_threshold, double n_sig_mz,
     double n_sig_rt) {
+    pybind11::gil_scoped_release release;
     if (group_ids.size() != peaks.size()) {
+        pybind11::gil_scoped_acquire acquire;
         std::ostringstream error_stream;
         error_stream << "error: the length of groups and peaks don't match";
         throw std::invalid_argument(error_stream.str());
     }
-    return MetaMatch::find_peak_clusters(group_ids, peaks, keep_perc,
+    auto clusters = MetaMatch::find_peak_clusters(group_ids, peaks, keep_perc,
                                             intensity_threshold, n_sig_mz,
                                             n_sig_rt);
+    pybind11::gil_scoped_acquire acquire;
+    return clusters;
 }
 
 }  // namespace PythonAPI

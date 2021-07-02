@@ -13,7 +13,7 @@ struct Grid {
     //   n: Number of sampling points in mz.
     //   m: Number of sampling points in rt.
     //   k: Number of sampling points per FWHM in mz.
-    //   k: Number of sampling points per FWHM in rt.
+    //   t: Number of sampling points per FWHM in rt.
     uint64_t n;
     uint64_t m;
     uint64_t k;
