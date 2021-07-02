@@ -3,6 +3,7 @@
 
 #include "grid/grid.hpp"
 #include "utils/serialization.hpp"
+#include "utils/search.hpp"
 
 uint64_t Grid::x_index(const Grid &grid, double mz) {
     switch (grid.instrument_type) {
@@ -263,4 +264,54 @@ Grid::Grid Grid::resample(const RawData::RawData &raw_data,
         grid.data = smoothed_data;
     }
     return grid;
+}
+
+Grid::Grid Grid::subset(Grid grid, double min_mz, double max_mz, double min_rt, double max_rt) {
+    // Find min/max bin in mz and rt.
+    size_t min_mz_idx = Search::lower_bound(grid.bins_mz, min_mz);
+    size_t max_mz_idx = Search::lower_bound(grid.bins_mz, max_mz);
+    size_t min_rt_idx = Search::lower_bound(grid.bins_rt, min_rt);
+    size_t max_rt_idx = Search::lower_bound(grid.bins_rt, max_rt);
+
+    // Initialize new grid.
+    Grid new_grid;
+    new_grid.n = max_mz_idx - min_mz_idx;
+    new_grid.m = max_rt_idx - min_rt_idx;
+    new_grid.k = grid.k;
+    new_grid.t = grid.t;
+    new_grid.instrument_type = grid.instrument_type;
+    new_grid.reference_mz = grid.reference_mz;
+    new_grid.fwhm_mz = grid.fwhm_mz;
+    new_grid.fwhm_rt = grid.fwhm_rt;
+    new_grid.min_mz = grid.bins_mz[min_mz_idx];
+    new_grid.max_mz = grid.bins_mz[max_mz_idx];
+    new_grid.min_rt = grid.bins_mz[min_rt_idx];
+    new_grid.max_rt = grid.bins_mz[max_rt_idx];
+
+    // Initialize new grid memory.
+    new_grid.data = std::vector<double>(new_grid.n * new_grid.m);
+
+    // Initialize bins.
+    new_grid.bins_mz = std::vector<double>(new_grid.n);
+    new_grid.bins_rt = std::vector<double>(new_grid.m);
+    for (size_t i = 0; i < new_grid.n; i++) {
+        size_t mz_idx = min_mz_idx + i;
+        new_grid.bins_mz[i] = grid.bins_mz[mz_idx];
+    }
+    for (size_t j = 0; j < new_grid.m; j++) {
+        size_t rt_idx = min_rt_idx + j;
+        new_grid.bins_rt[j] = grid.bins_rt[rt_idx];
+    }
+
+    // Represent the bounds of this grid in mass-to-charge and retention time
+    // coordinates.
+    for (size_t j = 0; j < new_grid.m; j++) {
+        for (size_t i = 0; i < new_grid.n; i++) {
+            size_t mz_idx = min_mz_idx + i;
+            size_t rt_idx = min_rt_idx + j;
+            new_grid.data[i + j * new_grid.n] = grid.data[mz_idx + rt_idx * grid.n];
+        }
+    }
+
+    return new_grid;
 }

@@ -934,6 +934,7 @@ PYBIND11_MODULE(pastaq, m) {
         .def_readonly("bins_mz", &Grid::Grid::bins_mz)
         .def_readonly("bins_rt", &Grid::Grid::bins_rt)
         .def("dump", &PythonAPI::write_grid)
+        .def("subset", &Grid::subset)
         .def("__repr__", [](const Grid::Grid &s) {
             return "Grid <n: " + std::to_string(s.n) +
                    ", m: " + std::to_string(s.m) +

@@ -71,6 +71,9 @@ uint64_t y_index(const Grid &grid, double rt);
 double mz_at(const Grid &grid, uint64_t i);
 double rt_at(const Grid &grid, uint64_t j);
 
+// Extract a subset from the grid based on the given constrained dimensions.
+Grid subset(Grid grid, double min_mz, double max_mz, double min_rt, double max_rt);
+
 }  // namespace Grid
 
 #endif /* GRID_GRID_HPP */
