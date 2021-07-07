@@ -54,9 +54,9 @@ RawData::RawData read_mzxml(std::string &input_file, double min_mz,
         instrument_type = Instrument::ORBITRAP;
     } else if (instrument_type_str == "tof") {
         instrument_type = Instrument::TOF;
-    } else if (instrument_type_str == "quad") {
+    } else if (instrument_type_str == "quad" || instrument_type_str == "quadrupole") {
         instrument_type = Instrument::QUAD;
-    } else if (instrument_type_str == "fticr") {
+    } else if (instrument_type_str == "fticr" || instrument_type_str == "ft-icr" ) {
         instrument_type = Instrument::FTICR;
     } else {
         pybind11::gil_scoped_acquire acquire;
