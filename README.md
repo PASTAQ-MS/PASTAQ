@@ -1,10 +1,12 @@
 # Installation
 
 To install from source, you will need to install a suitable C++ compiler and
-corresponding build tools for your platform as well as CMake and zlib. The
-instructions listed here refer to the installation of PASTAQ's Python bindings.
-Currently the only external dependencies other than zlib are included as git
-submodules. To get started, clone this repository and initialize git submodules:
+corresponding build tools for your platform as well as CMake and zlib. Note that
+on Windows you must use `zlibstatic` to avoid DLL path errors with the bindings.
+The instructions listed here refer to the installation of PASTAQ's Python
+bindings.  Currently the only external dependencies other than zlib are included
+as git submodules.  To get started, clone this repository and initialize git
+submodules:
 
 ```
 git clone https://github.com/PASTAQ-MS/PASTAQ.git

@@ -66,14 +66,18 @@ class CMakeBuild(build_ext):
                               cwd=self.build_temp)
         print()  # Add an empty line for cleaner output
 
+with open("README.md", "r", encoding="utf-8") as fh:
+    long_description = fh.read()
 
 setup(
     name='pastaq',
-    version='0.1',
+    version='0.9.0',
     author='Alejandro Sanchez Brotons',
     author_email='a.sanchez.brotons@rug.nl',
-    description='Pre-processing platform for LC-MS/MS data',
-    long_description='',
+    description='Pipelines And Systems for Threshold Avoiding Quantification (PASTAQ): Pre-processing tools for LC-MS/MS data',
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    url="https://github.com/PASTAQ-MS/PASTAQ",
     packages=find_packages('src/python-bindings'),
     package_dir={'': 'src/python-bindings'},
     ext_modules=[CMakeExtension('pastaq/pastaq_cpp')],
