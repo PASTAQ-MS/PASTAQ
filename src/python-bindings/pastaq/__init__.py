@@ -590,22 +590,41 @@ def parse_raw_files(params, output_dir, logger=None, force_override=False):
         if os.path.exists(out_path) and not force_override:
             continue
 
+        # File extension.
+        file_extension = os.path.splitext(raw_path)[1]
+
         # Read raw files (MS1).
         _custom_log('Reading MS1: {}'.format(raw_path), logger)
-        raw_data = pastaq.read_mzxml(
-            raw_path,
-            min_mz=params['min_mz'],
-            max_mz=params['max_mz'],
-            min_rt=params['min_rt'],
-            max_rt=params['max_rt'],
-            instrument_type=params['instrument_type'],
-            resolution_ms1=params['resolution_ms1'],
-            resolution_msn=params['resolution_msn'],
-            reference_mz=params['reference_mz'],
-            fwhm_rt=params['avg_fwhm_rt'],
-            polarity=params['polarity'],
-            ms_level=1,
-        )
+        if file_extension.lower() == '.mzxml':
+            raw_data = pastaq.read_mzxml(
+                raw_path,
+                min_mz=params['min_mz'],
+                max_mz=params['max_mz'],
+                min_rt=params['min_rt'],
+                max_rt=params['max_rt'],
+                instrument_type=params['instrument_type'],
+                resolution_ms1=params['resolution_ms1'],
+                resolution_msn=params['resolution_msn'],
+                reference_mz=params['reference_mz'],
+                fwhm_rt=params['avg_fwhm_rt'],
+                polarity=params['polarity'],
+                ms_level=1,
+            )
+        elif file_extension.lower() == '.mzml':
+            raw_data = pastaq.read_mzml(
+                raw_path,
+                min_mz=params['min_mz'],
+                max_mz=params['max_mz'],
+                min_rt=params['min_rt'],
+                max_rt=params['max_rt'],
+                instrument_type=params['instrument_type'],
+                resolution_ms1=params['resolution_ms1'],
+                resolution_msn=params['resolution_msn'],
+                reference_mz=params['reference_mz'],
+                fwhm_rt=params['avg_fwhm_rt'],
+                polarity=params['polarity'],
+                ms_level=1,
+            )
 
         # Write raw_data to disk (MS1).
         _custom_log('Writing MS1: {}'.format(out_path), logger)
@@ -620,22 +639,41 @@ def parse_raw_files(params, output_dir, logger=None, force_override=False):
         if os.path.exists(out_path) and not force_override:
             continue
 
+        # File extension.
+        file_extension = os.path.splitext(raw_path)[1]
+
         # Read raw files (MS2).
         _custom_log('Reading MS2: {}'.format(raw_path), logger)
-        raw_data = pastaq.read_mzxml(
-            raw_path,
-            min_mz=params['min_mz'],
-            max_mz=params['max_mz'],
-            min_rt=params['min_rt'],
-            max_rt=params['max_rt'],
-            instrument_type=params['instrument_type'],
-            resolution_ms1=params['resolution_ms1'],
-            resolution_msn=params['resolution_msn'],
-            reference_mz=params['reference_mz'],
-            fwhm_rt=params['avg_fwhm_rt'],
-            polarity=params['polarity'],
-            ms_level=2,
-        )
+        if file_extension.lower() == '.mzxml':
+            raw_data = pastaq.read_mzxml(
+                raw_path,
+                min_mz=params['min_mz'],
+                max_mz=params['max_mz'],
+                min_rt=params['min_rt'],
+                max_rt=params['max_rt'],
+                instrument_type=params['instrument_type'],
+                resolution_ms1=params['resolution_ms1'],
+                resolution_msn=params['resolution_msn'],
+                reference_mz=params['reference_mz'],
+                fwhm_rt=params['avg_fwhm_rt'],
+                polarity=params['polarity'],
+                ms_level=2,
+            )
+        elif file_extension.lower() == '.mzml':
+            raw_data = pastaq.read_mzml(
+                raw_path,
+                min_mz=params['min_mz'],
+                max_mz=params['max_mz'],
+                min_rt=params['min_rt'],
+                max_rt=params['max_rt'],
+                instrument_type=params['instrument_type'],
+                resolution_ms1=params['resolution_ms1'],
+                resolution_msn=params['resolution_msn'],
+                reference_mz=params['reference_mz'],
+                fwhm_rt=params['avg_fwhm_rt'],
+                polarity=params['polarity'],
+                ms_level=2,
+            )
 
         # Write raw_data to disk (MS2).
         _custom_log('Writing MS2: {}'.format(out_path), logger)

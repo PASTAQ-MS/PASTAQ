@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 # Only the first two chromatogram will be considered for retention time
 # alignment.
 input_files = [
-        {'reference': True,  'raw_path': '/path/to/mzxml/1_1.mzXML', 'group': 'a', 'ident_path': '/path/to/mzidentml/1_1.mzid'},
-        {'reference': True,  'raw_path': '/path/to/mzxml/1_2.mzXML', 'group': 'a', 'ident_path': '/path/to/mzidentml/1_2.mzid'},
-        {'reference': False, 'raw_path': '/path/to/mzxml/1_3.mzXML', 'group': 'a', 'ident_path': '/path/to/mzidentml/1_3.mzid'},
+        {'reference': True,  'raw_path': '/path/to/mzxml_or_mzml/1_1.mzXML', 'group': 'a', 'ident_path': '/path/to/mzidentml/1_1.mzid'},
+        {'reference': True,  'raw_path': '/path/to/mzxml_or_mzml/1_2.mzXML', 'group': 'a', 'ident_path': '/path/to/mzidentml/1_2.mzid'},
+        {'reference': False, 'raw_path': '/path/to/mzxml_or_mzml/1_3.mzXML', 'group': 'a', 'ident_path': '/path/to/mzidentml/1_3.mzid'},
 ]
 
 # Launch the DDA pipeline for the selected files for data acquired with an
