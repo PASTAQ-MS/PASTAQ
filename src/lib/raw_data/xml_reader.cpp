@@ -478,8 +478,14 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
                 }
 
                 if (tag.value().name == "precursor") {
-                    // TODO: Get precursor id from "spectrumRef" attribute.
-                    scan.precursor_information.scan_number = 0;
+                    auto precursor_attributes = tag.value().attributes;
+                    std::string spectrumRef =
+                        precursor_attributes["spectrumRef"];
+                    // Find scan number.
+                    size_t scanIdx = spectrumRef.find("scan=") + 5;
+                    scan.precursor_information.scan_number =
+                        std::stoull(spectrumRef.substr(scanIdx));
+
                     scan.precursor_information.charge = 0;
                     scan.precursor_information.mz = 0.0;
                     scan.precursor_information.window_wideness = 0.0;
@@ -532,11 +538,11 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
                 if (tag.value().name == "binaryDataArray") {
                     // precision can be: 64 or 32 (bits).
                     int precision = 0;
+                    // Uncompressed: false, Zlib compression: true.
+                    bool compressed = false;
                     // mz: 0, intensity: 1
                     int type = -1;
                     std::optional<std::string> data;
-                    size_t num_points =
-                        std::stoi(tag.value().attributes["encodedLength"]);
                     while (stream.good() && !stream.eof()) {
                         auto tag = XmlReader::read_tag(stream);
                         if (!tag) {
@@ -556,6 +562,10 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
                             if (accession == "MS:1000521") {
                                 precision = 32;
                             }
+                            // Compression.
+                            if (accession == "MS:1000574") {
+                                compressed = true;
+                            }
                             // Type of vector.
                             if (accession == "MS:1000514") {
                                 type = 0;
@@ -570,7 +580,28 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
                         }
                     }
                     if (data) {
-                        num_points = num_points / (precision / 8) / 4 * 3;
+                        // decode data.
+                        std::vector<uint8_t> binary_data;
+                        Base64::decode_base64(data.value(), binary_data);
+                        if (compressed) {
+                            std::vector<uint8_t> decompressed_data;
+
+                            // Decompress data, set decompressed length to 0
+                            // (unknown).
+                            int status = Compression::inflate(
+                                binary_data, decompressed_data, 0);
+
+                            // Check status after decompression.
+                            if (status != Z_OK) {
+                                return raw_data;
+                            }
+
+                            binary_data = decompressed_data;
+                        }
+
+                        size_t num_points =
+                            binary_data.size() / (precision / 8);
+
                         if (type == 0) {  // mz
                             mzs = std::vector<double>(num_points);
                         }
@@ -582,21 +613,17 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
                                 std::vector<bool>(num_points, false);
                         }
 
-                        // decode data.
-                        std::vector<uint8_t> raw_data;
-                        Base64::decode_base64(data.value(), raw_data);
-
                         // offset for interpretation.
                         size_t offset = 0;
                         for (size_t i = 0; i < num_points; ++i) {
                             double value = 0;
                             if (precision == 32) {
-                                value = Base64::interpret_float(
-                                    raw_data, offset, true);
+                                value = Base64::interpret_float(binary_data,
+                                                                offset, true);
                                 offset += 4;
                             } else if (precision == 64) {
-                                value = Base64::interpret_double(
-                                    raw_data, offset, true);
+                                value = Base64::interpret_double(binary_data,
+                                                                 offset, true);
                                 offset += 8;
                             }
                             if (type == 0) {  // mz
@@ -665,6 +692,7 @@ std::optional<RawData::RawData> XmlReader::read_mzml(
             }
         }
     }
+
     return raw_data;
 }
 

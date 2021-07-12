@@ -49,13 +49,17 @@ int Compression::inflate(std::vector<uint8_t> &in_data,
 
         // Run inflate() on input until output buffer not full.
         do {
-            bytes_decompressed = strm.total_out;
-
-            // Calculate amount of free bytes in output buffer.
-            if (bytes_decompressed + CHUNK > decompressed_len) {
-                strm.avail_out = decompressed_len - bytes_decompressed;
-            } else {
+            if (decompressed_len == 0) {
+                // Decompressed length unknown, alocate a new chunk.
                 strm.avail_out = CHUNK;
+                out_data.resize(out_data.size() + CHUNK);
+            } else {
+                // Calculate amount of free bytes in output buffer.
+                if (bytes_decompressed + CHUNK > decompressed_len) {
+                    strm.avail_out = decompressed_len - bytes_decompressed;
+                } else {
+                    strm.avail_out = CHUNK;
+                }
             }
 
             // Use next section of output buffer as output buffer.
@@ -64,6 +68,8 @@ int Compression::inflate(std::vector<uint8_t> &in_data,
 
             ret = inflate(&strm, Z_NO_FLUSH);
             assert(ret != Z_STREAM_ERROR);
+
+            bytes_decompressed = strm.total_out;
 
             switch (ret) {
                 case Z_NEED_DICT:
@@ -77,10 +83,14 @@ int Compression::inflate(std::vector<uint8_t> &in_data,
                     (void)inflateEnd(&strm);
                     return ret;
             }
-        } while (bytes_decompressed == decompressed_len);
+        } while (strm.avail_in != 0 && strm.avail_out != 0);
 
         // Done when inflate() says it's done.
     } while (ret != Z_STREAM_END);
+
+    // Output vector might be bigger than needed if the size was unknown, resize
+    // to fit data.
+    out_data.resize(bytes_decompressed);
 
     // Clean up and return.
     (void)inflateEnd(&strm);
@@ -212,7 +222,7 @@ Compression::InflateStreambuf::InflateStreambuf(size_t _buffer_size)
     setg(buffer, buffer + buffer_size, buffer + buffer_size);
 }
 
-// Destructor deleted the allocated memory, closes the input file, and frees the
+// Destructor deletes the allocated memory, closes the input file, and frees the
 // allocated Zlib state.
 Compression::InflateStreambuf::~InflateStreambuf() {
     delete[] buffer;
