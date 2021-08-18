@@ -89,7 +89,4 @@ ninja test
 
 # How to cite this work
 
-The main manuscript associated with this software has been submitted and is
-under peer review at the moment. You can find a pre-print to the current version
-here on [Research Square](https://www.researchsquare.com/article/rs-422254/v1)
-with DOI: [10.21203/rs.3.rs-422254/v1](https://doi.org/10.21203/rs.3.rs-422254/v1).
+The main manuscript has been published in as Open Access Analytical Chemistry with the following details: [Alejandro Sánchez Brotons, Jonatan O. Eriksson, Marcel Kwiatkowski, Justina C. Wolters, Ido P. Kema, Andrei Barcaru, Folkert Kuipers, Stephan J. L. Bakker, Rainer Bischoff, Frank Suits, and Péter Horvatovich, Pipelines and Systems for Threshold-Avoiding Quantification of LC–MS/MS Data, Analytical Chemistry, 2021, 93, 32, 11215–11224](https://pubs.acs.org/doi/10.1021/acs.analchem.1c01892).
