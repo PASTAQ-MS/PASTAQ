@@ -45,7 +45,7 @@ python examples/small_range.py
 You can use any mzXML files and identifications in mzIdentML v1.1+. If no
 identifications are available, remove the `ident_path` from the input files
 array or set it to `'none'`. You can find the files we used for testing and
-development via ProteomeXchange, with identifier PXD024584.
+development via ProteomeXchange, with identifier [PXD024584](https://www.ebi.ac.uk/pride/archive/projects/PXD024584).
 
 Processing of mzML files is in an early stage and may lead to some issues.
 
