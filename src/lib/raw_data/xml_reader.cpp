@@ -1,6 +1,7 @@
 #include <zlib.h>
 #include <regex>
 #include <sstream>
+#include <cctype>
 
 #include "utils/base64.hpp"
 #include "utils/compression.hpp"

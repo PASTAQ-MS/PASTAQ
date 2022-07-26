@@ -8,6 +8,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# To link with zlib-win-build on Windows point the following to the correct directories on your system
+# set(ZLIB_INCLUDE_DIR d:/fs/git/zlib-win-build)
+# set(ZLIB_LIBRARY d:/fs/git/zlib-win-build/build-VS2017-MT/x64/Release/libz-static.lib)
+
 # Set up compiler options based on platform.
 if (CMAKE_COMPILER_IS_GNUCXX)
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic")

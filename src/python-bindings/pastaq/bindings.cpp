@@ -3,6 +3,7 @@
 #include <iostream>
 #include <thread>
 #include <tuple>
+#include <cctype>
 
 #include "pybind11/numpy.h"
 #include "pybind11/pybind11.h"
@@ -48,7 +49,7 @@ RawData::RawData read_mzxml(std::string &input_file, double min_mz,
     // Parse the instrument type.
     auto instrument_type = Instrument::UNKNOWN;
     for (auto &ch : instrument_type_str) {
-        ch = std::tolower(ch);
+        ch = tolower(ch);
     }
     if (instrument_type_str == "orbitrap") {
         instrument_type = Instrument::ORBITRAP;
@@ -67,7 +68,7 @@ RawData::RawData read_mzxml(std::string &input_file, double min_mz,
     // Parse the polarity.
     auto polarity = Polarity::BOTH;
     for (auto &ch : polarity_str) {
-        ch = std::tolower(ch);
+        ch = tolower(ch);
     }
     if (polarity_str == "" || polarity_str == "both" || polarity_str == "+-" ||
         polarity_str == "-+") {
@@ -144,7 +145,7 @@ RawData::RawData read_mzml(std::string &input_file, double min_mz,
     // Parse the instrument type.
     auto instrument_type = Instrument::UNKNOWN;
     for (auto &ch : instrument_type_str) {
-        ch = std::tolower(ch);
+        ch = tolower(ch);
     }
     if (instrument_type_str == "orbitrap") {
         instrument_type = Instrument::ORBITRAP;
@@ -163,7 +164,7 @@ RawData::RawData read_mzml(std::string &input_file, double min_mz,
     // Parse the polarity.
     auto polarity = Polarity::BOTH;
     for (auto &ch : polarity_str) {
-        ch = std::tolower(ch);
+        ch = tolower(ch);
     }
     if (polarity_str == "" || polarity_str == "both" || polarity_str == "+-" ||
         polarity_str == "-+") {
@@ -230,7 +231,7 @@ Xic::Xic xic(const RawData::RawData &raw_data, double min_mz, double max_mz,
     // Parse the instrument type.
     auto method = Xic::UNKNOWN;
     for (auto &ch : method_str) {
-        ch = std::tolower(ch);
+        ch = tolower(ch);
     }
     if (method_str == "max") {
         method = Xic::MAX;
