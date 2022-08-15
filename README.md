@@ -1,12 +1,12 @@
 # Installation
 
 To install from source, you will need to install a suitable C++ compiler and
-corresponding build tools for your platform as well as CMake and zlib. Note that
-on Windows you must use `zlibstatic` to avoid DLL path errors with the bindings.
+corresponding build tools for your platform as well as CMake and zlib. 
 The instructions listed here refer to the installation of PASTAQ's Python
 bindings.  Currently the only external dependencies other than zlib are included
-as git submodules.  To get started, clone this repository and initialize git
-submodules:
+as git submodules.  
+
+To get started, clone this repository and initialize git submodules:
 
 ```
 git clone https://github.com/PASTAQ-MS/PASTAQ.git
@@ -15,7 +15,16 @@ git submodule init
 git submodule update
 ```
 
-Build the module and install it in your system:
+As usual, it is strongly recommended to create a Python environment in which to build Pastaq, and the core development has been with Python 3.7.8, but other versions may be fine.
+
+# Special build instructions for Windows
+
+Windows requires a static version of zlib, and the one recommended is [zlib-win-build](https://github.com/kiyolee/zlib-win-build).
+The core Windows work with Pastaq has been with Visual studio 2017, so it is recommended for building zlib and Pastaq.  Once you have built zlib, you must point `CMakeLists.txt` to the include directory and library according to the commented example at the top of that file.
+
+When building Pastaq in Windows, first open a Visual Studio command prompt using Tools->Visual Studio Command Prompt in the Visual Studio IDE so that you have access to the compiler and linker.  Then, in that command window, activate your Pastaq Python environment and proceed with the instructions below.
+
+# Build the module and install it in your system:
 
 ```sh
 # Installation
