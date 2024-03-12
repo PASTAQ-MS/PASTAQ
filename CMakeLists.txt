@@ -1,16 +1,12 @@
 cmake_minimum_required(VERSION 3.1)
 
-project(pastaq VERSION "0.9.0")
+project(pastaq VERSION "0.11.0")
 
 # Set project properties.
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-# To link with zlib-win-build on Windows point the following to the correct directories on your system
-# set(ZLIB_INCLUDE_DIR d:/fs/git/zlib-win-build)
-# set(ZLIB_LIBRARY d:/fs/git/zlib-win-build/build-VS2017-MT/x64/Release/libz-static.lib)
 
 # Set up compiler options based on platform.
 if (CMAKE_COMPILER_IS_GNUCXX)
@@ -20,15 +16,15 @@ if (MSVC)
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} /W4")
 endif()
 
-# Build the pastaqlib c++ library.
-# ------------------------------
-# Threads.
-find_package(Threads REQUIRED)
-# Zlib
-find_package(ZLIB)
-# Eigen.
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/eigen" ${CMAKE_CURRENT_BINARY_DIR}/eigen)
-# Build pastaqs library.
+# find_package(Threads REQUIRED)
+if (WIN32)
+    add_subdirectory("ext/zlib")
+else()
+    find_package(zlib REQUIRED)
+endif()
+add_subdirectory("ext/eigen")
+
+# Build pastaq library.
 add_library(pastaqlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid_serialize.cpp"
@@ -53,13 +49,18 @@ add_library(pastaqlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d_serialize.cpp"
     )
+
 target_include_directories(pastaqlib PUBLIC src/lib)
-target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen ZLIB::ZLIB)
+if (WIN32)
+    target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen zlibstatic)
+else()
+    target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen ZLIB::ZLIB)
+endif()
 
 # Build the python bindings.
 # --------------------------
 # PyBind.
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/pybind11" ${CMAKE_CURRENT_BINARY_DIR}/pybind11)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/pybind11")
 pybind11_add_module(pastaq src/python-bindings/pastaq/bindings.cpp)
 target_link_libraries(pastaq PRIVATE pastaqlib)
 
