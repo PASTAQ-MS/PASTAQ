@@ -20,7 +20,7 @@ endif()
 if (WIN32)
     add_subdirectory("ext/zlib")
 else()
-    find_package(zlib REQUIRED)
+    find_package(ZLIB REQUIRED)
 endif()
 add_subdirectory("ext/eigen")
 
