@@ -16,12 +16,7 @@ if (MSVC)
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} /W4")
 endif()
 
-# find_package(Threads REQUIRED)
-if (WIN32)
-    add_subdirectory("ext/zlib")
-else()
-    find_package(zlib REQUIRED)
-endif()
+add_subdirectory("ext/zlib")
 add_subdirectory("ext/eigen")
 
 # Build pastaq library.
