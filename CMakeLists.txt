@@ -49,7 +49,7 @@ target_include_directories(pastaqlib PUBLIC src/lib)
 if (WIN32)
     target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen zlibstatic)
 else()
-    target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen ZLIB::ZLIB)
+    target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen zlib)
 endif()
 
 # Build the python bindings.
