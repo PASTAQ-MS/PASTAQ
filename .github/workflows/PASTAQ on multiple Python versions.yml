@@ -21,5 +21,11 @@ jobs:
       - name: Display Python version
         run: python -c "import sys; print(sys.version)"
 
+      - name: Initialize git submodules
+        run: git submodule init
+
+      - name: Update git remote
+        run: git submodule update --remote
+
       - name: Install PASTAQ using python setup.py
         run: python setup.py install
