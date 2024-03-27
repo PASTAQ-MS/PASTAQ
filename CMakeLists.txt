@@ -16,12 +16,7 @@ if (MSVC)
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} /W4")
 endif()
 
-# find_package(Threads REQUIRED)
-if (WIN32)
-    add_subdirectory("ext/zlib")
-else()
-    find_package(ZLIB REQUIRED)
-endif()
+add_subdirectory("ext/zlib")
 add_subdirectory("ext/eigen")
 
 # Build pastaq library.
@@ -54,7 +49,7 @@ target_include_directories(pastaqlib PUBLIC src/lib)
 if (WIN32)
     target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen zlibstatic)
 else()
-    target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen ZLIB::ZLIB)
+    target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen zlib)
 endif()
 
 # Build the python bindings.
