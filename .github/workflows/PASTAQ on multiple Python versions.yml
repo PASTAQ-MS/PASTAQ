@@ -21,6 +21,11 @@ jobs:
       - name: Display Python version
         run: python -c "import sys; print(sys.version)"
 
+      - name: Install python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools wheel twine
+
       - name: Initialize git submodules
         run: | 
           git submodule init
