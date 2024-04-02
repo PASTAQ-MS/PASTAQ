@@ -1,6 +1,7 @@
 #ifndef UTILS_BASE64_HPP
 #define UTILS_BASE64_HPP
 
+#include <cstdint.h>
 #include <vector>
 
 // This namespace contains functions to decode base64-encoded data into raw
