@@ -31,10 +31,10 @@ jobs:
           - os: windows-latest
             c_compiler: cl
             cpp_compiler: cl
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             c_compiler: gcc
             cpp_compiler: g++
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             c_compiler: clang
             cpp_compiler: clang++
           - os: macos-13
@@ -48,7 +48,7 @@ jobs:
             c_compiler: gcc
           - os: windows-latest
             c_compiler: clang
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             c_compiler: cl
           - os: macos-13
             c_compiler: cl
