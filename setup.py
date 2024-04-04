@@ -82,7 +82,7 @@ setup(
     ext_modules=[CMakeExtension('pastaq/pastaq_cpp')],
     cmdclass=dict(build_ext=CMakeBuild),
     install_requires=[
-        'numpy',
+#        'numpy',
         'pandas',
         'seaborn',
         'matplotlib',
