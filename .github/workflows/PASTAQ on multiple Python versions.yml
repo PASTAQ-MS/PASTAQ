@@ -34,8 +34,8 @@ jobs:
 
       - name: Install PASTAQ using pip install
         # run: python setup.py install
-          run: |
-            python setup.py bdist_wheel 
-            python -m pip install dist/pastaq-0.11.0-cp39-cp39-linux_x86_64.whl
+        run: |
+          python setup.py bdist_wheel 
+          python -m pip install dist/pastaq-0.11.0-cp39-cp39-linux_x86_64.whl
         # run: pip install pastaq==0.11.0
         
