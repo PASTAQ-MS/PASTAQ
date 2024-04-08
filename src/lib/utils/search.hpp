@@ -2,7 +2,7 @@
 #define UTILS_SEARCH_HPP
 
 #include <vector>
-// #include <cstddef>
+#include <cstddef>
 
 // This namespace contain functions to perform search on data structures.
 namespace Search {
