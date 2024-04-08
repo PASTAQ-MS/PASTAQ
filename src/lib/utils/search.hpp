@@ -8,7 +8,7 @@ namespace Search {
 
 #include <cstddef>
 
-size_t lower_bound(const std::vector<double> &haystack, double needle);
+std::size_t lower_bound(const std::vector<double> &haystack, double needle);
 
 // Generalize lower_bound search that uses a custom comparison fuction.
 template <class T>
@@ -17,10 +17,10 @@ struct KeySort {
     T sorting_key;
 };
 template <typename T>
-size_t lower_bound(const std::vector<KeySort<T>> &haystack, T needle) {
-    size_t index = 0;
-    size_t l = 0;
-    size_t r = haystack.size() - 1;
+std::size_t lower_bound(const std::vector<KeySort<T>> &haystack, T needle) {
+    std::size_t index = 0;
+    std::size_t l = 0;
+    std::size_t r = haystack.size() - 1;
     while (l <= r) {
         index = (l + r) / 2;
         if (haystack[index].sorting_key < needle) {
