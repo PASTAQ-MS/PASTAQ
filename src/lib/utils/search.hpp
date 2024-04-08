@@ -1,12 +1,8 @@
 #ifndef UTILS_SEARCH_HPP
 #define UTILS_SEARCH_HPP
 
-#include <vector>
-
 // This namespace contain functions to perform search on data structures.
 namespace Search {
-
-#include <cstddef>
 
 std::size_t lower_bound(const std::vector<double> &haystack, double needle);
 
