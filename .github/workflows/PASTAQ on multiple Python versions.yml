@@ -37,6 +37,6 @@ jobs:
         run: |
           # python setup.py bdist_wheel 
           python -m build --installer pip --wheel
-          python -m pip install dist/pastaq-0.11.0-cp39-cp39-linux_x86_64.whl
-        # run: pip install pastaq==0.11.0
+          python -m pip install --no-index --find-links=dist
+          # run: pip install pastaq==0.11.0
         
