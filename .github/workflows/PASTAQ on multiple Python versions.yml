@@ -42,5 +42,5 @@ jobs:
       - name: Install PASTAQ using pip install
         run: |
           python3 -m build --installer pip --wheel
-          python3 -m pip install --no-index --find-links=dist pastaq
+          python3 -m pip install --no-index --find-links=dist 'pastaq==0.11.0'
         
