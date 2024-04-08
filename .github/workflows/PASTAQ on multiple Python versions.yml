@@ -40,11 +40,7 @@ jobs:
           cat src/lib/utils/search.hpp
 
       - name: Install PASTAQ using pip install
-        # run: python setup.py install
         run: |
           python3 -m pip wheel --wheel-dir=dist pastaq
           python3 -m pip install --no-index --find-links=dist pastaq
-        # python setup.py bdist_wheel 
-        # pip wheel --wheel-dir=dist pastaq 
-        # run: pip install pastaq==0.11.0
         
