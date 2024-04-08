@@ -13,7 +13,7 @@ std::size_t lower_bound(const std::vector<double> &haystack, double needle);
 // Generalize lower_bound search that uses a custom comparison fuction.
 template <class T>
 struct KeySort {
-    size_t index;
+    std::size_t index;
     T sorting_key;
 };
 template <typename T>
