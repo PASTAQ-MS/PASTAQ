@@ -41,6 +41,6 @@ jobs:
 
       - name: Install PASTAQ using pip install
         run: |
-          py -m pip wheel --wheel-dir=/tmp/wheelhouse pastaq
+          python3 -m build --installer pip --wheel
           Get-ChildItem ./dist/*.whl | ForEach-Object { pip install $_.FullName }
         
