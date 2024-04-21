@@ -11,24 +11,41 @@ To get started, clone this repository and initialize git submodules:
 git clone https://github.com/PASTAQ-MS/PASTAQ.git
 cd PASTAQ
 git submodule init
-git submodule update
+git submodule update --remote
 ```
 
-As usual, it is strongly recommended to create a Python environment in which to build Pastaq, and the core development has been with Python 3.9, but 3.10 and 3.11 should also work.
-
-# Special build instructions for Windows
-
-When building Pastaq in Windows, it may be helpful to first open a Visual Studio command prompt using Tools->Visual Studio Command Prompt in the Visual Studio IDE so that you have access to the compiler and linker.  Then, in that command window, activate your Pastaq Python environment and proceed with the instructions below.
-
-# Build the module and install it in your system:
+As usual, it is strongly recommended to create a **Python 3 environment** in which to build Pastaq, and the core development has been with Python `3.9`, but `3.10`, `3.11` and `3.12` should also work.
 
 ```sh
-# Installation
-python3 setup.py install --user
+python -m pip install --upgrade pip
+python -m pip install build
+pip install wheel twin
 
-# Development
-python3 setup.py develop --user
+python3 -m build --installer pip --wheel
 ```
+
+## Special build instructions for Windows
+
+When building Pastaq in Windows, it may be helpful to first open a Visual Studio command prompt using Tools->Visual Studio Command Prompt in the Visual Studio IDE so that you have access to the compiler and linker.  Then, in that command window, activate your Pastaq Python environment and proceed with the instructions, tested under `Powershell` below.
+
+```
+Get-ChildItem ./dist/*.whl | ForEach-Object { pip install $_.FullName }
+```
+
+## Special build instructions for Linux
+
+```
+find ./dist/*.whl | xargs pip install 
+```
+
+<!--- # # Build the module and install it in your system: -->
+<!--- ```sh -->
+<!--- # Installation -->
+<!--- python3 setup.py install --user -->
+
+<!---  # Development -->
+<!--- python3 setup.py develop --user -->
+<!--- ``` -->
 
 Now it can be imported and used in python as follows:
 
