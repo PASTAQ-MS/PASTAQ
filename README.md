@@ -21,7 +21,7 @@ python -m pip install --upgrade pip
 python -m pip install build
 pip install wheel twin
 
-python3 -m build --installer pip --wheel
+python -m build --installer pip --wheel
 ```
 
 ## Windows
