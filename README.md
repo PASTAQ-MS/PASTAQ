@@ -19,7 +19,7 @@ As usual, it is strongly recommended to create a **Python 3 environment** in whi
 ```sh
 python -m pip install --upgrade pip
 python -m pip install build
-pip install wheel twin
+pip install wheel
 
 # create the .whl file in the ./dist folder
 python -m build --installer pip --wheel
