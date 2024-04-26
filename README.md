@@ -21,6 +21,7 @@ python -m pip install --upgrade pip
 python -m pip install build
 pip install wheel twin
 
+# create the .whl file in the ./dist folder
 python -m build --installer pip --wheel
 ```
 
