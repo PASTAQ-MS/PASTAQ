@@ -28,13 +28,13 @@ python -m build --installer pip --wheel
 
 When building Pastaq in Windows, it may be helpful to first open a Visual Studio command prompt using Tools->Visual Studio Command Prompt in the Visual Studio IDE so that you have access to the compiler and linker.  Then, in that command window, activate your Pastaq Python environment and proceed with the instructions.
 
-### Powershell
+#### Powershell
 
 ```
 Get-ChildItem ./dist/*.whl | ForEach-Object { pip install $_.FullName }
 ```
 
-### CMD command prompt
+#### CMD command prompt
 
 ```
 for %f in (./dist\*.whl) do pip install %f
