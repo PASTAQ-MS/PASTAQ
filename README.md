@@ -24,15 +24,22 @@ pip install wheel twin
 python3 -m build --installer pip --wheel
 ```
 
-## Special build instructions for Windows
+## Windows
 
-When building Pastaq in Windows, it may be helpful to first open a Visual Studio command prompt using Tools->Visual Studio Command Prompt in the Visual Studio IDE so that you have access to the compiler and linker.  Then, in that command window, activate your Pastaq Python environment and proceed with the instructions, tested under `Powershell` below.
+When building Pastaq in Windows, it may be helpful to first open a Visual Studio command prompt using Tools->Visual Studio Command Prompt in the Visual Studio IDE so that you have access to the compiler and linker.  Then, in that command window, activate your Pastaq Python environment and proceed with the instructions.
+
+### Powershell
 
 ```
 Get-ChildItem ./dist/*.whl | ForEach-Object { pip install $_.FullName }
 ```
 
-## Special build instructions for Linux
+### CMD command prompt
+
+```
+for %f in (./dist\*.whl) do pip install %f
+```
+## Linux
 
 ```
 find ./dist/*.whl | xargs pip install 
