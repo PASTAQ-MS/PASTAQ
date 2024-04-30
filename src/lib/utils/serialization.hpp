@@ -2,6 +2,7 @@
 #define UTILS_SERIALIZATION_HPP
 
 #include <iostream>
+#include <stdint.h>
 #include <vector>
 
 // This namespace contains necessary functions to serialize commonly used types
