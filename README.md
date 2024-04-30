@@ -19,7 +19,7 @@ As usual, it is strongly recommended to create a **Python 3 environment** in whi
 ```sh
 python -m pip install --upgrade pip
 python -m pip install build
-pip install wheel
+python -m pip install wheel
 
 # create the .whl file in the ./dist folder
 python -m build --installer pip --wheel
@@ -27,7 +27,7 @@ python -m build --installer pip --wheel
 
 ## Windows
 
-When building Pastaq in Windows, it may be helpful to first open a Visual Studio command prompt using Tools->Visual Studio Command Prompt in the Visual Studio IDE so that you have access to the compiler and linker.  Then, in that command window, activate your Pastaq Python environment and proceed with the instructions.
+When building Pastaq in Windows, it may be helpful to first open a Visual Studio command prompt using Tools->Visual Studio Command Prompt in the Visual Studio IDE so that you have access to the compiler and linker.  Then, in that command window, activate your PASTAQ Python environment and proceed with the instructions.
 
 #### Powershell
 
@@ -84,38 +84,38 @@ please visit [the official website][website].
 
 [website]: https://pastaq.horvatovichlab.com
 
-# Compile the pastaq library from source
+<!-- # Compile the pastaq library from source -->
 
-For an out of source build of the library, create a build directory and run cmake:
+<!-- For an out of source build of the library, create a build directory and run cmake: -->
 
-```sh
-mkdir build
-cd build
-cmake ..
-make
-```
+<!-- ```sh -->
+<!-- mkdir build -->
+<!-- cd build -->
+<!-- cmake .. -->
+<!-- make -->
+<!-- ``` -->
 
-If you wish to enable the compilation of the tests you need to set up the
-`PASTAQ_ENABLE_TESTS` flag to 1. A limited number of automated test are
-currently available but we are looking forward to improve this in the future.
+<!-- If you wish to enable the compilation of the tests you need to set up the -->
+<!-- `PASTAQ_ENABLE_TESTS` flag to 1. A limited number of automated test are -->
+<!-- currently available but we are looking forward to improve this in the future. -->
 
-```sh
-mkdir build
-cd build
-cmake .. -DPASTAQ_ENABLE_TESTS=1
-make
-make test
-```
+<!-- ```sh -->
+<!-- mkdir build -->
+<!-- cd build -->
+<!-- cmake .. -DPASTAQ_ENABLE_TESTS=1 -->
+<!-- make -->
+<!-- make test -->
+<!-- ``` -->
 
-Additionally, you can use the Ninja building tool for faster compilation times.
+<!-- Additionally, you can use the Ninja building tool for faster compilation times. -->
 
-```sh
-mkdir build
-cd build
-cmake .. -DPASTAQ_ENABLE_TESTS=1 -GNinja
-ninja
-ninja test
-```
+<!-- ```sh -->
+<!-- mkdir build -->
+<!-- cd build -->
+<!-- cmake .. -DPASTAQ_ENABLE_TESTS=1 -GNinja -->
+<!-- ninja -->
+<!-- ninja test -->
+<!-- ``` -->
 
 # How to cite this work
 
