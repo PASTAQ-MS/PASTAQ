@@ -7,19 +7,19 @@
 // This namespace contain functions to perform search on data structures.
 namespace Search {
 
-size_t lower_bound(const std::vector<double> &haystack, double needle);
+std::size_t lower_bound(const std::vector<double> &haystack, double needle);
 
 // Generalize lower_bound search that uses a custom comparison fuction.
 template <class T>
 struct KeySort {
-    size_t index;
+    std::size_t index;
     T sorting_key;
 };
 template <typename T>
-size_t lower_bound(const std::vector<KeySort<T>> &haystack, T needle) {
-    size_t index = 0;
-    size_t l = 0;
-    size_t r = haystack.size() - 1;
+std::size_t lower_bound(const std::vector<KeySort<T>> &haystack, T needle) {
+    std::size_t index = 0;
+    std::size_t l = 0;
+    std::size_t r = haystack.size() - 1;
     while (l <= r) {
         index = (l + r) / 2;
         if (haystack[index].sorting_key < needle) {
