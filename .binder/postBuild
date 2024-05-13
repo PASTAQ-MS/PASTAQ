@@ -4,11 +4,6 @@ set -ex
 
 curl -L "https://drive.usercontent.google.com/download?id=1sDLF3Nh4lOfg6j2tzJmaARpxCbkStnKd&confirm=xxx" -o examples/3_2_extract.mzML
 
-apt install cmake
-
-pip install build
-pip install wheel
-
 # create the .whl file in the ./dist folder
 python -m build --installer pip --wheel
 find ./dist/*.whl | xargs pip3 install 
