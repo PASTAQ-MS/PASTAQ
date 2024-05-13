@@ -1,0 +1,12 @@
+name: pastaq-environment
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - numpy
+  - pip
+  - pip:
+    - build
+    - wheel
+    - pandas
+    - matplotlib
