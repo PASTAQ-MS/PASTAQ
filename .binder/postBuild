@@ -9,4 +9,4 @@ pip install wheel
 
 # create the .whl file in the ./dist folder
 python -m build --installer pip --wheel
-find ./dist/*.whl | xargs pip3 install 
+find ./dist/*.whl | xargs pip install 
