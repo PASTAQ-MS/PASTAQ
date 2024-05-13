@@ -1,0 +1,5 @@
+#!/bin/bash
+
+set -ex
+
+curl -L "https://drive.usercontent.google.com/download?id=1sDLF3Nh4lOfg6j2tzJmaARpxCbkStnKd&confirm=xxx" -o examples/3_2_extract.mzML
