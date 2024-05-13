@@ -3,10 +3,10 @@ channels:
   - conda-forge
 dependencies:
   - python
-  - cmake
   - numpy
   - pip
   - pip:
+    - cmake
     - build
     - wheel
     - pandas
