@@ -1,6 +1,6 @@
 # Test PASTAQ on `binder`
 
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/PASTAQ-MS/PASTAQ/venus/feature/ci?labpath=examples%2Fpastaq_tutorial.ipynb)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/PASTAQ-MS/PASTAQ/venus/feature/ci?labpath=examples%2FpastaqExamples.ipynb)
 
 # Installation
 
