@@ -16,6 +16,8 @@ jobs:
 
       - name: Build wheels
         run: |
+          ls -l
+          chmod +x pastaqwheels_p36-312.sh
           docker run --rm -v $(pwd):/io quay.io/pypa/manylinux_2_28_x86_64 /io/pastaqwheels_p36-312.sh
 
       - name: Upload wheels to TestPyPI
