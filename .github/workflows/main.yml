@@ -27,4 +27,6 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.TEST_PYPI_PASSWORD }}
         run: |
           python3 -m pip install --upgrade twine
+          ls -l
+          ls -l ./wheelhouse/
           python3 -m twine upload --repository testpypi /io/wheelhouse/*
