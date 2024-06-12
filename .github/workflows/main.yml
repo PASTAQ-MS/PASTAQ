@@ -1,4 +1,4 @@
-name: PASTAQ Python package
+name: PASTAQ Many Linux
 
 on:
   workflow_dispatch:
