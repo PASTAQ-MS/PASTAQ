@@ -1,0 +1,27 @@
+name: PASTAQ Python package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build wheels
+        run: |
+          docker run --rm -v $(pwd):/io quay.io/pypa/manylinux_2_28_x86_64 /io/pastaqwheels_p36-312.sh
+
+      - name: Upload wheels to TestPyPI
+        env:
+          TWINE_USERNAME: ${{ secrets.TEST_PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_PASSWORD }}
+        run: |
+          python3 -m pip install --upgrade twine
+          python3 -m twine upload --repository testpypi /io/PASTAQ/dist/*
