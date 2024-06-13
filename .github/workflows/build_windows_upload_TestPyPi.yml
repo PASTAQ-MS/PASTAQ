@@ -1,0 +1,43 @@
+name: Build on Windows and Upload to TestPyPi
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-upload:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel
+          
+      - name: Initialize git submodules
+        run: | 
+          git submodule init
+          git submodule update --remote
+
+      - name: Build wheels
+        run: |
+          python -m build --wheel
+
+      - name: Upload wheels to TestPyPI
+        env:
+          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        run: |
+          python -m pip install --upgrade twine
+          python -m twine upload --repository testpypi dist/*
