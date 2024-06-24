@@ -4,7 +4,7 @@
 
 # Installation
 
-## Python 3 environment
+## Python 3 virtual environment
 
 ```sh
 pip install pastaq
