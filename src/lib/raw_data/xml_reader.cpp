@@ -375,7 +375,7 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
     return raw_data;
 }
 
-std::optional<RawData::RawData> XmlReader::read_mzml(
+std::optional<RawData::RawData> XmlReader::_read_mzml(
     std::istream &stream, double min_mz, double max_mz, double min_rt,
     double max_rt, Instrument::Type instrument_type, double resolution_ms1,
     double resolution_msn, double reference_mz, Polarity::Type polarity,

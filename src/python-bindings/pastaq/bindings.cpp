@@ -129,7 +129,7 @@ RawData::RawData read_mzxml(std::string &input_file, double min_mz,
     return raw_data.value();
 }
 
-RawData::RawData read_mzml(std::string &input_file, double min_mz,
+RawData::RawData _read_mzml(std::string &input_file, double min_mz,
                            double max_mz, double min_rt, double max_rt,
                            std::string instrument_type_str,
                            double resolution_ms1, double resolution_msn,
@@ -209,7 +209,7 @@ RawData::RawData read_mzml(std::string &input_file, double min_mz,
         throw std::invalid_argument(error_stream.str());
     }
 
-    auto raw_data = XmlReader::read_mzml(
+    auto raw_data = XmlReader::_read_mzml(
         stream, min_mz, max_mz, min_rt, max_rt, instrument_type, resolution_ms1,
         resolution_msn, reference_mz, polarity, ms_level);
     if (!raw_data) {
@@ -247,7 +247,7 @@ Xic::Xic xic(const RawData::RawData &raw_data, double min_mz, double max_mz,
     return RawData::xic(raw_data, min_mz, max_mz, min_rt, max_rt, method);
 }
 
-Grid::Grid resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
+Grid::Grid _resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
                     uint64_t num_samples_rt, double smoothing_coef_mz,
                     double smoothing_coef_rt) {
     pybind11::gil_scoped_release release;
@@ -256,7 +256,7 @@ Grid::Grid resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
     params.num_samples_rt = num_samples_rt;
     params.smoothing_coef_mz = smoothing_coef_mz;
     params.smoothing_coef_rt = smoothing_coef_rt;
-    auto grid =  Grid::resample(raw_data, params);
+    auto grid =  Grid::_resample(raw_data, params);
     pybind11::gil_scoped_acquire acquire;
     return grid;
 }
@@ -300,7 +300,7 @@ std::string to_string(const Xic::Method &method) {
     };
 }
 
-Warp2D::TimeMap calculate_time_map(
+Warp2D::TimeMap _calculate_time_map(
     const std::vector<Centroid::Peak> &ref_peaks,
     const std::vector<Centroid::Peak> &source_peaks, int64_t slack,
     int64_t window_size, int64_t num_points, double rt_expand_factor,
@@ -311,7 +311,7 @@ Warp2D::TimeMap calculate_time_map(
     Warp2D::Parameters parameters = {slack, window_size, num_points,
                                      peaks_per_window, rt_expand_factor};
     auto time_map =
-        Warp2D::calculate_time_map(ref_peaks, source_peaks, parameters,
+        Warp2D::_calculate_time_map(ref_peaks, source_peaks, parameters,
                                    std::thread::hardware_concurrency());
     pybind11::gil_scoped_acquire acquire;
     return time_map;
@@ -1416,8 +1416,8 @@ PYBIND11_MODULE(pastaq, m) {
           py::arg("instrument_type") = "", py::arg("resolution_ms1"),
           py::arg("resolution_msn"), py::arg("reference_mz"),
           py::arg("fwhm_rt"), py::arg("polarity") = "", py::arg("ms_level") = 1)
-        .def("read_mzml", &PythonAPI::read_mzml,
-             "Read raw data from the given mzXML file ", py::arg("file_name"),
+        .def("_read_mzml", &PythonAPI::_read_mzml,
+             "Read raw data from the given mzML file ", py::arg("file_name"),
              py::arg("min_mz") = -1.0, py::arg("max_mz") = -1.0,
              py::arg("min_rt") = -1.0, py::arg("max_rt") = -1.0,
              py::arg("instrument_type") = "", py::arg("resolution_ms1"),
@@ -1428,22 +1428,22 @@ PYBIND11_MODULE(pastaq, m) {
              "Calculate the theoretical width of the peak at the given m/z for "
              "the given raw file",
              py::arg("raw_data"), py::arg("mz"))
-        .def("resample", &PythonAPI::resample,
+        .def("_resample", &PythonAPI::_resample,
              "Resample the raw data into a smoothed warped grid",
              py::arg("raw_data"), py::arg("num_mz") = 10,
              py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 0.5,
              py::arg("smoothing_coef_rt") = 0.5)
-        .def("find_peaks", &Centroid::find_peaks_parallel,
+        .def("_find_peaks", &Centroid::find_peaks_parallel,
              "Find all peaks in the given grid", py::arg("raw_data"),
              py::arg("grid"), py::arg("max_peaks") = 0,
              py::arg("max_threads") = std::thread::hardware_concurrency())
-        .def("calculate_time_map", &PythonAPI::calculate_time_map,
+        .def("_calculate_time_map", &PythonAPI::_calculate_time_map,
              "Calculate a warping time_map to maximize the similarity of "
              "ref_peaks and source_peaks",
              py::arg("ref_peaks"), py::arg("source_peaks"), py::arg("slack"),
              py::arg("window_size"), py::arg("num_points"),
              py::arg("rt_expand_factor"), py::arg("peaks_per_window"))
-        .def("warp_peaks", &Warp2D::warp_peaks,
+        .def("_warp_peaks", &Warp2D::_warp_peaks,
              "Warp the peak list using the given time map", py::arg("peaks"),
              py::arg("time_map"))
         .def("find_similarity", &PythonAPI::find_similarity,
@@ -1490,8 +1490,7 @@ PYBIND11_MODULE(pastaq, m) {
         .def("write_ident_data", &PythonAPI::write_ident_data,
              "Write the ident_data to disk in a binary format",
              py::arg("ident_data"), py::arg("file_name"))
-        .def(
-            "read_inferred_proteins", &PythonAPI::read_inferred_proteins,
+        .def("read_inferred_proteins", &PythonAPI::read_inferred_proteins,
             "Read the inferred_proteins from the binary inferred_proteins file",
             py::arg("file_name"))
         .def("write_inferred_proteins", &PythonAPI::write_inferred_proteins,

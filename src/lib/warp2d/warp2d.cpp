@@ -164,7 +164,7 @@ std::vector<int64_t> Warp2D::find_optimal_warping(std::vector<Level>& levels) {
     return warp_by;
 }
 
-std::vector<Centroid::Peak> Warp2D::warp_peaks(
+std::vector<Centroid::Peak> Warp2D::_warp_peaks(
     const std::vector<Centroid::Peak>& source_peaks,
     const Warp2D::TimeMap& time_map) {
     std::vector<Centroid::Peak> warped_peaks;
@@ -187,7 +187,7 @@ std::vector<Centroid::Peak> Warp2D::warp_peaks(
     return warped_peaks;
 }
 
-Warp2D::TimeMap Warp2D::calculate_time_map(
+Warp2D::TimeMap Warp2D::_calculate_time_map(
     const std::vector<Centroid::Peak>& ref_peaks,
     const std::vector<Centroid::Peak>& source_peaks,
     const Warp2D::Parameters& parameters, uint64_t max_threads) {
