@@ -4,7 +4,15 @@
 
 # Installation
 
-To install from source, you will need to install a suitable C++ compiler and
+## Python 3 virtual environment
+
+```sh
+pip install pastaq
+```
+
+## Installing from source
+
+You need to install a suitable C++ compiler and
 corresponding build tools for your platform as well as CMake. 
 The instructions listed here refer to the installation of PASTAQ's Python
 bindings.  Currently the only external dependencies, including zlib, are included as git submodules.  
