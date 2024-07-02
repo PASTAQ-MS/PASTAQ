@@ -193,13 +193,13 @@ void compute_warped_similarities(
 std::vector<int64_t> find_optimal_warping(std::vector<Level>& levels);
 
 // Perform the Warp2D algorithm to find the optimal TimeMap for peak warping.
-TimeMap calculate_time_map(const std::vector<Centroid::Peak>& ref_peaks,
+TimeMap _calculate_time_map(const std::vector<Centroid::Peak>& ref_peaks,
                            const std::vector<Centroid::Peak>& source_peaks,
                            const Parameters& parameters, uint64_t max_threads);
 
 // Use the given TimeMap to interpolate the source_peaks for retention time
 // alignment.
-std::vector<Centroid::Peak> warp_peaks(
+std::vector<Centroid::Peak> _warp_peaks(
     const std::vector<Centroid::Peak>& source_peaks, const TimeMap& time_map);
 
 // Use a TimeMap to interpolate a given retention time.
