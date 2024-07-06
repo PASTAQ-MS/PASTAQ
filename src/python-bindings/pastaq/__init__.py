@@ -1,17 +1,113 @@
-from .pastaq import *
-import pastaq
-import os
+import datetime
 import json
 import logging
-import time
-import datetime
-
+import matplotlib.colors as colors
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
 import numpy as np
+import os
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import matplotlib.colors as colors
+import time
+
+# Import the dll or .so containing the bound C++ functions so they are in the pastaq namespace
+# The loadable file will be in the same directory as __init__.py in site-packages - hence the local (.) directory
+from .pastaq import *  # noqa F401, F403
+# Some internal C++ functions exposed to python via pybind11 start with underscore and won't be loaded by the line above
+# so they need to be loaded explicitly for access from python
+# Those _ functions should only be referenced here and are called by higher level python functions with the same
+# name but no underscore
+from .pastaq import _read_mzml, _resample, _find_peaks, _calculate_time_map, _warp_peaks  # noqa F401
+import pastaq
+
+
+def read_mzml(input_file, min_mz=-1, max_mz=-1, min_rt=-1, max_rt=-1, instrument_type='ORBITRAP', resolution_ms1=70000,
+              resolution_msn=17500, reference_mz=200, fwhm_rt=9, polarity='+', ms_level=1):
+    """Read the mzml file.
+
+    The specified sub-region of the file is read as specified by the mz and rt ranges.
+
+    Args:
+        input_file (string): Path to the mzML file
+        min_mz (float): Min of the mz range to import (-1 for all)
+        min_rt (float): Min of the rt range to import (-1 for all)
+        max_rt (float): Max of the mz range to import (-1 for all)
+        max_rt (float): Max of the rt range to import (-1 for all)
+        instrument type (string): Type of instrument - one of ORBITRAP, TOF, QUAD, FTICR
+        resolution_ms1 (float): Resolution of the MS1 spectra at the reference mz value
+        resolution_msn (float): Resolution of the MSN spectra at the reference mz value
+        reference_mz (float): Reference mz where resolution is specified
+        fwhm_rt (float): fwhm of peaks in the rt dimension
+        polarity (string): Polarity of the instrument: can be '+', '-', 'pos', 'neg', '+-', 'both'
+        ms_level (int): ms_level of the data
+
+    Returns:
+        RawData structure over the specified sub-region
+    """
+    return pastaq._read_mzml(input_file, min_mz, max_mz, min_rt, max_rt, instrument_type, resolution_ms1, resolution_msn,
+                             reference_mz, fwhm_rt, polarity, ms_level)
+
+
+def resample(raw_data, num_samples_mz, num_samples_rt, smoothing_coef_mz, smoothing_coef_rt):
+    """Resample the raw data onto a uniform grid.
+
+    Args:
+        raw_data (RawData): Raw data loaded from file
+        num_samples_mz (int): The number of sub-samples per mz step in the mesh
+        num_samples_rt (int): The number of sub-samples per rt step in the mesh
+        smoothing_coef_mz (float): Smoothing coefficient in the mz direction
+        smoothing_coef_rt (float): Smoothing coefficient in the rt direction
+
+    Returns:
+        Grid or mesh object
+    """
+    return pastaq._resample(raw_data, num_samples_mz, num_samples_rt, smoothing_coef_mz, smoothing_coef_rt)
+
+
+def find_peaks(raw_data, grid, max_peaks=1000):
+    """Find peaks in the grid derived from the raw data.
+
+    Args:
+        raw_data (RawData): The original raw data file
+        grid (Grid): The resampled grid version of the raw data
+        max_peaks (int): The maximum number of peaks to find
+
+    Returns:
+        List of peaks - possibly empty if none found
+    """
+    return pastaq._find_peaks(raw_data, grid, max_peaks)
+
+
+def calculate_time_map(ref_peaks, samp_peaks, slack, segment_length, num_points, expand_factor, peaks_per_window):
+    """Calculate the time map that maps the sample peaks to the reference.
+
+    Args:
+        ref_peaks (peak list): Reference peak list
+        samp_peaks (peak list): Sample peak list
+        slack (int): Number of positions a segment is allowed to move during alignment
+        segment_length (int): Size of each window segment used in alignment
+        num_points (int): Number of total points in the chromatogram (divide this by segment_length to get n_segments)
+        expand_factor (float): Expansion factor of chromatogram to allow space for alignment
+        peaks_per_window (int): Number of primary peaks per segment to use for alignment
+
+    Returns:
+        TimeMap that maps time points on the sample chromatogram to the reference
+    """
+    return pastaq._calculate_time_map(ref_peaks, samp_peaks, slack, segment_length, num_points, expand_factor, peaks_per_window)
+
+
+def warp_peaks(peak_list, time_map):
+    """Warp peaks to match reference based on time map.
+
+    Args:
+        peak_list (peak list): List of peaks to be warped
+        time_map (TimeMap): Time mapping from sample peaks to reference
+
+    Returns:
+        Original peak list but with rt adjusted to match the reference
+    """
+    return pastaq._warp_peaks(peak_list, time_map)
+
 
 def find_sequence_consensus(annotations, sequence_column, min_consensus_count):
     consensus = annotations[["cluster_id", "file_id", sequence_column]]
@@ -34,6 +130,7 @@ def find_sequence_consensus(annotations, sequence_column, min_consensus_count):
     consensus = consensus.drop(["consensus_count_max"], axis=1)
     return consensus
 
+
 def find_protein_groups(
         feature_data,
         feature_annotations,
@@ -45,7 +142,6 @@ def find_protein_groups(
         ignore_ambiguous_peptides,
         protein_quant_type,
         ):
-
 
     # Create a list of annotations only with the info we need for protein groups.
     protein_annotations = feature_annotations[['cluster_id', sequence_col, protein_col, protein_description_col]].copy()
@@ -67,8 +163,8 @@ def find_protein_groups(
     protein_group_metadata['protein_group_id'] = -1
 
     # Initialize graph of protein-peptide nodes.
-    protein_nodes = {} # protein_id -> [peptide_1, peptide_2...]
-    peptide_nodes = {} # peptide_id -> [protein_1, protein_2...]
+    protein_nodes = {}  # protein_id -> [peptide_1, peptide_2...]
+    peptide_nodes = {}  # peptide_id -> [protein_1, protein_2...]
     for index, row in protein_annotations.iterrows():
         if row.protein_id not in protein_nodes:
             protein_nodes[row.protein_id] = set()
@@ -183,7 +279,7 @@ def find_protein_groups(
                 protein_group_counter += 1
                 break
         if not unique_found:
-                non_unique_protein_ids += [protein_id]
+            non_unique_protein_ids += [protein_id]
 
     # Remove unique protein groups from the graph.
     remove_proteins_from_graph(unique_protein_ids, protein_nodes, peptide_nodes)
@@ -231,7 +327,9 @@ def find_protein_groups(
                         selected_peptides.add(peptide_id)
         selected_cluster_ids = protein_annotations.cluster_id[protein_annotations.peptide_id.isin(selected_peptides)].unique()
         protein_group_data.loc[protein_group_data.cluster_id.isin(selected_cluster_ids), 'protein_group_id'] = protein_group_id
-        protein_group_metadata.loc[protein_group_metadata.peptide_id.isin(selected_peptides) & protein_group_metadata.protein_id.isin(protein_ids) , 'protein_group_id'] = protein_group_id
+        # FIXME what is purpose of & below
+        protein_group_metadata.loc[protein_group_metadata.peptide_id.isin(selected_peptides) &
+                                   protein_group_metadata.protein_id.isin(protein_ids), 'protein_group_id'] = protein_group_id
 
     def aggregate_protein_group_annotations(x):
         ret = {}
@@ -254,14 +352,33 @@ def find_protein_groups(
     del protein_group_metadata['cluster_id']
     del protein_group_metadata['peptide_id']
     del protein_group_metadata['protein_id']
-    protein_group_metdata = protein_group_metadata.drop_duplicates()
+    # protein_group_metdata = protein_group_metadata.drop_duplicates()
     protein_group_metadata = protein_group_metadata.groupby('protein_group_id')
     protein_group_metadata = protein_group_metadata.apply(aggregate_protein_group_annotations)
     protein_group_metadata = protein_group_metadata.reset_index()
 
     return protein_group_data, protein_group_metadata
 
+
 def plot_mesh(mesh, transform='sqrt', figure=None):
+    """Plot the mesh with side plots showing TIC vs. m/z and retention time.
+
+    The central plot shows the mesh as a colored 2D image with RT vs. m/z.
+    On the right is a plot of total ion current vs. retention matching the y-axis;
+    On the top is a plot of total ion current vs. m/z matchint the x-axis.
+
+    Args:
+        mesh (Grid): Grid of ion current vs. m/z and rt e.g. created by resample
+        transform (string): Optional transform to apply, either sqrt, cubic, or log
+        figure (figure): Optional figure in which to place the plots - otherwise created anew
+
+    Returns:
+        dictionary containing the three created plots with string keys img_plot, mz_plot, rt_plot
+
+    The returned dict need not be used and the entire layout of the three plots will appear if plt.show() is executed.
+
+    """
+
     plt.style.use('dark_background')
 
     if figure is None:
@@ -283,10 +400,11 @@ def plot_mesh(mesh, transform='sqrt', figure=None):
     mz_plot.set_ylabel("Intensity")
 
     rt_plot = plt.subplot(gs[1:, -1])
+    rt_plot.clear()
     rt_plot.plot(img.sum(axis=1), bins_rt)
     rt_plot.margins(y=0)
     rt_plot.set_yticks([])
-    rt_plot.set_xlabel("Intensity")
+    rt_plot.set_xlabel("Intens")
 
     img_plot = plt.subplot(gs[1:, :-1])
     offset_rt = (np.array(mesh.bins_rt).max() -
@@ -323,11 +441,11 @@ def plot_mesh(mesh, transform='sqrt', figure=None):
     img_plot.set_xlabel("m/z")
     img_plot.set_ylabel("retention time (s)")
 
-    return({
+    return {
         "img_plot": img_plot,
         "mz_plot": mz_plot,
         "rt_plot": rt_plot,
-    })
+    }
 
 
 def plot_xic(peak, raw_data, figure=None, method="max"):
@@ -433,17 +551,19 @@ def plot_peak_raw_points(
     img_plot.set_xlim([lim_min_mz, lim_max_mz])
     img_plot.set_ylim([lim_min_rt, lim_max_rt])
 
-    return({
+    return {
         "img_plot": img_plot,
         "mz_plot": mz_plot,
         "rt_plot": rt_plot,
-    })
+    }
 
 
 # TODO: Probably we don't want avg_fwhm_rt to be a parameter being passed on
 # this function. Just set it to a resonable level for the default parameters and
 # modify it later as needed.
-def default_parameters(instrument, avg_fwhm_rt):
+def default_parameters(instrument='orbitrap', avg_fwhm_rt=9):
+    """Generate large dictionary of default parameters for a dataset.
+    """
     if instrument == 'orbitrap':
         pastaq_parameters = {
             #
@@ -577,6 +697,7 @@ def _custom_log(msg, logger):
         logger.info(msg)
     print(msg)
 
+
 def parse_raw_files(params, output_dir, logger=None, force_override=False):
     _custom_log('Starting raw data conversion', logger)
     time_start = time.time()
@@ -611,7 +732,7 @@ def parse_raw_files(params, output_dir, logger=None, force_override=False):
                 ms_level=1,
             )
         elif file_extension.lower() == '.mzml':
-            raw_data = pastaq.read_mzml(
+            raw_data = pastaq._read_mzml(
                 raw_path,
                 min_mz=params['min_mz'],
                 max_mz=params['max_mz'],
@@ -660,7 +781,7 @@ def parse_raw_files(params, output_dir, logger=None, force_override=False):
                 ms_level=2,
             )
         elif file_extension.lower() == '.mzml':
-            raw_data = pastaq.read_mzml(
+            raw_data = pastaq._read_mzml(
                 raw_path,
                 min_mz=params['min_mz'],
                 max_mz=params['max_mz'],
@@ -682,6 +803,7 @@ def parse_raw_files(params, output_dir, logger=None, force_override=False):
     elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
     _custom_log('Finished raw data parsing in {}'.format(elapsed_time), logger)
 
+
 def detect_peaks(params, output_dir, save_grid=False, logger=None, force_override=False):
     # Perform resampling/smoothing and peak detection and save results to disk.
     _custom_log('Starting peak detection', logger)
@@ -700,7 +822,7 @@ def detect_peaks(params, output_dir, save_grid=False, logger=None, force_overrid
         raw_data = pastaq.read_raw_data(in_path)
 
         _custom_log("Resampling: {}".format(stem), logger)
-        grid = pastaq.resample(
+        grid = pastaq._resample(
             raw_data,
             params['num_samples_mz'],
             params['num_samples_rt'],
@@ -714,12 +836,13 @@ def detect_peaks(params, output_dir, save_grid=False, logger=None, force_overrid
             grid.dump(mesh_path)
 
         _custom_log("Finding peaks: {}".format(stem), logger)
-        peaks = pastaq.find_peaks(raw_data, grid, params['max_peaks'])
-        _custom_log('Writing peaks:'.format(out_path), logger)
+        peaks = pastaq._find_peaks(raw_data, grid, params['max_peaks'])
+        _custom_log('Writing peaks: {msg}'.format(msg=out_path), logger)
         pastaq.write_peaks(peaks, out_path)
 
     elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
     _custom_log('Finished peak detection in {}'.format(elapsed_time), logger)
+
 
 def calculate_similarity_matrix(params, output_dir, peak_dir, logger=None, force_override=False):
     out_path = os.path.join(output_dir, 'quality', 'similarity_{}.csv'.format(peak_dir))
@@ -755,6 +878,7 @@ def calculate_similarity_matrix(params, output_dir, peak_dir, logger=None, force
 
     elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
     _custom_log('Finished similarity matrix calculation from {} in {}'.format(peak_dir, elapsed_time), logger)
+
 
 def perform_rt_alignment(params, output_dir, logger=None, force_override=False):
     warped_sim_path = os.path.join(output_dir, 'quality', 'similarity_warped_peaks.csv')
@@ -794,14 +918,14 @@ def perform_rt_alignment(params, output_dir, logger=None, force_override=False):
                 stem_b = input_files[j]['stem']
                 peaks_b = pastaq.read_peaks(os.path.join(output_dir, 'peaks', '{}.peaks'.format(stem_b)))
                 _custom_log("Warping {} peaks to {}".format(stem_b, stem_a), logger)
-                time_map = pastaq.calculate_time_map(
+                time_map = pastaq._calculate_time_map(
                     peaks_a, peaks_b,
                     params['warp2d_slack'],
                     params['warp2d_window_size'],
                     params['warp2d_num_points'],
                     params['warp2d_rt_expand_factor'],
                     params['warp2d_peaks_per_window'])
-                peaks_b = pastaq.warp_peaks(peaks_b, time_map)
+                peaks_b = pastaq._warp_peaks(peaks_b, time_map)
                 _custom_log("Calculating similarity of {} vs {} (warped)".format(stem_a, stem_b), logger)
                 similarity_matrix[i, j] = pastaq.find_similarity(
                     peaks_a, peaks_b,
@@ -830,7 +954,7 @@ def perform_rt_alignment(params, output_dir, logger=None, force_override=False):
 
         if not os.path.exists(out_path_tmap) or force_override:
             _custom_log("Calculating time_map for {}".format(stem), logger)
-            time_map = pastaq.calculate_time_map(
+            time_map = pastaq._calculate_time_map(
                 ref_peaks, peaks,
                 params['warp2d_slack'],
                 params['warp2d_window_size'],
@@ -843,11 +967,12 @@ def perform_rt_alignment(params, output_dir, logger=None, force_override=False):
             continue
         if stem != ref_stem:
             _custom_log("Warping {} peaks to reference {}".format(stem, ref_stem), logger)
-            peaks = pastaq.warp_peaks(peaks, time_map)
+            peaks = pastaq._warp_peaks(peaks, time_map)
         pastaq.write_peaks(peaks, out_path)
 
     elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
     _custom_log('Finished peak warping to reference in {}'.format(elapsed_time), logger)
+
 
 def perform_feature_detection(params, output_dir, logger=None, force_override=False):
     _custom_log('Starting feature detection', logger)
@@ -871,6 +996,7 @@ def perform_feature_detection(params, output_dir, logger=None, force_override=Fa
 
     elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
     _custom_log('Finished feature detection in {}'.format(elapsed_time), logger)
+
 
 def parse_mzidentml_files(params, output_dir, logger=None, force_override=False):
     _custom_log('Starting mzIdentML parsing', logger)
@@ -900,6 +1026,7 @@ def parse_mzidentml_files(params, output_dir, logger=None, force_override=False)
 
     elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
     _custom_log('Finished mzIdentML parsing in {}'.format(elapsed_time), logger)
+
 
 def link_peaks_msms_idents(params, output_dir, logger=None, force_override=False):
     _custom_log('Starting ident/msms linkage', logger)
@@ -975,6 +1102,7 @@ def link_peaks_msms_idents(params, output_dir, logger=None, force_override=False
     elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
     _custom_log('Finished ident/msms linkage in {}'.format(elapsed_time), logger)
 
+
 def match_peaks_and_features(params, output_dir, logger=None, force_override=False):
     input_files = params['input_files']
 
@@ -1037,6 +1165,7 @@ def match_peaks_and_features(params, output_dir, logger=None, force_override=Fal
     elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
     _custom_log('Finished feature matching in {}'.format(elapsed_time), logger)
 
+
 # NOTE: This is a giant ball of spaghetti and could use some love.
 def create_quantitative_tables(params, output_dir, logger=None, force_override=False):
     input_files = params['input_files']
@@ -1052,8 +1181,8 @@ def create_quantitative_tables(params, output_dir, logger=None, force_override=F
         in_path_ident_link_msms = os.path.join(output_dir, 'linking', "{}.ident_ms2.link".format(stem))
         in_path_ident_link_theomz = os.path.join(output_dir, 'linking', "{}.ident_peak.link".format(stem))
         in_path_ident_data = os.path.join(output_dir, 'ident', "{}.ident".format(stem))
-        out_path_peaks = os.path.join(output_dir, 'quant',"{}_peaks.csv".format(stem))
-        out_path_peak_annotations = os.path.join(output_dir, 'quant',"{}_peak_annotations.csv".format(stem))
+        out_path_peaks = os.path.join(output_dir, 'quant', "{}_peaks.csv".format(stem))
+        out_path_peak_annotations = os.path.join(output_dir, 'quant', "{}_peak_annotations.csv".format(stem))
 
         # TODO: This is probably not necessary or needs to be changed if we are
         # doing all per-peak quantification in a single loop.
@@ -1449,42 +1578,42 @@ def create_quantitative_tables(params, output_dir, logger=None, force_override=F
             for i, input_file in enumerate(input_files):
                 stem = input_file['stem']
                 data[stem] = [cluster.monoisotopic_heights[i]
-                                             for cluster in feature_clusters]
+                              for cluster in feature_clusters]
         elif params['quant_features'] == 'monoisotopic_volume':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_monoisotopic_volume.csv")
             for i, input_file in enumerate(input_files):
                 stem = input_file['stem']
                 data[stem] = [cluster.monoisotopic_volumes[i]
-                                             for cluster in feature_clusters]
+                              for cluster in feature_clusters]
         elif params['quant_features'] == 'total_height':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_total_height.csv")
             for i, input_file in enumerate(input_files):
                 stem = input_file['stem']
                 data[stem] = [cluster.total_heights[i]
-                                             for cluster in feature_clusters]
+                              for cluster in feature_clusters]
         elif params['quant_features'] == 'total_volume':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_total_volume.csv")
             for i, input_file in enumerate(input_files):
                 stem = input_file['stem']
                 data[stem] = [cluster.total_volumes[i]
-                                             for cluster in feature_clusters]
+                              for cluster in feature_clusters]
         elif params['quant_features'] == 'max_height':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_max_height.csv")
             for i, input_file in enumerate(input_files):
                 stem = input_file['stem']
                 data[stem] = [cluster.max_heights[i]
-                                             for cluster in feature_clusters]
+                              for cluster in feature_clusters]
         elif params['quant_features'] == 'max_volume':
             out_path_feature_clusters = os.path.join(output_dir, 'quant',
                                                      "feature_clusters_max_volume.csv")
             for i, input_file in enumerate(input_files):
                 stem = input_file['stem']
                 data[stem] = [cluster.max_volumes[i]
-                                             for cluster in feature_clusters]
+                              for cluster in feature_clusters]
         else:
             raise ValueError("unknown quant_features parameter")
         _custom_log("Writing feature clusters quantitative table to disk", logger)
@@ -1595,14 +1724,13 @@ def create_quantitative_tables(params, output_dir, logger=None, force_override=F
                     params['quant_proteins_quant_type'],
                     )
             out_path_protein_data = os.path.join(output_dir, 'quant',
-                    "protein_groups.csv")
+                                                 "protein_groups.csv")
             out_path_protein_metadata = os.path.join(output_dir, 'quant',
-                    "protein_groups_metadata.csv")
+                                                     "protein_groups_metadata.csv")
 
             _custom_log("Writing protein group data/metadata to disk", logger)
             prot_data.to_csv(out_path_protein_data, index=False)
             prot_metadata.to_csv(out_path_protein_metadata, index=False)
-
 
         # Saving annotations before aggregation.
         if params['quant_save_all_annotations']:
@@ -1636,6 +1764,7 @@ def create_quantitative_tables(params, output_dir, logger=None, force_override=F
 
         if sequence_column in annotations:
             _custom_log("Aggregating peptide charge states", logger)
+
             def aggregate_peptide_annotations(x):
                 ret = {}
                 if "psm_sequence" in x:
@@ -1662,7 +1791,7 @@ def create_quantitative_tables(params, output_dir, logger=None, force_override=F
             peptide_data[sequence_column] = metadata[sequence_column]
             peptide_data = peptide_data[~peptide_data[sequence_column].isna()]
             peptide_data = peptide_data[peptide_data[sequence_column] != '']
-            peptide_data = peptide_data[~peptide_data[sequence_column].str.contains('\.\|\.')]
+            peptide_data = peptide_data[~peptide_data[sequence_column].str.contains(r'\.\|\.')]
             peptide_data = peptide_data.groupby(sequence_column).agg(sum)
             peptide_data = peptide_data.reset_index()
             peptide_metadata = annotations.copy()
@@ -1670,9 +1799,9 @@ def create_quantitative_tables(params, output_dir, logger=None, force_override=F
             peptide_metadata = peptide_metadata.groupby(sequence_column)
             peptide_metadata = peptide_metadata.apply(aggregate_peptide_annotations)
             out_path_peptide_data = os.path.join(output_dir, 'quant',
-                    "peptides_data.csv")
+                                                 "peptides_data.csv")
             out_path_peptide_metadata = os.path.join(output_dir, 'quant',
-                    "peptides_metadata.csv")
+                                                     "peptides_metadata.csv")
 
             _custom_log("Writing peptide data/metadata to disk", logger)
             peptide_data.to_csv(out_path_peptide_data, index=False)
@@ -1680,6 +1809,7 @@ def create_quantitative_tables(params, output_dir, logger=None, force_override=F
 
     elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
     _custom_log('Finished creation of quantitative tables in {}'.format(elapsed_time), logger)
+
 
 def dda_pipeline_summary(params, output_dir, logger):
     _custom_log("Starting summary stats", logger)
@@ -1865,7 +1995,8 @@ def dda_pipeline_summary(params, output_dir, logger):
                 summary_log.info('            Number of PSMs: {}'.format(len(ident_data.spectrum_matches)))
                 summary_log.info('            Number of PSMs linked to MS/MS events: {}'.format(len(ident_ms2)))
                 if len(ident_data.spectrum_matches) > 0:
-                    summary_log.info('            PSM-peaks linking efficiency (%): {}'.format(len(ident_ms2)/len(ident_data.spectrum_matches) * 100.0))
+                    summary_log.info('            PSM-peaks linking efficiency (%): {}'.format(len(ident_ms2) /
+                                                                                               len(ident_data.spectrum_matches) * 100.0))
 
             in_path_peak_idents = os.path.join(output_dir, 'linking', "{}.ident_peak.link".format(stem))
             if os.path.exists(in_path_peak_idents):
@@ -1874,7 +2005,8 @@ def dda_pipeline_summary(params, output_dir, logger):
                 summary_log.info('            Number of PSMs: {}'.format(len(ident_data.spectrum_matches)))
                 summary_log.info('            Number of PSMs linked to peaks: {}'.format(len(ident_peak)))
                 if len(ident_data.spectrum_matches) > 0:
-                    summary_log.info('            PSM-peaks linking efficiency (%): {}'.format(len(ident_peak)/len(ident_data.spectrum_matches) * 100.0))
+                    summary_log.info('            PSM-peaks linking efficiency (%): {}'.format(len(ident_peak) /
+                                                                                               len(ident_data.spectrum_matches) * 100.0))
 
     # TODO: Average identification linkage stats.
     # TODO: Metamatch stats
@@ -1885,6 +2017,7 @@ def dda_pipeline_summary(params, output_dir, logger):
 
     elapsed_time = datetime.timedelta(seconds=time.time()-time_start)
     _custom_log('Finished summary stats in {}'.format(elapsed_time), logger)
+
 
 def generate_qc_plots(params, output_dir, logger=None, force_override=False):
     input_files = params['input_files']

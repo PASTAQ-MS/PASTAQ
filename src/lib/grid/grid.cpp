@@ -75,7 +75,7 @@ double Grid::rt_at(const Grid &grid, uint64_t j) {
     return grid.min_rt + delta_rt * j;
 }
 
-Grid::Grid Grid::resample(const RawData::RawData &raw_data,
+Grid::Grid Grid::_resample(const RawData::RawData &raw_data,
                           const ResampleParams &params) {
     // Initialize the Grid.
     Grid grid;
