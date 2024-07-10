@@ -1,0 +1,32 @@
+name: PASTAQ Many Linux
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build wheels
+        run: |
+          git submodule init
+          git submodule update --remote
+          chmod +x pastaqwheels_p36-312.sh
+          docker run --rm -v $(pwd):/io quay.io/pypa/manylinux_2_28_x86_64 /io/pastaqwheels_p36-312.sh
+
+      - name: Upload wheels to TestPyPI
+        env:
+          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        run: |
+          python3 -m pip install --upgrade twine
+          ls -l
+          ls -l ./wheelhouse/
+          python3 -m twine upload --repository testpypi ./wheelhouse/*
