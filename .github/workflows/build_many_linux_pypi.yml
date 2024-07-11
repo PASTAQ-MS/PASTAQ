@@ -1,4 +1,4 @@
-name: PASTAQ Many Linux
+name: PASTAQ Many Linux PyPi
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ jobs:
           chmod +x pastaqwheels_p36-312.sh
           docker run --rm -v $(pwd):/io quay.io/pypa/manylinux_2_28_x86_64 /io/pastaqwheels_p36-312.sh
 
-      - name: Upload wheels to TestPyPI
+      - name: Upload wheels to PyPI
         env:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
