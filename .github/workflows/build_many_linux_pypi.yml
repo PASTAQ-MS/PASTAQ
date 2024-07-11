@@ -29,4 +29,4 @@ jobs:
           python3 -m pip install --upgrade twine
           ls -l
           ls -l ./wheelhouse/
-          python3 -m twine upload --repository testpypi ./wheelhouse/*
+          python3 -m twine upload ./wheelhouse/*
