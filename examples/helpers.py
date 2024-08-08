@@ -13,7 +13,7 @@ def euclidean_distance(peak1, peak2):
     return math.sqrt(((peak1x - peak2x)/(peak1.fitted_sigma_rt + peak2.fitted_sigma_rt)) ** 2 + ((peak1y - peak2y)/(peak1.fitted_sigma_mz + peak2.fitted_sigma_mz)) ** 2)
 
 # Function to find the closest peak
-def find_closest_peak(reference_peak, peaks, mz_tolerance=1, rt_tolerance=1):
+def find_closest_peak(reference_peak, peaks, mz_tolerance = 1, rt_tolerance = 1):
     closest_peak = None
     min_distance = float('inf')
     
@@ -26,7 +26,7 @@ def find_closest_peak(reference_peak, peaks, mz_tolerance=1, rt_tolerance=1):
     if reference_peak.fitted_mz - mz_tolerance <= closest_peak.fitted_mz <= reference_peak.fitted_mz + mz_tolerance and reference_peak.fitted_rt - rt_tolerance <= closest_peak.fitted_rt + closest_peak.rt_delta <= reference_peak.fitted_rt + rt_tolerance:
         return closest_peak
     else:
-        print("reference peak not found in the peaks list")
+        print("Reference peak not found in the peaks list.")
         return None
 
 # get segment indices for a value
@@ -107,3 +107,56 @@ def plot_gaussian(mean, sigma, height):
     x = np.linspace(mean - 4 * sigma, mean + 4 * sigma, 1000)
     y = gaussian(x, mean, sigma, height)
     plt.plot(x, y, label='fitted Gaussian peak', color='orange', alpha=0.75, linestyle='-', linewidth=1)
+
+# plot mass spectra considering that only non-eros values are included in the spectra
+def plot_msSpectra(mz, intensity, norm_mz_diff = 0.0035, diffFactor = 1.3, scanIdx = 0):
+    """
+    Plotting mass spectra, expecting spectra where 0 intensity values were omitted.
+    
+    Args:
+        mz: A list of mz values of the mass spectra.
+        intensity: A list of intensity (non-zero) values of the mass spectra.
+        norm_mz_diff: Difference between two adjacent mz at measurement point corresponding to the original sampling frequency of the mass spectra.
+        diffFactor: Tolerance factor allowing to vary sampling frequency of mass spectra. It is typically set to 30% (factor 1.3).
+    
+    Returns:
+        Figure object as fig.
+    """
+    spectra = {'mz': mz, 'intensity': intensity}
+    newSpectra = {'mz': [], 'intensity': []}
+    idxSpectra = 0
+    for i in range(1, len(spectra['mz'])):
+        diff = spectra['mz'][i]-spectra['mz'][i-1]
+        if diff > norm_mz_diff*diffFactor:
+            if diff < norm_mz_diff*2:
+                newSpectra['mz'].insert(idxSpectra, spectra['mz'][i-1] + diff/2)
+                newSpectra['intensity'].insert(idxSpectra, 0)
+                idxSpectra += 1
+                print(norm_mz_diff*diffFactor, diff, norm_mz_diff*diffFactor + diff, norm_mz_diff)
+                newSpectra['mz'].insert(idxSpectra, spectra['mz'][i])
+                newSpectra['intensity'].insert(idxSpectra, spectra['intensity'][i])
+                idxSpectra += 1
+            else:
+                newSpectra['mz'].insert(idxSpectra, spectra['mz'][i-1] + norm_mz_diff)
+                newSpectra['intensity'].insert(idxSpectra, 0)
+                idxSpectra += 1
+                newSpectra['mz'].insert(idxSpectra, spectra['mz'][i] - norm_mz_diff)
+                newSpectra['intensity'].insert(idxSpectra, 0)
+                idxSpectra += 1
+                newSpectra['mz'].insert(idxSpectra, spectra['mz'][i])
+                newSpectra['intensity'].insert(idxSpectra, spectra['intensity'][i])
+                idxSpectra += 1
+        else:
+            newSpectra['mz'].insert(idxSpectra, spectra['mz'][i])
+            newSpectra['intensity'].insert(idxSpectra, spectra['intensity'][i])
+            if (diff/diffFactor) > norm_mz_diff:
+                norm_mz_diff = diff
+            idxSpectra += 1
+
+    fig = plt.figure(figsize=(25, 6), facecolor='white')  # Set the figure size and white background
+    plt.plot(newSpectra['mz'], newSpectra['intensity'], color = 'red', marker='', linestyle='-')  # Plot mz vs. intensity
+    plt.xlabel('m/z')  # Set the x-axis label
+    plt.ylabel('Intensity')  # Set the y-axis label
+    plt.title('Mass Spectrum of scan {}' .format(scanIdx))  # Set the title
+    plt.grid(False)  # Show grid
+    return fig
