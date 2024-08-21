@@ -56,12 +56,12 @@ double Grid::mz_at(const Grid &grid, uint64_t i) {
         } break;
         case Instrument::TOF: {
             return grid.min_mz *
-                   std::exp(grid.fwhm_mz / grid.reference_mz * i / grid.k);
+                   std::exp(grid.fwhm_mz / grid.reference_mz * i);
         } break;
         case Instrument::QUAD: {
             double delta_mz =
                 (grid.max_mz - grid.min_mz) / static_cast<double>(grid.n - 1);
-            return grid.min_mz + delta_mz * i / grid.k;
+            return grid.min_mz + delta_mz * i;
         } break;
         default: {
             assert(false);  // Can't handle unknown instruments.
@@ -128,10 +128,10 @@ Grid::Grid Grid::_resample(const RawData::RawData &raw_data,
     double delta_rt = grid.fwhm_rt / params.num_samples_rt;
     double delta_mz = grid.fwhm_mz / params.num_samples_mz;
     double sigma_mz_ref = RawData::fwhm_to_sigma(grid.fwhm_mz);
-    uint64_t rt_kernel_hw = 3 * sigma_rt / delta_rt;
-    uint64_t mz_kernel_hw = 3 * sigma_mz_ref / delta_mz;
+    uint64_t rt_kernel_hw = 3 * sigma_rt / delta_rt; // size of rt kernel
+    uint64_t mz_kernel_hw = 3 * sigma_mz_ref / delta_mz; // size of mz kernel
 
-    // Gaussian splatting.
+    // Gaussian splatting. First pass.
     {
         auto weights = std::vector<double>(n * m);
         for (size_t s = 0; s < raw_data.scans.size(); ++s) {
@@ -195,7 +195,7 @@ Grid::Grid Grid::_resample(const RawData::RawData &raw_data,
         }
     }
 
-    // Gaussian smoothing.
+    // Gaussian smoothing. Second pass.
     //
     // The Gaussian 2D filter is separable. We obtain the same result with
     // faster performance by applying two 1D kernel convolutions instead. This

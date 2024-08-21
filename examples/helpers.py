@@ -2,6 +2,8 @@
 import math as math
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
+import pastaq as pq
 
 # helper functions
 # Function to calculate the Euclidean distance
@@ -160,3 +162,93 @@ def plot_msSpectra(mz, intensity, norm_mz_diff = 0.0035, diffFactor = 1.3, scanI
     plt.title('Mass Spectrum of scan {}' .format(scanIdx))  # Set the title
     plt.grid(False)  # Show grid
     return fig
+
+def plot_meshPeaks(mesh, peaks):
+    """
+    Plotting mesh grid with peak positions.
+    
+    Args:
+        mesh: A list of x values.
+        peaks: A list of y values.
+    
+    Returns:
+        Figure object as fig.
+    """
+    mzVec, rtVec, mzVecMax, rtVecMax = [], [], [], []
+    plot = pq.plot_mesh(mesh, transform='sqrt', figure=None)
+    plot['img_plot'].get_figure().set_size_inches(15, 10)
+    for k in range(len(peaks)):
+        mzVecMax.insert(k, peaks[k].local_max_mz)
+        rtVecMax.insert(k, peaks[k].local_max_rt)
+    plot['img_plot'].scatter(mzVecMax, rtVecMax, s=100, c='green', marker='.')
+    for k in range(len(peaks)):
+        mzVec.insert(k, peaks[k].fitted_mz)
+        rtVec.insert(k, peaks[k].fitted_rt)
+    plot['img_plot'].scatter(mzVec, rtVec, s=100, c='red', marker='.')
+    return plot
+
+def plot_meshRawPeaks(mesh, rawData, peaks):
+    """
+    Plots a mesh and raw data with identified peaks.
+    Args:
+        mesh (Mesh): The mesh object containing the mesh grid data.
+        rawData (ndarray): The raw data to be plotted as scatter plot.
+        peaks (list): A list of Peak objects representing the identified peaks and local maxima in the mesh.
+    Returns:
+        Figure: The scatter plot figure.
+    Raises:
+        None
+    """
+    
+    scatterRaw = plt.figure(figsize=(15, 8), facecolor='black')  # Set the figure size
+    img = mesh.data
+    img = np.reshape(img, (mesh.m, mesh.n))
+    bins_rt = mesh.bins_rt
+    bins_mz = mesh.bins_mz
+    offset_rt = (np.array(mesh.bins_rt).max() -
+                    np.array(mesh.bins_rt).min())/mesh.m / 2
+    offset_mz = (np.array(mesh.bins_mz).max() -
+                    np.array(mesh.bins_mz).min())/mesh.n / 2
+    plt.pcolormesh(
+                np.array(mesh.bins_mz) - offset_mz,
+                np.array(mesh.bins_rt) - offset_rt,
+                img,
+                snap=True,
+                cmap = 'viridis',
+                norm=colors.PowerNorm(gamma=1./2.),
+                alpha=0.6)
+    cbarMesh = plt.colorbar()
+    cbarMesh.set_label('Intensity grid')
+    plt.xlim([np.array(mesh.bins_mz).min() - offset_mz,
+                        np.array(mesh.bins_mz).max() - offset_mz])
+    plt.ylim([np.array(mesh.bins_rt).min() - offset_rt,
+                        np.array(mesh.bins_rt).max() - offset_rt])
+
+    # axRaw = scatterRaw.add_subplot(111)
+    plt.scatter(rawData[1], rawData[0], c = rawData[2], s = 5, alpha = 1, cmap = 'twilight_shifted', marker='.')
+
+    # Add color bar to show elevation scale
+    cbar = plt.colorbar()
+    cbar.set_label('Intensity raw data')
+
+    # shows local maxima
+    mzVecLoc, rtVecLoc, mzVec, rtVec = [], [], [], []
+    for k in range(len(peaks)):
+        mzVecLoc.insert(k, peaks[k].local_max_mz)
+        rtVecLoc.insert(k, peaks[k].local_max_rt)
+    plt.scatter(mzVecLoc, rtVecLoc, s=100, c='green', marker='.')
+
+    # shows identified peaks
+    for k in range(len(peaks)):
+        mzVec.insert(k, peaks[k].fitted_mz)
+        rtVec.insert(k, peaks[k].fitted_rt)
+    plt.scatter(mzVec, rtVec, s=100, c='red', marker='.')
+
+    # Label the axes
+    plt.xlabel('m/z')  # Set the x-axis label
+    plt.ylabel('Intensity')  # Set the y-axis label
+    plt.title('Raw data of a zommed in area of the isotope cluster')  # Set the title
+
+    # Show the plot
+    plt.show()
+    return scatterRaw
