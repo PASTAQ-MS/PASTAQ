@@ -1,7 +1,10 @@
 name: Build on Windows and Upload to PyPi
 
 on:
-  workflow_dispatch:
+  push:
+    tags:
+    - '*'
+#  workflow_dispatch:
 
 jobs:
   build-and-upload:
