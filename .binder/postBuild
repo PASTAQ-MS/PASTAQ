@@ -6,3 +6,5 @@ curl -L "https://drive.usercontent.google.com/download?id=1sDLF3Nh4lOfg6j2tzJmaA
 
 # Download data from google drive
 gdown --folder 1-RvQY14PLnY8sivldttT9v5inrz7uGLO -O ./examples/data/
+
+pip install ./tools/rugllm_provider-0.1.0-py3-none-any.whl
