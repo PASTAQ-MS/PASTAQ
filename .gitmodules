@@ -11,6 +11,3 @@
 [submodule "ext/zlib"]
 	path = ext/zlib
 	url = https://github.com/madler/zlib
-[submodule "ext/mstoolkit"]
-	path = ext/mstoolkit
-	url = git@github.com:mhoopmann/mstoolkit.git
