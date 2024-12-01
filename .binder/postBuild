@@ -6,3 +6,11 @@ curl -L "https://drive.usercontent.google.com/download?id=1sDLF3Nh4lOfg6j2tzJmaA
 
 # Download data from google drive
 gdown --folder 1-RvQY14PLnY8sivldttT9v5inrz7uGLO -O ./examples/data/
+
+# just for testint purpose, when pastaq is in pip, add pastaq in .binder/requirements.txt
+
+python3 -m pip install --upgrade pip
+python3 -m pip install build
+python3 -m build --wheel
+cd dist
+pip install *.whl
