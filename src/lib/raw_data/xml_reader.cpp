@@ -2,10 +2,179 @@
 #include <regex>
 #include <sstream>
 #include <cctype>
+#include <numeric>
 
 #include "utils/base64.hpp"
 #include "utils/compression.hpp"
 #include "xml_reader.hpp"
+
+#include "mzParser.h"
+
+using namespace std;
+using namespace mzParser;
+
+// Read a scan using mstoolkit and store it in the RawData::Scan structure
+//RawData::Scan read_mzxml_scan(const BasicSpectrum& spectrum) {
+RawData::Scan read_mzxml_scan(BasicSpectrum& spectrum) {
+    //mstoolkit functions
+    
+    // BasicSpectrum spe;
+    // MzParser sax(&s)
+    
+    RawData::Scan scan;
+
+    // Set scan number and MS level
+    // scan.scan_number = static_cast<uint64_t>(spectrum.getScanNum());
+    // scan.ms_level = static_cast<uint64_t>(spectrum.getMSLevel());
+
+    scan.scan_number = spectrum.getScanNum();
+    scan.ms_level = spectrum.getMSLevel();
+
+    // Get retention time in seconds (convert if stored in minutes)
+    scan.retention_time = spectrum.getRTime() * 60.0;
+
+    // Get spectrum data points (mz and intensity)
+    size_t num_points = spectrum.size();
+    scan.num_points = static_cast<uint64_t>(num_points);
+    scan.mz.reserve(num_points);
+    scan.intensity.reserve(num_points);
+
+    for (size_t i = 0; i < num_points; ++i) {
+        specDP dp = spectrum[i]; // Access data point
+        scan.mz.push_back(dp.mz);
+        scan.intensity.push_back(dp.intensity);
+    }
+
+    // Calculate max and total intensity
+    scan.max_intensity = *std::max_element(scan.intensity.begin(), scan.intensity.end());
+    scan.total_intensity = std::accumulate(scan.intensity.begin(), scan.intensity.end(), 0.0);
+
+    // Determine polarity
+    // from raw_data.hpp: "This parameter is meant to be used as a filter of the scans that are going to be
+    // read from the raw data." Probably it is not needed anymore as raw data is read using mstoolkit
+    scan.polarity = spectrum.getPositiveScan() ? Polarity::POSITIVE : Polarity::NEGATIVE;
+
+    // Get precursor information (for MSn scans)
+    if (scan.ms_level > 1 && spectrum.getPrecursorIonCount() > 0) {
+        scan.precursor_information.mz = spectrum.getPrecursorMZ();
+        // It seems that spectrum.getPrecursorIntensity() is not implemented in BasicSpectrum
+        // scan.precursor_information.intensity = spectrum.getPrecursorIntensity();
+        scan.precursor_information.charge = spectrum.getPrecursorCharge();
+        scan.precursor_information.scan_number = spectrum.getPrecursorScanNum();
+
+        // missing
+            // The activation method for the fragmentation of the MSn event.
+        // ActivationMethod::Type activation_method;
+            // The total isolation window selected for fragmentation in m/z units.
+        // double window_wideness;
+    }
+
+    return scan;
+
+}
+
+// Read an entire mzxml file into the RawData::RawData data structure filtering usin mstoolkit libraries1
+std::optional<RawData::RawData> XmlReader::read_mzxml2(
+    std::string &input_file, double min_mz, double max_mz, double min_rt,
+    double max_rt, Instrument::Type instrument_type, double resolution_ms1,
+    double resolution_msn, double reference_mz, Polarity::Type polarity,
+    size_t ms_level) {
+
+    BasicSpectrum s;
+    // mz file handler
+    MzParser mzfh(&s);
+    
+    RawData::RawData raw_data = {};
+    raw_data.instrument_type = instrument_type;
+    raw_data.min_mz = std::numeric_limits<double>::infinity();
+    raw_data.max_mz = -std::numeric_limits<double>::infinity();
+    raw_data.min_rt = std::numeric_limits<double>::infinity();
+    raw_data.max_rt = -std::numeric_limits<double>::infinity();
+    raw_data.resolution_ms1 = resolution_ms1;
+    raw_data.resolution_msn = resolution_msn;
+    raw_data.reference_mz = reference_mz;
+    raw_data.fwhm_rt = 0;  // TODO(alex): Should this be passed as well?
+    raw_data.scans = {};
+    raw_data.retention_times = {};
+    // TODO(alex): Can we automatically detect the instrument type and set
+    // resolution from the header?
+
+    // Load the MzXML file
+    if (!mzfh.load(input_file.c_str())) {
+        std::cerr << "Error: Could not load file " << input_file << std::endl;
+        return std::nullopt;
+    }
+
+    // Retrieve the SpectrumIndex
+    std::vector<cindex>* spectrumIndex = mzfh.getSpectrumIndex();
+    if (!spectrumIndex || spectrumIndex->empty()) {
+        std::cerr << "Error: SpectrumIndex is empty or unavailable." << std::endl;
+        return std::nullopt;
+    }
+
+    // Iterate over the SpectrumIndex and read each spectrum
+
+    for (const auto& index : *spectrumIndex) {
+        // Assuming cindex has meaningful fields (e.g., scan number, offset, etc.)
+        std::cout << "Scan Number: " << index.scanNum << ", Offset: " << index.offset << std::endl;
+
+		if(index.scanNum<mzfh.lowScan() || index.scanNum>mzfh.highScan()) {
+			cout << "Bad number! BOOOOO!" << endl;
+		} else {
+    		if(!mzfh.readSpectrum(index.scanNum)) 
+                cout << "Spectrum number not in file." << endl;
+    		else {
+                auto scan = read_mzxml_scan(s);
+                if (scan.num_points != 0) {
+                    raw_data.scans.push_back(scan);
+                    raw_data.retention_times.push_back(scan.retention_time);
+                    if (scan.retention_time < raw_data.min_rt)
+                        raw_data.min_rt = scan.retention_time;
+                    if (scan.retention_time > raw_data.max_rt) 
+                        raw_data.max_rt = scan.retention_time;
+                    if (scan.mz[0] < raw_data.min_mz)
+                        raw_data.min_mz = scan.mz[0];
+                    if (scan.mz[scan.mz.size() - 1] > raw_data.max_mz) 
+                        raw_data.max_mz = scan.mz[scan.mz.size() - 1];
+                }
+            }    
+		}
+    } // end reading spectrum loop
+    
+    // while (stream.good() && !stream.eof()) {
+    //     auto tag = XmlReader::read_tag(stream);
+    //     if (!tag) {
+    //         continue;
+    //     }
+    //     auto atts = tag.value().attributes;
+
+    //     if (tag.value().name == "msRun" && tag.value().closed) {
+    //         break;
+    //     }
+    //     if (tag.value().name == "scan" && !tag.value().closed) {
+    //         auto scan = read_mzxml_scan(stream, tag, min_mz, max_mz, min_rt,
+    //                                      max_rt, polarity, ms_level);
+    //         if (scan.num_points != 0) {
+    //             raw_data.scans.push_back(scan);
+    //             raw_data.retention_times.push_back(scan.retention_time);
+    //             if (scan.retention_time < raw_data.min_rt) {
+    //                 raw_data.min_rt = scan.retention_time;
+    //             }
+    //             if (scan.retention_time > raw_data.max_rt) {
+    //                 raw_data.max_rt = scan.retention_time;
+    //             }
+    //             if (scan.mz[0] < raw_data.min_mz) {
+    //                 raw_data.min_mz = scan.mz[0];
+    //             }
+    //             if (scan.mz[scan.mz.size() - 1] > raw_data.max_mz) {
+    //                 raw_data.max_mz = scan.mz[scan.mz.size() - 1];
+    //             }
+    //         }
+    //     }
+    // }
+    return raw_data;
+}
+
 
 RawData::Scan parse_mzxml_scan(std::istream &stream,
                                std::optional<XmlReader::Tag> &tag,
