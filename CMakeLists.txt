@@ -18,7 +18,7 @@ endif()
 
 add_subdirectory("ext/zlib")
 add_subdirectory("ext/eigen")
-add_subdirectory("/home/vsoancatl/develop/github/mhoopmann/mstoolkit/" "${CMAKE_BINARY_DIR}/mstoolkit_build")
+add_subdirectory("ext/mstoolkit" "${CMAKE_BINARY_DIR}/mstoolkit_build")
 
 # Build pastaq library.
 add_library(pastaqlib
@@ -55,7 +55,7 @@ IF (UNIX)
   # for linux
   add_definitions(-DGCC -DXML_DEV_URANDOM -D_FILE_OFFSET_BITS=64 -D_NO_THERMORAW -D_NOSQLITE)
 ENDIF()
-target_include_directories(pastaqlib PUBLIC "../mhoopmann/mstoolkit/include")
+target_include_directories(pastaqlib PUBLIC "./ext/mstoolkit/include")
 
 if (WIN32)
     target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen zlibstatic)
