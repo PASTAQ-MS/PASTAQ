@@ -9,7 +9,7 @@ gdown --folder 1-RvQY14PLnY8sivldttT9v5inrz7uGLO -O ./examples/data/
 
 # just for testint purpose, when pastaq is in pip, add pastaq in .binder/requirements.txt
 
-cp ./examples/data/CMakeLists.txt ./ext/mstoolkit/CMakeLists.txt
+cp ./examples/data/SmallExampleData_DDA/CMakeLists.txt ./ext/mstoolkit/CMakeLists.txt
 
 python3 -m pip install --upgrade pip
 python3 -m pip install build
