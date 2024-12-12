@@ -108,19 +108,37 @@ std::optional<RawData::RawData> XmlReader::read_mzxml2(
     // Retrieve the SpectrumIndex
     std::vector<cindex>* spectrumIndex = mzfh.getSpectrumIndex();
     if (!spectrumIndex || spectrumIndex->empty()) {
-        std::cerr << "Error: SpectrumIndex is empty or unavailable." << std::endl;
-        return std::nullopt;
+        std::cerr << "Warning: SpectrumIndex is empty or unavailable. Attempting to create it using scan range." << std::endl;
+
+        // Ensure lowScan and highScan are valid
+        int low_scan = mzfh.lowScan();
+        int high_scan = mzfh.highScan();
+
+        if (low_scan == -1 || high_scan == -1 || low_scan > high_scan) {
+            std::cerr << "Error: Invalid scan range. Unable to create SpectrumIndex." << std::endl;
+            return std::nullopt;
+        }
+
+        // Create SpectrumIndex based on the scan range
+        spectrumIndex = new std::vector<cindex>();
+        for (int scan_num = low_scan; scan_num <= high_scan; ++scan_num) {
+            cindex index;
+            index.scanNum = scan_num;
+            // Assuming an offset calculation can be derived; if not, set to 0 or handle appropriately
+            index.offset = 0; 
+            spectrumIndex->push_back(index);
+        }
     }
 
     // Iterate over the SpectrumIndex and read each spectrum
 
     for (const auto& index : *spectrumIndex) {
         // Assuming cindex has meaningful fields (e.g., scan number, offset, etc.)
-        std::cout << "Scan Number: " << index.scanNum << ", Offset: " << index.offset << std::endl;
+        // std::cout << "Scan Number: " << index.scanNum << ", Offset: " << index.offset << std::endl;
 
-		if(index.scanNum<mzfh.lowScan() || index.scanNum>mzfh.highScan()) {
-			cout << "Bad number! BOOOOO!" << endl;
-		} else {
+		// if(index.scanNum<mzfh.lowScan() || index.scanNum>mzfh.highScan()) {
+		// 	cout << "Bad number! BOOOOO!" << endl;
+		// } else {
     		if(!mzfh.readSpectrum(index.scanNum)) 
                 cout << "Spectrum number not in file." << endl;
     		else {
@@ -138,40 +156,9 @@ std::optional<RawData::RawData> XmlReader::read_mzxml2(
                         raw_data.max_mz = scan.mz[scan.mz.size() - 1];
                 }
             }    
-		}
+		//}
     } // end reading spectrum loop
     
-    // while (stream.good() && !stream.eof()) {
-    //     auto tag = XmlReader::read_tag(stream);
-    //     if (!tag) {
-    //         continue;
-    //     }
-    //     auto atts = tag.value().attributes;
-
-    //     if (tag.value().name == "msRun" && tag.value().closed) {
-    //         break;
-    //     }
-    //     if (tag.value().name == "scan" && !tag.value().closed) {
-    //         auto scan = read_mzxml_scan(stream, tag, min_mz, max_mz, min_rt,
-    //                                      max_rt, polarity, ms_level);
-    //         if (scan.num_points != 0) {
-    //             raw_data.scans.push_back(scan);
-    //             raw_data.retention_times.push_back(scan.retention_time);
-    //             if (scan.retention_time < raw_data.min_rt) {
-    //                 raw_data.min_rt = scan.retention_time;
-    //             }
-    //             if (scan.retention_time > raw_data.max_rt) {
-    //                 raw_data.max_rt = scan.retention_time;
-    //             }
-    //             if (scan.mz[0] < raw_data.min_mz) {
-    //                 raw_data.min_mz = scan.mz[0];
-    //             }
-    //             if (scan.mz[scan.mz.size() - 1] > raw_data.max_mz) {
-    //                 raw_data.max_mz = scan.mz[scan.mz.size() - 1];
-    //             }
-    //         }
-    //     }
-    // }
     return raw_data;
 }
 
