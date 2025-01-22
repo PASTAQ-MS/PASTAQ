@@ -9,9 +9,13 @@
 #include <vector>
 
 #include "mzParser.h"
+#include "Spectrum.h"
+#include "MSToolkitTypes.h"
+
 
 using namespace std;
 using namespace mzParser;
+using namespace MSToolkit;
 
 // The instrument in which the data was acquired.
 namespace Instrument {
@@ -27,9 +31,25 @@ enum Type : uint8_t { UNKNOWN = 0, POSITIVE = 1, NEGATIVE = 2, BOTH = 3 };
 }  // namespace Polarity
 
 // This describes the fragmentation method for MS/MS spectra.
+// namespace ActivationMethod {
+// enum Type : uint8_t { UNKNOWN = 0, CID = 1, HCD = 2 };
+// }  // namespace ActivationMethod
+
 namespace ActivationMethod {
-enum Type : uint8_t { UNKNOWN = 0, CID = 1, HCD = 2 };
+enum Type : uint8_t {
+    UNKNOWN = 0,  // Default unknown type
+    CID = 1,      // Collision-Induced Dissociation
+    ECD = 2,      // Electron Capture Dissociation
+    ETD = 3,      // Electron Transfer Dissociation
+    ETDSA = 4,    // Electron Transfer Dissociation with Supplemental Activation
+    PQD = 5,      // Pulsed-Q Dissociation
+    HCD = 6,      // Higher-energy Collision Dissociation
+    IRMPD = 7,    // Infrared Multiphoton Dissociation
+    SID = 8,      // Surface-Induced Dissociation
+    NA = 9        // No Activation (Not Applicable)
+};
 }  // namespace ActivationMethod
+
 
 // The Xic stores the information for an extracted ion chromatogram.
 namespace Xic {
@@ -96,7 +116,7 @@ struct Scan {
     PrecursorInformation precursor_information;
 };
 
-// Main structure that hold information spectrum data structures from mstoolkit.
+// Main structure that hold information 'basic' spectrum data structures from mstoolkit.
 struct RawMSData {
     // The instrument type.
     Instrument::Type instrument_type;
@@ -119,6 +139,35 @@ struct RawMSData {
 
     // Extracted scans.
     std::vector<BasicSpectrum> basicSpectra;
+    // This information is saved for quick search.
+    // TODO: Note that this is unnecessary if our search function is able to
+    // search through the `scans` array.
+    std::vector<double> retention_times;
+};
+
+// Main structure that hold information spectrum data structures from mstoolkit.
+struct RawMSDataS {
+    // The instrument type.
+    Instrument::Type instrument_type;
+    // Min/max mass to charge range (m/z).
+    double min_mz;
+    double max_mz;
+    // Min/max retention time range (seconds).
+    double min_rt;
+    double max_rt;
+    // Resolution of MS1/MSn at the reference m/z. In this case the resolution
+    // is defined as:
+    //
+    //     R = reference_mz/fwhm_at_reference_mz
+    //
+    double resolution_ms1;
+    double resolution_msn;
+    double reference_mz;
+    // Average full width half maximum of chromatographic peaks.
+    double fwhm_rt;
+
+    // Extracted scans.
+    std::vector<MSToolkit::Spectrum> Spectra;
     // This information is saved for quick search.
     // TODO: Note that this is unnecessary if our search function is able to
     // search through the `scans` array.

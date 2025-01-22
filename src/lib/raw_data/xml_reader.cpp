@@ -3,6 +3,7 @@
 #include <sstream>
 #include <cctype>
 #include <numeric>
+#include <chrono> // For timing
 
 #include "utils/base64.hpp"
 #include "utils/compression.hpp"
@@ -10,8 +11,98 @@
 
 #include "mzParser.h"
 
-using namespace std;
+#include "MSToolkitTypes.h"
+#include "MSReader.h"
+#include "MSObject.h"
+#include "Spectrum.h"
+
 using namespace mzParser;
+using namespace std;
+using namespace MSToolkit;
+
+ActivationMethod::Type mapActivationMethod(MSActivation activation) {
+    switch (activation) {
+        case mstCID:   return ActivationMethod::CID;
+        case mstECD:   return ActivationMethod::ECD;
+        case mstETD:   return ActivationMethod::ETD;
+        case mstETDSA: return ActivationMethod::ETDSA;
+        case mstPQD:   return ActivationMethod::PQD;
+        case mstHCD:   return ActivationMethod::HCD;
+        case mstIRMPD: return ActivationMethod::IRMPD;
+        case mstSID:   return ActivationMethod::SID;
+        case mstNA:    return ActivationMethod::NA;
+        default:       return ActivationMethod::UNKNOWN;
+    }
+}
+// Read a scan using mstoolkit and store it in the RawData::Scan structure
+//RawData::Scan read_mzxml_scan(const BasicSpectrum& spectrum) {
+RawData::Scan read_scan(MSToolkit::Spectrum& spectrum) {
+        
+    RawData::Scan scan;
+
+    // Set scan number and MS level
+    // scan.scan_number = static_cast<uint64_t>(spectrum.getScanNum());
+    // scan.ms_level = static_cast<uint64_t>(spectrum.getMSLevel());
+
+    scan.scan_number = spectrum.getScanNumber();
+    scan.ms_level = spectrum.getMsLevel();
+
+    // Get retention time
+    scan.retention_time = spectrum.getRTime();
+
+    // Get spectrum data points (mz and intensity)
+    size_t num_points = spectrum.size();
+    scan.num_points = static_cast<uint64_t>(num_points);
+    scan.mz.reserve(num_points);
+    scan.intensity.reserve(num_points);
+
+    for (size_t j=0;j<spectrum.size();j++) {
+        scan.mz.push_back(spectrum.at(j).mz);
+        scan.intensity.push_back(spectrum.at(j).intensity);
+    }
+
+    // Calculate max and total intensity
+    scan.max_intensity = *std::max_element(scan.intensity.begin(), scan.intensity.end());
+    scan.total_intensity = std::accumulate(scan.intensity.begin(), scan.intensity.end(), 0.0);
+
+    // Determine polarity
+    // Not sure how to do this from the spectrum data structure 
+    // https://github.com/mhoopmann/mstoolkit/blob/master/include/Spectrum.h
+    // BasicSpectrum: scan.polarity = spectrum.getPositiveScan() ? Polarity::POSITIVE : Polarity::NEGATIVE;
+
+    MSToolkit::MSPrecursorInfo mspinfo = spectrum.getPrecursor();
+
+    // Get precursor information (for MSn scans)
+    if (scan.ms_level > 1) {
+        scan.precursor_information.mz = mspinfo.mz;
+        // It seems that spectrum.getPrecursorIntensity() is not implemented in BasicSpectrum
+        // scan.precursor_information.intensity = spectrum.getPrecursorIntensity();
+        scan.precursor_information.charge = mspinfo.charge;
+        scan.precursor_information.scan_number = mspinfo.precursorScanNumber;
+
+        // The activation method for the fragmentation of the MSn event.
+        // ActivationMethod::Type activation_method;
+        scan.precursor_information.activation_method = mapActivationMethod(mspinfo.activation);
+        
+        // The total isolation window selected for fragmentation in m/z units.
+        // double window_wideness = isoOffsetUpper + isoOffsetLower;
+
+          //       can we extimate window_wideness from the following structure?
+          //           struct MSPrecursorInfo {
+          // double mz=0;
+          // double monoMz=0;
+          // double isoMz=0;
+          // int charge=0;
+          // MSActivation activation=mstNA;
+          // int precursorScanNumber=0;
+          // double isoOffsetLower=0;
+          // double isoOffsetUpper=0;
+          //   };
+    }
+
+    return scan;
+
+}
 
 // Read a scan using mstoolkit and store it in the RawData::Scan structure
 //RawData::Scan read_mzxml_scan(const BasicSpectrum& spectrum) {
@@ -74,17 +165,101 @@ RawData::Scan read_mzxml_scan(BasicSpectrum& spectrum) {
 }
 
 // Read an entire mzxml file into the RawData::RawData data structure filtering usin mstoolkit libraries1
-std::optional<RawData::RawMSData> XmlReader::read_msdata(
+// std::optional<RawData::RawMSData> XmlReader::read_msgdata(
+//     std::string &input_file, double min_mz, double max_mz, double min_rt,
+//     double max_rt, Instrument::Type instrument_type, double resolution_ms1,
+//     double resolution_msn, double reference_mz, Polarity::Type polarity,
+//     size_t ms_level) {
+
+//     BasicSpectrum s;
+//     // mz file handler
+//     MzParser mzfh(&s);
+    
+//     RawData::RawMSData raw_data = {};
+//     raw_data.instrument_type = instrument_type;
+//     raw_data.min_mz = std::numeric_limits<double>::infinity();
+//     raw_data.max_mz = -std::numeric_limits<double>::infinity();
+//     raw_data.min_rt = std::numeric_limits<double>::infinity();
+//     raw_data.max_rt = -std::numeric_limits<double>::infinity();
+//     raw_data.resolution_ms1 = resolution_ms1;
+//     raw_data.resolution_msn = resolution_msn;
+//     raw_data.reference_mz = reference_mz;
+//     raw_data.fwhm_rt = 0;  // TODO(alex): Should this be passed as well?
+//     raw_data.basicSpectra = {};
+//     raw_data.retention_times = {};
+//     // TODO(alex): Can we automatically detect the instrument type and set
+//     // resolution from the header?
+
+//     // Load the MzXML file
+//     if (!mzfh.load(input_file.c_str())) {
+//         std::cerr << "Error: Could not load file " << input_file << std::endl;
+//         return std::nullopt;
+//     }
+
+//     // Measure the time to retrieve the SpectrumIndex
+//     auto start_time = std::chrono::high_resolution_clock::now(); // Start timing
+
+//     // Retrieve the SpectrumIndex
+//     std::vector<cindex>* spectrumIndex = mzfh.getSpectrumIndex();
+
+//     auto end_time = std::chrono::high_resolution_clock::now();   // End timing
+
+//     // Calculate and print the elapsed time in milliseconds
+//     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+//     std::cout << "Time taken to execute mzfh.getSpectrumIndex(): " << duration << " ms" << std::endl;
+
+//     if (!spectrumIndex || spectrumIndex->empty()) {
+//         std::cerr << "Warning: SpectrumIndex is empty or unavailable. Attempting to create it using scan range." << std::endl;
+
+//         // Ensure lowScan and highScan are valid
+//         int low_scan = mzfh.lowScan();
+//         int high_scan = mzfh.highScan();
+
+//         if (low_scan == -1 || high_scan == -1 || low_scan > high_scan) {
+//             std::cerr << "Error: Invalid scan range. Unable to create SpectrumIndex." << std::endl;
+//             return std::nullopt;
+//         }
+
+//         // Create SpectrumIndex based on the scan range
+//         spectrumIndex = new std::vector<cindex>();
+//         for (int scan_num = low_scan; scan_num <= high_scan; ++scan_num) {
+//             cindex index;
+//             index.scanNum = scan_num;
+//             // Assuming an offset calculation can be derived; if not, set to 0 or handle appropriately
+//             index.offset = 0; 
+//             spectrumIndex->push_back(index);
+//         }
+//     }
+
+//     // Iterate over the SpectrumIndex and read each spectrum
+
+//     for (const auto& index : *spectrumIndex) {
+//         if (mzfh.readSpectrumHeader(index.scanNum)) {
+//             if (s.getMSLevel() == 1) { // Check the MS level from the header
+//                 //ms1_indices.push_back(index.scanNum);
+//                 mzfh.readSpectrum(index.scanNum);
+//                 raw_data.basicSpectra.push_back(s);
+                
+//             }
+
+// 		}
+//     } // end reading spectrum loop
+    
+//     return raw_data;
+// }
+
+// Read an entire mzxml file into the RawData::RawData data structure filtering usin mstoolkit libraries1
+std::optional<RawData::RawMSDataS> XmlReader::read_msdatas(
     std::string &input_file, double min_mz, double max_mz, double min_rt,
     double max_rt, Instrument::Type instrument_type, double resolution_ms1,
     double resolution_msn, double reference_mz, Polarity::Type polarity,
     size_t ms_level) {
 
-    BasicSpectrum s;
+    MSToolkit::Spectrum s;
     // mz file handler
-    MzParser mzfh(&s);
+    MSReader mzfh;
     
-    RawData::RawMSData raw_data = {};
+    RawData::RawMSDataS raw_data = {};
     raw_data.instrument_type = instrument_type;
     raw_data.min_mz = std::numeric_limits<double>::infinity();
     raw_data.max_mz = -std::numeric_limits<double>::infinity();
@@ -94,70 +269,89 @@ std::optional<RawData::RawMSData> XmlReader::read_msdata(
     raw_data.resolution_msn = resolution_msn;
     raw_data.reference_mz = reference_mz;
     raw_data.fwhm_rt = 0;  // TODO(alex): Should this be passed as well?
-    raw_data.basicSpectra = {};
+    raw_data.Spectra = {};
     raw_data.retention_times = {};
     // TODO(alex): Can we automatically detect the instrument type and set
     // resolution from the header?
 
-    // Load the MzXML file
-    if (!mzfh.load(input_file.c_str())) {
-        std::cerr << "Error: Could not load file " << input_file << std::endl;
+    mzfh.addFilter(MS1);
+
+    // Iterate over the SpectrumIndex and read each spectrum
+    bool next = mzfh.readFile(input_file.c_str(),s);
+    while (next){
+        raw_data.Spectra.push_back(s);
+        next = mzfh.nextSpectrum(s);
+    }
+  
+    return raw_data;
+}
+
+
+// Read an entire mzxml file into the RawData::RawData data structure filtering usin mstoolkit libraries1
+std::optional<RawData::RawData> XmlReader::read_msdata(
+    std::string &input_file, double min_mz, double max_mz, double min_rt,
+    double max_rt, Instrument::Type instrument_type, double resolution_ms1,
+    double resolution_msn, double reference_mz, Polarity::Type polarity,
+    size_t ms_level) {
+
+    MSToolkit::Spectrum s;
+    // mz file handler
+    MSReader mzfh;
+    
+    RawData::RawData raw_data = {};
+    raw_data.instrument_type = instrument_type;
+    raw_data.min_mz = std::numeric_limits<double>::infinity();
+    raw_data.max_mz = -std::numeric_limits<double>::infinity();
+    raw_data.min_rt = std::numeric_limits<double>::infinity();
+    raw_data.max_rt = -std::numeric_limits<double>::infinity();
+    raw_data.resolution_ms1 = resolution_ms1;
+    raw_data.resolution_msn = resolution_msn;
+    raw_data.reference_mz = reference_mz;
+    raw_data.fwhm_rt = 0;  // TODO(alex): Should this be passed as well?
+    raw_data.scans = {};
+    raw_data.retention_times = {};
+    // TODO(alex): Can we automatically detect the instrument type and set
+    // resolution from the header?
+
+    if (ms_level < 1 || ms_level > 10) { 
+        throw std::out_of_range("Invalid ms_level");
         return std::nullopt;
     }
 
-    // Retrieve the SpectrumIndex
-    std::vector<cindex>* spectrumIndex = mzfh.getSpectrumIndex();
-    if (!spectrumIndex || spectrumIndex->empty()) {
-        std::cerr << "Warning: SpectrumIndex is empty or unavailable. Attempting to create it using scan range." << std::endl;
+    // Convert ms_level to the appropriate MSSpectrumType
+    MSSpectrumType filter_type = static_cast<MSSpectrumType>(ms_level - 1);
 
-        // Ensure lowScan and highScan are valid
-        int low_scan = mzfh.lowScan();
-        int high_scan = mzfh.highScan();
-
-        if (low_scan == -1 || high_scan == -1 || low_scan > high_scan) {
-            std::cerr << "Error: Invalid scan range. Unable to create SpectrumIndex." << std::endl;
-            return std::nullopt;
-        }
-
-        // Create SpectrumIndex based on the scan range
-        spectrumIndex = new std::vector<cindex>();
-        for (int scan_num = low_scan; scan_num <= high_scan; ++scan_num) {
-            cindex index;
-            index.scanNum = scan_num;
-            // Assuming an offset calculation can be derived; if not, set to 0 or handle appropriately
-            index.offset = 0; 
-            spectrumIndex->push_back(index);
-        }
-    }
+    mzfh.addFilter(filter_type);
 
     // Iterate over the SpectrumIndex and read each spectrum
+    bool next = mzfh.readFile(input_file.c_str(),s);
 
-    for (const auto& index : *spectrumIndex) {
-        // Assuming cindex has meaningful fields (e.g., scan number, offset, etc.)
-        // std::cout << "Scan Number: " << index.scanNum << ", Offset: " << index.offset << std::endl;
-
-		// if(index.scanNum<mzfh.lowScan() || index.scanNum>mzfh.highScan()) {
-		// 	cout << "Bad number! BOOOOO!" << endl;
-		// } else {
-    		if(!mzfh.readSpectrum(index.scanNum)) 
-                cout << "Spectrum number not in file." << endl;
-    		else {
-                // auto scan = read_mzxml_scan(s);
-                if (s.size() != 0) {
-                    raw_data.basicSpectra.push_back(s);
-                    // raw_data.retention_times.push_back(scan.retention_time);
-                    // if (scan.retention_time < raw_data.min_rt)
-                    //     raw_data.min_rt = scan.retention_time;
-                    // if (scan.retention_time > raw_data.max_rt) 
-                    //     raw_data.max_rt = scan.retention_time;
-                    // if (scan.mz[0] < raw_data.min_mz)
-                    //     raw_data.min_mz = scan.mz[0];
-                    // if (scan.mz[scan.mz.size() - 1] > raw_data.max_mz) 
-                    //     raw_data.max_mz = scan.mz[scan.mz.size() - 1];
+    if (!next) {
+        std::cerr << "Error: Failed to read file: " << input_file << std::endl;
+        // Optionally throw an exception or handle the error as needed
+        throw std::runtime_error("Failed to read file: " + input_file);
+    }
+    
+    while (next){
+        auto scan = read_scan(s);
+        if (scan.num_points != 0) {
+                raw_data.scans.push_back(scan);
+                raw_data.retention_times.push_back(scan.retention_time);
+                if (scan.retention_time < raw_data.min_rt) {
+                    raw_data.min_rt = scan.retention_time;
                 }
-            }    
-		//}
-    } // end reading spectrum loop
+                if (scan.retention_time > raw_data.max_rt) {
+                    raw_data.max_rt = scan.retention_time;
+                }
+                if (scan.mz[0] < raw_data.min_mz) {
+                    raw_data.min_mz = scan.mz[0];
+                }
+                if (scan.mz[scan.mz.size() - 1] > raw_data.max_mz) {
+                    raw_data.max_mz = scan.mz[scan.mz.size() - 1];
+                }
+            }        
+        next = mzfh.nextSpectrum(s);
+    }
     
     return raw_data;
 }

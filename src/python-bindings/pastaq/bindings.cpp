@@ -32,9 +32,165 @@
 
 namespace py = pybind11;
 
+// Function to get file extension
+std::string getFileExtension(const std::string& filename) {
+    size_t pos = filename.find_last_of('.');
+    if (pos == std::string::npos) {
+        return ""; // No extension found
+    }
+    return filename.substr(pos);
+}
+
 namespace PythonAPI {
 
-RawData::RawMSData read_msdata(std::string &input_file, double min_mz,
+RawData::RawData read_msdata(std::string &input_file, double min_mz,
+                            double max_mz, double min_rt, double max_rt,
+                            std::string instrument_type_str,
+                            double resolution_ms1, double resolution_msn,
+                            double reference_mz, double fwhm_rt,
+                            std::string polarity_str, size_t ms_level) {
+    pybind11::gil_scoped_release release;
+    // Setup infinite range if no point was specified.
+    min_rt = min_rt < 0 ? 0 : min_rt;
+    max_rt = max_rt < 0 ? std::numeric_limits<double>::infinity() : max_rt;
+    min_mz = min_mz < 0 ? 0 : min_mz;
+    max_mz = max_mz < 0 ? std::numeric_limits<double>::infinity() : max_mz;
+
+    // Parse the instrument type.
+    auto instrument_type = Instrument::UNKNOWN;
+    for (auto &ch : instrument_type_str) {
+        ch = tolower(ch);
+    }
+    if (instrument_type_str == "orbitrap") {
+        instrument_type = Instrument::ORBITRAP;
+    } else if (instrument_type_str == "tof") {
+        instrument_type = Instrument::TOF;
+    } else if (instrument_type_str == "quad" || instrument_type_str == "quadrupole") {
+        instrument_type = Instrument::QUAD;
+    } else if (instrument_type_str == "fticr" || instrument_type_str == "ft-icr" ) {
+        instrument_type = Instrument::FTICR;
+    } else {
+        pybind11::gil_scoped_acquire acquire;
+        std::ostringstream error_stream;
+        error_stream << "the given instrument is not supported";
+        throw std::invalid_argument(error_stream.str());
+    }
+    // Parse the polarity.
+    auto polarity = Polarity::BOTH;
+    for (auto &ch : polarity_str) {
+        ch = tolower(ch);
+    }
+    if (polarity_str == "" || polarity_str == "both" || polarity_str == "+-" ||
+        polarity_str == "-+") {
+        polarity = Polarity::BOTH;
+    } else if (polarity_str == "+" || polarity_str == "pos" ||
+               polarity_str == "positive") {
+        polarity = Polarity::POSITIVE;
+    } else if (polarity_str == "-" || polarity_str == "neg" ||
+               polarity_str == "negative") {
+        polarity = Polarity::NEGATIVE;
+    } else {
+        pybind11::gil_scoped_acquire acquire;
+        std::ostringstream error_stream;
+        error_stream << "the given polarity is not supported. choose "
+                        "between '+', '-', 'both' (default)";
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    // Sanity check the min/max rt/mz.
+    if (min_rt >= max_rt) {
+        pybind11::gil_scoped_acquire acquire;
+        std::ostringstream error_stream;
+        error_stream << "error: min_rt >= max_rt (min_rt: " << min_rt
+                     << ", max_rt: " << max_rt << ")";
+        throw std::invalid_argument(error_stream.str());
+    }
+    if (min_mz >= max_mz) {
+        pybind11::gil_scoped_acquire acquire;
+        std::ostringstream error_stream;
+        error_stream << "error: min_mz >= max_mz (min_mz: " << min_mz
+                     << ", max_mz: " << max_mz << ")";
+        throw std::invalid_argument(error_stream.str());
+    }
+
+    std::string extension = getFileExtension(input_file);
+    RawData::RawData raw_data;
+
+    if (extension == ".mzML" || extension == ".mzMLgz") {
+        // Use read_mzxml for supported XML-based formats
+
+        // Open file stream.
+        std::ifstream stream;
+        stream.open(input_file);
+        if (!stream) {
+            // pybind11::gil_scoped_acquire acquire;
+            std::ostringstream error_stream;
+            error_stream << "error: couldn't open input file" << input_file;
+            throw std::invalid_argument(error_stream.str());
+        }
+        auto raw_data_optional = XmlReader::_read_mzml(
+            stream, min_mz, max_mz, min_rt, max_rt, instrument_type,
+            resolution_ms1, resolution_msn, reference_mz, polarity, ms_level);
+        
+        if (!raw_data_optional) {
+            throw std::runtime_error("Failed to read raw data from XML-based format.");
+        }
+
+        raw_data = raw_data_optional.value();
+        
+    } else if (extension == ".mzXML" || extension == ".mzXMLgz") {
+        // Use read_mzxml for supported XML-based formats
+
+        // Open file stream.
+        std::ifstream stream;
+        stream.open(input_file);
+        if (!stream) {
+            // pybind11::gil_scoped_acquire acquire;
+            std::ostringstream error_stream;
+            error_stream << "error: couldn't open input file" << input_file;
+            throw std::invalid_argument(error_stream.str());
+        }
+        auto raw_data_optional = XmlReader::read_mzxml(
+            stream, min_mz, max_mz, min_rt, max_rt, instrument_type,
+            resolution_ms1, resolution_msn, reference_mz, polarity, ms_level);
+        
+        if (!raw_data_optional) {
+            throw std::runtime_error("Failed to read raw data from XML-based format.");
+        }
+
+        raw_data = raw_data_optional.value();
+        
+    } else if (extension == ".bms1" || extension == ".bms2" || 
+               extension == ".cms1" || extension == ".cms2" || 
+               extension == ".mgf" || extension == ".ms1" || 
+               extension == ".ms2" || extension == ".msmat_ff" || 
+               extension == ".mz5" || extension == ".raw" || 
+               extension == ".sqlite" || extension == ".psm" || 
+               extension == ".uzs" || extension == ".zs") {
+        // Use read_msdata for other supported formats
+        auto raw_data_optional = XmlReader::read_msdata(
+            input_file, min_mz, max_mz, min_rt, max_rt, instrument_type,
+            resolution_ms1, resolution_msn, reference_mz, polarity, ms_level);
+        
+        if (!raw_data_optional) {
+            throw std::runtime_error("Failed to read raw data from MS data format.");
+        }
+
+        raw_data = raw_data_optional.value();
+    } else {
+        // Unsupported format
+        std::cerr << "Error: Unsupported file format: " << input_file << std::endl;
+        throw std::runtime_error("Unsupported file format");
+    }
+
+    raw_data.fwhm_rt = fwhm_rt;
+    // pybind11::gil_scoped_acquire acquire;
+
+    return raw_data;
+}
+
+
+RawData::RawMSDataS read_msdatas(std::string &input_file, double min_mz,
                             double max_mz, double min_rt, double max_rt,
                             std::string instrument_type_str,
                             double resolution_ms1, double resolution_msn,
@@ -114,7 +270,8 @@ RawData::RawMSData read_msdata(std::string &input_file, double min_mz,
     //     throw std::invalid_argument(error_stream.str());
     // }
 
-    auto raw_data = XmlReader::read_msdata(
+    
+    auto raw_data = XmlReader::read_msdatas(
         input_file, min_mz, max_mz, min_rt, max_rt, instrument_type, resolution_ms1,
         resolution_msn, reference_mz, polarity, ms_level);
     if (!raw_data) {
@@ -1278,6 +1435,37 @@ PYBIND11_MODULE(pastaq, m) {
                    "\n> number of scans: " + std::to_string(rd.basicSpectra.size());
         });
 
+        py::class_<RawData::RawMSDataS>(m, "RawMSDataS")
+        .def_readonly("Spectra", &RawData::RawMSDataS::Spectra)
+        .def_readonly("fwhm_rt", &RawData::RawMSDataS::fwhm_rt)
+        .def_readonly("instrument_type", &RawData::RawMSDataS::instrument_type)
+        .def_readonly("resolution_ms1", &RawData::RawMSDataS::resolution_ms1)
+        .def_readonly("resolution_msn", &RawData::RawMSDataS::resolution_msn)
+        .def_readonly("reference_mz", &RawData::RawMSDataS::reference_mz)
+        .def_readonly("min_mz", &RawData::RawMSDataS::min_mz)
+        .def_readonly("max_mz", &RawData::RawMSDataS::max_mz)
+        .def_readonly("min_rt", &RawData::RawMSDataS::min_rt)
+        .def_readonly("max_rt", &RawData::RawMSDataS::max_rt)
+        .def("theoretical_fwhm", &RawData::theoretical_fwhm, py::arg("mz"))
+        .def("dump", &PythonAPI::write_raw_data)
+        .def("raw_points", &RawData::raw_points,
+             "Get the raw data points on the square region defined by "
+             "min/max_mz/rt",
+             py::arg("min_mz"), py::arg("max_mz"), py::arg("min_rt"),
+             py::arg("max_rt"))
+        .def("__repr__", [](const RawData::RawMSDataS &rd) {
+            return "RawData:\n> instrument_type: " +
+                   PythonAPI::to_string(rd.instrument_type) +
+                   "\n> resolution_ms1: " + std::to_string(rd.resolution_ms1) +
+                   "\n> resolution_msn: " + std::to_string(rd.resolution_msn) +
+                   "\n> reference_mz: " + std::to_string(rd.reference_mz) +
+                   "\n> min_mz: " + std::to_string(rd.min_mz) +
+                   "\n> max_mz: " + std::to_string(rd.max_mz) +
+                   "\n> min_rt: " + std::to_string(rd.min_rt) +
+                   "\n> max_rt: " + std::to_string(rd.max_rt) +
+                   "\n> number of scans: " + std::to_string(rd.Spectra.size());
+        });
+
     py::class_<Grid::Grid>(m, "Grid")
         .def_readonly("n", &Grid::Grid::n)
         .def_readonly("m", &Grid::Grid::m)
@@ -1648,6 +1836,13 @@ PYBIND11_MODULE(pastaq, m) {
           py::arg("resolution_msn"), py::arg("reference_mz"),
           py::arg("fwhm_rt"), py::arg("polarity") = "", py::arg("ms_level") = 1) //
         .def("read_msdata", &PythonAPI::read_msdata,
+          "Read raw data from the given mzXML file ", py::arg("file_name"),
+          py::arg("min_mz") = -1.0, py::arg("max_mz") = -1.0,
+          py::arg("min_rt") = -1.0, py::arg("max_rt") = -1.0,
+          py::arg("instrument_type") = "", py::arg("resolution_ms1"),
+          py::arg("resolution_msn"), py::arg("reference_mz"),
+          py::arg("fwhm_rt"), py::arg("polarity") = "", py::arg("ms_level") = 1)
+        .def("read_msdatas", &PythonAPI::read_msdatas,
           "Read raw data from the given mzXML file ", py::arg("file_name"),
           py::arg("min_mz") = -1.0, py::arg("max_mz") = -1.0,
           py::arg("min_rt") = -1.0, py::arg("max_rt") = -1.0,
