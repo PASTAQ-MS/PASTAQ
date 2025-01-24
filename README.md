@@ -129,6 +129,20 @@ please visit [the official website][website].
 <!-- ninja test -->
 <!-- ``` -->
 
+## Third-Party Libraries
+
+This project uses the TDF SDK (v2.21.0.x) to interface with timsTOF data. The `include` folder contains essential headers required for compilation.
+
+### File Structure
+- `libtimsdata.so` (Linux) or `timsdata.dll` (Windows): Shared libraries.
+- `include/`: Header files required to build and use the SDK.
+  - `c/`: Contains C/C++ header files.
+    - `timsdata.h`: Main header for interfacing with timsTOF data.
+    - `timsvisualization.h`: Header for visualization functionalities.
+    - Other headers as required by the SDK.
+
+These files are distributed in compliance with the SDK's licensing terms.
+
 # How to cite this work
 
 The main manuscript has been published in as Open Access Analytical Chemistry with the following details: [Alejandro Sánchez Brotons, Jonatan O. Eriksson, Marcel Kwiatkowski, Justina C. Wolters, Ido P. Kema, Andrei Barcaru, Folkert Kuipers, Stephan J. L. Bakker, Rainer Bischoff, Frank Suits, and Péter Horvatovich, Pipelines and Systems for Threshold-Avoiding Quantification of LC–MS/MS Data, Analytical Chemistry, 2021, 93, 32, 11215–11224](https://pubs.acs.org/doi/10.1021/acs.analchem.1c01892).

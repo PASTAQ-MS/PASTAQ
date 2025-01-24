@@ -8,6 +8,30 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+
+# Set paths to TDF SDK libraries and include directories
+set(TDF_SDK_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/timsdata_sdk/include/c")
+
+if(WIN32)
+    # Windows-specific settings
+    # set(TDF_SDK_LIB "${CMAKE_SOURCE_DIR}/third_party/timsdata_sdk/win64/timsdata.dll")
+    set(TDF_SDK_LIB "${CMAKE_SOURCE_DIR}/third_party/timsdata_sdk/win64")
+    find_library(TIMSDATA_LIBRARY timsdata.dll PATHS "${TDF_SDK_LIB}")
+    message(STATUS "Building on Windows")
+elseif(UNIX)
+    # Linux-specific settings
+    # set(TDF_SDK_LIB "${CMAKE_SOURCE_DIR}/third_party/timsdata_sdk/linux64/libtimsdata.so")
+    set(TDF_SDK_LIB "${CMAKE_SOURCE_DIR}/third_party/timsdata_sdk/linux64")
+    find_library(TIMSDATA_LIBRARY libtimsdata.so PATHS "${TDF_SDK_LIB}")
+    message(STATUS "Building on Linux")
+else()
+    message(FATAL_ERROR "Unsupported platform")
+endif()
+
+
+set(SQLITE_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/CppSQLite")
+set(SQLITE_DIR "${CMAKE_SOURCE_DIR}/third_party/sqlite")
+
 # Set up compiler options based on platform.
 if (CMAKE_COMPILER_IS_GNUCXX)
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic")
@@ -34,6 +58,7 @@ add_library(pastaqlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/metamatch/metamatch_serialize.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/protein_inference/protein_inference.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/protein_inference/protein_inference_serialize.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/timsdatacpp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/raw_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/raw_data_serialize.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/xml_reader.cpp"
@@ -44,11 +69,14 @@ add_library(pastaqlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/serialization.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d_serialize.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/CppSQLite/CppSQLite3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/sqlite/shell.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/sqlite/sqlite3.c"
     )
 
-target_include_directories(pastaqlib PUBLIC src/lib)
-# Link mstoolkit with your `pastaqlib` target
-target_link_libraries(pastaqlib mstoolkit)
+# add_library(CppSQLite3 STATIC third_party/CppSQLite/CppSQLite3.cpp)
+
+target_include_directories(pastaqlib PUBLIC src/lib )
 
 # Add mstoolkit include directory
 IF (UNIX)
@@ -56,19 +84,49 @@ IF (UNIX)
   add_definitions(-DGCC -DXML_DEV_URANDOM -D_FILE_OFFSET_BITS=64 -D_NO_THERMORAW -D_NOSQLITE)
 ENDIF()
 target_include_directories(pastaqlib PUBLIC "./ext/mstoolkit/include")
+target_include_directories(pastaqlib PUBLIC "${SQLITE_INCLUDE_DIR}")
+target_include_directories(pastaqlib PUBLIC "${SQLITE_DIR}")
+target_include_directories(pastaqlib PUBLIC "${TDF_SDK_INCLUDE_DIR}")
+
+
+# Set rpath for runtime library resolution
+# set_target_properties(pastaqlib PROPERTIES
+#     BUILD_RPATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/timsdata_sdk/linux64"
+# )
 
 if (WIN32)
-    target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen zlibstatic)
+    target_link_libraries(pastaqlib PRIVATE ${CMAKE_THREAD_LIBS_INIT} 
+        Eigen3::Eigen 
+        zlibstatic
+        mstoolkit
+        ${TIMSDATA_LIBRARY}
+    )
 else()
-    target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen zlib)
+    target_link_libraries(pastaqlib PRIVATE ${CMAKE_THREAD_LIBS_INIT} 
+        Eigen3::Eigen 
+        zlib
+        mstoolkit
+        ${TIMSDATA_LIBRARY}
+    )
 endif()
+
 
 # Build the python bindings.
 # --------------------------
 # PyBind.
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/pybind11")
 pybind11_add_module(pastaq src/python-bindings/pastaq/bindings.cpp)
+# target_include_directories(pastaq PUBLIC src/lib )
+# target_include_directories(pastaq PUBLIC "${SQLITE_INCLUDE_DIR}")
+# target_include_directories(pastaq PUBLIC "${TDF_SDK_INCLUDE_DIR}")
+# target_include_directories(pastaq PUBLIC "./ext/mstoolkit/include")
+
+
+
+
 target_link_libraries(pastaq PRIVATE pastaqlib)
+# set_target_properties(pastaq PROPERTIES BUILD_RPATH ${TDF_SDK_LIB})
+
 
 # Include tests if testing library is present.
 # --------------------------------------------

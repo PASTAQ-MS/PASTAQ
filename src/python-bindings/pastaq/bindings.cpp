@@ -8,6 +8,7 @@
 #include "pybind11/numpy.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
+#include "raw_data/timsdatacpp.h"
 
 #include "centroid/centroid.hpp"
 #include "centroid/centroid_serialize.hpp"
@@ -31,6 +32,7 @@
 #include "warp2d/warp2d_serialize.hpp"
 
 namespace py = pybind11;
+using namespace timsdata;
 
 // Function to get file extension
 std::string getFileExtension(const std::string& filename) {
@@ -1323,6 +1325,21 @@ PYBIND11_MODULE(pastaq, m) {
     // Documentation.
     m.doc() = "pastaq documentation";
 
+    py::enum_<pressure_compensation_strategy>(m, "PressureCompensationStrategy")
+    .value("NoPressureCompensation", NoPressureCompensation)
+    .value("AnalyisGlobalPressureCompensation", AnalyisGlobalPressureCompensation)
+    .value("PerFramePressureCompensation", PerFramePressureCompensation)
+    .value("PerFramePressureCompensationWithMissingReference", PerFramePressureCompensationWithMissingReference)
+    .export_values();
+
+    py::class_<TimsData>(m, "TimsData")
+        .def(py::init<const std::string&, bool, pressure_compensation_strategy>(),
+             py::arg("analysis_directory_name"),
+             py::arg("use_recalibration") = false,
+             py::arg("pressure_compensation") = AnalyisGlobalPressureCompensation,
+             "Initialize TimsData with an analysis directory and optional settings.")
+        .def("getNumberOfFrames", &TimsData::getNumberOfFrames, "Get the number of frames in the analysis.");
+    
     // Structs.
     py::class_<RawData::PrecursorInformation>(m, "PrecursorInformation")
         .def_readonly("id", &RawData::PrecursorInformation::scan_number)
@@ -1820,6 +1837,10 @@ PYBIND11_MODULE(pastaq, m) {
                    ", psm_id: " + p.psm_id + ">";
         });
 
+    m.def("createTimsDataInstance", [] (const std::string& analysisDirectory) {
+        return std::make_unique<TimsData>(analysisDirectory);
+    }, "Create an instance of TimsData using the provided analysis directory");
+    
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,
           "Read raw data from the given mzXML file ", py::arg("file_name"),
