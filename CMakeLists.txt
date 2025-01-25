@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1)
 
-project(pastaq VERSION "0.11.0")
+project(pastaq VERSION "0.11.2")
 
 # Set project properties.
 set(CMAKE_CXX_STANDARD 17)
@@ -10,16 +10,16 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 
 # Set paths to TDF SDK libraries and include directories
-set(TDF_SDK_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/timsdata_sdk/include/c")
+set(TDF_SDK_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/ext/third_party/timsdata_sdk/include/c")
 
 if(WIN32)
     # Windows-specific settings
-    set(TDF_SDK_LIB "${CMAKE_SOURCE_DIR}/third_party/timsdata_sdk/win64")
+    set(TDF_SDK_LIB "${CMAKE_SOURCE_DIR}/ext/third_party/timsdata_sdk/win64")
     find_library(TIMSDATA_LIBRARY timsdata.dll PATHS "${TDF_SDK_LIB}")
     message(STATUS "Building on Windows")
 elseif(UNIX)
     # Linux-specific settings
-    set(TDF_SDK_LIB "${CMAKE_SOURCE_DIR}/third_party/timsdata_sdk/linux64")
+    set(TDF_SDK_LIB "${CMAKE_SOURCE_DIR}/ext/third_party/timsdata_sdk/linux64")
     find_library(TIMSDATA_LIBRARY libtimsdata.so PATHS "${TDF_SDK_LIB}")
     message(STATUS "Building on Linux")
 else()
@@ -27,8 +27,8 @@ else()
 endif()
 
 
-set(SQLITE_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/CppSQLite")
-set(SQLITE_DIR "${CMAKE_SOURCE_DIR}/third_party/sqlite")
+set(SQLITE_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/ext/third_party/CppSQLite")
+set(SQLITE_DIR "${CMAKE_SOURCE_DIR}/ext/third_party/sqlite")
 
 # Set up compiler options based on platform.
 if (CMAKE_COMPILER_IS_GNUCXX)
@@ -67,12 +67,10 @@ add_library(pastaqlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/serialization.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d_serialize.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/CppSQLite/CppSQLite3.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/sqlite/shell.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/sqlite/sqlite3.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/third_party/CppSQLite/CppSQLite3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/third_party/sqlite/shell.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/third_party/sqlite/sqlite3.c"
     )
-
-# add_library(CppSQLite3 STATIC third_party/CppSQLite/CppSQLite3.cpp)
 
 target_include_directories(pastaqlib PUBLIC src/lib )
 
@@ -85,12 +83,6 @@ target_include_directories(pastaqlib PUBLIC "./ext/mstoolkit/include")
 target_include_directories(pastaqlib PUBLIC "${SQLITE_INCLUDE_DIR}")
 target_include_directories(pastaqlib PUBLIC "${SQLITE_DIR}")
 target_include_directories(pastaqlib PUBLIC "${TDF_SDK_INCLUDE_DIR}")
-
-
-# Set rpath for runtime library resolution
-# set_target_properties(pastaqlib PROPERTIES
-#     BUILD_RPATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/timsdata_sdk/linux64"
-# )
 
 if (WIN32)
     target_link_libraries(pastaqlib PRIVATE ${CMAKE_THREAD_LIBS_INIT} 
@@ -108,16 +100,24 @@ else()
     )
 endif()
 
-
 # Build the python bindings.
 # --------------------------
 # PyBind.
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/pybind11")
 pybind11_add_module(pastaq src/python-bindings/pastaq/bindings.cpp)
 
-target_link_libraries(pastaq PRIVATE pastaqlib)
-# set_target_properties(pastaq PROPERTIES BUILD_RPATH ${TDF_SDK_LIB})
-
+if(UNIX)
+    set_target_properties(pastaq PROPERTIES
+        INSTALL_RPATH "$ORIGIN/linux64"
+        BUILD_WITH_INSTALL_RPATH TRUE
+    )
+elseif(WIN32)
+    set_target_properties(pastaq PROPERTIES
+        INSTALL_RPATH "$ORIGIN/win64"
+        BUILD_WITH_INSTALL_RPATH TRUE
+    )
+endif()
+target_link_libraries(pastaq PRIVATE pastaqlib )
 
 # Include tests if testing library is present.
 # --------------------------------------------

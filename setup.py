@@ -68,7 +68,6 @@ class CMakeBuild(build_ext):
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-
 setup(
     name='pastaq',
     version='0.11.2',
@@ -79,9 +78,14 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/PASTAQ-MS/PASTAQ",
     packages=find_packages('src/python-bindings'),
+    #packages = find_packages(),
     package_dir={'': 'src/python-bindings'},
     ext_modules=[CMakeExtension('pastaq/pastaq_cpp')],
     cmdclass=dict(build_ext=CMakeBuild),
+    package_data={
+        'pastaq': ['win64/timsdata.dll', 'linux64/libtimsdata.so'],
+    },
+    include_package_data=True,  # Ensures package_data is included
     install_requires=[
 #        'numpy',
         'pandas',
