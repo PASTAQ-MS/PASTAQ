@@ -68,6 +68,7 @@ class CMakeBuild(build_ext):
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+
 setup(
     name='pastaq',
     version='0.11.2',

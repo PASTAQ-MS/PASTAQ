@@ -14,13 +14,11 @@ set(TDF_SDK_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/timsdata_sdk/include/c"
 
 if(WIN32)
     # Windows-specific settings
-    # set(TDF_SDK_LIB "${CMAKE_SOURCE_DIR}/third_party/timsdata_sdk/win64/timsdata.dll")
     set(TDF_SDK_LIB "${CMAKE_SOURCE_DIR}/third_party/timsdata_sdk/win64")
     find_library(TIMSDATA_LIBRARY timsdata.dll PATHS "${TDF_SDK_LIB}")
     message(STATUS "Building on Windows")
 elseif(UNIX)
     # Linux-specific settings
-    # set(TDF_SDK_LIB "${CMAKE_SOURCE_DIR}/third_party/timsdata_sdk/linux64/libtimsdata.so")
     set(TDF_SDK_LIB "${CMAKE_SOURCE_DIR}/third_party/timsdata_sdk/linux64")
     find_library(TIMSDATA_LIBRARY libtimsdata.so PATHS "${TDF_SDK_LIB}")
     message(STATUS "Building on Linux")
@@ -116,13 +114,6 @@ endif()
 # PyBind.
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/pybind11")
 pybind11_add_module(pastaq src/python-bindings/pastaq/bindings.cpp)
-# target_include_directories(pastaq PUBLIC src/lib )
-# target_include_directories(pastaq PUBLIC "${SQLITE_INCLUDE_DIR}")
-# target_include_directories(pastaq PUBLIC "${TDF_SDK_INCLUDE_DIR}")
-# target_include_directories(pastaq PUBLIC "./ext/mstoolkit/include")
-
-
-
 
 target_link_libraries(pastaq PRIVATE pastaqlib)
 # set_target_properties(pastaq PROPERTIES BUILD_RPATH ${TDF_SDK_LIB})
