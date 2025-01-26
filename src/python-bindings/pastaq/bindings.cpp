@@ -1368,7 +1368,11 @@ PYBIND11_MODULE(pastaq, m) {
 
             return py::make_tuple(py_column_names, py_frames_table);
             // return py_frames_table;
-        }, "Get the Frames table as a list of rows, where each row is a list of values.");
+        }, "Get the Frames table as a list of rows, where each row is a list of values.")
+        .def("getTdfFile", [](const TimsData& self) -> std::string {
+            // Access the private attribute via a getter
+            return self.getTdfFile(); // Assuming you have a getter in the TimsData class
+        }, "Get the path to the .tdf SQLite file.");
     
     // Structs.
     py::class_<RawData::PrecursorInformation>(m, "PrecursorInformation")
