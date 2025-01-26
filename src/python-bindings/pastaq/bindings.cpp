@@ -1338,7 +1338,37 @@ PYBIND11_MODULE(pastaq, m) {
              py::arg("use_recalibration") = false,
              py::arg("pressure_compensation") = AnalyisGlobalPressureCompensation,
              "Initialize TimsData with an analysis directory and optional settings.")
-        .def("getNumberOfFrames", &TimsData::getNumberOfFrames, "Get the number of frames in the analysis.");
+        .def("getNumberOfFrames", &TimsData::getNumberOfFrames, "Get the number of frames in the analysis.")
+        .def("getFramesTable", [](const TimsData& self) {
+            auto [column_names, frames_table] = self.getFramesTable();
+            // auto frames_table = self.getFramesTable();
+
+            // Convert column names to Python list
+            py::list py_column_names;
+            for (const auto& col : column_names) {
+                py_column_names.append(py::str(col));
+            }
+            
+            // Convert to a Python list of lists
+            std::vector<std::vector<py::object>> py_frames_table;
+
+            for (const auto& row : frames_table) {
+                std::vector<py::object> py_row;
+                for (const auto& col : row) {
+                    if (std::holds_alternative<int64_t>(col)) {
+                        py_row.push_back(py::int_(std::get<int64_t>(col)));
+                    } else if (std::holds_alternative<double>(col)) {
+                        py_row.push_back(py::float_(std::get<double>(col)));
+                    } else if (std::holds_alternative<std::string>(col)) {
+                        py_row.push_back(py::str(std::get<std::string>(col)));
+                    }
+                }
+                py_frames_table.push_back(py_row);
+            }
+
+            return py::make_tuple(py_column_names, py_frames_table);
+            // return py_frames_table;
+        }, "Get the Frames table as a list of rows, where each row is a list of values.");
     
     // Structs.
     py::class_<RawData::PrecursorInformation>(m, "PrecursorInformation")

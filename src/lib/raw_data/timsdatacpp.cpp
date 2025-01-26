@@ -142,5 +142,52 @@ namespace timsdata
         auto number_of_frames = db.execScalar("SELECT COUNT(*) FROM Frames;");
         return static_cast<uint32_t>(number_of_frames);
     }
+    std::pair<std::vector<std::string>, std::vector<std::vector<std::variant<int64_t, double, std::string>>>> 
+TimsData::getFramesTable() const {
+    // std::vector<std::vector<std::variant<int64_t, double, std::string>>> TimsData::getFramesTable() const {
+        std::vector<std::string> column_names;
+        std::vector<std::vector<std::variant<int64_t, double, std::string>>> frames_data;
+
+        try {
+            // Execute SQL query to fetch all rows from the Frames table
+            CppSQLite3Query query = db.execQuery("SELECT * FROM Frames;");
+
+            // Retrieve column names
+            int num_fields = query.numFields();
+            for (int col = 0; col < num_fields; ++col) {
+                column_names.push_back(query.fieldName(col));
+            }
+
+            // Loop through each row in the query result
+            while (!query.eof()) {
+                std::vector<std::variant<int64_t, double, std::string>> frame_row;
+
+                // Loop through each column in the current row
+                for (int col = 0; col < query.numFields(); ++col) {
+                    const char* value = query.fieldValue(col);
+                    const char* colType = query.fieldDeclType(col);
+    
+                    if (!value) {
+                        frame_row.push_back("");  // Handle NULL values as empty strings
+                    } else if (std::string(colType).find("INT") != std::string::npos) {
+                        frame_row.push_back(static_cast<int64_t>(std::stoll(value)));
+                    } else if (std::string(colType).find("REAL") != std::string::npos || 
+                           std::string(colType).find("FLOAT") != std::string::npos) {
+                        frame_row.push_back(std::stod(value));
+                    } else {
+                        frame_row.push_back(std::string(value));  // Default to string
+                    }
+                }
+
+                frames_data.push_back(frame_row);
+                query.nextRow();
+            }
+        } catch (const CppSQLite3Exception& e) {
+            throw std::runtime_error("Error fetching data from Frames table: " + std::string(e.errorMessage()));
+        }
+
+        return {column_names, frames_data};
+        // return frames_data;
+    }
 
 } // namespace timsdata

@@ -9,6 +9,7 @@
 #include <vector>
 #include <limits>
 #include <memory>
+#include <variant>
 
 #include "CppSQLite3.h"
 #include "timsdata.h" // fundamental C API
@@ -73,7 +74,10 @@ namespace timsdata
         uint64_t getHandle() const;
 
         FrameProxy readScans(int64_t frame_id, uint32_t scan_begin, uint32_t scan_end);
+
         uint32_t getNumberOfFrames() const;
+        std::pair<std::vector<std::string>, std::vector<std::vector<std::variant<int64_t, double, std::string>>>> getFramesTable() const;
+        // std::vector<std::vector<std::variant<int64_t, double, std::string>>> getFramesTable() const;
 
         BDAL_TIMS_DEFINE_CONVERSION_FUNCTION(indexToMz, tims_index_to_mz)
         BDAL_TIMS_DEFINE_CONVERSION_FUNCTION(mzToIndex, tims_mz_to_index)
