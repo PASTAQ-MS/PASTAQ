@@ -14,12 +14,12 @@ set(TDF_SDK_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/ext/third_party/timsdata_sdk/includ
 
 if(WIN32)
     # Windows-specific settings
-    set(TDF_SDK_LIB "${CMAKE_SOURCE_DIR}/ext/third_party/timsdata_sdk/win64")
+    set(TDF_SDK_LIB "${CMAKE_SOURCE_DIR}/src/python-bindings/pastaq/win64")
     find_library(TIMSDATA_LIBRARY timsdata.dll PATHS "${TDF_SDK_LIB}")
     message(STATUS "Building on Windows")
 elseif(UNIX)
     # Linux-specific settings
-    set(TDF_SDK_LIB "${CMAKE_SOURCE_DIR}/ext/third_party/timsdata_sdk/linux64")
+    set(TDF_SDK_LIB "${CMAKE_SOURCE_DIR}/src/python-bindings/pastaq/linux64")
     find_library(TIMSDATA_LIBRARY libtimsdata.so PATHS "${TDF_SDK_LIB}")
     message(STATUS "Building on Linux")
 else()
