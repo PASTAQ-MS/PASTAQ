@@ -4,7 +4,7 @@
 #include <map>
 #include <optional>
 
-#include "raw_data/raw_data.hpp"
+#include "raw_data.hpp"
 
 // XmlReader handles reading xml tags and the supported xml files. This is not
 // a generic module, it is tailored to read Grid::Point objects to use for

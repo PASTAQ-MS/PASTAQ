@@ -3,7 +3,7 @@
 
 #include <optional>
 
-#include "raw_data/raw_data.hpp"
+#include "raw_data.hpp"
 
 namespace ProteinInference {
 enum NodeType : uint8_t { UNKNOWN = 0, PROTEIN = 1, PSM = 2 };

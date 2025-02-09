@@ -9,9 +9,9 @@
 #include <iostream>
 
 // #include <cstddef>
-#include "CppSQLite3.h"
+// #include "CppSQLite3.h"
 
-#include "timsdata.h"
+// #include "timsdata.h"
 #include "timsdatacpp.h"
 
 
@@ -85,6 +85,50 @@ namespace timsdata
     {
         tims_close(handle);
         db.close();
+    }
+
+    std::vector<std::string> TimsData::get_tables() const {
+        std::vector<std::string> tables;
+        CppSQLite3Query query = db.execQuery("SELECT name FROM sqlite_master WHERE type='table';");
+        while (!query.eof()) {
+            tables.push_back(query.getStringField(0));
+            query.nextRow();
+        }
+        return tables;
+    }
+
+    std::string TimsData::get_schema(const std::string& table_name) const {
+        std::ostringstream schema;
+        std::string query_str = "PRAGMA table_info(" + table_name + ");";  // Create a string
+        CppSQLite3Query query = db.execQuery(query_str.c_str());
+        
+        while (!query.eof()) {
+            schema << query.getStringField(1) << " (" << query.getStringField(2) << ")\n";
+            query.nextRow();
+        }
+        return schema.str();
+    }
+
+    std::vector<std::map<std::string, std::variant<int64_t, double, std::string>>> TimsData::query(const std::string& sql_query) const {
+        std::vector<std::map<std::string, std::variant<int64_t, double, std::string>>> results;
+        CppSQLite3Query query = db.execQuery(sql_query.c_str());
+        int col_count = query.numFields();
+        while (!query.eof()) {
+            std::map<std::string, std::variant<int64_t, double, std::string>> row;
+            for (int i = 0; i < col_count; ++i) {
+                std::string col_name = query.fieldName(i);
+                if (query.fieldDataType(i) == SQLITE_INTEGER) {
+                    row[col_name] = static_cast<int64_t>(query.getInt64Field(i));
+                } else if (query.fieldDataType(i) == SQLITE_FLOAT) {
+                    row[col_name] = query.getFloatField(i);
+                } else {
+                    row[col_name] = query.getStringField(i);
+                }
+            }
+            results.push_back(row);
+            query.nextRow();
+        }
+        return results;
     }
 
     uint64_t TimsData::getHandle() const

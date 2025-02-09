@@ -1,4 +1,4 @@
-#include <cassert>
+git #include <cassert>
 #include <fstream>
 #include <iostream>
 #include <thread>
@@ -8,7 +8,7 @@
 #include "pybind11/numpy.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
-#include "raw_data/timsdatacpp.h"
+#include "timsdatacpp.h"
 
 #include "centroid/centroid.hpp"
 #include "centroid/centroid_serialize.hpp"
@@ -22,9 +22,9 @@
 #include "metamatch/metamatch_serialize.hpp"
 #include "protein_inference/protein_inference.hpp"
 #include "protein_inference/protein_inference_serialize.hpp"
-#include "raw_data/raw_data.hpp"
-#include "raw_data/raw_data_serialize.hpp"
-#include "raw_data/xml_reader.hpp"
+#include "raw_data.hpp"
+#include "raw_data_serialize.hpp"
+#include "xml_reader.hpp"
 #include "utils/compression.hpp"
 #include "utils/search.hpp"
 #include "utils/serialization.hpp"

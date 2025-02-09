@@ -1,4 +1,4 @@
-#include "raw_data/raw_data.hpp"
+#include "raw_data.hpp"
 #include "utils/search.hpp"
 
 double RawData::theoretical_fwhm(const RawData &raw_data, double mz) {

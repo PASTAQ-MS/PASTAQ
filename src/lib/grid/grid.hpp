@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "raw_data/raw_data.hpp"
+#include "raw_data.hpp"
 
 namespace Grid {
 

@@ -41,9 +41,10 @@ endif()
 add_subdirectory("ext/zlib")
 add_subdirectory("ext/eigen")
 add_subdirectory("ext/mstoolkit" "${CMAKE_BINARY_DIR}/mstoolkit_build")
+# add_subdirectory(src/lib/raw_data)
 
 # Build pastaq library.
-add_library(pastaqlib
+add_library(pastaqlib STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/centroid/centroid_serialize.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/feature_detection/feature_detection.cpp"
@@ -70,19 +71,25 @@ add_library(pastaqlib
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/third_party/CppSQLite/CppSQLite3.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/third_party/sqlite/shell.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/third_party/sqlite/sqlite3.c"
+#    "${CMAKE_CURRENT_SOURCE_DIR}/examples/cpp/timstdf.cpp"
     )
 
-target_include_directories(pastaqlib PUBLIC src/lib )
+
+
+target_include_directories(pastaqlib PUBLIC src/lib
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/include
+)
 
 # Add mstoolkit include directory
 IF (UNIX)
   # for linux
   add_definitions(-DGCC -DXML_DEV_URANDOM -D_FILE_OFFSET_BITS=64 -D_NO_THERMORAW -D_NOSQLITE)
 ENDIF()
-target_include_directories(pastaqlib PUBLIC "./ext/mstoolkit/include")
+target_include_directories(pastaqlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/ext/mstoolkit/include)
 target_include_directories(pastaqlib PUBLIC "${SQLITE_INCLUDE_DIR}")
 target_include_directories(pastaqlib PUBLIC "${SQLITE_DIR}")
 target_include_directories(pastaqlib PUBLIC "${TDF_SDK_INCLUDE_DIR}")
+
 
 if (WIN32)
     target_link_libraries(pastaqlib PRIVATE ${CMAKE_THREAD_LIBS_INIT} 
@@ -99,6 +106,10 @@ else()
         ${TIMSDATA_LIBRARY}
     )
 endif()
+
+add_executable(TimsDataExample "${CMAKE_CURRENT_SOURCE_DIR}/examples/cpp/timstdf.cpp")
+# Link the pastaqlib library to the executable
+target_link_libraries(TimsDataExample PRIVATE pastaqlib)
 
 # Build the python bindings.
 # --------------------------

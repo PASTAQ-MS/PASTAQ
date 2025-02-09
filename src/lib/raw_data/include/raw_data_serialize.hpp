@@ -3,7 +3,7 @@
 
 #include <iostream>
 
-#include "raw_data/raw_data.hpp"
+#include "raw_data.hpp"
 
 // This namespace groups the functions used to serialize RawData data structures
 // into a binary stream.

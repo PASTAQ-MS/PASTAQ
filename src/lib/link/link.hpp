@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "centroid/centroid.hpp"
-#include "raw_data/raw_data.hpp"
+#include "raw_data.hpp"
 
 namespace Link {
 // This table can store linkage for both peak-msms and spectrum_id-msms. In

@@ -1,6 +1,8 @@
 #ifndef DE_BDAL_TIMSDATA_CPP_H
 #define DE_BDAL_TIMSDATA_CPP_H
 
+#include <map>
+#include <sstream>
 #include <cstddef>     // For size_t
 #include <stdexcept>
 #include <string>
@@ -62,7 +64,8 @@ namespace timsdata
     class TimsData
     {
     public:
-        explicit TimsData(const std::string& analysis_directory_name, bool use_recalibration = false, pressure_compensation_strategy pressure_compensation = AnalyisGlobalPressureCompensation);
+        explicit TimsData(const std::string& analysis_directory_name, bool use_recalibration = false, 
+                            pressure_compensation_strategy pressure_compensation = AnalyisGlobalPressureCompensation);
         ~TimsData();
 
         TimsData(const TimsData&) = delete;
@@ -88,11 +91,16 @@ namespace timsdata
         BDAL_TIMS_DEFINE_CONVERSION_FUNCTION(scanNumToVoltage, tims_scannum_to_voltage)
         BDAL_TIMS_DEFINE_CONVERSION_FUNCTION(voltageToScanNum, tims_voltage_to_scannum)
 
+        std::vector<std::string> get_tables() const;
+        std::string get_schema(const std::string& table_name) const;
+        std::vector<std::map<std::string, std::variant<int64_t, double, std::string>>> query(const std::string& sql_query) const;
+
     private:
         uint64_t handle;
         size_t initial_frame_buffer_size;
 
-        void doTransformation(int64_t frame_id, const std::vector<double>& in, std::vector<double>& out, BdalTimsConversionFunction* func);
+        void doTransformation(int64_t frame_id, const std::vector<double>& in, std::vector<double>& out, 
+                                BdalTimsConversionFunction* func);
         std::string tdfFile;             // Path to the .tdf SQLite file
         mutable CppSQLite3DB db;         // Database connection object
     };
