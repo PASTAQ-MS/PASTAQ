@@ -71,7 +71,6 @@ add_library(pastaqlib STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/third_party/CppSQLite/CppSQLite3.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/third_party/sqlite/shell.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/third_party/sqlite/sqlite3.c"
-#    "${CMAKE_CURRENT_SOURCE_DIR}/examples/cpp/timstdf.cpp"
     )
 
 

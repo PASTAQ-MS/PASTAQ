@@ -94,6 +94,7 @@ namespace timsdata
         std::vector<std::string> get_tables() const;
         std::string get_schema(const std::string& table_name) const;
         std::vector<std::map<std::string, std::variant<int64_t, double, std::string>>> query(const std::string& sql_query) const;
+        void relationships() const;
 
     private:
         uint64_t handle;

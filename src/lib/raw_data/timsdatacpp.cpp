@@ -7,6 +7,7 @@
 #include <memory>
 #include <utility> // For std::move
 #include <iostream>
+#include <iomanip>
 
 // #include <cstddef>
 // #include "CppSQLite3.h"
@@ -101,11 +102,15 @@ namespace timsdata
         std::ostringstream schema;
         std::string query_str = "PRAGMA table_info(" + table_name + ");";  // Create a string
         CppSQLite3Query query = db.execQuery(query_str.c_str());
-        
+
+        schema << "Column name" << std::setw(21) << "Data type\n";
+        schema << std::string(30, '-') << std::endl;
         while (!query.eof()) {
-            schema << query.getStringField(1) << " (" << query.getStringField(2) << ")\n";
+            size_t length = std::string(query.getStringField(1)).length();
+            schema << query.getStringField(1) << std::setw(23-length) << " " << query.getStringField(2) << std::endl;
             query.nextRow();
         }
+        schema << std::string(30, '-') << std::endl;
         return schema.str();
     }
 
@@ -234,4 +239,38 @@ TimsData::getFramesTable() const {
         // return frames_data;
     }
 
+    void TimsData::relationships() const {
+        try {
+            // Retrieve the list of tables
+            CppSQLite3Query tableQuery = db.execQuery("SELECT name FROM sqlite_master WHERE type='table';");
+            std::map<std::string, std::vector<std::pair<std::string, std::string>>> relationships;
+
+            while (!tableQuery.eof()) {
+                std::string table_name = tableQuery.getStringField(0);
+                std::string query = "PRAGMA foreign_key_list('" + table_name + "');";
+                CppSQLite3Query fkQuery = db.execQuery(query.c_str());
+
+                while (!fkQuery.eof()) {
+                    std::string source_table = fkQuery.getStringField(2); // Referenced table
+                    std::string target_table = table_name; // Table containing the foreign key
+                    std::string column_relationship = std::string(fkQuery.getStringField(3)) + " -> " + fkQuery.getStringField(4);
+                    relationships[source_table].emplace_back(target_table, column_relationship);
+                    fkQuery.nextRow();
+                }
+                tableQuery.nextRow();
+            }
+
+            // Print relationships
+            std::cout << "Table Relationships (Foreign Keys):\n" << std::endl;
+            for (const auto& entry : relationships) {
+                std::cout << "Table '" << entry.first << "' is referenced by:" << std::endl;
+                for (const auto& rel : entry.second) {
+                    std::cout << "  -> " << rel.first << " (" << rel.second << ")" << std::endl;
+                }
+                std::cout << std::endl;
+            }
+        } catch (const CppSQLite3Exception& e) {
+            std::cerr << "SQLite error: " << e.errorMessage() << std::endl;
+        }
+    } // relationships
 } // namespace timsdata
