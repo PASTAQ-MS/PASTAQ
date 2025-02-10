@@ -107,8 +107,12 @@ else()
 endif()
 
 add_executable(TimsDataExample "${CMAKE_CURRENT_SOURCE_DIR}/examples/cpp/timstdf.cpp")
+add_executable(TimsDataSamples "${CMAKE_CURRENT_SOURCE_DIR}/examples/cpp/timsdataSamples.cpp")
+
 # Link the pastaqlib library to the executable
 target_link_libraries(TimsDataExample PRIVATE pastaqlib)
+target_link_libraries(TimsDataSamples PRIVATE pastaqlib)
+
 
 # Build the python bindings.
 # --------------------------
