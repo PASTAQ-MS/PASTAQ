@@ -34,11 +34,11 @@ std::optional<RawData::RawData> read_mzxml(
     size_t ms_level);
 
 // Read an entire mzxml file into the RawData::RawData data structure filtering usin mstoolkit libraries
-std::optional<RawData::RawData> read_mzxml2(
-    std::string &input_file, double min_mz, double max_mz, double min_rt,
-    double max_rt, Instrument::Type instrument_type, double resolution_ms1,
-    double resolution_msn, double reference_mz, Polarity::Type polarity,
-    size_t ms_level);
+// std::optional<RawData::RawData> read_mzxml2(
+//     std::string &input_file, double min_mz, double max_mz, double min_rt,
+//     double max_rt, Instrument::Type instrument_type, double resolution_ms1,
+//     double resolution_msn, double reference_mz, Polarity::Type polarity,
+//     size_t ms_level);
 
 // Read an entire mzxml file into the RawData::RawData data structure filtering usin mstoolkit libraries
 std::optional<RawData::RawData> read_msdata(
@@ -48,11 +48,11 @@ std::optional<RawData::RawData> read_msdata(
     size_t ms_level);
 
 // Read an entire mzxml file into the RawData::RawData data structure filtering usin mstoolkit libraries
-std::optional<RawData::RawMSDataS> read_msdatas(
-    std::string &input_file, double min_mz, double max_mz, double min_rt,
-    double max_rt, Instrument::Type instrument_type, double resolution_ms1,
-    double resolution_msn, double reference_mz, Polarity::Type polarity,
-    size_t ms_level);
+// std::optional<RawData::RawMSDataS> read_msdatas(
+//     std::string &input_file, double min_mz, double max_mz, double min_rt,
+//     double max_rt, Instrument::Type instrument_type, double resolution_ms1,
+//     double resolution_msn, double reference_mz, Polarity::Type polarity,
+//     size_t ms_level);
 
 // Read an entire mzML file into the RawData::RawData data structure filtering
 // based on min/max mz/rt and polarity.
