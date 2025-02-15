@@ -118,7 +118,22 @@ target_link_libraries(TimsDataSamples PRIVATE pastaqlib)
 # --------------------------
 # PyBind.
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/pybind11")
-pybind11_add_module(pastaq src/python-bindings/pastaq/bindings.cpp)
+
+# Define source files for the `pastaq` module.
+set(PASTAQ_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/python-bindings/pastaq/bindings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/python-bindings/pastaq/timsdata_pybind.cpp
+)
+
+# Define include directories.
+set(PASTAQ_INCLUDE_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/python-bindings/pastaq/include
+)
+
+pybind11_add_module(pastaq ${PASTAQ_SOURCES})
+
+# Set include directories for the target.
+target_include_directories(pastaq PRIVATE ${PASTAQ_INCLUDE_DIRS})
 
 if(UNIX)
     set_target_properties(pastaq PROPERTIES

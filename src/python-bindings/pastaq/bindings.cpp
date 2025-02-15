@@ -8,7 +8,7 @@
 #include "pybind11/numpy.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
-#include "timsdatacpp.h"
+#include "timsdata_pybind.h"
 
 #include "centroid/centroid.hpp"
 #include "centroid/centroid_serialize.hpp"
@@ -25,6 +25,7 @@
 #include "raw_data.hpp"
 #include "raw_data_serialize.hpp"
 #include "xml_reader.hpp"
+#include "timsdatacpp.h"
 #include "utils/compression.hpp"
 #include "utils/search.hpp"
 #include "utils/serialization.hpp"
@@ -1324,55 +1325,8 @@ std::vector<MetaMatch::PeakCluster> find_peak_clusters(
 PYBIND11_MODULE(pastaq, m) {
     // Documentation.
     m.doc() = "pastaq documentation";
-
-    py::enum_<pressure_compensation_strategy>(m, "PressureCompensationStrategy")
-    .value("NoPressureCompensation", NoPressureCompensation)
-    .value("AnalyisGlobalPressureCompensation", AnalyisGlobalPressureCompensation)
-    .value("PerFramePressureCompensation", PerFramePressureCompensation)
-    .value("PerFramePressureCompensationWithMissingReference", PerFramePressureCompensationWithMissingReference)
-    .export_values();
-
-    py::class_<TimsData>(m, "TimsData")
-        .def(py::init<const std::string&, bool, pressure_compensation_strategy>(),
-             py::arg("analysis_directory_name"),
-             py::arg("use_recalibration") = false,
-             py::arg("pressure_compensation") = AnalyisGlobalPressureCompensation,
-             "Initialize TimsData with an analysis directory and optional settings.")
-        .def("getNumberOfFrames", &TimsData::getNumberOfFrames, "Get the number of frames in the analysis.")
-        .def("getFramesTable", [](const TimsData& self) {
-            auto [column_names, frames_table] = self.getFramesTable();
-            // auto frames_table = self.getFramesTable();
-
-            // Convert column names to Python list
-            py::list py_column_names;
-            for (const auto& col : column_names) {
-                py_column_names.append(py::str(col));
-            }
-            
-            // Convert to a Python list of lists
-            std::vector<std::vector<py::object>> py_frames_table;
-
-            for (const auto& row : frames_table) {
-                std::vector<py::object> py_row;
-                for (const auto& col : row) {
-                    if (std::holds_alternative<int64_t>(col)) {
-                        py_row.push_back(py::int_(std::get<int64_t>(col)));
-                    } else if (std::holds_alternative<double>(col)) {
-                        py_row.push_back(py::float_(std::get<double>(col)));
-                    } else if (std::holds_alternative<std::string>(col)) {
-                        py_row.push_back(py::str(std::get<std::string>(col)));
-                    }
-                }
-                py_frames_table.push_back(py_row);
-            }
-
-            return py::make_tuple(py_column_names, py_frames_table);
-            // return py_frames_table;
-        }, "Get the Frames table as a list of rows, where each row is a list of values.")
-        .def("getTdfFile", [](const TimsData& self) -> std::string {
-            // Access the private attribute via a getter
-            return self.getTdfFile(); // Assuming you have a getter in the TimsData class
-        }, "Get the path to the .tdf SQLite file.");
+    
+    register_tims_data(m);
     
     // Structs.
     py::class_<RawData::PrecursorInformation>(m, "PrecursorInformation")
@@ -1871,9 +1825,9 @@ PYBIND11_MODULE(pastaq, m) {
                    ", psm_id: " + p.psm_id + ">";
         });
 
-    m.def("createTimsDataInstance", [] (const std::string& analysisDirectory) {
-        return std::make_unique<TimsData>(analysisDirectory);
-    }, "Create an instance of TimsData using the provided analysis directory");
+    // m.def("createTimsDataInstance", [] (const std::string& analysisDirectory) {
+    //     return std::make_unique<TimsData>(analysisDirectory);
+    // }, "Create an instance of TimsData using the provided analysis directory");
     
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,
