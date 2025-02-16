@@ -49,6 +49,10 @@ namespace timsdata
         FrameIteratorRange getScanX(size_t scan_num) const;
         FrameIteratorRange getScanY(size_t scan_num) const;
 
+        const std::shared_ptr<uint32_t[]>& getData() const {
+            return pData;
+        }
+
     private:
         const size_t num_scans;
         const std::shared_ptr<uint32_t[]> pData;
