@@ -273,4 +273,211 @@ TimsData::getFramesTable() const {
             std::cerr << "SQLite error: " << e.errorMessage() << std::endl;
         }
     } // relationships
+
+    void TimsData::populateFrames(const std::string& filter) {
+        // Construct the SQL query with optional filter
+        std::string query_str = "SELECT * FROM Frames";
+        if (!filter.empty()) {
+            query_str += " WHERE " + filter;
+        }
+        query_str += ";";
+
+        std::vector<std::string> column_names;
+        std::vector<std::vector<std::variant<int64_t, double, std::string>>> frames_data;
+
+        try {
+            // Execute SQL query to fetch frames
+            CppSQLite3Query query = db.execQuery(query_str.c_str());
+
+            // Retrieve column names
+            int num_fields = query.numFields();
+            for (int col = 0; col < num_fields; ++col) {
+                column_names.push_back(query.fieldName(col));
+            }
+
+            // Loop through each row in the query result
+            while (!query.eof()) {
+                std::vector<std::variant<int64_t, double, std::string>> frame_row;
+
+                // Loop through each column in the current row
+                for (int col = 0; col < query.numFields(); ++col) {
+                    const char* value = query.fieldValue(col);
+                    const char* colType = query.fieldDeclType(col);
+
+                    if (!value) {
+                        frame_row.push_back("");  // Handle NULL values as empty strings
+                    } else if (std::string(colType).find("INT") != std::string::npos) {
+                        frame_row.push_back(static_cast<int64_t>(std::stoll(value)));
+                    } else if (std::string(colType).find("REAL") != std::string::npos ||
+                               std::string(colType).find("FLOAT") != std::string::npos) {
+                        frame_row.push_back(std::stod(value));
+                    } else {
+                        frame_row.push_back(std::string(value));  // Default to string
+                    }
+                }
+
+                frames_data.push_back(frame_row);
+                query.nextRow();
+            }
+        } catch (const CppSQLite3Exception& e) {
+            throw std::runtime_error("Error fetching data from Frames table: " + std::string(e.errorMessage()));
+        }
+
+        // Map column names to indices for easier reference
+        std::map<std::string, size_t> column_map;
+        for (size_t i = 0; i < column_names.size(); ++i) {
+            column_map[column_names[i]] = i;
+        }
+
+        // Clear existing frames in the cache before populating
+        frames_.clear();
+
+        // Loop through each row of the frames data
+        for (const auto& row : frames_data) {
+            Frame frame;
+
+            // Populate Frame fields, checking for column existence
+            if (column_map.count("Id") && std::holds_alternative<int64_t>(row[column_map["Id"]]))
+                frame.setId(std::get<int64_t>(row[column_map["Id"]]));
+
+            if (column_map.count("Time") && std::holds_alternative<double>(row[column_map["Time"]]))
+                frame.setTime(std::get<double>(row[column_map["Time"]]));
+
+            if (column_map.count("Polarity") && std::holds_alternative<std::string>(row[column_map["Polarity"]]))
+                frame.setPolarity(std::get<std::string>(row[column_map["Polarity"]]));
+
+            if (column_map.count("ScanMode") && std::holds_alternative<int64_t>(row[column_map["ScanMode"]]))
+                frame.setScanMode(static_cast<int>(std::get<int64_t>(row[column_map["ScanMode"]])));
+
+            if (column_map.count("MsMsType") && std::holds_alternative<int64_t>(row[column_map["MsMsType"]]))
+                frame.setMsMsType(static_cast<int>(std::get<int64_t>(row[column_map["MsMsType"]])));
+
+            if (column_map.count("TimsId") && std::holds_alternative<int64_t>(row[column_map["TimsId"]]))
+                frame.setTimsId(static_cast<int32_t>(std::get<int64_t>(row[column_map["TimsId"]])));
+
+            if (column_map.count("MaxIntensity") && std::holds_alternative<int64_t>(row[column_map["MaxIntensity"]]))
+                frame.setMaxIntensity(static_cast<uint32_t>(std::get<int64_t>(row[column_map["MaxIntensity"]])));
+
+            if (column_map.count("SummedIntensities") && std::holds_alternative<int64_t>(row[column_map["SummedIntensities"]]))
+                frame.setSummedIntensities(static_cast<uint64_t>(std::get<int64_t>(row[column_map["SummedIntensities"]])));
+
+            if (column_map.count("NumScans") && std::holds_alternative<int64_t>(row[column_map["NumScans"]]))
+                frame.setNumScans(static_cast<uint32_t>(std::get<int64_t>(row[column_map["NumScans"]])));
+
+            if (column_map.count("NumPeaks") && std::holds_alternative<int64_t>(row[column_map["NumPeaks"]]))
+                frame.setNumPeaks(static_cast<uint32_t>(std::get<int64_t>(row[column_map["NumPeaks"]])));
+
+            if (column_map.count("MzCalibration") && std::holds_alternative<double>(row[column_map["MzCalibration"]]))
+                frame.setMzCalibration(std::get<double>(row[column_map["MzCalibration"]]));
+
+            if (column_map.count("T1") && std::holds_alternative<double>(row[column_map["T1"]]))
+                frame.setT1(std::get<double>(row[column_map["T1"]]));
+
+            if (column_map.count("T2") && std::holds_alternative<double>(row[column_map["T2"]]))
+                frame.setT2(std::get<double>(row[column_map["T2"]]));
+
+            if (column_map.count("TimsCalibration") && std::holds_alternative<double>(row[column_map["TimsCalibration"]]))
+                frame.setTimsCalibration(std::get<double>(row[column_map["TimsCalibration"]]));
+
+            if (column_map.count("PropertyGroup") && std::holds_alternative<int64_t>(row[column_map["PropertyGroup"]]))
+                frame.setPropertyGroup(static_cast<int>(std::get<int64_t>(row[column_map["PropertyGroup"]])));
+            else
+                frame.setPropertyGroup(-1); // Use -1 to indicate NULL
+
+            if (column_map.count("AccumulationTime") && std::holds_alternative<double>(row[column_map["AccumulationTime"]]))
+                frame.setAccumulationTime(std::get<double>(row[column_map["AccumulationTime"]]));
+
+            if (column_map.count("RampTime") && std::holds_alternative<double>(row[column_map["RampTime"]]))
+                frame.setRampTime(std::get<double>(row[column_map["RampTime"]]));
+
+            if (column_map.count("Pressure") && std::holds_alternative<double>(row[column_map["Pressure"]]))
+                frame.setPressure(std::get<double>(row[column_map["Pressure"]]));
+
+            // Store the frame in the cache
+            frames_[frame.getId()] = std::move(frame);
+        }
+    }    //populateFrames
+
+    void TimsData::populateScans() {
+        // Ensure frames are populated first
+        if (frames_.empty()) {
+            throw std::runtime_error("Frames are not populated. Call populateFrames() first.");
+        }
+
+        // Loop through all frames
+        for (auto& frame_pair : frames_) {
+            Frame& frame = frame_pair.second;
+
+            // Clear existing scans to avoid duplication
+            frame.clearScans();
+
+            // Read scans for the current frame
+            FrameProxy frameProxy = readScans(frame.getId(), 0, frame.getNumScans());
+
+            for (uint32_t scan_idx = 0; scan_idx < frameProxy.getNbrScans(); ++scan_idx) {
+                // Skip scans without peaks
+                auto numberOfPeaks = frameProxy.getNbrPeaks(scan_idx);
+                if (numberOfPeaks == 0) {
+                    continue;
+                }
+
+                // Create a new Scan object
+                TimsScan scan;
+            
+                // Populate Spectra for the current scan
+                std::vector<double> mobilities;
+                scanNumToOneOverK0(frame.getId(), {static_cast<double>(scan_idx)},mobilities);
+                double mobility = mobilities.empty() ? 0.0 : mobilities[0];
+
+                // Get the X (index) and Y (intensity) axis data
+                auto x_axis = frameProxy.getScanX(scan_idx);
+                auto y_axis = frameProxy.getScanY(scan_idx);
+
+                // Convert X indices to m/z values
+                std::vector<double> mz_values;
+                std::vector<double> indices(x_axis.first, x_axis.second);
+                indexToMz(frame.getId(), indices, mz_values);
+
+                // Create and populate a Spectrum object
+                TimsSpectrum spectrum(mobility);
+
+                // size_t num_peaks = std::min(x_axis.size(), y_axis.size());
+                for (size_t peak_idx = 0; peak_idx < numberOfPeaks; ++peak_idx) {
+                    spectrum.addPeak(mz_values[peak_idx], y_axis.first[peak_idx]);
+                }
+
+                // Only add the Spectrum if it contains peaks
+                if (spectrum.getNumberOfPeaks() > 0) {
+                    scan.addSpectrum(spectrum);
+                }
+
+                // Store the populated Scan object in the frame's vector
+                frame.addScan(scan);
+            }
+        }
+    }
+
+        
 } // namespace timsdata
+
+// // Assume 'timsData' is an instance of TimsData
+// timsData.populateFrames();  // Populate frame metadata first
+// timsData.populateScansAndSpectra();  // Then populate scans and spectra
+
+// // Iterate through frames, scans, and spectra
+// for (const auto& frame_pair : timsData.getFrames()) {
+//     const Frame& frame = frame_pair.second;
+//     std::cout << "Frame ID: " << frame.Id << "\n";
+
+//     for (const auto& scan : frame.getScans()) {
+//         std::cout << "  Scan with " << scan.getNumberOfSpectra() << " spectra\n";
+
+//         for (const auto& spectrum : scan.getSpectra()) {
+//             std::cout << "    Mobility: " << spectrum.getMobility() << "\n";
+//             for (size_t i = 0; i < spectrum.getNumberOfPeaks(); ++i) {
+//                 std::cout << "      m/z: " << spectrum.getMz()[i]
+//                           << ", Intensity: " << spectrum.getIntensity()[i] << "\n";
+//             }
+//         }
+//     }
+// }

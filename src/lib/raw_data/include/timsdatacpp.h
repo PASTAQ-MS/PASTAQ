@@ -12,22 +12,162 @@
 #include <limits>
 #include <memory>
 #include <variant>
+#include <utility>
 
 #include "CppSQLite3.h"
 #include "timsdata.h" // fundamental C API
 
-        #define BDAL_TIMS_DEFINE_CONVERSION_FUNCTION(CPPNAME, CNAME) \
-        void CPPNAME ( \
+#define BDAL_TIMS_DEFINE_CONVERSION_FUNCTION(CPPNAME, CNAME) \
+void CPPNAME ( \
             int64_t frame_id,               /**< frame index */ \
             const std::vector<double> & in, /**< vector of input values (can be empty) */ \
             std::vector<double> & out )     /**< vector of corresponding output values (will be resized automatically) */ \
-        { \
-            doTransformation(frame_id, in, out, CNAME); \
-        }
+{ \
+    doTransformation(frame_id, in, out, CNAME); \
+}
 
 
 namespace timsdata
 {
+
+    // Forward Declaration
+    class FrameProxy;
+    class Spectrum;
+    class Scan;
+    class Frame;
+    class TimsData;
+
+    class TimsSpectrum {
+        public:
+            TimsSpectrum(double mobility) : mobility_(mobility) {}
+
+            void addPeak(double mzValue, double intensityValue) {
+                mz_.push_back(mzValue);
+                intensity_.push_back(intensityValue);
+            }
+
+            const std::vector<double>& getMz() const {
+                return mz_;
+            }
+
+            const std::vector<double>& getIntensity() const {
+                return intensity_;
+            }
+
+            double getMobility() const {
+                return mobility_;
+            }
+
+            size_t getNumberOfPeaks() const {
+                return mz_.size();
+            }
+
+        private:
+            double mobility_;
+            std::vector<double> mz_;
+            std::vector<double> intensity_;
+    };
+
+    // Scan Class
+    class TimsScan {
+        public:
+            void addSpectrum(const TimsSpectrum& spectrum) {
+                spectra_.push_back(spectrum);
+            }
+
+            const std::vector<TimsSpectrum>& getSpectra() const {
+                return spectra_;
+            }
+
+            size_t getNumberOfSpectra() const {
+                return spectra_.size();
+            }
+
+        private:
+            std::vector<TimsSpectrum> spectra_;
+    };
+
+    // Frame Class
+    class Frame {
+        public:
+            void addScan(const TimsScan& scan) {
+                scans_.push_back(scan);
+            }
+
+            void clearScans() {
+                scans_.clear();
+            }
+
+            const std::vector<TimsScan>& getScans() const {
+                return scans_;
+            }
+
+            size_t getNumberOfScans() const {
+                return scans_.size();
+            }
+
+            // Setters 
+            void setId(int64_t id) { Id = id; }
+            void setTime(double time) { Time = time; }
+            void setPolarity(const std::string& polarity) { Polarity = polarity; }
+            void setScanMode(int scanMode) { ScanMode = scanMode; }
+            void setMsMsType(int msMsType) { MsMsType = msMsType; }
+            void setTimsId(int32_t timsId) { TimsId = timsId; }
+            void setMaxIntensity(uint32_t maxIntensity) { MaxIntensity = maxIntensity; }
+            void setSummedIntensities(uint64_t summedIntensities) { SummedIntensities = summedIntensities; }
+            void setNumScans(uint32_t numScans) { NumScans = numScans; }
+            void setNumPeaks(uint32_t numPeaks) { NumPeaks = numPeaks; }
+            void setMzCalibration(double mzCalibration) { MzCalibration = mzCalibration; }
+            void setT1(double t1) { T1 = t1; }
+            void setT2(double t2) { T2 = t2; }
+            void setTimsCalibration(double timsCalibration) { TimsCalibration = timsCalibration; }
+            void setPropertyGroup(int propertyGroup) { PropertyGroup = propertyGroup; }
+            void setAccumulationTime(double accumulationTime) { AccumulationTime = accumulationTime; }
+            void setRampTime(double rampTime) { RampTime = rampTime; }
+            void setPressure(double pressure) { Pressure = pressure; }
+
+            // Getters
+            int64_t getId() const { return Id; }
+            double getTime() const { return Time; }
+            const std::string& getPolarity() const { return Polarity; }
+            int getScanMode() const { return ScanMode; }
+            int getMsMsType() const { return MsMsType; }
+            int32_t getTimsId() const { return TimsId; }
+            uint32_t getMaxIntensity() const { return MaxIntensity; }
+            uint64_t getSummedIntensities() const { return SummedIntensities; }
+            uint32_t getNumScans() const { return NumScans; }
+            uint32_t getNumPeaks() const { return NumPeaks; }
+            double getMzCalibration() const { return MzCalibration; }
+            double getT1() const { return T1; }
+            double getT2() const { return T2; }
+            double getTimsCalibration() const { return TimsCalibration; }
+            int getPropertyGroup() const { return PropertyGroup; }
+            double getAccumulationTime() const { return AccumulationTime; }
+            double getRampTime() const { return RampTime; }
+            double getPressure() const { return Pressure; }
+
+        private:
+            std::vector<TimsScan> scans_;
+
+            int64_t Id;
+            double Time;
+            std::string Polarity;
+            int ScanMode;
+            int MsMsType;
+            int32_t TimsId;
+            uint32_t MaxIntensity;
+            uint64_t SummedIntensities;
+            uint32_t NumScans;
+            uint32_t NumPeaks;
+            double MzCalibration;
+            double T1;
+            double T2;
+            double TimsCalibration;
+            int PropertyGroup;
+            double AccumulationTime;
+            double RampTime;
+            double Pressure;
+    };
 
     class FrameProxy
     {
@@ -65,6 +205,8 @@ namespace timsdata
     std::string getLastError();
     void throwLastError();
 
+
+
     class TimsData
     {
     public:
@@ -84,6 +226,11 @@ namespace timsdata
 
         uint32_t getNumberOfFrames() const;
         std::pair<std::vector<std::string>, std::vector<std::vector<std::variant<int64_t, double, std::string>>>> getFramesTable() const;
+        void populateFrames(const std::string& filter = "");
+        const std::map<int64_t, Frame>& getFrames() const {
+            return frames_;
+        }
+        void populateScans();
         std::string getTdfFile() const {
             return tdfFile;
         }
@@ -104,10 +251,15 @@ namespace timsdata
         uint64_t handle;
         size_t initial_frame_buffer_size;
 
-        void doTransformation(int64_t frame_id, const std::vector<double>& in, std::vector<double>& out, 
-                                BdalTimsConversionFunction* func);
+        void doTransformation(int64_t frame_id, 
+                              const std::vector<double>& in,
+                              std::vector<double>& out, 
+                              BdalTimsConversionFunction* func);
         std::string tdfFile;             // Path to the .tdf SQLite file
         mutable CppSQLite3DB db;         // Database connection object
+
+        // Cache for frames
+        std::map<int64_t, Frame> frames_;
     };
 
 } // namespace timsdata

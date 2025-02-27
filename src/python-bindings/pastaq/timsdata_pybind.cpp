@@ -11,6 +11,24 @@ void register_tims_data(py::module_ &m) {
         .value("PerFramePressureCompensationWithMissingReference", pressure_compensation_strategy::PerFramePressureCompensationWithMissingReference)
         .export_values();
 
+    // Expose Spectrum Class
+    py::class_<TimsSpectrum>(m, "TimsSpectrum")
+        .def("getMz", &TimsSpectrum::getMz, "Get m/z values.")
+        .def("getIntensity", &TimsSpectrum::getIntensity, "Get intensity values.")
+        .def("getMobility", &TimsSpectrum::getMobility, "Get mobility.")
+        .def("getNumberOfPeaks", &TimsSpectrum::getNumberOfPeaks, "Get number of peaks.");
+
+    // Expose Scan Class
+    py::class_<TimsScan>(m, "TimsScan")
+        .def("getSpectra", &TimsScan::getSpectra, "Get list of spectra.")
+        .def("getNumberOfSpectra", &TimsScan::getNumberOfSpectra, "Get number of spectra.");
+
+    // Expose Frame Class
+    py::class_<Frame>(m, "Frame")
+        .def("getTime", &Frame::getTime, "Get time.")
+        .def("getNumScans", &Frame::getNumScans, "Get number of scans.")
+        .def("getScans",&Frame::getScans,"Get scans as a list");
+    
     py::class_<PyFrameProxy>(m, "PyFrameProxy")
         .def("getNbrScans", &PyFrameProxy::getNbrScans)
         .def("getTotalNbrPeaks", &PyFrameProxy::getTotalNbrPeaks)
@@ -90,5 +108,16 @@ void register_tims_data(py::module_ &m) {
             std::vector<double> out;
             self.voltageToScanNum(frame_id, in, out);
             return out;
-        }, "Convert voltage to scan number.");
+        }, "Convert voltage to scan number.")
+        
+        .def("populateFrames", 
+             &timsdata::TimsData::populateFrames, 
+             py::arg("filter") = "", 
+             "Populate frames, optionally filtering by a condition.")
+        
+        .def("populateScans", 
+             &timsdata::TimsData::populateScans, 
+             "Populate scans for the previously loaded frames.")
+        
+        .def("getFrames", &timsdata::TimsData::getFrames, "Get all frames.");
 }
