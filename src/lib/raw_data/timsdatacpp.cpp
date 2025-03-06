@@ -191,6 +191,8 @@ namespace timsdata
         auto number_of_frames = db.execScalar("SELECT COUNT(*) FROM Frames;");
         return static_cast<uint32_t>(number_of_frames);
     }
+
+
     std::pair<std::vector<std::string>, std::vector<std::vector<std::variant<int64_t, double, std::string>>>> 
 TimsData::getFramesTable() const {
     // std::vector<std::vector<std::variant<int64_t, double, std::string>>> TimsData::getFramesTable() const {
@@ -398,7 +400,138 @@ TimsData::getFramesTable() const {
         }
     }    //populateFrames
 
-    void TimsData::populateSpectra() {
+    // void TimsData::populateSpectra() {
+    //     // Ensure frames are populated first
+    //     if (frames_.empty()) {
+    //         throw std::runtime_error("Frames are not populated. Call populateFrames() first.");
+    //     }
+
+    //     // Loop through all frames
+    //     for (auto& frame_pair : frames_) {
+    //         Frame& frame = frame_pair.second;
+
+    //         // Clear existing scans to avoid duplication
+    //         // frame.clearScans();
+    //         frame.clearSpectra();
+
+    //         // Read scans for the current frame
+    //         FrameProxy frameProxy = readScans(frame.getId(), 0, frame.getNumScans());
+
+    //         for (uint32_t scan_idx = 0; scan_idx < frameProxy.getNbrScans(); ++scan_idx) {
+    //             // Skip scans without peaks
+    //             auto numberOfPeaks = frameProxy.getNbrPeaks(scan_idx);
+    //             if (numberOfPeaks == 0) {
+    //                 continue;
+    //             }
+
+    //             // Create a new Spectrum object
+    //             //TimsScan scan;
+            
+    //             // Populate Spectra for the current scan
+    //             std::vector<double> mobilities;
+    //             scanNumToOneOverK0(frame.getId(), {static_cast<double>(scan_idx)},mobilities);
+    //             double mobility = mobilities.empty() ? 0.0 : mobilities[0];
+
+    //             // Get the X (index) and Y (intensity) axis data
+    //             auto x_axis = frameProxy.getScanX(scan_idx);
+    //             auto y_axis = frameProxy.getScanY(scan_idx);
+
+    //             // Convert X indices to m/z values
+    //             std::vector<double> mz_values;
+    //             std::vector<double> indices(x_axis.first, x_axis.second);
+    //             indexToMz(frame.getId(), indices, mz_values);
+
+    //             // Create and populate a Spectrum object
+    //             TimsSpectrum spectrum(mobility);
+
+    //             // size_t num_peaks = std::min(x_axis.size(), y_axis.size());
+    //             for (size_t peak_idx = 0; peak_idx < numberOfPeaks; ++peak_idx) {
+    //                 spectrum.addPeak(mz_values[peak_idx], y_axis.first[peak_idx]);
+    //             }
+
+    //             // Only add the Spectrum if it contains peaks
+    //             if (spectrum.getNumberOfPeaks() > 0) {
+    //                 //scan.addSpectrum(spectrum);
+    //                 frame.addSpectrum(spectrum);
+    //             }
+
+    //             // Store the populated Scan object in the frame's vector
+    //             //frame.addScan(scan);
+    //         }
+    //     }
+    // }
+
+    void TimsData::selectFrames(
+        std::optional<int> min_id, std::optional<int> max_id,
+        std::optional<double> min_time, std::optional<double> max_time,
+        std::optional<std::string> polarity, std::optional<int> msms_type,
+        std::optional<int> scan_mode, std::optional<int> tims_id,
+        std::optional<double> min_max_intensity, std::optional<double> max_max_intensity,
+        std::optional<double> min_summed_intensities, std::optional<double> max_summed_intensities,
+        std::optional<int> min_num_peaks, std::optional<int> max_num_peaks) {
+
+        // Check for invalid min/max value combinations and throw errors
+        if (min_id && max_id && *min_id > *max_id) {
+            throw std::invalid_argument("min_id cannot be greater than max_id");
+        }
+        if (min_time && max_time && *min_time > *max_time) {
+            throw std::invalid_argument("min_time cannot be greater than max_time");
+        }
+        if (min_max_intensity && max_max_intensity && *min_max_intensity > *max_max_intensity) {
+            throw std::invalid_argument("min_max_intensity cannot be greater than max_max_intensity");
+        }
+        if (min_summed_intensities && max_summed_intensities && *min_summed_intensities > *max_summed_intensities) {
+            throw std::invalid_argument("min_summed_intensities cannot be greater than max_summed_intensities");
+        }
+        if (min_num_peaks && max_num_peaks && *min_num_peaks > *max_num_peaks) {
+            throw std::invalid_argument("min_num_peaks cannot be greater than max_num_peaks");
+        }
+        
+        std::stringstream filter;
+        bool first_condition = true;
+
+        auto append_condition = [&](const std::string& condition) {
+            if (!first_condition) {
+                filter << " AND ";
+            }
+            filter << condition;
+            first_condition = false;
+        };
+
+        if (min_id) append_condition("Id >= " + std::to_string(*min_id));
+        if (max_id) append_condition("Id <= " + std::to_string(*max_id));
+        if (min_time) append_condition("Time >= " + std::to_string(*min_time));
+        if (max_time) append_condition("Time <= " + std::to_string(*max_time));
+        if (polarity) {
+            if (*polarity == "+" || *polarity == "-") {
+                append_condition("Polarity = '" + *polarity + "'");
+            } else {
+                throw std::invalid_argument("Polarity must be '+' or '-'");
+            }
+        }
+        if (msms_type) append_condition("MsMsType = " + std::to_string(*msms_type));
+        if (scan_mode) append_condition("ScanMode = " + std::to_string(*scan_mode));
+        if (tims_id) append_condition("TimsId = " + std::to_string(*tims_id));
+        if (min_max_intensity) append_condition("MaxIntensity >= " + std::to_string(*min_max_intensity));
+        if (max_max_intensity) append_condition("MaxIntensity <= " + std::to_string(*max_max_intensity));
+        if (min_summed_intensities) append_condition("SummedIntensities >= " + std::to_string(*min_summed_intensities));
+        if (max_summed_intensities) append_condition("SummedIntensities <= " + std::to_string(*max_summed_intensities));
+        if (min_num_peaks) append_condition("NumPeaks >= " + std::to_string(*min_num_peaks));
+        if (max_num_peaks) append_condition("NumPeaks <= " + std::to_string(*max_num_peaks));
+
+        // Convert the filter into a string
+        std::string filter_str = filter.str();
+    
+        // Call populateFrames with the constructed filter
+        populateFrames(filter_str);
+    }
+
+    void TimsData::populateSpectra(
+        std::optional<double> min_mz,
+        std::optional<double> max_mz,
+        std::optional<double> min_mobility,
+        std::optional<double> max_mobility) {
+    
         // Ensure frames are populated first
         if (frames_.empty()) {
             throw std::runtime_error("Frames are not populated. Call populateFrames() first.");
@@ -407,9 +540,6 @@ TimsData::getFramesTable() const {
         // Loop through all frames
         for (auto& frame_pair : frames_) {
             Frame& frame = frame_pair.second;
-
-            // Clear existing scans to avoid duplication
-            // frame.clearScans();
             frame.clearSpectra();
 
             // Read scans for the current frame
@@ -421,14 +551,15 @@ TimsData::getFramesTable() const {
                 if (numberOfPeaks == 0) {
                     continue;
                 }
-
-                // Create a new Spectrum object
-                //TimsScan scan;
-            
+        
                 // Populate Spectra for the current scan
                 std::vector<double> mobilities;
-                scanNumToOneOverK0(frame.getId(), {static_cast<double>(scan_idx)},mobilities);
+                scanNumToOneOverK0(frame.getId(), {static_cast<double>(scan_idx)}, mobilities);
                 double mobility = mobilities.empty() ? 0.0 : mobilities[0];
+
+                // Check mobility range
+                if (min_mobility && mobility < *min_mobility) continue;
+                if (max_mobility && mobility > *max_mobility) continue;
 
                 // Get the X (index) and Y (intensity) axis data
                 auto x_axis = frameProxy.getScanX(scan_idx);
@@ -442,19 +573,21 @@ TimsData::getFramesTable() const {
                 // Create and populate a Spectrum object
                 TimsSpectrum spectrum(mobility);
 
-                // size_t num_peaks = std::min(x_axis.size(), y_axis.size());
                 for (size_t peak_idx = 0; peak_idx < numberOfPeaks; ++peak_idx) {
-                    spectrum.addPeak(mz_values[peak_idx], y_axis.first[peak_idx]);
+                    double mz = mz_values[peak_idx];
+                    double intensity = y_axis.first[peak_idx];
+
+                    // Check m/z range
+                    if (min_mz && mz < *min_mz) continue;
+                    if (max_mz && mz > *max_mz) continue;
+
+                    spectrum.addPeak(mz, intensity);
                 }
 
                 // Only add the Spectrum if it contains peaks
                 if (spectrum.getNumberOfPeaks() > 0) {
-                    //scan.addSpectrum(spectrum);
                     frame.addSpectrum(spectrum);
                 }
-
-                // Store the populated Scan object in the frame's vector
-                //frame.addScan(scan);
             }
         }
     }
@@ -462,24 +595,4 @@ TimsData::getFramesTable() const {
         
 } // namespace timsdata
 
-// // Assume 'timsData' is an instance of TimsData
-// timsData.populateFrames();  // Populate frame metadata first
-// timsData.populateScansAndSpectra();  // Then populate scans and spectra
 
-// // Iterate through frames, scans, and spectra
-// for (const auto& frame_pair : timsData.getFrames()) {
-//     const Frame& frame = frame_pair.second;
-//     std::cout << "Frame ID: " << frame.Id << "\n";
-
-//     for (const auto& scan : frame.getScans()) {
-//         std::cout << "  Scan with " << scan.getNumberOfSpectra() << " spectra\n";
-
-//         for (const auto& spectrum : scan.getSpectra()) {
-//             std::cout << "    Mobility: " << spectrum.getMobility() << "\n";
-//             for (size_t i = 0; i < spectrum.getNumberOfPeaks(); ++i) {
-//                 std::cout << "      m/z: " << spectrum.getMz()[i]
-//                           << ", Intensity: " << spectrum.getIntensity()[i] << "\n";
-//             }
-//         }
-//     }
-// }

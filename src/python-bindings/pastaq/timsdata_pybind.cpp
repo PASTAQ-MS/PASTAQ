@@ -111,13 +111,44 @@ void register_tims_data(py::module_ &m) {
         }, "Convert voltage to scan number.")
         
         .def("populateFrames", 
-             &timsdata::TimsData::populateFrames, 
+             &TimsData::populateFrames, 
              py::arg("filter") = "", 
-             "Populate frames, optionally filtering by a condition.")
-        
+             "Populate frames, optionally filtering by an SQL condition.")
+
+        .def("selectFrames", &TimsData::selectFrames,
+            py::arg("min_id") = std::nullopt,
+            py::arg("max_id") = std::nullopt,
+            py::arg("min_time") = std::nullopt,
+            py::arg("max_time") = std::nullopt,
+            py::arg("polarity") = std::nullopt,
+            py::arg("msms_type") = std::nullopt,
+            py::arg("scan_mode") = std::nullopt,
+            py::arg("tims_id") = std::nullopt,
+            py::arg("min_max_intensity") = std::nullopt,
+            py::arg("max_max_intensity") = std::nullopt,
+            py::arg("min_summed_intensities") = std::nullopt,
+            py::arg("max_summed_intensities") = std::nullopt,
+            py::arg("min_num_peaks") = std::nullopt,
+            py::arg("max_num_peaks") = std::nullopt)
+
         .def("populateSpectra", 
-             &timsdata::TimsData::populateSpectra, 
-             "Populate scans for the previously loaded frames.")
+            [](timsdata::TimsData& self, 
+                py::object min_mz, py::object max_mz, 
+                py::object min_mobility, py::object max_mobility) {
+         
+                     // Convert Python None to std::optional<double>
+                     std::optional<double> min_mz_opt = min_mz.is_none() ? std::nullopt : std::make_optional(min_mz.cast<double>());
+                     std::optional<double> max_mz_opt = max_mz.is_none() ? std::nullopt : std::make_optional(max_mz.cast<double>());
+                     std::optional<double> min_mobility_opt = min_mobility.is_none() ? std::nullopt : std::make_optional(min_mobility.cast<double>());
+                     std::optional<double> max_mobility_opt = max_mobility.is_none() ? std::nullopt : std::make_optional(max_mobility.cast<double>());
+
+                 self.populateSpectra(min_mz_opt, max_mz_opt, min_mobility_opt, max_mobility_opt);
+                 },
+             py::arg("min_mz") = py::none(),
+             py::arg("max_mz") = py::none(),
+             py::arg("min_mobility") = py::none(),
+             py::arg("max_mobility") = py::none(),
+             "Populate spectra for the previously loaded frames, with optional filtering by m/z and mobility.")
         
         .def("getFrames", &timsdata::TimsData::getFrames, "Get all frames.");
 }

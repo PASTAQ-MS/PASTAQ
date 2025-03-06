@@ -231,7 +231,21 @@ namespace timsdata
         const std::map<int64_t, Frame>& getFrames() const {
             return frames_;
         }
-        void populateSpectra();
+
+        void selectFrames(
+            std::optional<int> min_id, std::optional<int> max_id,
+            std::optional<double> min_time, std::optional<double> max_time,
+            std::optional<std::string> polarity, std::optional<int> msms_type,
+            std::optional<int> scan_mode, std::optional<int> tims_id,
+            std::optional<double> min_max_intensity, std::optional<double> max_max_intensity,
+            std::optional<double> min_summed_intensities, std::optional<double> max_summed_intensities,
+            std::optional<int> min_num_peaks, std::optional<int> max_num_peaks);
+
+        void populateSpectra(std::optional<double> min_mz = std::nullopt,
+            std::optional<double> max_mz = std::nullopt,
+            std::optional<double> min_mobility = std::nullopt,
+            std::optional<double> max_mobility = std::nullopt);
+
         std::string getTdfFile() const {
             return tdfFile;
         }
