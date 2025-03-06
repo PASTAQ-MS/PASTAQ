@@ -398,7 +398,7 @@ TimsData::getFramesTable() const {
         }
     }    //populateFrames
 
-    void TimsData::populateScans() {
+    void TimsData::populateSpectra() {
         // Ensure frames are populated first
         if (frames_.empty()) {
             throw std::runtime_error("Frames are not populated. Call populateFrames() first.");
@@ -409,7 +409,8 @@ TimsData::getFramesTable() const {
             Frame& frame = frame_pair.second;
 
             // Clear existing scans to avoid duplication
-            frame.clearScans();
+            // frame.clearScans();
+            frame.clearSpectra();
 
             // Read scans for the current frame
             FrameProxy frameProxy = readScans(frame.getId(), 0, frame.getNumScans());
@@ -421,8 +422,8 @@ TimsData::getFramesTable() const {
                     continue;
                 }
 
-                // Create a new Scan object
-                TimsScan scan;
+                // Create a new Spectrum object
+                //TimsScan scan;
             
                 // Populate Spectra for the current scan
                 std::vector<double> mobilities;
@@ -448,11 +449,12 @@ TimsData::getFramesTable() const {
 
                 // Only add the Spectrum if it contains peaks
                 if (spectrum.getNumberOfPeaks() > 0) {
-                    scan.addSpectrum(spectrum);
+                    //scan.addSpectrum(spectrum);
+                    frame.addSpectrum(spectrum);
                 }
 
                 // Store the populated Scan object in the frame's vector
-                frame.addScan(scan);
+                //frame.addScan(scan);
             }
         }
     }

@@ -69,41 +69,41 @@ namespace timsdata
     };
 
     // Scan Class
-    class TimsScan {
+    // class TimsScan {
+    //     public:
+    //         void addSpectrum(const TimsSpectrum& spectrum) {
+    //             spectra_.push_back(spectrum);
+    //         }
+
+    //         const std::vector<TimsSpectrum>& getSpectra() const {
+    //             return spectra_;
+    //         }
+
+    //         size_t getNumberOfSpectra() const {
+    //             return spectra_.size();
+    //         }
+
+    //     private:
+    //         std::vector<TimsSpectrum> spectra_;
+    // };
+
+    // Frame Class
+    class Frame {
         public:
             void addSpectrum(const TimsSpectrum& spectrum) {
                 spectra_.push_back(spectrum);
+            }
+
+            void clearSpectra() {
+                spectra_.clear();
             }
 
             const std::vector<TimsSpectrum>& getSpectra() const {
                 return spectra_;
             }
 
-            size_t getNumberOfSpectra() const {
-                return spectra_.size();
-            }
-
-        private:
-            std::vector<TimsSpectrum> spectra_;
-    };
-
-    // Frame Class
-    class Frame {
-        public:
-            void addScan(const TimsScan& scan) {
-                scans_.push_back(scan);
-            }
-
-            void clearScans() {
-                scans_.clear();
-            }
-
-            const std::vector<TimsScan>& getScans() const {
-                return scans_;
-            }
-
             size_t getNumberOfScans() const {
-                return scans_.size();
+                return spectra_.size();
             }
 
             // Setters 
@@ -147,7 +147,8 @@ namespace timsdata
             double getPressure() const { return Pressure; }
 
         private:
-            std::vector<TimsScan> scans_;
+            // std::vector<TimsScan> scans_;
+            std::vector<TimsSpectrum> spectra_;
 
             int64_t Id;
             double Time;
@@ -230,7 +231,7 @@ namespace timsdata
         const std::map<int64_t, Frame>& getFrames() const {
             return frames_;
         }
-        void populateScans();
+        void populateSpectra();
         std::string getTdfFile() const {
             return tdfFile;
         }

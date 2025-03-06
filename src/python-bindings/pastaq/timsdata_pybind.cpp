@@ -19,15 +19,15 @@ void register_tims_data(py::module_ &m) {
         .def("getNumberOfPeaks", &TimsSpectrum::getNumberOfPeaks, "Get number of peaks.");
 
     // Expose Scan Class
-    py::class_<TimsScan>(m, "TimsScan")
-        .def("getSpectra", &TimsScan::getSpectra, "Get list of spectra.")
-        .def("getNumberOfSpectra", &TimsScan::getNumberOfSpectra, "Get number of spectra.");
+    // py::class_<TimsScan>(m, "TimsScan")
+    //     .def("getSpectra", &TimsScan::getSpectra, "Get list of spectra.")
+    //     .def("getNumberOfSpectra", &TimsScan::getNumberOfSpectra, "Get number of spectra.");
 
     // Expose Frame Class
     py::class_<Frame>(m, "Frame")
         .def("getTime", &Frame::getTime, "Get time.")
         .def("getNumScans", &Frame::getNumScans, "Get number of scans.")
-        .def("getScans",&Frame::getScans,"Get scans as a list");
+        .def("getSpectra",&Frame::getSpectra,"Get spectra as a list");
     
     py::class_<PyFrameProxy>(m, "PyFrameProxy")
         .def("getNbrScans", &PyFrameProxy::getNbrScans)
@@ -115,8 +115,8 @@ void register_tims_data(py::module_ &m) {
              py::arg("filter") = "", 
              "Populate frames, optionally filtering by a condition.")
         
-        .def("populateScans", 
-             &timsdata::TimsData::populateScans, 
+        .def("populateSpectra", 
+             &timsdata::TimsData::populateSpectra, 
              "Populate scans for the previously loaded frames.")
         
         .def("getFrames", &timsdata::TimsData::getFrames, "Get all frames.");
