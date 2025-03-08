@@ -1,7 +1,11 @@
 #include "timsdata_pybind.h"
+#include "tims_visualization.h"
 #include <pybind11/stl.h>
+#include <pybind11/numpy.h> 
 
 using namespace timsdata;
+using namespace timsvis;
+
 
 void register_tims_data(py::module_ &m) {
     py::enum_<pressure_compensation_strategy>(m, "PressureCompensationStrategy")
@@ -151,4 +155,20 @@ void register_tims_data(py::module_ &m) {
              "Populate spectra for the previously loaded frames, with optional filtering by m/z and mobility.")
         
         .def("getFrames", &timsdata::TimsData::getFrames, "Get all frames.");
+
+    py::class_<timsvis::HeatmapData>(m, "HeatmapData")
+        .def_readonly("value_matrix", &HeatmapData::value_matrix)
+        .def_readonly("x_edges", &HeatmapData::x_edges)
+        .def_readonly("y_edges", &HeatmapData::y_edges);
+
+    py::class_<timsvis::TimsVisualization>(m, "TimsVisualization")
+        .def(py::init<const timsdata::TimsData&>())
+        .def("heatmap_data", [](timsvis::TimsVisualization& self, int x_bins, int y_bins) {
+            auto result = self.heatmap_data(x_bins, y_bins);
+            return py::make_tuple(
+                py::array_t<double>({result.value_matrix.size(), result.value_matrix[0].size()}, &result.value_matrix[0][0]),
+                py::array_t<double>(result.x_edges.size(), result.x_edges.data()),
+                py::array_t<double>(result.y_edges.size(), result.y_edges.data())
+            );
+        });
 }

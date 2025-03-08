@@ -66,6 +66,7 @@ add_library(pastaqlib STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/interpolation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/search.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/utils/serialization.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/visualization/tims_visualization.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d_serialize.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/third_party/CppSQLite/CppSQLite3.cpp"
@@ -77,6 +78,7 @@ add_library(pastaqlib STATIC
 
 target_include_directories(pastaqlib PUBLIC src/lib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/include
 )
 
 # Add mstoolkit include directory
