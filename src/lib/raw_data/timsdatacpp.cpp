@@ -284,6 +284,9 @@ TimsData::getFramesTable() const {
         }
         query_str += ";";
 
+        // Print the query to debug
+        std::cout << "Executing SQL Query: " << query_str << std::endl;
+
         std::vector<std::string> column_names;
         std::vector<std::vector<std::variant<int64_t, double, std::string>>> frames_data;
 

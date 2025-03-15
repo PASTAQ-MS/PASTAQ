@@ -156,19 +156,40 @@ void register_tims_data(py::module_ &m) {
         
         .def("getFrames", &timsdata::TimsData::getFrames, "Get all frames.");
 
-    py::class_<timsvis::HeatmapData>(m, "HeatmapData")
-        .def_readonly("value_matrix", &HeatmapData::value_matrix)
-        .def_readonly("x_edges", &HeatmapData::x_edges)
-        .def_readonly("y_edges", &HeatmapData::y_edges);
+        py::class_<timsvis::HeatmapData>(m, "HeatmapData")
+        .def_readonly("x_values", &timsvis::HeatmapData::x_edges, 
+                  "List of x-values (m/z) corresponding to each column in the heatmap.")
+        .def_readonly("y_values", &timsvis::HeatmapData::y_edges, 
+                  "List of y-values (Time) corresponding to each row in the heatmap.")
+        .def_readonly("z_values", &timsvis::HeatmapData::value_matrix, 
+                  "List of intensity values (log-transformed) at each (x, y) position in the heatmap.");
 
-    py::class_<timsvis::TimsVisualization>(m, "TimsVisualization")
-        .def(py::init<const timsdata::TimsData&>())
+        py::class_<timsvis::TimsVisualization>(m, "TimsVisualization")
+        .def(py::init<const timsdata::TimsData&>(), 
+         "Constructor for TimsVisualization class, requires a TimsData object to initialize.")
         .def("heatmap_data", [](timsvis::TimsVisualization& self, int x_bins, int y_bins) {
             auto result = self.heatmap_data(x_bins, y_bins);
             return py::make_tuple(
-                py::array_t<double>({result.value_matrix.size(), result.value_matrix[0].size()}, &result.value_matrix[0][0]),
-                py::array_t<double>(result.x_edges.size(), result.x_edges.data()),
-                py::array_t<double>(result.y_edges.size(), result.y_edges.data())
+            py::array_t<double>(result.x_edges.size(), result.x_edges.data()),  // x_values
+            py::array_t<double>(result.y_edges.size(), result.y_edges.data()),  // y_values
+            py::array_t<double>({result.value_matrix.size(), result.value_matrix[0].size()}, &result.value_matrix[0][0])   // z_values
             );
-        });
+        }, 
+        "Generates heatmap data with x_bins and y_bins, returning x_values, y_values, and z_values as NumPy arrays.");
+    
+    // py::class_<timsvis::HeatmapData>(m, "HeatmapData")
+    //     .def_readonly("value_matrix", &HeatmapData::value_matrix)
+    //     .def_readonly("x_edges", &HeatmapData::x_edges)
+    //     .def_readonly("y_edges", &HeatmapData::y_edges);
+
+    // py::class_<timsvis::TimsVisualization>(m, "TimsVisualization")
+    //     .def(py::init<const timsdata::TimsData&>())
+    //     .def("heatmap_data", [](timsvis::TimsVisualization& self, int x_bins, int y_bins) {
+    //         auto result = self.heatmap_data(x_bins, y_bins);
+    //         return py::make_tuple(
+    //             py::array_t<double>({result.value_matrix.size(), result.value_matrix[0].size()}, &result.value_matrix[0][0]),
+    //             py::array_t<double>(result.x_edges.size(), result.x_edges.data()),
+    //             py::array_t<double>(result.y_edges.size(), result.y_edges.data())
+    //         );
+    //     });
 }
