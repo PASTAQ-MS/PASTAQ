@@ -163,37 +163,44 @@ def plot_msSpectra(mz, intensity, norm_mz_diff = 0.0035, diffFactor = 1.3, scanI
     plt.grid(False)  # Show grid
     return fig
 
-def plot_meshPeaks(mesh, peaks):
+def plot_meshPeaks(mesh, peaks, localMax=[]):
     """
     Plotting mesh grid with peak positions.
     
     Args:
-        mesh: A list of x values.
-        peaks: A list of y values.
+        mesh: smoothed grid object.
+        peaks: A list of peaks values.
+        localMax: A list of local maxima values.
     
     Returns:
         Figure object as fig.
     """
-    mzVec, rtVec, mzVecMax, rtVecMax = [], [], [], []
+    mzVec, rtVec, mzVecMax, rtVecMax, mzLocMax, rtLocMax = [], [], [], [], [], []
     plot = pq.plot_mesh(mesh, transform='sqrt', figure=None)
     plot['img_plot'].get_figure().set_size_inches(15, 10)
     for k in range(len(peaks)):
         mzVecMax.insert(k, peaks[k].local_max_mz)
         rtVecMax.insert(k, peaks[k].local_max_rt)
-    plot['img_plot'].scatter(mzVecMax, rtVecMax, s=100, c='green', marker='.')
+    plot['img_plot'].scatter(mzVecMax, rtVecMax, s=100, c='green', marker='o', alpha=0.7)
     for k in range(len(peaks)):
         mzVec.insert(k, peaks[k].fitted_mz)
         rtVec.insert(k, peaks[k].fitted_rt)
     plot['img_plot'].scatter(mzVec, rtVec, s=100, c='red', marker='.')
+    if localMax != []:
+        for k in range(len(localMax)):
+            mzLocMax.insert(k, localMax[k].mz)
+            rtLocMax.insert(k, localMax[k].rt)
+        plot['img_plot'].scatter(mzLocMax, rtLocMax, s=50, c='blue', marker='x', alpha=0.7)
     return plot
 
-def plot_meshRawPeaks(mesh, rawData, peaks):
+def plot_meshRawPeaks(mesh, rawData, peaks, localMax=[]):
     """
     Plots a mesh and raw data with identified peaks.
     Args:
         mesh (Mesh): The mesh object containing the mesh grid data.
         rawData (ndarray): The raw data to be plotted as scatter plot.
         peaks (list): A list of Peak objects representing the identified peaks and local maxima in the mesh.
+        loaclMax (list): A list of local maxima to be plotted.
     Returns:
         Figure: The scatter plot figure.
     Raises:
@@ -203,8 +210,6 @@ def plot_meshRawPeaks(mesh, rawData, peaks):
     scatterRaw = plt.figure(figsize=(15, 8), facecolor='black')  # Set the figure size
     img = mesh.data
     img = np.reshape(img, (mesh.m, mesh.n))
-    bins_rt = mesh.bins_rt
-    bins_mz = mesh.bins_mz
     offset_rt = (np.array(mesh.bins_rt).max() -
                     np.array(mesh.bins_rt).min())/mesh.m / 2
     offset_mz = (np.array(mesh.bins_mz).max() -
@@ -236,17 +241,25 @@ def plot_meshRawPeaks(mesh, rawData, peaks):
     for k in range(len(peaks)):
         mzVecLoc.insert(k, peaks[k].local_max_mz)
         rtVecLoc.insert(k, peaks[k].local_max_rt)
-    plt.scatter(mzVecLoc, rtVecLoc, s=100, c='green', marker='.')
+    plt.scatter(mzVecLoc, rtVecLoc, s=100, c='green', marker='o', alpha=0.7)
 
     # shows identified peaks
     for k in range(len(peaks)):
         mzVec.insert(k, peaks[k].fitted_mz)
         rtVec.insert(k, peaks[k].fitted_rt)
     plt.scatter(mzVec, rtVec, s=100, c='red', marker='.')
+    
+    # shows local maxima
+    if localMax != []:
+        mzVecLocMax, rtVecLocMax = [], []
+        for k in range(len(localMax)):
+            mzVecLocMax.insert(k, localMax[k].mz)
+            rtVecLocMax.insert(k, localMax[k].rt)
+        plt.scatter(mzVecLocMax, rtVecLocMax, s=50, c='blue', marker='x', alpha=0.7)
 
     # Label the axes
     plt.xlabel('m/z')  # Set the x-axis label
-    plt.ylabel('Intensity')  # Set the y-axis label
+    plt.ylabel('Retention time (s)')  # Set the y-axis label
     plt.title('Raw data of a zommed in area of the isotope cluster')  # Set the title
 
     # Show the plot

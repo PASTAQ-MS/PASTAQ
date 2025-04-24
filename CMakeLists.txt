@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.14)
 
-project(pastaq VERSION "0.11.0")
+project(pastaq VERSION "0.11.2")
 
 # Set project properties.
 set(CMAKE_CXX_STANDARD 17)
