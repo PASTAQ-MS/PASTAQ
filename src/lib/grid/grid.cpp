@@ -1,5 +1,7 @@
 #include <cassert>
 #include <cmath>
+#include <iostream>
+#include <sstream>
 
 #include "grid/grid.hpp"
 #include "utils/serialization.hpp"
@@ -265,6 +267,266 @@ Grid::Grid Grid::_resample(const RawData::RawData &raw_data,
     }
     return grid;
 }
+
+Grid::Grid Grid::_resamplex(const RawData::RawData &raw_data,
+                          const ResampleParams &params) {
+// std::tuple<Grid::Grid, std::vector<std::string>> _resamplex(const RawData::RawData &raw_data, const Grid::ResampleParams &params) {
+    // Initialize the Grid.
+    Grid grid;
+    std::vector<std::string> warnings;
+
+    grid.k = params.num_samples_mz;
+    grid.t = params.num_samples_rt;
+    grid.reference_mz = raw_data.reference_mz;
+    grid.fwhm_mz = raw_data.reference_mz / raw_data.resolution_ms1;
+    grid.fwhm_rt = raw_data.fwhm_rt;
+    grid.instrument_type = raw_data.instrument_type;
+    grid.min_mz = raw_data.min_mz;
+    grid.max_mz = raw_data.max_mz;
+    grid.min_rt = raw_data.min_rt;
+    grid.max_rt = raw_data.max_rt;
+
+    std::cerr << "Testing message: no neighbors found for mz="; 
+    // Estimate number of bins based on fwhm and desired number of samples.
+    double delta_mz = grid.fwhm_mz / params.num_samples_mz;
+    double delta_rt = grid.fwhm_rt / params.num_samples_rt;
+    uint64_t n = static_cast<uint64_t>((grid.max_mz - grid.min_mz) / delta_mz) + 1;
+    uint64_t m = static_cast<uint64_t>((grid.max_rt - grid.min_rt) / delta_rt) + 1;
+
+    grid.n = n;
+    grid.m = m;
+    grid.data = std::vector<double>(n * m);
+    grid.bins_mz = std::vector<double>(n);
+    grid.bins_rt = std::vector<double>(m);
+
+    // Generate bins_mz.
+    for (size_t i = 0; i < n; ++i) {
+        grid.bins_mz[i] = grid.min_mz + i * delta_mz;
+    }
+
+    // Generate bins_rt.
+    for (size_t j = 0; j < m; ++j) {
+        grid.bins_rt[j] = grid.min_rt + j * delta_rt;
+    }
+
+    // Pre-calculate the smoothing sigma values for all bins of the grid.
+    double sigma_rt = RawData::fwhm_to_sigma(raw_data.fwhm_rt) *
+                      params.smoothing_coef_rt / std::sqrt(2);
+    auto sigma_mz_vec = std::vector<double>(n);
+    for (size_t i = 0; i < n; ++i) {
+        sigma_mz_vec[i] = RawData::fwhm_to_sigma(RawData::theoretical_fwhm(
+                              raw_data, grid.bins_mz[i])) *
+                          params.smoothing_coef_mz / std::sqrt(2);
+    }
+
+    // Pre-calculate the kernel half widths for rt and mz.
+    double sigma_mz_ref = RawData::fwhm_to_sigma(grid.fwhm_mz);
+    uint64_t rt_kernel_hw = static_cast<uint64_t>(3 * sigma_rt / delta_rt);
+    uint64_t mz_kernel_hw = static_cast<uint64_t>(3 * sigma_mz_ref / delta_mz);
+
+
+    // Gaussian splatting. First pass.
+    {
+        auto weights = std::vector<double>(n * m);
+        for (size_t s = 0; s < raw_data.scans.size(); ++s) {
+            const auto &scan = raw_data.scans[s];
+            double current_rt = scan.retention_time;
+
+            // Find the bin for the current retention time.
+            size_t index_rt = y_index(grid, current_rt);
+
+            // Find the min/max indexes for the rt kernel.
+            size_t j_min = 0;
+            if (index_rt >= rt_kernel_hw) {
+                j_min = index_rt - rt_kernel_hw;
+            }
+            size_t j_max = grid.m - 1;
+            if ((index_rt + rt_kernel_hw) < grid.m) {
+                j_max = index_rt + rt_kernel_hw;
+            }
+
+            for (size_t k = 0; k < scan.num_points; ++k) {
+                double current_intensity = scan.intensity[k];
+                double current_mz = scan.mz[k];
+
+                // Find the bin for the current mz.
+                size_t index_mz = x_index(grid, current_mz);
+
+                double sigma_mz = sigma_mz_vec[index_mz];
+
+                // Find the min/max indexes for the mz kernel.
+                size_t i_min = 0;
+                if (index_mz >= mz_kernel_hw) {
+                    i_min = index_mz - mz_kernel_hw;
+                }
+                size_t i_max = grid.n - 1;
+                if ((index_mz + mz_kernel_hw) < grid.n) {
+                    i_max = index_mz + mz_kernel_hw;
+                }
+
+                bool has_neighbor = false;
+
+                for (size_t j = j_min; j <= j_max; ++j) {
+                    for (size_t i = i_min; i <= i_max; ++i) {
+                        double x = grid.bins_mz[i];
+                        double y = grid.bins_rt[j];
+
+                        // Calculate the Gaussian weight for this point.
+                        double a = (x - current_mz) / sigma_mz;
+                        double b = (y - current_rt) / sigma_rt;
+                        double weight = std::exp(-0.5 * (a * a + b * b));
+                        if (weight > 1e-6) has_neighbor = true;
+                        
+                        grid.data[i + j * n] += weight * current_intensity;
+                        weights[i + j * n] += weight;
+                    }
+                }
+
+                if (!has_neighbor) {
+                std::ostringstream oss;
+                oss << "Warning: no neighbors found for mz=" << current_mz
+                    << ", rt=" << current_rt << ", intensity=" << current_intensity << "\n";
+                    // << "Base bins: mz=" << base_bin_mz << ", rt=" << base_bin_rt << "\n"
+                    // << "Sigma mz=" << sigma_mz_val << ", sigma rt=" << sigma_rt_val;
+                warnings.push_back(oss.str());
+            }
+            }
+        }
+        for (size_t i = 0; i < (n * m); ++i) {
+            double weight = weights[i];
+            if (weight == 0) {
+                weight = 1;
+            }
+            grid.data[i] = grid.data[i] / weight;
+        }
+    }
+
+    // Gaussian smoothing. Second pass.
+    //
+    // The Gaussian 2D filter is separable. We obtain the same result with
+    // faster performance by applying two 1D kernel convolutions instead. This
+    // is specially noticeable on the full image.
+    {
+        auto smoothed_data = std::vector<double>(grid.n * grid.m);
+
+        // Retention time smoothing.
+        for (size_t j = 0; j < grid.m; ++j) {
+            double current_rt = grid.bins_rt[j];
+            size_t min_k = 0;
+            if (j >= rt_kernel_hw) {
+                min_k = j - rt_kernel_hw;
+            }
+            size_t max_k = grid.m - 1;
+            if ((j + rt_kernel_hw) < grid.m) {
+                max_k = j + rt_kernel_hw;
+            }
+            for (size_t i = 0; i < grid.n; ++i) {
+                double sum_weights = 0;
+                double sum_weighted_values = 0;
+                for (size_t k = min_k; k <= max_k; ++k) {
+                    double a = (current_rt - grid.bins_rt[k]) / sigma_rt;
+                    double weight = std::exp(-0.5 * (a * a));
+                    sum_weights += weight;
+                    sum_weighted_values += weight * grid.data[i + k * grid.n];
+                }
+                smoothed_data[i + j * grid.n] =
+                    sum_weighted_values / sum_weights;
+            }
+        }
+        grid.data = smoothed_data;
+    }
+    {
+        auto smoothed_data = std::vector<double>(grid.n * grid.m);
+
+        // mz smoothing.
+        //
+        // Since sigma_mz is not constant, we need to calculate the kernel half
+        // width for each potential mz value.
+        for (size_t i = 0; i < grid.n; ++i) {
+            double sigma_mz = sigma_mz_vec[i];
+            double current_mz = grid.bins_mz[i];
+
+            size_t min_k = 0;
+            if (i >= mz_kernel_hw) {
+                min_k = i - mz_kernel_hw;
+            }
+            size_t max_k = grid.n - 1;
+            if ((i + mz_kernel_hw) < grid.n) {
+                max_k = i + mz_kernel_hw;
+            }
+            for (size_t j = 0; j < grid.m; ++j) {
+                double sum_weights = 0;
+                double sum_weighted_values = 0;
+                for (size_t k = min_k; k <= max_k; ++k) {
+                    double a = (current_mz - grid.bins_mz[k]) / sigma_mz;
+                    double weight = std::exp(-0.5 * (a * a));
+                    // if (weight > 1e-6) has_neighbor = true;
+                    sum_weights += weight;
+                    sum_weighted_values += weight * grid.data[k + j * grid.n];
+                }
+                smoothed_data[i + j * grid.n] =
+                    sum_weighted_values / sum_weights;
+            }
+        }
+        grid.data = smoothed_data;
+    }
+    
+    // Kernel smoothing application.
+    // for (size_t s = 0; s < raw_data.scans.size(); ++s) {
+    //     const auto &scan = raw_data.scans[s];
+    //     double current_rt = scan.retention_time;
+
+    //     for (size_t k = 0; k < scan.num_points; ++k) {
+    //         double current_intensity = scan.intensity[k];
+    //         double current_mz = scan.mz[k];
+
+    //         int base_bin_mz = static_cast<int>((current_mz - grid.min_mz) / delta_mz);
+    //         int base_bin_rt = static_cast<int>((current_rt - grid.min_rt) / delta_rt);
+
+    //         double sigma_rt_val = sigma_rt;
+    //         double sigma_mz_val = RawData::fwhm_to_sigma(
+    //             RawData::theoretical_fwhm(raw_data, current_mz)) *
+    //             params.smoothing_coef_mz / std::sqrt(2);
+
+    //         int mz_hw = static_cast<int>(3 * sigma_mz_val / delta_mz);
+    //         int rt_hw = static_cast<int>(3 * sigma_rt_val / delta_rt);
+
+    //         bool has_neighbor = false;
+
+    //         for (int di = -mz_hw; di <= mz_hw; ++di) {
+    //             int i = base_bin_mz + di;
+    //             if (i < 0 || i >= static_cast<int>(n)) continue;
+    //             double mz_dist = grid.bins_mz[i] - current_mz;
+
+    //             for (int dj = -rt_hw; dj <= rt_hw; ++dj) {
+    //                 int j = base_bin_rt + dj;
+    //                 if (j < 0 || j >= static_cast<int>(m)) continue;
+    //                 double rt_dist = grid.bins_rt[j] - current_rt;
+
+    //                 double weight = std::exp(-0.5 * (
+    //                     (mz_dist * mz_dist) / (sigma_mz_val * sigma_mz_val) +
+    //                     (rt_dist * rt_dist) / (sigma_rt_val * sigma_rt_val)));
+
+    //                 if (weight > 1e-6) has_neighbor = true;
+    //                 grid.data[i * m + j] += weight * current_intensity;
+    //             }
+    //         }
+
+    //         if (!has_neighbor) {
+    //             std::ostringstream oss;
+    //             oss << "Warning: no neighbors found for mz=" << current_mz
+    //                 << ", rt=" << current_rt << ", intensity=" << current_intensity << "\n"
+    //                 << "Base bins: mz=" << base_bin_mz << ", rt=" << base_bin_rt << "\n"
+    //                 << "Sigma mz=" << sigma_mz_val << ", sigma rt=" << sigma_rt_val;
+    //             warnings.push_back(oss.str());
+    //         }
+    //     }
+    // }
+
+    //return std::make_tuple(grid, warnings);
+    return grid;
+}
+
 
 Grid::Grid Grid::subset(Grid grid, double min_mz, double max_mz, double min_rt, double max_rt) {
     // Find min/max bin in mz and rt.

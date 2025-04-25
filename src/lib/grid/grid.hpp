@@ -61,6 +61,9 @@ struct ResampleParams {
 };
 Grid _resample(const RawData::RawData &raw_data, const ResampleParams &params);
 
+Grid _resamplex(const RawData::RawData &raw_data, const ResampleParams &params);
+
+// std::tuple<Grid, std::vector<std::string>> _resamplex(const RawData::RawData &raw_data, const ResampleParams &params);
 // Calculate the index i/j for the given mz/rt on the grid. This calculation is
 // performed in linear time.
 uint64_t x_index(const Grid &grid, double mz);

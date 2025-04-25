@@ -4,6 +4,7 @@
 #include <thread>
 #include <tuple>
 #include <cctype>
+#include <pybind11/iostream.h>
 
 #include "pybind11/numpy.h"
 #include "pybind11/pybind11.h"
@@ -27,6 +28,7 @@
 #include "utils/compression.hpp"
 #include "utils/search.hpp"
 #include "utils/serialization.hpp"
+#include "utils/test_utils.hpp"
 #include "warp2d/warp2d.hpp"
 #include "warp2d/warp2d_serialize.hpp"
 
@@ -258,6 +260,34 @@ Grid::Grid _resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
     params.smoothing_coef_rt = smoothing_coef_rt;
     auto grid =  Grid::_resample(raw_data, params);
     pybind11::gil_scoped_acquire acquire;
+    return grid;
+}
+
+// std::tuple<Grid::Grid, std::vector<std::string>> _resamplex(const RawData::RawData &raw_data,
+Grid::Grid _resamplex(const RawData::RawData &raw_data, uint64_t num_samples_mz,
+                    uint64_t num_samples_rt,
+                    double smoothing_coef_mz,
+                    double smoothing_coef_rt) {
+    pybind11::gil_scoped_release release;
+    // pybind11::scoped_ostream_redirect stream(
+    //     std::cout, pybind11::module_::import("sys").attr("stdout"));
+    // pybind11::scoped_ostream_redirect stream_err(
+    //     std::cerr, pybind11::module_::import("sys").attr("stderr"));
+    
+    std::cout << "[C++] Starting resamplex" << std::endl;
+    std::cout.flush();
+
+    auto params = Grid::ResampleParams{};
+    params.num_samples_mz = num_samples_mz;
+    params.num_samples_rt = num_samples_rt;
+    params.smoothing_coef_mz = smoothing_coef_mz;
+    params.smoothing_coef_rt = smoothing_coef_rt;
+
+    // auto  [grid, warnings] = Grid::_resamplex(raw_data, params);
+    auto  grid = Grid::_resamplex(raw_data, params);
+
+    pybind11::gil_scoped_acquire acquire;
+    // return std::make_tuple(grid, warnings);
     return grid;
 }
 
@@ -967,6 +997,10 @@ std::vector<MetaMatch::PeakCluster> find_peak_clusters(
     return clusters;
 }
 
+void bind_test_utils(py::module_ &m) {
+    m.def("create_test_data", &create_test_data, py::arg("block_mode") = false);
+}
+
 }  // namespace PythonAPI
 
 PYBIND11_MODULE(pastaq, m) {
@@ -1408,6 +1442,12 @@ PYBIND11_MODULE(pastaq, m) {
                    ", psm_id: " + p.psm_id + ">";
         });
 
+    // python_test_helpers.cpp
+    py::module_ m_test = m.def_submodule("_test_utils", "Test utilities");
+    PythonAPI::bind_test_utils(m_test);
+
+    m.def("generate_synthetic_data", &create_test_data, py::arg("block_mode") = false,
+      "Generate test RawData with a vertical line or 3x3 block pattern");
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,
           "Read raw data from the given mzXML file ", py::arg("file_name"),
@@ -1432,6 +1472,13 @@ PYBIND11_MODULE(pastaq, m) {
              "Resample the raw data into a smoothed warped grid",
              py::arg("raw_data"), py::arg("num_mz") = 10,
              py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 0.5,
+             py::arg("smoothing_coef_rt") = 0.5)
+        .def("_resamplex", &PythonAPI::_resamplex, 
+             "Resample the raw data into a smoothed warped grid",
+             py::arg("raw_data"), 
+             py::arg("num_mz") = 10,
+             py::arg("num_rt") = 10,
+             py::arg("smoothing_coef_mz") = 0.5,
              py::arg("smoothing_coef_rt") = 0.5)
         .def("_find_peaks", &Centroid::find_peaks_parallel,
              "Find all peaks in the given grid", py::arg("raw_data"),
