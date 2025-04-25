@@ -17,7 +17,8 @@ from .pastaq import *  # noqa F401, F403
 # so they need to be loaded explicitly for access from python
 # Those _ functions should only be referenced here and are called by higher level python functions with the same
 # name but no underscore
-from .pastaq import _read_mzml, _resample, _resamplex, _find_peaks, _calculate_time_map, _warp_peaks  # noqa F401
+
+from .pastaq import _read_mzml, _resample, _find_peaks, _find_local_maxima, _calculate_time_map, _warp_peaks  # noqa F401
 import pastaq
 
 
@@ -92,6 +93,16 @@ def find_peaks(raw_data, grid, max_peaks=1000):
     """
     return pastaq._find_peaks(raw_data, grid, max_peaks)
 
+def find_local_maxima(grid):
+    """Find local maxima in the grid derived from the raw data.
+
+    Args:
+        grid (Grid): The resampled grid version of the raw data
+
+    Returns:
+        List of local maxima - possibly empty if none found
+    """
+    return pastaq._find_local_maxima(grid)
 
 def calculate_time_map(ref_peaks, samp_peaks, slack, segment_length, num_points, expand_factor, peaks_per_window):
     """Calculate the time map that maps the sample peaks to the reference.

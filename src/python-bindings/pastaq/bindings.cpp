@@ -1188,6 +1188,16 @@ PYBIND11_MODULE(pastaq, m) {
             return ret;
         });
 
+    py::class_<Centroid::LocalMax>(m, "LocalMax")
+        .def_readonly("mz", &Centroid::LocalMax::mz)
+        .def_readonly("rt", &Centroid::LocalMax::rt)
+        .def_readonly("value", &Centroid::LocalMax::value)
+        .def("__repr__", [](const Centroid::LocalMax &m) {
+            return "local maxima <mz: " + std::to_string(m.mz) +
+                   ", rt: " + std::to_string(m.rt) + 
+                   ", value: " + std::to_string(m.value) + ">";
+        });
+
     py::class_<Warp2D::TimeMap>(m, "TimeMap")
         .def_readonly("num_segments", &Warp2D::TimeMap::num_segments)
         .def_readonly("rt_start", &Warp2D::TimeMap::rt_start)
@@ -1484,6 +1494,8 @@ PYBIND11_MODULE(pastaq, m) {
              "Find all peaks in the given grid", py::arg("raw_data"),
              py::arg("grid"), py::arg("max_peaks") = 0,
              py::arg("max_threads") = std::thread::hardware_concurrency())
+        .def("_find_local_maxima", &Centroid::find_local_maxima,
+                "Find all local maxima in the given grid", py::arg("grid"))
         .def("_calculate_time_map", &PythonAPI::_calculate_time_map,
              "Calculate a warping time_map to maximize the similarity of "
              "ref_peaks and source_peaks",

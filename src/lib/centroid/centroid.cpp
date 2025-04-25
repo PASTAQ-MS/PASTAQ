@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <thread>
+#include <fstream>
 
 #include "Eigen/Dense"
 
@@ -7,6 +8,13 @@
 #include "utils/search.hpp"
 
 #define PI 3.141592653589793238
+
+void log_it(const std::string &msg) {
+    std::ofstream log_file("/log.txt", std::ios_base::app); // Open in append mode
+    if (log_file.is_open()) {
+        log_file << msg << std::endl;
+    }
+}
 
 std::vector<Centroid::LocalMax> Centroid::find_local_maxima(
     const Grid::Grid &grid) {
