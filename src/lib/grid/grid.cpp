@@ -180,8 +180,8 @@ Grid::Grid Grid::_resample(const RawData::RawData &raw_data,
                         double b = (y - current_rt) / sigma_rt;
                         double weight = std::exp(-0.5 * (a * a + b * b));
 
-                        grid.data[i + j * n] += weight * current_intensity;
-                        weights[i + j * n] += weight;
+                        grid.data[index_mz + index_rt * n] += weight * current_intensity;
+                        weights[index_mz + index_rt * n] += weight;
                     }
                 }
             }
