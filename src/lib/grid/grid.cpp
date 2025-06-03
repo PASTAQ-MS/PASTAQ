@@ -12,7 +12,7 @@ uint64_t Grid::x_index(const Grid &grid, double mz) {
         case Instrument::ORBITRAP: {
             double a = grid.fwhm_mz / std::pow(grid.reference_mz, 1.5);
             double b = (1 / std::sqrt(grid.min_mz) - 1 / std::sqrt(mz));
-            return static_cast<uint64_t>(grid.k * 2 / a * b);
+            return static_cast<uint64_t>((grid.k) * 2 / a * b);
         } break;
         case Instrument::FTICR: {
             double a = 1 - grid.min_mz / mz;
@@ -46,7 +46,7 @@ double Grid::mz_at(const Grid &grid, uint64_t i) {
     switch (grid.instrument_type) {
         case Instrument::ORBITRAP: {
             double a = 1 / std::sqrt(grid.min_mz);
-            double b = grid.fwhm_mz / std::pow(grid.reference_mz, 1.5) * i / 2 /
+            double b = grid.fwhm_mz / std::pow(grid.reference_mz, 1.5) * (i) / 2 /
                        grid.k;
             double c = a - b;
             return 1 / (c * c);
@@ -77,6 +77,147 @@ double Grid::rt_at(const Grid &grid, uint64_t j) {
     return grid.min_rt + delta_rt * j;
 }
 
+
+Grid::Grid Grid::_resample_first_pass(const RawData::RawData &raw_data,
+                          const ResampleParams &params) {
+    // Initialize the Grid.
+    Grid grid;
+    grid.k = params.num_samples_mz;
+    grid.t = params.num_samples_rt;
+    grid.reference_mz = raw_data.reference_mz;
+    grid.fwhm_mz = raw_data.reference_mz / raw_data.resolution_ms1;
+    grid.fwhm_rt = raw_data.fwhm_rt;
+    grid.instrument_type = raw_data.instrument_type;
+    grid.min_mz = raw_data.min_mz;
+    grid.max_mz = raw_data.max_mz;
+    grid.min_rt = raw_data.min_rt;
+    grid.max_rt = raw_data.max_rt;
+
+    // Calculate the necessary dimensions for the Grid.
+    uint64_t n = (x_index(grid, raw_data.max_mz) + 1);
+    uint64_t m = (y_index(grid, raw_data.max_rt) + 1);
+    grid.n = n;
+    grid.m = m;
+    grid.data = std::vector<double>(n * m);
+    grid.bins_mz = std::vector<double>(n);
+    grid.bins_rt = std::vector<double>(m);
+
+    // Generate bins_mz.
+    for (size_t i = 0; i < n; ++i) {
+        grid.bins_mz[i] = mz_at(grid, i);
+    }
+
+    // Generate bins_rt.
+    for (size_t j = 0; j < m; ++j) {
+        grid.bins_rt[j] = rt_at(grid, j);
+    }
+
+    // Pre-calculate the smoothing sigma values for all bins of the grid.
+    double sigma_rt = RawData::fwhm_to_sigma(raw_data.fwhm_rt) *
+                      params.smoothing_coef_rt / std::sqrt(2);
+    auto sigma_mz_vec = std::vector<double>(n);
+    for (size_t i = 0; i < n; ++i) {
+        sigma_mz_vec[i] = RawData::fwhm_to_sigma(RawData::theoretical_fwhm(
+                              raw_data, grid.bins_mz[i])) *
+                          params.smoothing_coef_mz / std::sqrt(2);
+    }
+
+    // Pre-calculate the kernel half widths for rt and mz.
+    //
+    // Since sigma_rt is constant, the size of the kernel will be the same
+    // for the entire rt range. The same applies for mz, as we are using a
+    // warped grid that keeps the number of sampling points constant across the
+    // entire m/z range.
+    double delta_rt = grid.fwhm_rt / params.num_samples_rt;
+    double delta_mz = grid.fwhm_mz / params.num_samples_mz;
+    double sigma_mz_ref = RawData::fwhm_to_sigma(grid.fwhm_mz);
+    uint64_t rt_kernel_hw = 3 * sigma_rt / delta_rt; // size of rt kernel
+    uint64_t mz_kernel_hw = 3 * sigma_mz_ref / delta_mz; // size of mz kernel
+
+    // int halft = static_cast<int>(std::floor(grid.t / 2.0));
+    // int halfz = static_cast<int>(std::floor(grid.k / 2.0));
+
+    // Gaussian splatting. First pass.
+    {
+        auto weights = std::vector<double>(n * m);
+        for (size_t s = 0; s < raw_data.scans.size(); ++s) {
+            const auto &scan = raw_data.scans[s];
+            double current_rt = scan.retention_time;
+
+            // Find the bin for the current retention time.
+            size_t index_rt = y_index(grid, current_rt);
+
+            // Find the min/max indexes for the rt kernel.
+            size_t j_min = 0;
+            if (index_rt >= rt_kernel_hw) {
+                j_min = index_rt - rt_kernel_hw;
+            }
+            size_t j_max = grid.m - 1;
+            if ((index_rt + rt_kernel_hw) < grid.m) {
+                j_max = index_rt + rt_kernel_hw;
+            }
+
+            for (size_t k = 0; k < scan.num_points; ++k) {
+                double current_intensity = scan.intensity[k];
+                double current_mz = scan.mz[k];
+
+                // Find the bin for the current mz.
+                size_t index_mz = x_index(grid, current_mz);
+
+                double sigma_mz = sigma_mz_vec[index_mz];
+
+                // Find the min/max indexes for the mz kernel.
+                size_t i_min = 0;
+                if (index_mz >= mz_kernel_hw) {
+                    i_min = index_mz - mz_kernel_hw;
+                }
+                size_t i_max = grid.n - 1;
+                if ((index_mz + mz_kernel_hw) < grid.n) {
+                    i_max = index_mz + mz_kernel_hw;
+                }
+
+                for (size_t j = j_min; j <= j_max; ++j) {
+                    for (size_t i = i_min; i <= i_max; ++i) {
+                        double x = grid.bins_mz[i];
+                        double y = grid.bins_rt[j];
+
+                        // Calculate the Gaussian weight for this point.
+                        double a = (x - current_mz) / sigma_mz;
+                        double b = (y - current_rt) / sigma_rt;
+                        double weight = std::exp(-0.5 * (a * a + b * b));
+
+
+                                // Compute shifted indices
+                        size_t i_shifted = i + grid.k / 2;
+                        size_t j_shifted = j + grid.t / 2;
+
+                        // Ensure the shifted index is within bounds
+                        if (i_shifted < n && j_shifted < m) {
+                            size_t index = i_shifted + j_shifted * n;
+                            grid.data[index] += weight * current_intensity;
+                            weights[index] += weight;
+                        }
+                        
+                        // grid.data[(i+ halfz) + (j + halft) * n] += weight * current_intensity;
+                        // weights[(i+ halfz) + (j + halft) * n] += weight;
+
+                    }
+                }
+            }
+        }
+        for (size_t i = 0; i < (n * m); ++i) {
+            double weight = weights[i];
+            if (weight == 0) {
+                weight = 1;
+            }
+            grid.data[i] = grid.data[i] / weight;
+        }
+    }
+    return grid;
+}
+
+
+
 Grid::Grid Grid::_resample(const RawData::RawData &raw_data,
                           const ResampleParams &params) {
     // Initialize the Grid.
@@ -93,8 +234,8 @@ Grid::Grid Grid::_resample(const RawData::RawData &raw_data,
     grid.max_rt = raw_data.max_rt;
 
     // Calculate the necessary dimensions for the Grid.
-    uint64_t n = x_index(grid, raw_data.max_mz) + 1;
-    uint64_t m = y_index(grid, raw_data.max_rt) + 1;
+    uint64_t n = (x_index(grid, raw_data.max_mz) + 1);
+    uint64_t m = (y_index(grid, raw_data.max_rt) + 1);
     grid.n = n;
     grid.m = m;
     grid.data = std::vector<double>(n * m);
@@ -182,9 +323,10 @@ Grid::Grid Grid::_resample(const RawData::RawData &raw_data,
                         double b = (y - current_rt) / sigma_rt;
                         double weight = std::exp(-0.5 * (a * a + b * b));
 
-                        grid.data[i + j * n] += weight * current_intensity;
-                        weights[i + j * n] += weight;
-                    }
+                        grid.data[index_mz + index_rt * n] += weight * current_intensity;
+                        weights[index_mz+ index_rt * n] += weight;
+
+                     }
                 }
             }
         }

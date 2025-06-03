@@ -263,6 +263,20 @@ Grid::Grid _resample(const RawData::RawData &raw_data, uint64_t num_samples_mz,
     return grid;
 }
 
+Grid::Grid _resample_first_pass(const RawData::RawData &raw_data, uint64_t num_samples_mz,
+                    uint64_t num_samples_rt, double smoothing_coef_mz,
+                    double smoothing_coef_rt) {
+    pybind11::gil_scoped_release release;
+    auto params = Grid::ResampleParams{};
+    params.num_samples_mz = num_samples_mz;
+    params.num_samples_rt = num_samples_rt;
+    params.smoothing_coef_mz = smoothing_coef_mz;
+    params.smoothing_coef_rt = smoothing_coef_rt;
+    auto grid =  Grid::_resample_first_pass(raw_data, params);
+    pybind11::gil_scoped_acquire acquire;
+    return grid;
+}
+
 // std::tuple<Grid::Grid, std::vector<std::string>> _resamplex(const RawData::RawData &raw_data,
 Grid::Grid _resamplex(const RawData::RawData &raw_data, uint64_t num_samples_mz,
                     uint64_t num_samples_rt,
@@ -1091,6 +1105,8 @@ PYBIND11_MODULE(pastaq, m) {
     py::class_<Grid::Grid>(m, "Grid")
         .def_readonly("n", &Grid::Grid::n)
         .def_readonly("m", &Grid::Grid::m)
+        .def_readonly("k", &Grid::Grid::k)
+        .def_readonly("t", &Grid::Grid::t)
         .def_readonly("data", &Grid::Grid::data)
         .def_readonly("bins_mz", &Grid::Grid::bins_mz)
         .def_readonly("bins_rt", &Grid::Grid::bins_rt)
@@ -1106,6 +1122,12 @@ PYBIND11_MODULE(pastaq, m) {
                    ", min_rt: " + std::to_string(s.min_rt) +
                    ", max_rt: " + std::to_string(s.max_rt) + ">";
         });
+
+
+    m.def("x_index", &Grid::x_index, "Get x index (i) from m/z");
+    m.def("y_index", &Grid::y_index, "Get y index (j) from rt");
+    m.def("mz_at", &Grid::mz_at, "Get m/z value at x index (i)");
+    m.def("rt_at", &Grid::rt_at, "Get rt value at y index (j)");
 
     py::class_<RawData::RawPoints>(m, "RawPoints")
         .def_readonly("rt", &RawData::RawPoints::rt)
@@ -1458,6 +1480,12 @@ PYBIND11_MODULE(pastaq, m) {
 
     m.def("generate_synthetic_data", &create_test_data, py::arg("block_mode") = false,
       "Generate test RawData with a vertical line or 3x3 block pattern");
+
+    m.def("generate_synthetic_data_pairs", &create_test_data_pairs, py::arg("initial_separation") = 0.2,
+        "Generate test RawData with pairs of peaks separated by a decreasing distance");
+
+    m.def("generate_synthetic_data_triplets", &create_test_data_triplets, py::arg("initial_separation") = 0.2,
+        "Generate test RawData with triplets of peaks separated by a decreasing distance");
     // Functions.
     m.def("read_mzxml", &PythonAPI::read_mzxml,
           "Read raw data from the given mzXML file ", py::arg("file_name"),
@@ -1479,6 +1507,11 @@ PYBIND11_MODULE(pastaq, m) {
              "the given raw file",
              py::arg("raw_data"), py::arg("mz"))
         .def("_resample", &PythonAPI::_resample,
+             "Resample the raw data into a smoothed warped grid",
+             py::arg("raw_data"), py::arg("num_mz") = 10,
+             py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 0.5,
+             py::arg("smoothing_coef_rt") = 0.5)
+        .def("_resample_first_pass", &PythonAPI::_resample_first_pass,
              "Resample the raw data into a smoothed warped grid",
              py::arg("raw_data"), py::arg("num_mz") = 10,
              py::arg("num_rt") = 10, py::arg("smoothing_coef_mz") = 0.5,

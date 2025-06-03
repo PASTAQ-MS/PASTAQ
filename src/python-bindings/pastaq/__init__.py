@@ -18,7 +18,7 @@ from .pastaq import *  # noqa F401, F403
 # Those _ functions should only be referenced here and are called by higher level python functions with the same
 # name but no underscore
 
-from .pastaq import _read_mzml, _resample, _find_peaks, _find_local_maxima, _calculate_time_map, _warp_peaks  # noqa F401
+from .pastaq import _read_mzml, _resample, _resample_first_pass, _resamplex, _find_peaks, _find_local_maxima, _calculate_time_map, _warp_peaks  # noqa F401
 import pastaq
 
 
@@ -63,6 +63,21 @@ def resample(raw_data, num_samples_mz, num_samples_rt, smoothing_coef_mz, smooth
         Grid or mesh object
     """
     return pastaq._resample(raw_data, num_samples_mz, num_samples_rt, smoothing_coef_mz, smoothing_coef_rt)
+
+def resample_first_pass(raw_data, num_samples_mz, num_samples_rt, smoothing_coef_mz, smoothing_coef_rt):
+    """Resample the raw data onto a uniform grid.
+
+    Args:
+        raw_data (RawData): Raw data loaded from file
+        num_samples_mz (int): The number of sub-samples per mz step in the mesh
+        num_samples_rt (int): The number of sub-samples per rt step in the mesh
+        smoothing_coef_mz (float): Smoothing coefficient in the mz direction
+        smoothing_coef_rt (float): Smoothing coefficient in the rt direction
+
+    Returns:
+        Grid or mesh object
+    """
+    return pastaq._resample_first_pass(raw_data, num_samples_mz, num_samples_rt, smoothing_coef_mz, smoothing_coef_rt)
 
 def resamplex(raw_data, num_samples_mz, num_samples_rt, smoothing_coef_mz, smoothing_coef_rt):
     """Resample the raw data onto a uniform grid.

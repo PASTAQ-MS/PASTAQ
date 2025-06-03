@@ -60,7 +60,7 @@ struct ResampleParams {
     double smoothing_coef_rt;
 };
 Grid _resample(const RawData::RawData &raw_data, const ResampleParams &params);
-
+Grid _resample_first_pass(const RawData::RawData &raw_data, const ResampleParams &params);
 Grid _resamplex(const RawData::RawData &raw_data, const ResampleParams &params);
 
 // std::tuple<Grid, std::vector<std::string>> _resamplex(const RawData::RawData &raw_data, const ResampleParams &params);
