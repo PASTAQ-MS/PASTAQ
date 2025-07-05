@@ -127,13 +127,18 @@ Grid::Grid Grid::_resample(const RawData::RawData &raw_data,
     // entire m/z range.
     double delta_rt = grid.fwhm_rt / params.num_samples_rt;
     double delta_mz = grid.fwhm_mz / params.num_samples_mz;
-    double sigma_mz_ref = RawData::fwhm_to_sigma(grid.fwhm_mz);
-    uint64_t rt_kernel_hw = 3 * sigma_rt / delta_rt; // size of rt kernel
-    uint64_t mz_kernel_hw = 3 * sigma_mz_ref / delta_mz; // size of mz kernel
+    double sigma_mz_ref = RawData::fwhm_to_sigma(grid.fwhm_mz) * params.smoothing_coef_mz/ std::sqrt(2);
+    uint64_t rt_kernel_hw = 7 * sigma_rt / delta_rt; // size of rt kernel, 7 sigma as it still gets some values at 6sigma for a peak with 10^9
+    uint64_t mz_kernel_hw = 7 * sigma_mz_ref / delta_mz; // size of mz kernel, 7 sigma as it still gets some values at 6sigma for a peak with 10^9
+        if (rt_kernel_hw <= 4) {
+        rt_kernel_hw = 5;
+    }
+    if (mz_kernel_hw <= 4) {
+        mz_kernel_hw = 5;
+    }
 
     // Gaussian splatting. First pass.
     {
-        auto weights = std::vector<double>(n * m);
         for (size_t s = 0; s < raw_data.scans.size(); ++s) {
             const auto &scan = raw_data.scans[s];
             double current_rt = scan.retention_time;
@@ -170,28 +175,32 @@ Grid::Grid Grid::_resample(const RawData::RawData &raw_data,
                     i_max = index_mz + mz_kernel_hw;
                 }
 
+                std::vector<double> weights((j_max - j_min + 1) * (i_max - i_min + 1), 0.0);
+                double weight{0.0}, weight_sum{0.0}, a{0.0}, b{0.0}, x{0.0}, y{0.0};
+                size_t kernelWidth = i_max - i_min + 1;
                 for (size_t j = j_min; j <= j_max; ++j) {
                     for (size_t i = i_min; i <= i_max; ++i) {
-                        double x = grid.bins_mz[i];
-                        double y = grid.bins_rt[j];
+                        x = grid.bins_mz[i];
+                        y = grid.bins_rt[j];
 
                         // Calculate the Gaussian weight for this point.
-                        double a = (x - current_mz) / sigma_mz;
-                        double b = (y - current_rt) / sigma_rt;
-                        double weight = std::exp(-0.5 * (a * a + b * b));
+                        a = (x - current_mz) / sigma_mz;
+                        b = (y - current_rt) / sigma_rt;
+                        weight = std::exp(-0.5 * (a * a + b * b));
+                        weight_sum += weight;
+                        weights[(i-i_min) + (j-j_min) * kernelWidth] = weight;
+                    }
+                }
+                if (weight == 0) {
+                    weight = 1;
+                }
 
-                        grid.data[i + j * n] += weight * current_intensity;
-                        weights[i + j * n] += weight;
+                for (size_t j = j_min; j <= j_max; ++j) {
+                    for (size_t i = i_min; i <= i_max; ++i) {
+                        grid.data[i + j * n] += (weights[(i-i_min) + (j-j_min) * kernelWidth] / weight_sum) * current_intensity;
                     }
                 }
             }
-        }
-        for (size_t i = 0; i < (n * m); ++i) {
-            double weight = weights[i];
-            if (weight == 0) {
-                weight = 1;
-            }
-            grid.data[i] = grid.data[i] / weight;
         }
     }
 

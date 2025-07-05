@@ -10,7 +10,7 @@
 #define PI 3.141592653589793238
 
 void log_it(const std::string &msg) {
-    std::ofstream log_file("/log.txt", std::ios_base::app); // Open in append mode
+    std::ofstream log_file("/home/phorvatovich/development/pastaqTesting/PASTAQ/log.txt", std::ios_base::app); // Open in append mode
     if (log_file.is_open()) {
         log_file << msg << std::endl;
     }
@@ -109,7 +109,11 @@ std::optional<Centroid::Peak> Centroid::build_peak(
             rt_mean += value * rt;
         }
         if (weight_sum == 0) {
-            return std::nullopt;
+            if (raw_data.get_failed_peaks){
+                peak.fit_failure_code |= 1 << 0;
+            } else {
+                return std::nullopt;
+            }
         }
         mz_mean /= weight_sum;
         rt_mean /= weight_sum;
@@ -220,7 +224,24 @@ std::optional<Centroid::Peak> Centroid::build_peak(
                 std::isnan(d) || std::isnan(e) || std::isinf(a) ||
                 std::isinf(b) || std::isinf(c) || std::isinf(d) ||
                 std::isinf(e) || c >= 0 || e >= 0) {
-                return std::nullopt;
+                    if (raw_data.get_failed_peaks){
+                        peak.fit_failure_code |= static_cast<uint64_t>(std::isnan(a)) << 1;
+                        peak.fit_failure_code  |= static_cast<uint64_t>(std::isnan(b)) << 2;
+                        peak.fit_failure_code  |= static_cast<uint64_t>(std::isnan(c)) << 3;
+                        peak.fit_failure_code  |= static_cast<uint64_t>(std::isnan(d)) << 4;
+                        peak.fit_failure_code  |= static_cast<uint64_t>(std::isnan(e)) << 5;
+                    
+                        peak.fit_failure_code  |= static_cast<uint64_t>(std::isinf(a)) << 6;
+                        peak.fit_failure_code  |= static_cast<uint64_t>(std::isinf(b)) << 7;
+                        peak.fit_failure_code  |= static_cast<uint64_t>(std::isinf(c)) << 8;
+                        peak.fit_failure_code  |= static_cast<uint64_t>(std::isinf(d)) << 9;
+                        peak.fit_failure_code  |= static_cast<uint64_t>(std::isinf(e)) << 10;
+                    
+                        peak.fit_failure_code  |= static_cast<uint64_t>(c >= 0) << 11;
+                        peak.fit_failure_code  |= static_cast<uint64_t>(e >= 0) << 12;
+                    } else {
+                        return std::nullopt;
+                    }
             }
             double sigma_mz = std::sqrt(1 / (-2 * c));
             double mz = b / (-2 * c) + local_max.mz;
@@ -234,7 +255,25 @@ std::optional<Centroid::Peak> Centroid::build_peak(
                 std::isinf(mz) || std::isinf(sigma_mz) || std::isinf(rt) ||
                 std::isinf(sigma_rt) || height <= 0 || sigma_mz <= 0 ||
                 sigma_rt <= 0 || mz <= 0 || rt <= 0) {
-                return std::nullopt;
+                if (raw_data.get_failed_peaks){
+                    peak.fit_failure_code  |= static_cast<uint64_t>(std::isnan(height)) << 13;
+                    peak.fit_failure_code |= static_cast<uint64_t>(std::isnan(mz)) << 14;
+                    peak.fit_failure_code |= static_cast<uint64_t>(std::isnan(sigma_mz)) << 15;
+                    peak.fit_failure_code |= static_cast<uint64_t>(std::isnan(rt)) << 16;
+                    peak.fit_failure_code |= static_cast<uint64_t>(std::isnan(sigma_rt)) << 17;
+                    peak.fit_failure_code |= static_cast<uint64_t>(std::isinf(height)) << 18;
+                    peak.fit_failure_code |= static_cast<uint64_t>(std::isinf(mz)) << 19;
+                    peak.fit_failure_code |= static_cast<uint64_t>(std::isinf(sigma_mz)) << 20;
+                    peak.fit_failure_code |= static_cast<uint64_t>(std::isinf(rt)) << 21;
+                    peak.fit_failure_code |= static_cast<uint64_t>(std::isinf(sigma_rt)) << 22;
+                    peak.fit_failure_code |= static_cast<uint64_t>(height <= 0) << 23;
+                    peak.fit_failure_code |= static_cast<uint64_t>(sigma_mz <= 0) << 24;
+                    peak.fit_failure_code |= static_cast<uint64_t>(sigma_rt <= 0) << 25;
+                    peak.fit_failure_code |= static_cast<uint64_t>(mz <= 0) << 26;
+                    peak.fit_failure_code |= static_cast<uint64_t>(rt <= 0) << 27;
+                    } else {
+                        return std::nullopt;
+                }
             }
 
             peak.fitted_height = height;
@@ -257,9 +296,84 @@ std::optional<Centroid::Peak> Centroid::build_peak(
         peak.fitted_sigma_rt <= theoretical_sigma_rt / 3 ||
         peak.fitted_sigma_mz >= theoretical_sigma_mz * 3 ||
         peak.fitted_sigma_rt >= theoretical_sigma_rt * 3) {
-        return std::nullopt;
+        if (raw_data.get_failed_peaks){
+            peak.fit_failure_code  |= static_cast<uint64_t>(peak.raw_roi_sigma_mz <= 0) << 28;
+            peak.fit_failure_code  |= static_cast<uint64_t>(peak.raw_roi_sigma_rt <= 0) << 29;
+            peak.fit_failure_code  |= static_cast<uint64_t>(peak.fitted_height > 2 * peak.raw_roi_max_height) << 30;
+            peak.fit_failure_code  |= static_cast<uint64_t>(peak.fitted_mz < local_max.mz - 3 * theoretical_sigma_mz) << 31;
+            peak.fit_failure_code  |= static_cast<uint64_t>(peak.fitted_mz > local_max.mz + 3 * theoretical_sigma_mz) << 32;
+            peak.fit_failure_code  |= static_cast<uint64_t>(peak.fitted_rt < local_max.rt - 3 * theoretical_sigma_rt) << 33;
+            peak.fit_failure_code  |= static_cast<uint64_t>(peak.fitted_rt > local_max.rt + 3 * theoretical_sigma_rt) << 34;
+            peak.fit_failure_code  |= static_cast<uint64_t>(peak.fitted_sigma_mz <= theoretical_sigma_mz / 3) << 35;
+            peak.fit_failure_code  |= static_cast<uint64_t>(peak.fitted_sigma_rt <= theoretical_sigma_rt / 3) << 36;
+            peak.fit_failure_code  |= static_cast<uint64_t>(peak.fitted_sigma_mz >= theoretical_sigma_mz * 3) << 37;
+            peak.fit_failure_code  |= static_cast<uint64_t>(peak.fitted_sigma_rt >= theoretical_sigma_rt * 3) << 38;
+        } else {
+            return std::nullopt;
+        }
     }
     return peak;
+}
+
+const std::vector<std::string> Centroid::Peak::error_messages = {
+    "Weight sum is zero",
+    "NaN detected in parameter 'a'",
+    "NaN detected in parameter 'b'",
+    "NaN detected in parameter 'c'",
+    "NaN detected in parameter 'd'",
+    "NaN detected in parameter 'e'",
+    "Infinity detected in parameter 'a'",
+    "Infinity detected in parameter 'b'",
+    "Infinity detected in parameter 'c'",
+    "Infinity detected in parameter 'd'",
+    "Infinity detected in parameter 'e'",
+    "Parameter 'c' is non-negative",
+    "Parameter 'e' is non-negative",
+    "NaN detected in fitted height",
+    "NaN detected in fitted mz",
+    "NaN detected in fitted sigma_mz",
+    "NaN detected in fitted rt",
+    "NaN detected in fitted sigma_rt",
+    "Infinity detected in fitted height",
+    "Infinity detected in fitted mz",
+    "Infinity detected in fitted sigma_mz",
+    "Infinity detected in fitted rt",
+    "Infinity detected in fitted sigma_rt",
+    "Fitted height is non-positive",
+    "Fitted sigma_mz is non-positive",
+    "Fitted sigma_rt is non-positive",
+    "Fitted mz is non-positive",
+    "Fitted rt is non-positive",
+    "Raw ROI sigma_mz is non-positive",
+    "Raw ROI sigma_rt is non-positive",
+    "Fitted height exceeds twice the raw ROI max height",
+    "Fitted mz is outside the expected range",
+    "Fitted mz is outside the expected range",
+    "Fitted rt is outside the expected range",
+    "Fitted rt is outside the expected range",
+    "Fitted sigma_mz is too small",
+    "Fitted sigma_rt is too small",
+    "Fitted sigma_mz is too large",
+    "Fitted sigma_rt is too large"
+};
+
+std::string Centroid::get_fit_failure_errors(const uint64_t &fit_failure_code, const std::vector<std::string> &error_messages) {
+    // Function providing error messages for each bit in the fit_failure_code
+    std::ostringstream result;
+    result << "Fit Failure Errors:\n";
+
+    // Iterate through each bit and check if it's set
+    if (fit_failure_code == 0) {
+        result << "No errors detected.\n";
+    } else {
+        for (size_t i = 0; i < error_messages.size(); ++i) {
+            if (fit_failure_code & (1ULL << i)) {
+                result << "- " << error_messages[i] << "\n";
+            }
+        }
+    }
+
+    return result.str();
 }
 
 std::vector<Centroid::Peak> Centroid::find_peaks_serial(
@@ -270,7 +384,7 @@ std::vector<Centroid::Peak> Centroid::find_peaks_serial(
 
     // Sort the local_maxima by value.
     auto sort_local_max = [](const Centroid::LocalMax &p1,
-                             const Centroid::LocalMax &p2) -> bool {
+                                const Centroid::LocalMax &p2) -> bool {
         return (p2.value < p1.value);
     };
     std::sort(local_max.begin(), local_max.end(), sort_local_max);
