@@ -499,59 +499,6 @@ def print_64bit_as_bytes(val):
     # print(grouped)
     return grouped
 
-#download test files used in this tutorial from OSF
-# def downloadTestFilesFromOSF():
-#     """
-#     Download .mzML test files used in this tutorial from OSF and save them in the 'data' directory.
-#     If the files already exist, skip the download.
-#     """
-
-#     fileList = [
-#         {"name": "3_1_extract_3400_4100_590_615.mzML", "size": 29328010, "centroid": False},
-#         {"name": "3_2_extract_3400_4100_590_615.mzML", "size": 26397653, "centroid": False}
-#         {"name": "3_1_extract_3400_4100_590_615_c.mzML", "size": 10342153, "centroid": True},
-#         {"name": "3_2_extract_3400_4100_590_615_c.mzML", "size": 9465509, "centroid": True},
-#     ]
-#     # Target directory for data
-#     target_dir = os.path.join(os.getcwd(), "data")
-#     os.makedirs(target_dir, exist_ok=True)
-
-#     # Check if any .mzML files already exist
-#     mzml_files = [f for f in os.listdir(target_dir) if f.endswith('.mzML')]
-#     if mzml_files:
-#         print("mzML files already exist in 'examples/data/'. Skipping download.")
-#     else:
-#         # OSF API endpoint for files in the storage
-#         project_id = "b2he9"
-#         url = f"https://api.osf.io/v2/nodes/{project_id}/files/osfstorage/"
-
-#         print("Downloading mzML files from OSF...")
-
-#         # Get the file list from OSF
-#         resp = requests.get(url)
-#         resp.raise_for_status()
-#         if resp.status_code != 200:
-#             print("Failed to fetch OSF file list.")
-#             exit(1)
-#         # OSF API URL to list the files in the root storage of the project
-#         files = resp.json()['data']
-#         print(len(files), "files found in the OSF project.")
-
-#         # Loop through them
-#         for file in files:
-#             fname = file['attributes']['name']
-#             if fname.endswith('.mzML'):
-#                 download_url = file['links']['download']
-#                 out_path = os.path.join(target_dir, fname)
-#                 print(f"Downloading {fname}...")
-#                 r = requests.get(download_url)
-#                 if r.status_code == 200:
-#                     with open(out_path, 'wb') as f:
-#                         f.write(r.content)
-#                 else:
-#                     print(f"Failed to download {fname}")
-#         print("Download complete.")
-        
 def downloadTestFilesFromOSF():
     """
     Download .mzML test files used in this tutorial from OSF and save them in the 'data' directory.

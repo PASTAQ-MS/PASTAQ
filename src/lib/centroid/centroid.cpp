@@ -177,10 +177,10 @@ std::optional<Centroid::Peak> Centroid::build_peak(
     {
         // Solve the linearized 2D gaussian fitting problem `A * beta = c` with
         // weighted residuals.
-        Eigen::MatrixXd A(5, 5);
-        Eigen::VectorXd c(5);
-        A = Eigen::MatrixXd::Zero(5, 5);
-        c = Eigen::VectorXd::Zero(5);
+        Matrix5d A(5, 5);
+        Vector5d c(5);
+        A = Matrix5d::Zero(5, 5);
+        c = Vector5d::Zero(5);
         for (size_t i = 0; i < raw_points.num_points; ++i) {
             double mz = raw_points.mz[i] - local_max.mz;
             double rt = raw_points.rt[i] - local_max.rt;
@@ -244,8 +244,17 @@ std::optional<Centroid::Peak> Centroid::build_peak(
             /* std::string log_msg = std::string("Profile data peak picking.") + "\n\n";
             log_itg(log_msg); */
 
-            Eigen::VectorXd beta(5);
-            beta = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(c);
+            Vector5d beta(5);
+            // Compute SVD once
+            Eigen::JacobiSVD<Matrix5d> svd(A, Eigen::ComputeThinU | Eigen::ComputeThinV);
+            double cond = svd.singularValues()(0) / svd.singularValues()(4);
+            const double cond_threshold = 1e6;
+
+            if (cond < cond_threshold) {
+                beta = A.ldlt().solve(c); // fast for well-conditioned
+            } else {
+                beta = svd.solve(c);      // robust for ill-conditioned
+            }
             {
                 double a = beta(0);
                 double b = beta(1);
@@ -314,19 +323,28 @@ std::optional<Centroid::Peak> Centroid::build_peak(
             
             // If the raw data is centroided, we can use simpler approach
             // to solve the linear system by fixing sigmamz and umz
-            Eigen::VectorXd beta(3);
-            Eigen::VectorXi selectedCols(3);
-            selectedCols << 0, 3, 4; // index vector for selected columns
-            Eigen::VectorXi fixedCols(2);
-            fixedCols << 1, 2; // index vector for not-selected columns
-            Eigen::MatrixXd B(5, 3);
-            B = A(Eigen::indexing::all, selectedCols);
-            Eigen::VectorXd e(2);
-            e(0) = 0; //local_max.mz/(theoretical_sigma_mz*theoretical_sigma_mz); // these are the fixed constant the peak location in mz and sigma_mz
+            Eigen::Vector3d beta;
+            Eigen::Vector3i selectedCols;
+            selectedCols << 0, 3, 4;
+            Eigen::Vector2i fixedCols;
+            fixedCols << 1, 2;
+            Eigen::Matrix<double, 5, 3> B = A(Eigen::indexing::all, selectedCols);
+            Eigen::Vector2d e;
+            e(0) = 0;
             e(1) = -1/(2*theoretical_sigma_mz*theoretical_sigma_mz);
-            Eigen::VectorXd d = c - A(Eigen::indexing::all, fixedCols) * e;
-            beta = B.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(d);
+            Vector5d d = c - A(Eigen::indexing::all, fixedCols) * e;
 
+            // Compute SVD once
+            Eigen::JacobiSVD<Eigen::Matrix<double, 5, 3>> svd(B, Eigen::ComputeThinU | Eigen::ComputeThinV);
+            double cond = svd.singularValues()(0) / svd.singularValues()(2);
+            const double cond_threshold = 1e6;
+
+            if (cond < cond_threshold) {
+                beta = B.colPivHouseholderQr().solve(d); // fast for well-conditioned
+            } else {
+                beta = svd.solve(d);                     // robust for ill-conditioned
+            }
+            // beta = B.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(d);
             /* // if (!triggerPeakLog) {
                 log_msg = std::string("Beta values: ") + std::to_string(beta(0)) + ", " + std::to_string(beta(1)) + ", " + std::to_string(beta(2)) + "\n" +
                     "d vector: " + std::to_string(d(0)) + ", " + std::to_string(d(1)) + ", " + std::to_string(d(2)) + "\n" +

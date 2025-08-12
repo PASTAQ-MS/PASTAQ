@@ -4,8 +4,17 @@
 #include <cstdint>
 #include <optional>
 #include <vector>
+#include "Eigen/Core"
+#include "Eigen/Dense"
 
 #include "grid/grid.hpp"
+
+// Typedef for Eigen matrix 5x5 with double and float
+// and Eigen vector 5x1 with double and float
+using Matrix5d = Eigen::Matrix<double, 5, 5>;
+using Matrix5f = Eigen::Matrix<float, 5, 5>;
+using Vector5d = Eigen::Matrix<double, 5, 1>;
+using Vector5f = Eigen::Matrix<float, 5, 1>;
 
 // In this namespace we can find the necessary functions to detect, quantify
 // and manipulate peaks.
