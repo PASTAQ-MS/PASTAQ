@@ -191,8 +191,8 @@ Grid::Grid Grid::_resample(const RawData::RawData &raw_data,
                         weights[(i-i_min) + (j-j_min) * kernelWidth] = weight;
                     }
                 }
-                if (weight == 0) {
-                    weight = 1;
+                if (weight_sum == 0) {
+                    weight_sum = 1;
                 }
 
                 for (size_t j = j_min; j <= j_max; ++j) {

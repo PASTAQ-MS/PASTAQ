@@ -1050,7 +1050,7 @@ PYBIND11_MODULE(pastaq, m) {
                    "\n> resolution_ms1: " + std::to_string(rd.resolution_ms1) +
                    "\n> resolution_msn: " + std::to_string(rd.resolution_msn) +
                    "\n> reference_mz: " + std::to_string(rd.reference_mz) +
-                   "\n> profile data: " + std::to_string(rd.centroid) +
+                   "\n> centroid data: " + std::to_string(rd.centroid) +
                    "\n> min_mz: " + std::to_string(rd.min_mz) +
                    "\n> max_mz: " + std::to_string(rd.max_mz) +
                    "\n> min_rt: " + std::to_string(rd.min_rt) +

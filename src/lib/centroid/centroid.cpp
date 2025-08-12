@@ -1,20 +1,38 @@
 #include <algorithm>
 #include <thread>
 #include <fstream>
+#include <iostream>
 
+#include "Eigen/Core"
 #include "Eigen/Dense"
 
 #include "centroid/centroid.hpp"
-#include "utils/search.hpp"
+// #include "utils/search.hpp"
 
 #define PI 3.141592653589793238
 
-void log_it(const std::string &msg) {
-    std::ofstream log_file("/home/phorvatovich/development/pastaqTesting/PASTAQ/log.txt", std::ios_base::app); // Open in append mode
-    if (log_file.is_open()) {
-        log_file << msg << std::endl;
+/* bool triggerPeakLog{true};
+
+void log_itg(const std::string& msg) {
+    const char* log_path = "/home/phorvatovich/development/pastaqTesting/PASTAQ/log.txt";
+    // Open in append mode so previous logs are preserved
+    if (msg == "reset") {
+        // Delete the log file and start fresh
+        std::remove(log_path);
     }
-}
+
+    std::ofstream log_file(log_path, std::ios::app);
+
+    if (!log_file) {
+        std::cerr << "Error: Could not open log file." << std::endl;
+        return;
+    }
+
+    log_file << msg << std::endl;
+
+    // Optional: flush explicitly
+    log_file.flush();
+} */
 
 std::vector<Centroid::LocalMax> Centroid::find_local_maxima(
     const Grid::Grid &grid) {
@@ -212,18 +230,32 @@ std::optional<Centroid::Peak> Centroid::build_peak(
             c(3) += w_2 * std::log(intensity) * rt;
             c(4) += w_2 * std::log(intensity) * rt * rt;
         }
-        Eigen::VectorXd beta(5);
-        beta = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(c);
-        {
-            double a = beta(0);
-            double b = beta(1);
-            double c = beta(2);
-            double d = beta(3);
-            double e = beta(4);
-            if (std::isnan(a) || std::isnan(b) || std::isnan(c) ||
-                std::isnan(d) || std::isnan(e) || std::isinf(a) ||
-                std::isinf(b) || std::isinf(c) || std::isinf(d) ||
-                std::isinf(e) || c >= 0 || e >= 0) {
+
+        double sigma_mz{0};
+        double mz{0};
+        double sigma_rt{0};
+        double rt{0};
+        double height{0};
+        /* std::string log_msg = std::string("Raw data type profile (0) or centroid (1): ") +
+                std::to_string(raw_data.centroid) + "\n\n";
+        log_itg(log_msg); */
+
+        if (!(raw_data.centroid)) {
+            /* std::string log_msg = std::string("Profile data peak picking.") + "\n\n";
+            log_itg(log_msg); */
+
+            Eigen::VectorXd beta(5);
+            beta = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(c);
+            {
+                double a = beta(0);
+                double b = beta(1);
+                double c = beta(2);
+                double d = beta(3);
+                double e = beta(4);
+                if (std::isnan(a) || std::isnan(b) || std::isnan(c) ||
+                    std::isnan(d) || std::isnan(e) || std::isinf(a) ||
+                    std::isinf(b) || std::isinf(c) || std::isinf(d) ||
+                    std::isinf(e) || c >= 0 || e >= 0) {
                     if (raw_data.get_failed_peaks){
                         peak.fit_failure_code |= static_cast<uint64_t>(std::isnan(a)) << 1;
                         peak.fit_failure_code  |= static_cast<uint64_t>(std::isnan(b)) << 2;
@@ -242,47 +274,159 @@ std::optional<Centroid::Peak> Centroid::build_peak(
                     } else {
                         return std::nullopt;
                     }
-            }
-            double sigma_mz = std::sqrt(1 / (-2 * c));
-            double mz = b / (-2 * c) + local_max.mz;
-            double sigma_rt = std::sqrt(1 / (-2 * e));
-            double rt = d / (-2 * e) + local_max.rt;
-            double height =
-                std::exp(a - ((b * b) / (4 * c)) - ((d * d) / (4 * e)));
-
-            if (std::isnan(height) || std::isnan(mz) || std::isnan(sigma_mz) ||
-                std::isnan(rt) || std::isnan(sigma_rt) || std::isinf(height) ||
-                std::isinf(mz) || std::isinf(sigma_mz) || std::isinf(rt) ||
-                std::isinf(sigma_rt) || height <= 0 || sigma_mz <= 0 ||
-                sigma_rt <= 0 || mz <= 0 || rt <= 0) {
-                if (raw_data.get_failed_peaks){
-                    peak.fit_failure_code  |= static_cast<uint64_t>(std::isnan(height)) << 13;
-                    peak.fit_failure_code |= static_cast<uint64_t>(std::isnan(mz)) << 14;
-                    peak.fit_failure_code |= static_cast<uint64_t>(std::isnan(sigma_mz)) << 15;
-                    peak.fit_failure_code |= static_cast<uint64_t>(std::isnan(rt)) << 16;
-                    peak.fit_failure_code |= static_cast<uint64_t>(std::isnan(sigma_rt)) << 17;
-                    peak.fit_failure_code |= static_cast<uint64_t>(std::isinf(height)) << 18;
-                    peak.fit_failure_code |= static_cast<uint64_t>(std::isinf(mz)) << 19;
-                    peak.fit_failure_code |= static_cast<uint64_t>(std::isinf(sigma_mz)) << 20;
-                    peak.fit_failure_code |= static_cast<uint64_t>(std::isinf(rt)) << 21;
-                    peak.fit_failure_code |= static_cast<uint64_t>(std::isinf(sigma_rt)) << 22;
-                    peak.fit_failure_code |= static_cast<uint64_t>(height <= 0) << 23;
-                    peak.fit_failure_code |= static_cast<uint64_t>(sigma_mz <= 0) << 24;
-                    peak.fit_failure_code |= static_cast<uint64_t>(sigma_rt <= 0) << 25;
-                    peak.fit_failure_code |= static_cast<uint64_t>(mz <= 0) << 26;
-                    peak.fit_failure_code |= static_cast<uint64_t>(rt <= 0) << 27;
-                    } else {
-                        return std::nullopt;
                 }
-            }
+                sigma_mz = std::sqrt(1 / (-2 * c));
+                mz = b / (-2 * c) + local_max.mz;            //it use 1/(-2c) in order to use the original value from the solved equation
+                sigma_rt = std::sqrt(1 / (-2 * e));
+                rt = d / (-2 * e) + local_max.rt;            // it use 1/(-2e) in order to use the original value from the solved equation
+                height = std::exp(a - ((b * b) / (4 * c)) - ((d * d) / (4 * e)));
 
-            peak.fitted_height = height;
-            peak.fitted_mz = mz;
-            peak.fitted_rt = rt;
-            peak.fitted_sigma_mz = sigma_mz;
-            peak.fitted_sigma_rt = sigma_rt;
-            peak.fitted_volume = height * sigma_mz * sigma_rt * 2.0 * PI;
+                /* log_msg = std::string("derived parameters. sigma mz: " + std::to_string(sigma_mz) + ", mz: " + std::to_string(mz) + ", sigma rt: " +
+                    std::to_string(sigma_rt) + ", rt: " + std::to_string(rt) + ", height: " +
+                    std::to_string(height)) + "\n" +
+                    "a: " + std::to_string(a) + ", b: " + std::to_string(b) + ", c: " +
+                    std::to_string(c) + ", d: " + std::to_string(d) + ", e: " + std::to_string(e) + "\n\n";
+
+                if (local_max.mz>612.95&&local_max.mz<612.99&&local_max.rt>3635&&local_max.rt<3645) {
+                    log_msg += "Roi range:\n";
+                    log_msg += "mzRoiMin: " + std::to_string(peak.roi_min_mz) +
+                        ", mzRoiMax: " + std::to_string(peak.roi_max_mz) +
+                        ", rtRoiMin: " + std::to_string(peak.roi_min_rt) +
+                        ", rtRoiMax: " + std::to_string(peak.roi_max_rt) + "\n\n";
+                }
+                
+                if (local_max.mz>612.95&&local_max.mz<612.99&&local_max.rt>3635&&local_max.rt<3645) {
+                    log_msg += "Raw data points:\n";
+                    for (size_t i = 0; i < raw_points.num_points; ++i) {
+                        log_msg += "mz: " + std::to_string(raw_points.mz[i]) +
+                        " rt: " + std::to_string(raw_points.rt[i]) + " intensity: " +
+                        std::to_string(raw_points.intensity[i]) + "\n";
+                    }
+
+                    log_msg += "\n";
+                }
+                log_itg(log_msg); */
+            }
         }
+        else {
+            /* std::string log_msg = std::string("Centroid data peak picking.") + "\n\n";
+            log_itg(log_msg); */
+            
+            // If the raw data is centroided, we can use simpler approach
+            // to solve the linear system by fixing sigmamz and umz
+            Eigen::VectorXd beta(3);
+            Eigen::VectorXi selectedCols(3);
+            selectedCols << 0, 3, 4; // index vector for selected columns
+            Eigen::VectorXi fixedCols(2);
+            fixedCols << 1, 2; // index vector for not-selected columns
+            Eigen::MatrixXd B(5, 3);
+            B = A(Eigen::indexing::all, selectedCols);
+            Eigen::VectorXd e(2);
+            e(0) = 0; //local_max.mz/(theoretical_sigma_mz*theoretical_sigma_mz); // these are the fixed constant the peak location in mz and sigma_mz
+            e(1) = -1/(2*theoretical_sigma_mz*theoretical_sigma_mz);
+            Eigen::VectorXd d = c - A(Eigen::indexing::all, fixedCols) * e;
+            beta = B.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(d);
+
+            /* // if (!triggerPeakLog) {
+                log_msg = std::string("Beta values: ") + std::to_string(beta(0)) + ", " + std::to_string(beta(1)) + ", " + std::to_string(beta(2)) + "\n" +
+                    "d vector: " + std::to_string(d(0)) + ", " + std::to_string(d(1)) + ", " + std::to_string(d(2)) + "\n" +
+                    "e vector: " + std::to_string(e(0)) + ", " + std::to_string(e(1)) + "\n\n";
+                log_itg(log_msg);
+                // triggerPeakLog = false;
+            // } */
+            {
+                double a = beta(0);
+                double b = beta(1);
+                double c = beta(2);
+                if (std::isnan(a) || std::isnan(b) || std::isnan(c) ||
+                    std::isinf(a) || std::isinf(b) || std::isinf(c) ||
+                    c >= 0) {
+                        if (raw_data.get_failed_peaks){
+                            peak.fit_failure_code |= static_cast<uint64_t>(std::isnan(a)) << 1;
+                            peak.fit_failure_code  |= static_cast<uint64_t>(std::isnan(b)) << 2;
+                            peak.fit_failure_code  |= static_cast<uint64_t>(std::isnan(c)) << 3;
+                        
+                            peak.fit_failure_code  |= static_cast<uint64_t>(std::isinf(a)) << 6;
+                            peak.fit_failure_code  |= static_cast<uint64_t>(std::isinf(b)) << 7;
+                            peak.fit_failure_code  |= static_cast<uint64_t>(std::isinf(c)) << 8;
+                        
+                            peak.fit_failure_code  |= static_cast<uint64_t>(c >= 0) << 11;
+                        } else {
+                            return std::nullopt;
+                        }
+                }
+                sigma_mz = theoretical_sigma_mz;
+                mz = local_max.mz;
+                sigma_rt = std::sqrt(1 / (-2 * c));
+                rt = b / (-2 * c) + local_max.rt;
+                height = std::exp(a - ((b * b) / (4 * c))); //+ (0.5 * (local_max.mz * local_max.mz) / (theoretical_sigma_mz * theoretical_sigma_mz)) 
+
+                /* log_msg = std::string("derived parameters. sigma mz: " + std::to_string(sigma_mz) + ", mz: " + std::to_string(mz) + ", sigma rt: " +
+                    std::to_string(sigma_rt) + ", rt: " + std::to_string(rt) + ", height: " +
+                    std::to_string(height)) + "\n" +
+                    "a: " + std::to_string(a) + ", b: " + std::to_string(b) + ", c: " +
+                    std::to_string(c) + "\n" +
+                    "height elements. First:  " + std::to_string(a) + ", Second: " + std::to_string((0.5 * (local_max.mz * local_max.mz) / (theoretical_sigma_mz * theoretical_sigma_mz))) + ", Third: " +
+                    std::to_string(-((b * b) / (4 * c))) + ", Sum: " + std::to_string(a + (0.5 * (local_max.mz * local_max.mz) / (theoretical_sigma_mz * theoretical_sigma_mz)) - ((b * b) / (4 * c))) + "\n\n";
+                
+                if (local_max.mz>612.95&&local_max.mz<612.99&&local_max.rt>3635&&local_max.rt<3645) {
+                    int num_points_per_lines = 10;
+                    log_msg += "Raw data points:\n";
+                    if (raw_points.num_points > num_points_per_lines) {
+                        for (size_t i = 0; i < raw_points.num_points; i += num_points_per_lines) {
+                            for (size_t j = 0; j < num_points_per_lines && i + j < raw_points.num_points; ++j) {
+                                log_msg += "mz: " + std::to_string(raw_points.mz[i + j]) +
+                                " rt: " + std::to_string(raw_points.rt[i + j]) + " intensity: " +
+                                std::to_string(raw_points.intensity[i + j]) + "\n";
+                            }
+                            log_msg += "\n";
+                        }
+                    } else {
+                        for (size_t i = 0; i < raw_points.num_points; ++i) {
+                            log_msg += "mz: " + std::to_string(raw_points.mz[i]) +
+                            " rt: " + std::to_string(raw_points.rt[i]) + " intensity: " +
+                            std::to_string(raw_points.intensity[i]) + "\n";
+                        }
+                    }
+                    log_msg += "\n";
+                }
+
+                log_itg(log_msg); */
+            }
+        }
+
+        if (std::isnan(height) || std::isnan(mz) || std::isnan(sigma_mz) ||
+        std::isnan(rt) || std::isnan(sigma_rt) || std::isinf(height) ||
+        std::isinf(mz) || std::isinf(sigma_mz) || std::isinf(rt) ||
+        std::isinf(sigma_rt) || height <= 0 || sigma_mz <= 0 ||
+        sigma_rt <= 0 || mz <= 0 || rt <= 0) {
+            if (raw_data.get_failed_peaks){
+                peak.fit_failure_code  |= static_cast<uint64_t>(std::isnan(height)) << 13;
+                peak.fit_failure_code |= static_cast<uint64_t>(std::isnan(mz)) << 14;
+                peak.fit_failure_code |= static_cast<uint64_t>(std::isnan(sigma_mz)) << 15;
+                peak.fit_failure_code |= static_cast<uint64_t>(std::isnan(rt)) << 16;
+                peak.fit_failure_code |= static_cast<uint64_t>(std::isnan(sigma_rt)) << 17;
+                peak.fit_failure_code |= static_cast<uint64_t>(std::isinf(height)) << 18;
+                peak.fit_failure_code |= static_cast<uint64_t>(std::isinf(mz)) << 19;
+                peak.fit_failure_code |= static_cast<uint64_t>(std::isinf(sigma_mz)) << 20;
+                peak.fit_failure_code |= static_cast<uint64_t>(std::isinf(rt)) << 21;
+                peak.fit_failure_code |= static_cast<uint64_t>(std::isinf(sigma_rt)) << 22;
+                peak.fit_failure_code |= static_cast<uint64_t>(height <= 0) << 23;
+                peak.fit_failure_code |= static_cast<uint64_t>(sigma_mz <= 0) << 24;
+                peak.fit_failure_code |= static_cast<uint64_t>(sigma_rt <= 0) << 25;
+                peak.fit_failure_code |= static_cast<uint64_t>(mz <= 0) << 26;
+                peak.fit_failure_code |= static_cast<uint64_t>(rt <= 0) << 27;
+                } else {
+                    return std::nullopt;
+            }
+    }
+
+        peak.fitted_height = height;
+        peak.fitted_mz = mz;
+        peak.fitted_rt = rt;
+        peak.fitted_sigma_mz = sigma_mz;
+        peak.fitted_sigma_rt = sigma_rt;
+        peak.fitted_volume = height * sigma_mz * sigma_rt * 2.0 * PI;
     }
 
     // Ensure peak quality.
@@ -413,6 +557,7 @@ std::vector<Centroid::Peak> Centroid::find_peaks_parallel(
     size_t max_threads) {
     // Finding local maxima.
     auto local_max = Centroid::find_local_maxima(grid);
+    // log_itg("reset");
 
     // The number of groups/threads is set to the maximum possible concurrency.
     uint64_t num_threads = std::thread::hardware_concurrency();
