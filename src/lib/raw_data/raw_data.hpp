@@ -100,6 +100,7 @@ struct Scan {
     // TODO(alex): We might want to make this a smart pointer, as this field is
     // only useful for MSn scans.
     PrecursorInformation precursor_information;
+    bool centroid {false}; // Indicating if the raw data is centroided (1) or not (0 default).
 };
 
 // Main structure that hold information about a RawData file.
