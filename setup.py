@@ -7,6 +7,7 @@ import subprocess
 from distutils.version import LooseVersion
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
+from setuptools import find_namespace_packages
 
 
 class CMakeExtension(Extension):
@@ -77,7 +78,8 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/PASTAQ-MS/PASTAQ",
-    packages=find_packages('src/python-bindings'),
+    packages=find_namespace_packages(where='src/python-bindings'),
+    # packages=find_packages('src/python-bindings'),
     #packages = find_packages(),
     package_dir={'': 'src/python-bindings'},
     ext_modules=[CMakeExtension('pastaq/pastaq_cpp')],

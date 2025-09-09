@@ -13,6 +13,7 @@
 #include <memory>
 #include <variant>
 #include <utility>
+#include <optional>
 
 #include "CppSQLite3.h"
 #include "timsdata.h" // fundamental C API

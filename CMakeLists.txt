@@ -5,6 +5,7 @@ project(pastaq VERSION "0.11.2")
 # Set project properties.
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -40,7 +41,12 @@ endif()
 
 add_subdirectory("ext/zlib")
 add_subdirectory("ext/eigen")
-add_subdirectory("ext/mstoolkit" "${CMAKE_BINARY_DIR}/mstoolkit_build")
+# add_subdirectory("ext/mstoolkit" "${CMAKE_BINARY_DIR}/mstoolkit_build")
+add_subdirectory(
+  "ext/mstoolkit"
+  "${CMAKE_BINARY_DIR}/mstoolkit_build"
+  EXCLUDE_FROM_ALL
+)
 # add_subdirectory(src/lib/raw_data)
 
 # Build pastaq library.
@@ -74,38 +80,51 @@ add_library(pastaqlib STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/third_party/sqlite/sqlite3.c"
     )
 
-
+# Try to find HDF5 (cross-platform)
+find_package(HDF5 REQUIRED COMPONENTS C CXX)
+message(STATUS "Found HDF5 include dirs: ${HDF5_INCLUDE_DIRS}")
+message(STATUS "Found HDF5 libraries: ${HDF5_LIBRARIES}")
 
 target_include_directories(pastaqlib PUBLIC src/lib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/include
+    ${HDF5_INCLUDE_DIRS}
 )
+
+add_definitions(-DMZP_HDF)
 
 # Add mstoolkit include directory
 IF (UNIX)
   # for linux
-  add_definitions(-DGCC -DXML_DEV_URANDOM -D_FILE_OFFSET_BITS=64 -D_NO_THERMORAW -D_NOSQLITE)
+  add_definitions(-DMZP_HDF -DGCC -DXML_DEV_URANDOM -D_FILE_OFFSET_BITS=64 -D_NO_THERMORAW -D_NOSQLITE)
 ENDIF()
 target_include_directories(pastaqlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/ext/mstoolkit/include)
 target_include_directories(pastaqlib PUBLIC "${SQLITE_INCLUDE_DIR}")
 target_include_directories(pastaqlib PUBLIC "${SQLITE_DIR}")
 target_include_directories(pastaqlib PUBLIC "${TDF_SDK_INCLUDE_DIR}")
+target_include_directories(mstoolkit PUBLIC "${HDF5_INCLUDE_DIRS}")
+# target_include_directories(pastaqlib PUBLIC "${HDF5_INCLUDE_DIRS}")
 
+target_compile_definitions(mstoolkit PUBLIC MZP_HDF)
 
 if (WIN32)
-    target_link_libraries(pastaqlib PRIVATE ${CMAKE_THREAD_LIBS_INIT} 
+    target_link_libraries(pastaqlib PRIVATE ${CMAKE_THREAD_LIBS_INIT}
         Eigen3::Eigen 
         zlibstatic
-        mstoolkit
+        mstoolkit PUBLIC
+        ${HDF5_LIBRARIES}
         ${TIMSDATA_LIBRARY}
     )
+#    target_link_libraries(pastaqlib PUBLIC mstoolkit ${HDF5_LIBRARIES})
 else()
-    target_link_libraries(pastaqlib PRIVATE ${CMAKE_THREAD_LIBS_INIT} 
+    target_link_libraries(pastaqlib PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${HDF5_LIBRARIES}
         Eigen3::Eigen 
         zlib
-        mstoolkit
+        mstoolkit PUBLIC
+        ${HDF5_LIBRARIES}
         ${TIMSDATA_LIBRARY}
     )
+#    target_link_libraries(pastaqlib PUBLIC mstoolkit ${HDF5_LIBRARIES})
 endif()
 
 add_executable(TimsDataExample "${CMAKE_CURRENT_SOURCE_DIR}/examples/cpp/timstdf.cpp")

@@ -132,7 +132,7 @@ def plot_msSpectra(mz, intensity, norm_mz_diff = 0.0035, diffFactor = 1.3, scanI
                 newSpectra['mz'].insert(idxSpectra, spectra['mz'][i-1] + diff/2)
                 newSpectra['intensity'].insert(idxSpectra, 0)
                 idxSpectra += 1
-                print(norm_mz_diff*diffFactor, diff, norm_mz_diff*diffFactor + diff, norm_mz_diff)
+                # print(norm_mz_diff*diffFactor, diff, norm_mz_diff*diffFactor + diff, norm_mz_diff)
                 newSpectra['mz'].insert(idxSpectra, spectra['mz'][i])
                 newSpectra['intensity'].insert(idxSpectra, spectra['intensity'][i])
                 idxSpectra += 1
