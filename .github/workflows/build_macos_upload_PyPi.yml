@@ -1,4 +1,4 @@
-name: Build on Windows and Upload to PyPi
+name: Build on macOS and Upload to PyPi
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-and-upload:
-    runs-on: windows-latest
+    runs-on: macos-latest
 
     strategy:
       matrix:
