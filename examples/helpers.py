@@ -665,7 +665,7 @@ def showXICRAWAligned(lcmsData1, lcmsData2, peak1, peaks2, sigmaFactor, rtWidthX
     plt.xlabel('rt (sec)')
     plt.ylabel('intensity (cps)')
     plt.title(f'Extracted ion chromatogram of reference XIC for peak {peak1.id} at {peak1.fitted_rt} sec and sample XIC for '
-              f'peak {matchedpeak.id if matchedpeak else 'N/A'} at {matchedpeak.fitted_rt if matchedpeak else 'N/A'} sec.')
+              f"peak {matchedpeak.id if matchedpeak else 'N/A'} at {matchedpeak.fitted_rt if matchedpeak else 'N/A'} sec.")
     plt.legend()
 
     # show the plot
