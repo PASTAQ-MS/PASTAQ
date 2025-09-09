@@ -70,7 +70,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='pastaq',
-    version='0.11.2',
+    version='0.11.3',
     author='Alejandro Sanchez Brotons',
     author_email='a.sanchez.brotons@rug.nl',
     description='Pipelines And Systems for Threshold Avoiding Quantification (PASTAQ): Pre-processing tools for LC-MS/MS data',
