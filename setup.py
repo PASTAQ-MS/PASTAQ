@@ -27,8 +27,8 @@ class CMakeBuild(build_ext):
         if platform.system() == "Windows":
             cmake_version = LooseVersion(re.search(r'version\s*([\d.]+)',
                                                    out.decode()).group(1))
-            if cmake_version < '3.1.0':
-                raise RuntimeError("CMake >= 3.1.0 is required on Windows")
+            if cmake_version < '3.14.0':
+                raise RuntimeError("CMake >= 3.14.0 is required on Windows")
 
         for ext in self.extensions:
             self.build_extension(ext)
@@ -70,7 +70,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='pastaq',
-    version='0.11.2',
+    version='0.11.3',
     author='Alejandro Sanchez Brotons',
     author_email='a.sanchez.brotons@rug.nl',
     description='Pipelines And Systems for Threshold Avoiding Quantification (PASTAQ): Pre-processing tools for LC-MS/MS data',

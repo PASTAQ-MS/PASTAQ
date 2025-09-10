@@ -17,7 +17,7 @@ from .pastaq import *  # noqa F401, F403
 # so they need to be loaded explicitly for access from python
 # Those _ functions should only be referenced here and are called by higher level python functions with the same
 # name but no underscore
-from .pastaq import _read_mzml, _resample, _find_peaks, _calculate_time_map, _warp_peaks  # noqa F401
+from .pastaq import _read_mzml, _resample, _find_peaks, _find_local_maxima, _get_fit_failure_errors, _calculate_time_map, _warp_peaks  # noqa F401
 import pastaq
 
 
@@ -77,6 +77,28 @@ def find_peaks(raw_data, grid, max_peaks=1000):
     """
     return pastaq._find_peaks(raw_data, grid, max_peaks)
 
+def find_local_maxima(grid):
+    """Find local maxima in the grid derived from the raw data.
+
+    Args:
+        grid (Grid): The resampled grid version of the raw data
+
+    Returns:
+        List of local maxima - possibly empty if none found
+    """
+    return pastaq._find_local_maxima(grid)
+
+def get_fit_failure_errors(fit_failure_code, error_message):
+    """Get human readable error messages on peak fitting.
+
+    Args:
+        fit_failure_code (int): Error code from the peak fitting as 64 bit long integer
+        error_message (string): Error message from the peak fitting
+
+    Returns:
+        String containing list of error messages.
+    """
+    return pastaq._get_fit_failure_errors(fit_failure_code, error_message)
 
 def calculate_time_map(ref_peaks, samp_peaks, slack, segment_length, num_points, expand_factor, peaks_per_window):
     """Calculate the time map that maps the sample peaks to the reference.

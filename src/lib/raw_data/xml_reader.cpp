@@ -36,6 +36,12 @@ RawData::Scan parse_mzxml_scan(std::istream &stream,
             return {};
         }
     }
+    
+    if (scan_attributes.find("centroided") != scan_attributes.end()) {
+        if (scan_attributes["centroided"] == "1"){
+            scan.centroid = true;
+        }
+    }
 
     // Find MS level.
     if (scan_attributes.find("msLevel") == scan_attributes.end()) {
@@ -339,6 +345,7 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
     raw_data.fwhm_rt = 0;  // TODO(alex): Should this be passed as well?
     raw_data.scans = {};
     raw_data.retention_times = {};
+    raw_data.centroid = false;
     // TODO(alex): Can we automatically detect the instrument type and set
     // resolution from the header?
     while (stream.good() && !stream.eof()) {
@@ -369,6 +376,9 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
                 if (scan.mz[scan.mz.size() - 1] > raw_data.max_mz) {
                     raw_data.max_mz = scan.mz[scan.mz.size() - 1];
                 }
+                if (scan.centroid) {
+                    raw_data.centroid = true;
+                }
             }
         }
     }
@@ -392,6 +402,7 @@ std::optional<RawData::RawData> XmlReader::_read_mzml(
     raw_data.fwhm_rt = 0;  // TODO(alex): Should this be passed as well?
     raw_data.scans = {};
     raw_data.retention_times = {};
+    raw_data.centroid = false;
     // TODO(alex): Can we automatically detect the instrument type and set
     // resolution from the header?
     while (stream.good() && !stream.eof()) {
@@ -475,6 +486,12 @@ std::optional<RawData::RawData> XmlReader::_read_mzml(
                             scan = {};
                             break;
                         }
+                    }
+
+                    //Detect centroid based on MS:1000127 in the spectrum header
+                    // if then is a change from centroid to profile then a flag should be raised. This is not yet implemented.
+                    if (accession == "MS:1000127") {
+                        raw_data.centroid = true;
                     }
                 }
 

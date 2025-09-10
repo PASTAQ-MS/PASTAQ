@@ -1,6 +1,7 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <thread>
 #include <tuple>
 #include <cctype>
@@ -1034,6 +1035,8 @@ PYBIND11_MODULE(pastaq, m) {
         .def_readonly("max_mz", &RawData::RawData::max_mz)
         .def_readonly("min_rt", &RawData::RawData::min_rt)
         .def_readonly("max_rt", &RawData::RawData::max_rt)
+        .def_readonly("centroid", &RawData::RawData::centroid)
+        .def_readwrite("get_failed_peaks", &RawData::RawData::get_failed_peaks)
         .def("theoretical_fwhm", &RawData::theoretical_fwhm, py::arg("mz"))
         .def("dump", &PythonAPI::write_raw_data)
         .def("raw_points", &RawData::raw_points,
@@ -1047,6 +1050,7 @@ PYBIND11_MODULE(pastaq, m) {
                    "\n> resolution_ms1: " + std::to_string(rd.resolution_ms1) +
                    "\n> resolution_msn: " + std::to_string(rd.resolution_msn) +
                    "\n> reference_mz: " + std::to_string(rd.reference_mz) +
+                   "\n> centroid data: " + std::to_string(rd.centroid) +
                    "\n> min_mz: " + std::to_string(rd.min_mz) +
                    "\n> max_mz: " + std::to_string(rd.max_mz) +
                    "\n> min_rt: " + std::to_string(rd.min_rt) +
@@ -1122,6 +1126,11 @@ PYBIND11_MODULE(pastaq, m) {
         .def_readonly("fitted_sigma_mz", &Centroid::Peak::fitted_sigma_mz)
         .def_readonly("fitted_sigma_rt", &Centroid::Peak::fitted_sigma_rt)
         .def_readonly("fitted_volume", &Centroid::Peak::fitted_volume)
+        .def_readonly("peak_fit_failure", &Centroid::Peak::peak_fit_failure)
+        .def_readonly("fit_failure_code", &Centroid::Peak::fit_failure_code,
+              "64-bit unsigned integer encoding fit failure flags")
+        .def_readonly_static("error_messages", &Centroid::Peak::error_messages,
+                             "Error messages for fit failure codes")
         .def(
             "xic",
             [](const Centroid::Peak &peak, const RawData::RawData &raw_data,
@@ -1150,8 +1159,20 @@ PYBIND11_MODULE(pastaq, m) {
             ret += ", fitted_sigma_mz: " + std::to_string(p.fitted_sigma_mz);
             ret += ", fitted_sigma_rt: " + std::to_string(p.fitted_sigma_rt);
             ret += ", fitted_volume: " + std::to_string(p.fitted_volume);
+            // ret += ", peak_fit_failure: " +
+            //        Centroid::get_fit_failure_errors(p.fit_failure_code, Centroid::error_messages);
             ret += ">";
             return ret;
+        });
+
+    py::class_<Centroid::LocalMax>(m, "LocalMax")
+        .def_readonly("mz", &Centroid::LocalMax::mz)
+        .def_readonly("rt", &Centroid::LocalMax::rt)
+        .def_readonly("value", &Centroid::LocalMax::value)
+        .def("__repr__", [](const Centroid::LocalMax &m) {
+            return "local maxima <mz: " + std::to_string(m.mz) +
+                   ", rt: " + std::to_string(m.rt) + 
+                   ", value: " + std::to_string(m.value) + ">";
         });
 
     py::class_<Warp2D::TimeMap>(m, "TimeMap")
@@ -1437,6 +1458,12 @@ PYBIND11_MODULE(pastaq, m) {
              "Find all peaks in the given grid", py::arg("raw_data"),
              py::arg("grid"), py::arg("max_peaks") = 0,
              py::arg("max_threads") = std::thread::hardware_concurrency())
+        .def("_find_local_maxima", &Centroid::find_local_maxima,
+             "Find all local maxima in the given grid", py::arg("grid"))
+        .def("_get_fit_failure_errors",
+             static_cast<std::string (*)(const uint64_t &, const std::vector<std::string> &)>(&Centroid::get_fit_failure_errors),
+             "Get the fit failure errors for the given peak",
+             py::arg("fit_failure_code"), py::arg("error_messages"))
         .def("_calculate_time_map", &PythonAPI::_calculate_time_map,
              "Calculate a warping time_map to maximize the similarity of "
              "ref_peaks and source_peaks",
