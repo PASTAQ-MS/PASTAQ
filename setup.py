@@ -73,6 +73,7 @@ setup(
     version='0.11.3',
     author='Alejandro Sanchez Brotons',
     author_email='a.sanchez.brotons@rug.nl',
+    license_files=[],
     description='Pipelines And Systems for Threshold Avoiding Quantification (PASTAQ): Pre-processing tools for LC-MS/MS data',
     long_description=long_description,
     long_description_content_type="text/markdown",
