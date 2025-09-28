@@ -1039,7 +1039,7 @@ PYBIND11_MODULE(pastaq, m) {
         .def_readwrite("get_failed_peaks", &RawData::RawData::get_failed_peaks)
         .def("theoretical_fwhm", &RawData::theoretical_fwhm, py::arg("mz"))
         .def("dump", &PythonAPI::write_raw_data)
-        .def("raw_points", &RawData::raw_points,
+        .def("raw_points", &RawData::raw_points, 
              "Get the raw data points on the square region defined by "
              "min/max_mz/rt",
              py::arg("min_mz"), py::arg("max_mz"), py::arg("min_rt"),
@@ -1047,7 +1047,7 @@ PYBIND11_MODULE(pastaq, m) {
         .def("__repr__", [](const RawData::RawData &rd) {
             return "RawData:\n> instrument_type: " +
                    PythonAPI::to_string(rd.instrument_type) +
-                   "\n> resolution_ms1: " + std::to_string(rd.resolution_ms1) +
+                   "\n> resolution_ms1: " + std::to_string(rd.resolution_ms1) + 
                    "\n> resolution_msn: " + std::to_string(rd.resolution_msn) +
                    "\n> reference_mz: " + std::to_string(rd.reference_mz) +
                    "\n> centroid data: " + std::to_string(rd.centroid) +
@@ -1056,7 +1056,12 @@ PYBIND11_MODULE(pastaq, m) {
                    "\n> min_rt: " + std::to_string(rd.min_rt) +
                    "\n> max_rt: " + std::to_string(rd.max_rt) +
                    "\n> number of scans: " + std::to_string(rd.scans.size());
-        });
+        })
+        .def("get_theoretical_sigma_mz", [](const RawData::RawData& self, double mz) {
+            return RawData::fwhm_to_sigma(RawData::theoretical_fwhm(self, mz));
+        },
+            "Calculate theoretical sigma mz for a given m/z, resolution, and reference_mz. "
+            " The later two parameters are obtained from the raw data");
 
     py::class_<Grid::Grid>(m, "Grid")
         .def_readonly("n", &Grid::Grid::n)

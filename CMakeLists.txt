@@ -16,6 +16,23 @@ if (MSVC)
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} /W4")
 endif()
 
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug)  # Default to Debug if not specified
+endif()
+
+# Add debug-specific flags.
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "Project is build in debug mode.")
+    if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
+    endif()
+    if(MSVC)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zi /Od")
+    endif()
+else()
+    message(STATUS "Project is build in release mode.")
+endif()
+
 add_subdirectory("ext/zlib")
 add_subdirectory("ext/eigen")
 

@@ -19,8 +19,8 @@ uint64_t Grid::x_index(const Grid &grid, double mz) {
             return static_cast<uint64_t>(grid.k * a * b / c);
         } break;
         case Instrument::TOF: {
-            return static_cast<uint64_t>(grid.k * grid.reference_mz /
-                                         grid.fwhm_mz *
+            return static_cast<uint64_t>((grid.k * grid.reference_mz /
+                                         grid.fwhm_mz) *
                                          std::log(mz / grid.min_mz));
         } break;
         case Instrument::QUAD: {
@@ -56,7 +56,7 @@ double Grid::mz_at(const Grid &grid, uint64_t i) {
         } break;
         case Instrument::TOF: {
             return grid.min_mz *
-                   std::exp(grid.fwhm_mz / grid.reference_mz * i);
+                   std::exp(grid.fwhm_mz * i / (grid.reference_mz * grid.k));
         } break;
         case Instrument::QUAD: {
             double delta_mz =

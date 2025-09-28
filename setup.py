@@ -7,6 +7,7 @@ import subprocess
 from distutils.version import LooseVersion
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
+from wheel.bdist_wheel import bdist_wheel
 
 
 class CMakeExtension(Extension):
@@ -16,6 +17,17 @@ class CMakeExtension(Extension):
 
 
 class CMakeBuild(build_ext):
+    user_options = build_ext.user_options + [
+        ('debug', None, 'build with debug symbols'),
+    ]
+
+    def initialize_options(self):
+        build_ext.initialize_options(self)
+        self.debug = None
+
+    def finalize_options(self):
+        build_ext.finalize_options(self)
+
     def run(self):
         try:
             out = subprocess.check_output(['cmake', '--version'])
@@ -38,6 +50,12 @@ class CMakeBuild(build_ext):
             os.path.dirname(self.get_ext_fullpath(ext.name)))
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
                       '-DPYTHON_EXECUTABLE=' + sys.executable]
+
+        # Set build type based on --debug flag
+        if self.debug:
+            cmake_args += ['-DCMAKE_BUILD_TYPE=Debug']
+        else:
+            cmake_args += ['-DCMAKE_BUILD_TYPE=Release']
 
         cfg = 'Debug' if self.debug else 'Release'
         build_args = ['--config', cfg]
@@ -65,6 +83,26 @@ class CMakeBuild(build_ext):
                               cwd=self.build_temp)
         print()  # Add an empty line for cleaner output
 
+
+# Add custom bdist_wheel command that supports --debug
+class DebugBdistWheel(bdist_wheel):
+    user_options = bdist_wheel.user_options + [
+        ('debug', None, 'build with debug symbols'),
+    ]
+
+    def initialize_options(self):
+        bdist_wheel.initialize_options(self)
+        self.debug = None
+
+    def finalize_options(self):
+        bdist_wheel.finalize_options(self)
+
+    def run(self):
+        # Pass debug flag to build_ext
+        if self.debug:
+            self.distribution.get_command_obj('build_ext').debug = True
+        bdist_wheel.run(self)
+
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
@@ -81,7 +119,10 @@ setup(
     packages=find_packages('src/python-bindings'),
     package_dir={'': 'src/python-bindings'},
     ext_modules=[CMakeExtension('pastaq/pastaq_cpp')],
-    cmdclass=dict(build_ext=CMakeBuild),
+    cmdclass={
+        'build_ext': CMakeBuild,
+        'bdist_wheel': DebugBdistWheel,
+    },
     install_requires=[
 #        'numpy',
         'pandas',
