@@ -128,6 +128,8 @@ setup(
         'pandas',
         'seaborn',
         'matplotlib',
+        'plotly',
+        'requests',
     ],
     zip_safe=False,
 )

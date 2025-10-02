@@ -473,7 +473,7 @@ std::optional<RawData::RawData> XmlReader::_read_mzml(
                     // This scan is ms_level 1
                     if (accession == "MS:1000579") {
                         scan.ms_level = 1;
-                        precursor_scan_number = scan.scan_number;
+                        previousMS1_scan_number = scan.scan_number;
                     }
 
                     // MS level a multi-level MSn experiment.
@@ -482,7 +482,7 @@ std::optional<RawData::RawData> XmlReader::_read_mzml(
                             std::stoi(cv_attributes["value"]);
                         scan.ms_level = scan_ms_level;
                         if (scan.ms_level == 1) {
-                            precursor_scan_number = scan.scan_number;
+                            previousMS1_scan_number = scan.scan_number;
                         }
                     }
 
