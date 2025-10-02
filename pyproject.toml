@@ -29,16 +29,19 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Programming Language :: C++",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 
 # Specify the minimum required Python version (based on the repo's instructions)
-requires-python = ">=3.9"
+requires-python = ">=3.7"
 
 # List your runtime dependencies. 
 # You should manually copy these from your existing 'requirements.txt' file.
@@ -70,7 +73,7 @@ Changelog = "https://github.com/Venustiano/PASTAQ/releases"
 # Configuration for the Black code formatter
 [tool.black]
 line-length = 88
-target-version = ['py39', 'py310', 'py311']
+target-version = ['py37', 'py38','py39', 'py310', 'py311', 'py312']
 
 # Configuration for the isort import sorter
 [tool.isort]
