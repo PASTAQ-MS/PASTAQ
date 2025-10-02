@@ -16,8 +16,8 @@ build-backend = "setuptools.build_meta"
 # This replaces the metadata traditionally found in setup.py.
 # ====================================================================
 [project]
-name = "pastaq"
-version = "0.11.4" # Update this to match your current version
+name = "pastaq-venus79"
+version = "0.11.7" # Update this to match your current version
 description = "Pipelines and Systems for Threshold Avoiding Quantification of LC-MS/MS data"
 readme = "README.md"
 license = { text = "MIT" } # Based on the repo's LICENSE.md
