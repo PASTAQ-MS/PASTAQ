@@ -48,6 +48,8 @@ dependencies = [
     # "lxml",
     # Add all other dependencies here
     'pandas',
+    'build',
+    'wheel',
     'seaborn',
     'matplotlib',
     'plotly',
