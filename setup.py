@@ -107,13 +107,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name='pastaq',
-    version='0.11.3',
-    author='Alejandro Sanchez Brotons',
-    author_email='a.sanchez.brotons@rug.nl',
-    license_files=[],
-    description='Pipelines And Systems for Threshold Avoiding Quantification (PASTAQ): Pre-processing tools for LC-MS/MS data',
-    long_description=long_description,
+    # name='pastaq',
+    # version='0.11.3',
+    # author='Alejandro Sanchez Brotons',
+    # author_email='a.sanchez.brotons@rug.nl',
+    # license_files=[],
+    # description='Pipelines And Systems for Threshold Avoiding Quantification (PASTAQ): Pre-processing tools for LC-MS/MS data',
+    # long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/PASTAQ-MS/PASTAQ",
     packages=find_packages('src/python-bindings'),

@@ -1,0 +1,78 @@
+# ====================================================================
+# 1. Build System Configuration (Mandatory for Python Packaging)
+# ====================================================================
+[build-system]
+# Specify the backends required to build the package. 
+# Since PASTAQ uses setup.py and C++ extensions, 'setuptools' is the necessary backend.
+requires = [
+    "setuptools>=61.0.0",
+    "wheel",
+    "cmake", # Typically required for building C++ extensions via setuptools
+]
+build-backend = "setuptools.build_meta"
+
+# ====================================================================
+# 2. Project Metadata (PEP 621 Standard)
+# This replaces the metadata traditionally found in setup.py.
+# ====================================================================
+[project]
+name = "pastaq"
+version = "0.11.4" # Update this to match your current version
+description = "Pipelines and Systems for Threshold Avoiding Quantification of LC-MS/MS data"
+readme = "README.md"
+license = { text = "MIT" } # Based on the repo's LICENSE.md
+authors = [
+    {name = "Venustiano/PASTAQ Developers"} # Update with a specific author/maintainer name
+]
+keywords = ["LC-MS/MS", "proteomics", "quantification", "C++", "python-bindings"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+
+# Specify the minimum required Python version (based on the repo's instructions)
+requires-python = ">=3.9"
+
+# List your runtime dependencies. 
+# You should manually copy these from your existing 'requirements.txt' file.
+dependencies = [
+    # "numpy>=1.20",
+    # "scipy",
+    # "lxml",
+    # Add all other dependencies here
+    'pandas',
+    'seaborn',
+    'matplotlib',
+    'plotly',
+    'requests',
+]
+
+# Define external links
+[project.urls]
+Homepage = "https://pastaq.horvatovichlab.com"
+Documentation = "https://pastaq.horvatovichlab.com/docs"
+Repository = "https://github.com/Venustiano/PASTAQ"
+Changelog = "https://github.com/Venustiano/PASTAQ/releases"
+
+# ====================================================================
+# 3. Tool-Specific Configuration (Optional but highly recommended)
+# ====================================================================
+
+# Configuration for the Black code formatter
+[tool.black]
+line-length = 88
+target-version = ['py39', 'py310', 'py311']
+
+# Configuration for the isort import sorter
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_only = true
