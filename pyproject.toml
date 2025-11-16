@@ -1,82 +1,150 @@
-# ====================================================================
-# 1. Build System Configuration (Mandatory for Python Packaging)
-# ====================================================================
 [build-system]
-# Specify the backends required to build the package. 
-# Since PASTAQ uses setup.py and C++ extensions, 'setuptools' is the necessary backend.
-requires = [
-    "setuptools>=61.0.0",
-    "wheel",
-    "cmake", # Typically required for building C++ extensions via setuptools
-]
+requires = ["setuptools>=64", "wheel", "cmake>=3.14", "packaging>=23", "ninja; platform_system != 'Windows'"]
 build-backend = "setuptools.build_meta"
 
-# ====================================================================
-# 2. Project Metadata (PEP 621 Standard)
-# This replaces the metadata traditionally found in setup.py.
-# ====================================================================
 [project]
 name = "pastaq-venus79"
-version = "0.11.9" # Update this to match your current version
-description = "Pipelines and Systems for Threshold Avoiding Quantification of LC-MS/MS data"
+version = "0.11.91"
+description = "Pipelines And Systems for Threshold Avoiding Quantification (PASTAQ): Pre-processing tools for LC-MS/MS data"
 readme = "README.md"
-license = { text = "MIT" } # Based on the repo's LICENSE.md
+requires-python = ">=3.8"
+license = {text = "MIT License"}
+keywords = ["mass spectrometry", "proteomics", "LC-MS", "data processing"]
+
 authors = [
-    {name = "Venustiano/PASTAQ Developers"} # Update with a specific author/maintainer name
+    {name = "Peter Horvatovich", email = "p.l.horvatovich@rug.nl"},
+    {name = "Alejandro Sanchez Brotons", email = "a.sanchez.brotons@rug.nl"}
 ]
-keywords = ["LC-MS/MS", "proteomics", "quantification", "C++", "python-bindings"]
+
+maintainers = [
+    {name = "Peter Horvatovich", email = "p.l.horvatovich@rug.nl"}
+]
+
 classifiers = [
     "Development Status :: 4 - Beta",
-    "Programming Language :: C++",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: C++",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
 ]
 
-# Specify the minimum required Python version (based on the repo's instructions)
-requires-python = ">=3.7"
-
-# List your runtime dependencies. 
-# You should manually copy these from your existing 'requirements.txt' file.
 dependencies = [
-    # "numpy>=1.20",
-    # "scipy",
-    # "lxml",
-    # Add all other dependencies here
-    'pandas',
-    'build',
-    'wheel',
-    'seaborn',
-    'matplotlib',
-    'plotly',
-    'requests',
+    "numpy>=1.22",
+    "pandas>=1.0.0",
+    "seaborn>=0.11.0",
+    "matplotlib>=3.0.0",
+    "plotly>=5.0.0",
+    "requests>=2.25.0",
 ]
 
-# Define external links
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=3.0",
+    "jupyter>=1.0",
+    "ipykernel>=6.0",
+    "black>=22.0",
+    "ruff>=0.1.0",
+]
+
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=3.0",
+]
+
+docs = [
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=1.0",
+]
+
 [project.urls]
-Homepage = "https://pastaq.horvatovichlab.com"
-Documentation = "https://pastaq.horvatovichlab.com/docs"
-Repository = "https://github.com/Venustiano/PASTAQ"
-Changelog = "https://github.com/Venustiano/PASTAQ/releases"
+Homepage = "https://pastaq.horvatovichlab.com/"
+Documentation = "https://github.com/PASTAQ-MS/PASTAQ/blob/master/README.md"
+Repository = "https://github.com/PASTAQ-MS/PASTAQ"
+"Bug Tracker" = "https://github.com/PASTAQ-MS/PASTAQ/issues"
 
-# ====================================================================
-# 3. Tool-Specific Configuration (Optional but highly recommended)
-# ====================================================================
+[tool.setuptools]
+zip-safe = false
 
-# Configuration for the Black code formatter
+[tool.setuptools.package-dir]
+"" = "src/python-bindings"
+
+[tool.setuptools.packages.find]
+where = ["src/python-bindings"]
+include = ["pastaq*"]
+namespaces = false
+
+# ===== CIBUILDWHEEL CONFIGURATION =====
+
+[tool.cibuildwheel]
+# Build for CPython 3.8-3.13 (added 3.13)
+build = "cp38-* cp39-* cp310-* cp311-* cp312-* cp313-*"
+
+# Skip unwanted builds
+skip = [
+    "*-win32",           # No 32-bit Windows
+    "*-manylinux_i686",  # No 32-bit Linux
+    "*-musllinux_*",     # Skip musl (use glibc manylinux)
+    "pp*"                # Skip PyPy
+]
+
+# Test the wheels
+test-command = "python -c \"import pastaq; print(pastaq.__version__)\""
+
+# If you have proper tests:
+# test-requires = ["pytest", "numpy", "pandas"]
+# test-command = "pytest {package}/tests -v"
+
+# Build settings
+build-frontend = "build"
+
+[tool.cibuildwheel.environment]
+CMAKE_BUILD_PARALLEL_LEVEL = "4"
+
+# ===== LINUX: x86_64 only (64-bit) =====
+[tool.cibuildwheel.linux]
+archs = ["x86_64"]
+manylinux-x86_64-image = "manylinux2014"
+# Clean stale build artifacts before configuring
+before-all = [
+    "pip install cmake",
+    "rm -rf {project}/build {project}/dist {project}/*.egg-info {project}/**/*.so"
+]
+repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
+
+# ===== WINDOWS: x64 only (64-bit) =====
+[tool.cibuildwheel.windows]
+archs = ["AMD64"]  # 64-bit only (no win32)
+before-all = "choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'"
+
+# ===== MACOS: x86_64 and arm64 =====
+[tool.cibuildwheel.macos]
+# Note: archs are controlled by the runner OS in the workflow
+# macos-13 → x86_64 (Intel)
+# macos-14 → arm64 (Apple Silicon)
+before-all = "brew install cmake"
+repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=pastaq --cov-report=term-missing"
+
 [tool.black]
-line-length = 88
-target-version = [ 'py38','py39', 'py310', 'py311', 'py312']
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312', 'py313']
 
-# Configuration for the isort import sorter
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-include_trailing_comma = true
-force_grid_only = true
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+select = ["E", "F", "W", "I", "N", "UP"]
+ignore = ["E501"]
