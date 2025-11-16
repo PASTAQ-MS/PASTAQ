@@ -1,0 +1,260 @@
+name: Build Wheels
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Updated OS matrix for specific architectures
+        os: [ubuntu-22.04, windows-2022, macos-13, macos-14]
+        # ubuntu-22.04: x86_64 only
+        # windows-2022: x64 only (no 32-bit)
+        # macos-13: x86_64 (Intel)
+        # macos-14: arm64 (Apple Silicon M1/M2/M3)
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive  # Critical for pybind11, eigen, zlib
+          fetch-depth: 0  # For setuptools_scm if using git versioning
+
+      # Explicitly initialize and update submodules (belt-and-suspenders approach)
+      - name: Initialize Git Submodules
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --recursive --force
+        shell: bash
+
+      # Verify submodules are present
+      - name: Verify Submodules
+        run: |
+          echo "Checking submodules..."
+          ls -la ext/
+          test -f ext/pybind11/CMakeLists.txt || (echo "ERROR: pybind11 submodule missing!" && exit 1)
+          test -f ext/eigen/CMakeLists.txt || (echo "ERROR: eigen submodule missing!" && exit 1)
+          test -f ext/zlib/CMakeLists.txt || (echo "ERROR: zlib submodule missing!" && exit 1)
+          echo "All submodules present ✓"
+        shell: bash
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.16.5
+        env:
+          # Build Python 3.8-3.13 (added Python 3.13)
+          CIBW_BUILD: cp38-* cp39-* cp310-* cp311-* cp312-* cp313-*
+          
+          # Skip unwanted builds:
+          # - 32-bit builds (*-win32, *-manylinux_i686)
+          # - musllinux (use glibc manylinux instead)
+          # - PyPy (pybind11 works best with CPython)
+          CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux_* pp*"
+          
+          # Build frontend
+          CIBW_BUILD_FRONTEND: build
+          
+          # Test the built wheels
+          CIBW_TEST_COMMAND: python -c "import pastaq; print(pastaq.__version__)"
+          
+          # If you have proper tests:
+          # CIBW_TEST_REQUIRES: pytest numpy pandas
+          # CIBW_TEST_COMMAND: pytest {package}/tests -v
+          
+          # ===== PLATFORM-SPECIFIC SETTINGS =====
+          
+          # Linux: x86_64 only (64-bit)
+          CIBW_ARCHS_LINUX: x86_64
+          CIBW_BEFORE_ALL_LINUX: |
+            pip install cmake
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+          CIBW_REPAIR_WHEEL_COMMAND_LINUX: auditwheel repair -w {dest_dir} {wheel}
+          
+          # Windows: x64 only (64-bit)
+          CIBW_ARCHS_WINDOWS: AMD64
+          CIBW_BEFORE_ALL_WINDOWS: choco install cmake -y --installargs 'ADD_CMAKE_TO_PATH=System'
+          
+          # macOS: Separate x86_64 and arm64 builds
+          # macos-13 runner will build x86_64
+          # macos-14 runner will build arm64
+          CIBW_ARCHS_MACOS: ${{ matrix.os == 'macos-13' && 'x86_64' || 'arm64' }}
+          CIBW_BEFORE_ALL_MACOS: brew install cmake
+          CIBW_REPAIR_WHEEL_COMMAND_MACOS: delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}
+          
+          # ===== BUILD ENVIRONMENT =====
+          
+          # Parallel build (use 4 cores to avoid memory issues on CI)
+          # Pass CMake args to disable unnecessary builds
+          CIBW_ENVIRONMENT: >
+            CMAKE_BUILD_PARALLEL_LEVEL=4
+            PASTAQ_CMAKE_ARGS="-DPASTAQ_ENABLE_TESTS=OFF -DEIGEN_BUILD_DOC=OFF -DEIGEN_BUILD_TESTING=OFF -DBUILD_TESTING=OFF"
+          
+          # Python 3.13 specific: Set free-threading flag if needed
+          # (Python 3.13 introduces experimental free-threaded mode)
+          CIBW_ENVIRONMENT_PASS_LINUX: CMAKE_BUILD_PARALLEL_LEVEL PASTAQ_CMAKE_ARGS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ strategy.job-index }}
+          path: ./wheelhouse/*.whl
+          retention-days: 7
+
+  build_sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      # Explicitly initialize submodules
+      - name: Initialize Git Submodules
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --recursive --force
+
+      # Verify submodules
+      - name: Verify Submodules
+        run: |
+          echo "Checking submodules..."
+          test -f ext/pybind11/CMakeLists.txt || (echo "ERROR: pybind11 missing!" && exit 1)
+          test -f ext/eigen/CMakeLists.txt || (echo "ERROR: eigen missing!" && exit 1)
+          test -f ext/zlib/CMakeLists.txt || (echo "ERROR: zlib missing!" && exit 1)
+          echo "All submodules present ✓"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'  # Use stable Python for building sdist
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+
+      - name: Build sdist
+        run: python -m build --sdist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          retention-days: 7
+
+  # Check if version has changed (compare with PyPI)
+  check_version:
+    name: Check if version changed
+    runs-on: ubuntu-latest
+    outputs:
+      should_upload: ${{ steps.version_check.outputs.should_upload }}
+      current_version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Get current version from pyproject.toml
+        id: get_version
+        run: |
+          # Extract version from pyproject.toml
+          VERSION=$(grep -Po '(?<=^version = ")[^"]*' pyproject.toml)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+
+      - name: Check if version exists on PyPI
+        id: version_check
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          
+          # Check if version exists on PyPI
+          if pip index versions pastaq 2>/dev/null | grep -q "$VERSION"; then
+            echo "Version $VERSION already exists on PyPI"
+            echo "should_upload=false" >> $GITHUB_OUTPUT
+          else
+            echo "Version $VERSION is new, will upload to PyPI"
+            echo "should_upload=true" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true  # Don't fail if package doesn't exist on PyPI yet
+
+      - name: Check if this is a tagged release
+        id: check_tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "This is a tagged release"
+            echo "should_upload=true" >> $GITHUB_OUTPUT
+          fi
+
+  upload_pypi:
+    name: Upload to PyPI
+    needs: [build_wheels, build_sdist, check_version]
+    runs-on: ubuntu-latest
+    # Upload if:
+    # 1. This is a tagged release (v*), OR
+    # 2. Version has changed (new version not on PyPI), AND
+    # 3. This is a push to main/master (not a PR)
+    if: |
+      github.event_name == 'push' && 
+      (startsWith(github.ref, 'refs/tags/v') || 
+       (needs.check_version.outputs.should_upload == 'true' && 
+        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')))
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pastaq
+    permissions:
+      id-token: write  # IMPORTANT: for trusted publishing
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+
+      - name: Download sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+
+      - name: Display artifacts
+        run: |
+          ls -lh dist/
+          echo "Uploading version: ${{ needs.check_version.outputs.current_version }}"
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
+          verbose: true
+
+  # Optional: Notify on successful upload
+  notify_upload:
+    name: Notify Upload Success
+    needs: [upload_pypi, check_version]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Create Release Summary
+        run: |
+          echo "# 🎉 PASTAQ ${{ needs.check_version.outputs.current_version }} Published to PyPI" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.check_version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**PyPI URL:** https://pypi.org/project/pastaq/${{ needs.check_version.outputs.current_version }}/" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Installation" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "pip install pastaq==${{ needs.check_version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
