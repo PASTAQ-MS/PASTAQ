@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "wheel", "cmake>=3.14", "packaging>=23", "ninja; p
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pastaq"
+name = "pastaq-venus79"
 version = "0.11.91"
 description = "Pipelines And Systems for Threshold Avoiding Quantification (PASTAQ): Pre-processing tools for LC-MS/MS data"
 readme = "README.md"
