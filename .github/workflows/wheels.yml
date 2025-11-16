@@ -196,8 +196,10 @@ jobs:
             echo "should_upload=true" >> $GITHUB_OUTPUT
           fi
 
-  upload_pypi:
-    name: Upload to PyPI
+  # upload_pypi:
+  upload_testpypi:
+    name: Upload to TestPyPI
+    # name: Upload to PyPI
     needs: [build_wheels, build_sdist, check_version]
     runs-on: ubuntu-latest
     # Upload if:
@@ -210,8 +212,10 @@ jobs:
        (needs.check_version.outputs.should_upload == 'true' && 
         (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')))
     environment:
-      name: pypi
-      url: https://pypi.org/p/pastaq
+      # name: pypi
+      # url: https://pypi.org/p/pastaq
+      name: testpypi
+      url: https://test.pypi.org/project/pastaq
     permissions:
       id-token: write  # IMPORTANT: for trusted publishing
     
@@ -243,18 +247,28 @@ jobs:
   # Optional: Notify on successful upload
   notify_upload:
     name: Notify Upload Success
-    needs: [upload_pypi, check_version]
+    needs: [upload_testpypi, check_version]
+    # needs: [upload_pypi, check_version]
     runs-on: ubuntu-latest
     if: success()
     steps:
       - name: Create Release Summary
         run: |
-          echo "# 🎉 PASTAQ ${{ needs.check_version.outputs.current_version }} Published to PyPI" >> $GITHUB_STEP_SUMMARY
+          echo "# 🎉 PASTAQ ${{ needs.check_version.outputs.current_version }} Published to TestPyPI" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** ${{ needs.check_version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**PyPI URL:** https://pypi.org/project/pastaq/${{ needs.check_version.outputs.current_version }}/" >> $GITHUB_STEP_SUMMARY
+          echo "**TestPyPI URL:** https://test.pypi.org/project/pastaq/${{ needs.check_version.outputs.current_version }}/" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Installation" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "pip install pastaq==${{ needs.check_version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple pastaq==${{ needs.check_version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+          # echo "# 🎉 PASTAQ ${{ needs.check_version.outputs.current_version }} Published to PyPI" >> $GITHUB_STEP_SUMMARY
+          # echo "" >> $GITHUB_STEP_SUMMARY
+          # echo "**Version:** ${{ needs.check_version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
+          # echo "**PyPI URL:** https://pypi.org/project/pastaq/${{ needs.check_version.outputs.current_version }}/" >> $GITHUB_STEP_SUMMARY
+          # echo "" >> $GITHUB_STEP_SUMMARY
+          # echo "## Installation" >> $GITHUB_STEP_SUMMARY
+          # echo '```bash' >> $GITHUB_STEP_SUMMARY
+          # echo "pip install pastaq==${{ needs.check_version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
+          # echo '```' >> $GITHUB_STEP_SUMMARY
