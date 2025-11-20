@@ -8,6 +8,7 @@ import matplotlib.colors as colors
 import pastaq as pq
 import plotly.graph_objects as go
 import plotly.tools as tls
+import matplotlib as mpl
 
 # helper functions
 # Function to calculate the Euclidean distance
@@ -724,3 +725,212 @@ def plot_feature_zoom(grid, feature, peaks, mzm, mzp, rtm, rtp):
             break
 
     return
+
+def match_peaks_within_sigma(peaks_profile, peaks_centroid, lcmsData_profile, lcmsData_centroid, n_sigma_mz=3, n_sigma_rt=3):
+    """
+    Match peaks from profile and centroid data within specified sigma ranges.
+    
+    Parameters:
+    - peaks_profile: Peak list from profile data
+    - peaks_centroid: Peak list from centroid data
+    - lcmsData_profile: RawData object for profile data (to get theoretical sigma_mz)
+    - lcmsData_centroid: RawData object for centroid data (to get fwhm_rt)
+    - n_sigma_mz: Number of sigmas for m/z matching (default: 3)
+    - n_sigma_rt: Number of sigmas for RT matching (default: 3)
+    
+    Returns:
+    - matched_pairs: List of tuples (profile_idx, centroid_idx, mz_diff, rt_diff)
+    """
+    
+    # Convert FWHM to sigma (sigma = FWHM / 2.355)
+    sigma_rt = lcmsData_centroid.fwhm_rt / 2.355
+    
+    matched_pairs = []
+    used_centroid_indices = set()
+    
+    # Iterate through profile peaks
+    for i, peak_profile in enumerate(peaks_profile):
+        mz_profile = peak_profile.fitted_mz
+        rt_profile = peak_profile.fitted_rt
+        intensity_profile = peak_profile.fitted_height
+        
+        # Get theoretical sigma for this m/z
+        sigma_mz_theoretical = lcmsData_profile.get_theoretical_sigma_mz(mz_profile)
+        
+        # Define matching windows
+        mz_window = n_sigma_mz * sigma_mz_theoretical
+        rt_window = n_sigma_rt * sigma_rt
+        
+        best_match = None
+        best_distance = float('inf')
+        
+        # Search for matching centroid peak
+        for j, peak_centroid in enumerate(peaks_centroid):
+            if j in used_centroid_indices:
+                continue
+                
+            mz_centroid = peak_centroid.fitted_mz
+            rt_centroid = peak_centroid.fitted_rt
+            
+            # Calculate differences
+            mz_diff = abs(mz_profile - mz_centroid)
+            rt_diff = abs(rt_profile - rt_centroid)
+            
+            # Check if within windows
+            if mz_diff <= mz_window and rt_diff <= rt_window:
+                # Calculate normalized distance
+                normalized_distance = np.sqrt(
+                    (mz_diff / sigma_mz_theoretical)**2 + 
+                    (rt_diff / sigma_rt)**2
+                )
+                
+                if normalized_distance < best_distance:
+                    best_distance = normalized_distance
+                    best_match = (j, mz_diff, rt_diff)
+        
+        # Store the best match if found
+        if best_match is not None:
+            j, mz_diff, rt_diff = best_match
+            matched_pairs.append({
+                'profile_idx': i,
+                'centroid_idx': j,
+                'mz_profile': mz_profile,
+                'rt_profile': rt_profile,
+                'mz_centroid': peaks_centroid[j].fitted_mz,
+                'rt_centroid': peaks_centroid[j].fitted_rt,
+                'mz_diff': mz_diff,
+                'rt_diff': rt_diff,
+                'mz_diff_sigma': mz_diff / sigma_mz_theoretical,
+                'rt_diff_sigma': rt_diff / sigma_rt,
+                'distance': best_distance,
+                'profile_peak_intensity': peak_profile.fitted_height,
+                'centroid_peak_intensity': peaks_centroid[j].fitted_height,
+                'profile_centroid_intensity_log2ratio': np.log2(peak_profile.fitted_height / peaks_centroid[j].fitted_height) if peaks_centroid[j].fitted_height != 0 else np.nan
+            })
+            used_centroid_indices.add(j)
+    
+    return matched_pairs
+
+# New cell: function to plot matched peak scatter (m/z vs log2 ratio), color by avg log2 intensity
+def plot_matched_peaks_scatter(
+    matched_peaks,
+    *,
+    cmap: str = 'plasma',
+    s: float = 15,
+    edgecolors: str = 'black',
+    linewidth: float = 0.3,
+    vmin: float | None = None,
+    vmax: float | None = None,
+    min_alpha: float = 0.2,
+    max_alpha: float = 1.0,
+    alpha_percentile: float = 95.0,
+    figsize=(12, 6),
+    title: str | None = None,
+    annotate_stats: bool = True,
+    ax=None
+):
+    """
+    Plot matched peaks: x=m/z (profile), y=log2(centroid/profile), color by average log2 intensity,
+    with lower alpha for points near log2 ratio ~ 0.
+
+    Returns (fig, ax, data_dict) where data_dict contains arrays:
+      'mz', 'log2_ratio', 'avg_log2_intensity', 'rgba'
+    """
+    # Collect data
+    mz_vals = []
+    int_prof = []
+    int_cent = []
+
+    for m in matched_peaks:
+        ip = m['profile_peak_intensity']
+        ic = m['centroid_peak_intensity']
+        if ip is None or ic is None or ip <= 0 or ic <= 0:
+            continue
+        mz_vals.append(m.get('mz_profile', m['mz_profile']))
+        int_prof.append(ip)
+        int_cent.append(ic)
+
+    mz_vals = np.asarray(mz_vals)
+    int_prof = np.asarray(int_prof, dtype=float)
+    int_cent = np.asarray(int_cent, dtype=float)
+
+    if mz_vals.size == 0:
+        fig = None
+        if ax is None:
+            fig, ax = plt.subplots(figsize=figsize)
+        ax.text(0.5, 0.5, 'No matched peaks with positive intensities', ha='center', va='center')
+        ax.set_axis_off()
+        return fig, ax, {'mz': mz_vals, 'log2_ratio': np.array([]), 'avg_log2_intensity': np.array([]), 'rgba': np.empty((0,4))}
+
+    # y-axis: log2 intensity ratio
+    log2_ratio = np.log2(int_cent / int_prof)
+
+    # color: average log2 intensity = log2(sqrt(Ic*Ip))
+    avg_log2_intensity = 0.5 * (np.log2(int_cent) + np.log2(int_prof))
+
+    # color normalization (robust)
+    if vmin is None:
+        vmin = np.percentile(avg_log2_intensity, 5)
+    if vmax is None:
+        vmax = np.percentile(avg_log2_intensity, 95)
+    norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+    cmap_obj = plt.get_cmap(cmap)
+    rgba = cmap_obj(norm(avg_log2_intensity))
+
+    # per-point alpha: near ratio ~ 0 => more transparent
+    ratio_scale = np.abs(log2_ratio)
+    ratio_ref = np.percentile(ratio_scale, alpha_percentile) if ratio_scale.size else 1.0
+    alpha_vals = min_alpha + (max_alpha - min_alpha) * np.clip(ratio_scale / (ratio_ref + 1e-12), 0, 1)
+    rgba[:, 3] = alpha_vals
+
+    # plot
+    created_fig = False
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+        created_fig = True
+    else:
+        fig = ax.figure
+
+    sc = ax.scatter(mz_vals, log2_ratio, c=rgba, s=s, edgecolors=edgecolors, linewidth=linewidth)
+    ax.axhline(y=0, color='white', linestyle='--', linewidth=1, alpha=0.6)
+
+    ax.set_xlabel('m/z')
+    ax.set_ylabel('log₂(Intensity Centroid / Intensity Profile)')
+    ax.set_title(title or 'Centroid vs Profile: log₂ Ratio vs m/z\nColor = mean log₂ intensity; Alpha ∝ |log₂ ratio|')
+
+    # colorbar for avg log2 intensity
+    sm = plt.cm.ScalarMappable(cmap=cmap_obj, norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm, ax=ax)
+    cbar.set_label('Mean log₂ intensity (centroid/profile)')
+
+    ax.grid(True, alpha=0.3, linestyle=':')
+
+    if annotate_stats:
+        mean_ratio = float(np.mean(log2_ratio))
+        median_ratio = float(np.median(log2_ratio))
+        std_ratio = float(np.std(log2_ratio))
+        stats_text = (
+            f'Statistics:\n'
+            f'Mean: {mean_ratio:.3f}\n'
+            f'Median: {median_ratio:.3f}\n'
+            f'Std Dev: {std_ratio:.3f}\n'
+            f'N peaks: {len(log2_ratio)}'
+        )
+        ax.text(
+            0.02, 0.98, stats_text,
+            transform=ax.transAxes,
+            va='top',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8),
+            fontsize=10
+        )
+
+    if created_fig:
+        fig.tight_layout()
+
+    return fig, ax, {
+        'mz': mz_vals,
+        'log2_ratio': log2_ratio,
+        'avg_log2_intensity': avg_log2_intensity,
+        'rgba': rgba
+    }
