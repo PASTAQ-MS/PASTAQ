@@ -1,4 +1,4 @@
-name: Build Wheels
+name: Build TestPyPi Wheels
 
 on:
   # push:
@@ -269,12 +269,4 @@ jobs:
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple pastaq==${{ needs.check_version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          # echo "# 🎉 PASTAQ ${{ needs.check_version.outputs.current_version }} Published to PyPI" >> $GITHUB_STEP_SUMMARY
-          # echo "" >> $GITHUB_STEP_SUMMARY
-          # echo "**Version:** ${{ needs.check_version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
-          # echo "**PyPI URL:** https://pypi.org/project/pastaq/${{ needs.check_version.outputs.current_version }}/" >> $GITHUB_STEP_SUMMARY
-          # echo "" >> $GITHUB_STEP_SUMMARY
-          # echo "## Installation" >> $GITHUB_STEP_SUMMARY
-          # echo '```bash' >> $GITHUB_STEP_SUMMARY
-          # echo "pip install pastaq==${{ needs.check_version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
           # echo '```' >> $GITHUB_STEP_SUMMARY
