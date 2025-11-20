@@ -175,17 +175,18 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $VERSION"
 
-      - name: Check if version exists on PyPI
+      - name: Check if version exists on test PyPI
         id: version_check
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
-          
-          # Check if version exists on PyPI
-          if pip index versions pastaq 2>/dev/null | grep -q "$VERSION"; then
-            echo "Version $VERSION already exists on PyPI"
+          PACKAGE="pastaq"
+
+          # Query Test PyPI explicitly
+          if pip index versions "$PACKAGE" --index-url https://test.pypi.org/simple 2>/dev/null | grep -F -q "$VERSION"; then
+            echo "Version $VERSION already exists on Test PyPI"
             echo "should_upload=false" >> $GITHUB_OUTPUT
           else
-            echo "Version $VERSION is new, will upload to PyPI"
+            echo "Version $VERSION is new, will upload to Test PyPI"
             echo "should_upload=true" >> $GITHUB_OUTPUT
           fi
         continue-on-error: true  # Don't fail if package doesn't exist on PyPI yet
@@ -217,7 +218,7 @@ jobs:
       # name: pypi
       # url: https://pypi.org/p/pastaq
       name: testpypi
-      url: https://test.pypi.org/project/pastaq
+      url: https://test.pypi.org/project/pastaq-venus79
     permissions:
       id-token: write  # IMPORTANT: for trusted publishing
     
