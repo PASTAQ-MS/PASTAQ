@@ -210,13 +210,12 @@ jobs:
     # 2. Version has changed (new version not on PyPI), AND
     # 3. This is a push to main/master (not a PR)
     if: |
-      github.event_name == 'push' && 
-      (startsWith(github.ref, 'refs/tags/v') || 
-       (needs.check_version.outputs.should_upload == 'true' && 
-        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')))
+      (github.event_name == 'push' &&
+        (startsWith(github.ref, 'refs/tags/v') ||
+         (needs.check_version.outputs.should_upload == 'true' &&
+          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')))) ||
+      (github.event_name == 'workflow_dispatch' && needs.check_version.outputs.should_upload == 'true')
     environment:
-      # name: pypi
-      # url: https://pypi.org/p/pastaq
       name: testpypi
       url: https://test.pypi.org/project/pastaq-venus79
     permissions:
