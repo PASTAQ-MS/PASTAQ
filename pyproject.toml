@@ -3,8 +3,8 @@ requires = ["setuptools>=64", "wheel", "cmake>=3.14", "packaging>=23", "ninja; p
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pastaq-venus79"
-version = "0.11.91"
+name = "pastaq"
+version = "0.11.4"
 description = "Pipelines And Systems for Threshold Avoiding Quantification (PASTAQ): Pre-processing tools for LC-MS/MS data"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -13,11 +13,18 @@ keywords = ["mass spectrometry", "proteomics", "LC-MS", "data processing"]
 
 authors = [
     {name = "Peter Horvatovich", email = "p.l.horvatovich@rug.nl"},
-    {name = "Alejandro Sanchez Brotons", email = "a.sanchez.brotons@rug.nl"}
+    {name = "Alejandro Sanchez Brotons", email = "a.sanchez.brotons@rug.nl"},
+    {name = "Kristoffer Basse", email = "k.basse@rug.nl"},
+    {name = "Frank Suits", email ="fsuits44@gmail.com"},
+    {name = "Venustiano Soancatl Aguilar", "v.soancatl.aguilar@rug.nl"}
 ]
 
 maintainers = [
-    {name = "Peter Horvatovich", email = "p.l.horvatovich@rug.nl"}
+    {name = "Peter Horvatovich", email = "p.l.horvatovich@rug.nl"},
+    {name = "Alejandro Sanchez Brotons", email = "a.sanchez.brotons@rug.nl"},
+    {name = "Kristoffer Basse", email = "k.basse@rug.nl"},
+    {name = "Frank Suits", email ="fsuits44@gmail.com"},
+    {name = "Venustiano Soancatl Aguilar", "v.soancatl.aguilar@rug.nl"}
 ]
 
 classifiers = [

@@ -1,12 +1,12 @@
 name: Build Wheels
 
 on:
-  # push:
-  #   branches: [ main, master, develop ]
-  #   tags:
-  #     - 'v*'
-  # pull_request:
-  #   branches: [ main, master ]
+  push:
+    branches: [ main, master, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
@@ -86,7 +86,7 @@ jobs:
           # macOS: Separate x86_64 and arm64 builds
           # macos-13 runner will build x86_64
           # macos-14 runner will build arm64
-          CIBW_ARCHS_MACOS: ${{ matrix.os == 'macos-13' && 'x86_64' || 'arm64' }}
+          CIBW_ARCHS_MACOS: ${{ matrix.os == 'x86_64' || 'arm64' }}
           CIBW_BEFORE_ALL_MACOS: brew install cmake
           CIBW_ENVIRONMENT_MACOS: "CFLAGS='-arch arm64' LDFLAGS='-arch arm64' CMAKE_OSX_ARCHITECTURES=arm64"
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}
@@ -198,10 +198,8 @@ jobs:
             echo "should_upload=true" >> $GITHUB_OUTPUT
           fi
 
-  # upload_pypi:
-  upload_testpypi:
-    name: Upload to TestPyPI
-    # name: Upload to PyPI
+  upload_pypi:
+    name: Upload to PyPI
     needs: [build_wheels, build_sdist, check_version]
     runs-on: ubuntu-latest
     # Upload if:
@@ -214,10 +212,8 @@ jobs:
        (needs.check_version.outputs.should_upload == 'true' && 
         (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')))
     environment:
-      # name: pypi
-      # url: https://pypi.org/p/pastaq
-      name: testpypi
-      url: https://test.pypi.org/project/pastaq
+      name: pypi
+      url: https://pypi.org/p/pastaq
     permissions:
       id-token: write  # IMPORTANT: for trusted publishing
     
@@ -240,41 +236,30 @@ jobs:
           ls -lh dist/
           echo "Uploading version: ${{ needs.check_version.outputs.current_version }}"
 
-      # - name: Publish to PyPI
-      - name: Publish to TestPyPI
+      - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          repository_url: https://test.pypi.org/legacy/
+          repository_url: https://upload.pypi.org/legacy/
           username: __token__
-          password: ${{ secrets.TEST_PYPI_PASSWORD }}
+          password: ${{ secrets.PYPI_PASSWORD }}
           skip-existing: true
           verbose: true
 
   # Optional: Notify on successful upload
   notify_upload:
     name: Notify Upload Success
-    needs: [upload_testpypi, check_version]
-    # needs: [upload_pypi, check_version]
+    needs: [upload_pypi, check_version]
     runs-on: ubuntu-latest
     if: success()
     steps:
       - name: Create Release Summary
         run: |
-          echo "# 🎉 PASTAQ ${{ needs.check_version.outputs.current_version }} Published to TestPyPI" >> $GITHUB_STEP_SUMMARY
+          echo "# 🎉 PASTAQ ${{ needs.check_version.outputs.current_version }} Published to PyPI" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** ${{ needs.check_version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**TestPyPI URL:** https://test.pypi.org/project/pastaq/${{ needs.check_version.outputs.current_version }}/" >> $GITHUB_STEP_SUMMARY
+          echo "**PyPI URL:** https://pypi.org/project/pastaq/${{ needs.check_version.outputs.current_version }}/" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Installation" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple pastaq==${{ needs.check_version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "pip install pastaq==${{ needs.check_version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          # echo "# 🎉 PASTAQ ${{ needs.check_version.outputs.current_version }} Published to PyPI" >> $GITHUB_STEP_SUMMARY
-          # echo "" >> $GITHUB_STEP_SUMMARY
-          # echo "**Version:** ${{ needs.check_version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
-          # echo "**PyPI URL:** https://pypi.org/project/pastaq/${{ needs.check_version.outputs.current_version }}/" >> $GITHUB_STEP_SUMMARY
-          # echo "" >> $GITHUB_STEP_SUMMARY
-          # echo "## Installation" >> $GITHUB_STEP_SUMMARY
-          # echo '```bash' >> $GITHUB_STEP_SUMMARY
-          # echo "pip install pastaq==${{ needs.check_version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
-          # echo '```' >> $GITHUB_STEP_SUMMARY
