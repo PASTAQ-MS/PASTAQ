@@ -86,7 +86,7 @@ jobs:
           # macOS: Separate x86_64 and arm64 builds
           # macos-13 runner will build x86_64
           # macos-14 runner will build arm64
-          CIBW_ARCHS_MACOS: ${{ matrix.os == 'x86_64' || 'arm64' }}
+          CIBW_ARCHS_MACOS: ${{ (matrix.os == 'macos-14' && 'x86_64;arm64') || '' }}
           CIBW_BEFORE_ALL_MACOS: brew install cmake
           CIBW_ENVIRONMENT_MACOS: "CFLAGS='-arch arm64' LDFLAGS='-arch arm64' CMAKE_OSX_ARCHITECTURES=arm64"
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}
