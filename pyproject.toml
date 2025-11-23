@@ -23,7 +23,7 @@ maintainers = [
     {name = "Peter Horvatovich", email = "p.l.horvatovich@rug.nl"},
     {name = "Alejandro Sanchez Brotons", email = "a.sanchez.brotons@rug.nl"},
     {name = "Kristoffer Basse", email = "k.basse@rug.nl"},
-    {name = "Frank Suits", email ="fsuits44@gmail.com"},
+    {name = "Frank Suits", email = "fsuits44@gmail.com"},
     {name = "Venustiano Soancatl Aguilar", email = "v.soancatl.aguilar@rug.nl"}
 ]
 
