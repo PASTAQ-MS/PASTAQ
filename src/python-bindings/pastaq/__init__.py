@@ -3,7 +3,7 @@ PASTAQ: Pipelines And Systems for Threshold Avoiding Quantification
 Pre-processing tools for LC-MS/MS data
 """
 
-__version__ = "0.11.3"
+__version__ = "0.11.4"
 
 # Import all functions from C++ extension
 from .pastaq import *
