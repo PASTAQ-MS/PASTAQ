@@ -1,4 +1,6 @@
 cmake
 build
 wheel
+plotly
+pastaq
 gdown

@@ -4,6 +4,8 @@
 #include <cctype>
 #include <numeric>
 #include <chrono> // For timing
+#include <fstream>
+#include <iostream>
 
 #include "utils/base64.hpp"
 #include "utils/compression.hpp"
@@ -445,6 +447,7 @@ std::optional<RawData::RawData> XmlReader::read_msdata(
 //     return raw_data;
 // }
 
+bool triggerPeakLog{true};
 
 RawData::Scan parse_mzxml_scan(std::istream &stream,
                                std::optional<XmlReader::Tag> &tag,
@@ -473,6 +476,12 @@ RawData::Scan parse_mzxml_scan(std::istream &stream,
         }
         if (polarity != Polarity::BOTH && scan.polarity != polarity) {
             return {};
+        }
+    }
+    
+    if (scan_attributes.find("centroided") != scan_attributes.end()) {
+        if (scan_attributes["centroided"] == "1"){
+            scan.centroid = true;
         }
     }
 
@@ -778,6 +787,7 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
     raw_data.fwhm_rt = 0;  // TODO(alex): Should this be passed as well?
     raw_data.scans = {};
     raw_data.retention_times = {};
+    raw_data.centroid = false;
     // TODO(alex): Can we automatically detect the instrument type and set
     // resolution from the header?
     while (stream.good() && !stream.eof()) {
@@ -808,6 +818,9 @@ std::optional<RawData::RawData> XmlReader::read_mzxml(
                 if (scan.mz[scan.mz.size() - 1] > raw_data.max_mz) {
                     raw_data.max_mz = scan.mz[scan.mz.size() - 1];
                 }
+                if (scan.centroid) {
+                    raw_data.centroid = true;
+                }
             }
         }
     }
@@ -831,11 +844,13 @@ std::optional<RawData::RawData> XmlReader::_read_mzml(
     raw_data.fwhm_rt = 0;  // TODO(alex): Should this be passed as well?
     raw_data.scans = {};
     raw_data.retention_times = {};
+    raw_data.centroid = false;
+    long previousMS1_scan_number{0};
     // TODO(alex): Can we automatically detect the instrument type and set
     // resolution from the header?
     while (stream.good() && !stream.eof()) {
         auto tag = XmlReader::read_tag(stream);
-        if (!tag) {
+            if (!tag) {
             continue;
         }
         if (tag.value().name == "spectrumList" && tag.value().closed) {
@@ -874,6 +889,7 @@ std::optional<RawData::RawData> XmlReader::_read_mzml(
                     // This scan is ms_level 1
                     if (accession == "MS:1000579") {
                         scan.ms_level = 1;
+                        previousMS1_scan_number = scan.scan_number;
                     }
 
                     // MS level a multi-level MSn experiment.
@@ -881,6 +897,9 @@ std::optional<RawData::RawData> XmlReader::_read_mzml(
                         size_t scan_ms_level =
                             std::stoi(cv_attributes["value"]);
                         scan.ms_level = scan_ms_level;
+                        if (scan.ms_level == 1) {
+                            previousMS1_scan_number = scan.scan_number;
+                        }
                     }
 
                     // Polarity.
@@ -915,16 +934,26 @@ std::optional<RawData::RawData> XmlReader::_read_mzml(
                             break;
                         }
                     }
+
+                    //Detect centroid based on MS:1000127 in the spectrum header
+                    // if then is a change from centroid to profile then a flag should be raised. This is not yet implemented.
+                    if (accession == "MS:1000127") {
+                        raw_data.centroid = true;
+                    }
                 }
 
                 if (tag.value().name == "precursor") {
-                    auto precursor_attributes = tag.value().attributes;
-                    std::string spectrumRef =
-                        precursor_attributes["spectrumRef"];
-                    // Find scan number.
-                    size_t scanIdx = spectrumRef.find("scan=") + 5;
-                    scan.precursor_information.scan_number =
-                        std::stoull(spectrumRef.substr(scanIdx));
+                    if (tag.value().attributes.size()!=0){
+                        auto precursor_attributes = tag.value().attributes;
+                        std::string spectrumRef =
+                            precursor_attributes["spectrumRef"];
+                        // Find scan number.
+                        size_t scanIdx = spectrumRef.find("scan=") + 5;
+                        scan.precursor_information.scan_number =
+                            std::stoull(spectrumRef.substr(scanIdx));
+                    } else {
+                        scan.precursor_information.scan_number = previousMS1_scan_number;
+                    }
 
                     scan.precursor_information.charge = 0;
                     scan.precursor_information.mz = 0.0;

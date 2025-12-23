@@ -71,6 +71,17 @@ struct Xic {
 };
 }  // namespace Xic
 
+namespace IonMobility {
+/* Ion mobility data is not always available. There are multiple ion mobility types
+   such as trapping mobility spectrometry (TIMS) and field asymmetric waveform ion mobility
+   spectrometry (FAIMS). The type of ion mobility is determined by the instrument
+   used for the analysis. The type of ion mobility is not always available in the
+   raw data, but when it is, it can be used to improve the analysis. TIMS represents
+   continous map in Bruker instruments and FAIMS represents a
+   discrete map in Thermo instruments.*/
+    enum Type : uint8_t { UNKNOWN = 0, TIMS = 1, FAIMS = 2 };
+}
+
 // In this namespace we have access to the data structures for working with raw
 // data.
 namespace RawData {
@@ -114,6 +125,7 @@ struct Scan {
     // TODO(alex): We might want to make this a smart pointer, as this field is
     // only useful for MSn scans.
     PrecursorInformation precursor_information;
+    bool centroid {false}; // Indicating if the raw data is centroided (1) or not (0 default).
 };
 
 
@@ -144,6 +156,8 @@ struct RawData {
     // TODO: Note that this is unnecessary if our search function is able to
     // search through the `scans` array.
     std::vector<double> retention_times;
+    bool centroid {false}; // Indicating if the raw data is centroided (1) or not (0 default).
+    bool get_failed_peaks {false}; // Indicating if the failed peaks should be returned (1) or not (0 default).
 };
 
 // Raw data points in a struct of arrays format.

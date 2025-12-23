@@ -143,6 +143,10 @@ This project uses the TDF SDK (v2.21.0.x) to interface with timsTOF data. The `i
 
 These files are distributed in compliance with the SDK's licensing terms.
 
+# Tutorial Jupyter notebook
+
+Tutorial demonstrating PASTAQ functionality to read and process LC-MS/MS data is available in examples/pastaqExamples.ipynb. Click the Binder icon above to try out the tutorial in Binder virtual environment.
+
 # How to cite this work
 
 The main manuscript has been published in as Open Access Analytical Chemistry with the following details: [Alejandro Sánchez Brotons, Jonatan O. Eriksson, Marcel Kwiatkowski, Justina C. Wolters, Ido P. Kema, Andrei Barcaru, Folkert Kuipers, Stephan J. L. Bakker, Rainer Bischoff, Frank Suits, and Péter Horvatovich, Pipelines and Systems for Threshold-Avoiding Quantification of LC–MS/MS Data, Analytical Chemistry, 2021, 93, 32, 11215–11224](https://pubs.acs.org/doi/10.1021/acs.analchem.1c01892).

@@ -9,7 +9,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
 
     steps:
       - name: Checkout repository
@@ -36,8 +36,8 @@ jobs:
 
       - name: Upload wheels to TestPyPI
         env:
-          TWINE_USERNAME: ${{ secrets.TEST_PYPI_USERNAME }}
+          TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.TEST_PYPI_PASSWORD }}
         run: |
           python -m pip install --upgrade twine
-          python -m twine upload --repository testpypi ./dist/*
+          python -m twine upload --repository testpypi --verbose ./dist/*

@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.14)
 
-project(pastaq VERSION "0.11.2")
+project(pastaq VERSION "0.11.3")
 
 # Set project properties.
 set(CMAKE_CXX_STANDARD 17)
@@ -37,6 +37,23 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 endif()
 if (MSVC)
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} /W4")
+endif()
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug)  # Default to Debug if not specified
+endif()
+
+# Add debug-specific flags.
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "Project is build in debug mode.")
+    if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
+    endif()
+    if(MSVC)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zi /Od")
+    endif()
+else()
+    message(STATUS "Project is build in release mode.")
 endif()
 
 add_subdirectory("ext/zlib")

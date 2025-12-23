@@ -4,8 +4,17 @@
 #include <cstdint>
 #include <optional>
 #include <vector>
+#include "Eigen/Core"
+#include "Eigen/Dense"
 
 #include "grid/grid.hpp"
+
+// Typedef for Eigen matrix 5x5 with double and float
+// and Eigen vector 5x1 with double and float
+using Matrix5d = Eigen::Matrix<double, 5, 5>;
+using Matrix5f = Eigen::Matrix<float, 5, 5>;
+using Vector5d = Eigen::Matrix<double, 5, 1>;
+using Vector5f = Eigen::Matrix<float, 5, 1>;
 
 // In this namespace we can find the necessary functions to detect, quantify
 // and manipulate peaks.
@@ -61,6 +70,11 @@ struct Peak {
     double fitted_sigma_mz;
     double fitted_sigma_rt;
     double fitted_volume;
+
+    // Fitting failure information word
+    bool peak_fit_failure{false};
+    uint64_t fit_failure_code{0};
+    static const std::vector<std::string> error_messages;
 };
 
 // Find all candidate points on the given grid by calculating the local maxima
@@ -68,6 +82,8 @@ struct Peak {
 // given indexes i and j the point at data[i][j] is greater than the neighbors
 // in all 4 cardinal directions.
 std::vector<LocalMax> find_local_maxima(const Grid::Grid &grid);
+
+std::string get_fit_failure_errors(const uint64_t &fit_failure_code, const std::vector<std::string> &error_messages);
 
 // Builds a Peak object for the given local_max.
 std::optional<Peak> build_peak(const RawData::RawData &raw_data,
