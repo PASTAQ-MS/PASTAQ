@@ -59,6 +59,8 @@ endif()
 add_subdirectory("ext/zlib")
 add_subdirectory("ext/eigen")
 # add_subdirectory("ext/mstoolkit" "${CMAKE_BINARY_DIR}/mstoolkit_build")
+
+
 add_subdirectory(
   "ext/mstoolkit"
   "${CMAKE_BINARY_DIR}/mstoolkit_build"
@@ -98,13 +100,14 @@ add_library(pastaqlib STATIC
     )
 
 # Try to find HDF5 (cross-platform)
-find_package(HDF5 REQUIRED COMPONENTS C CXX)
-message(STATUS "Found HDF5 include dirs: ${HDF5_INCLUDE_DIRS}")
-message(STATUS "Found HDF5 libraries: ${HDF5_LIBRARIES}")
+# find_package(HDF5 REQUIRED COMPONENTS C CXX)
+# message(STATUS "Found HDF5 include dirs: ${HDF5_INCLUDE_DIRS}")
+# message(STATUS "Found HDF5 libraries: ${HDF5_LIBRARIES}")
 
 target_include_directories(pastaqlib PUBLIC src/lib
     ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/raw_data/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/ext/eigen
     ${HDF5_INCLUDE_DIRS}
 )
 
@@ -119,7 +122,7 @@ target_include_directories(pastaqlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/ext/msto
 target_include_directories(pastaqlib PUBLIC "${SQLITE_INCLUDE_DIR}")
 target_include_directories(pastaqlib PUBLIC "${SQLITE_DIR}")
 target_include_directories(pastaqlib PUBLIC "${TDF_SDK_INCLUDE_DIR}")
-target_include_directories(mstoolkit PUBLIC "${HDF5_INCLUDE_DIRS}")
+# target_include_directories(mstoolkit PUBLIC "${HDF5_INCLUDE_DIRS}")
 # target_include_directories(pastaqlib PUBLIC "${HDF5_INCLUDE_DIRS}")
 
 target_compile_definitions(mstoolkit PUBLIC MZP_HDF)
@@ -129,7 +132,7 @@ if (WIN32)
         Eigen3::Eigen 
         zlibstatic
         mstoolkit PUBLIC
-        ${HDF5_LIBRARIES}
+#        ${HDF5_LIBRARIES}
         ${TIMSDATA_LIBRARY}
     )
 #    target_link_libraries(pastaqlib PUBLIC mstoolkit ${HDF5_LIBRARIES})
@@ -138,7 +141,7 @@ else()
         Eigen3::Eigen 
         zlib
         mstoolkit PUBLIC
-        ${HDF5_LIBRARIES}
+#        ${HDF5_LIBRARIES}
         ${TIMSDATA_LIBRARY}
     )
 #    target_link_libraries(pastaqlib PUBLIC mstoolkit ${HDF5_LIBRARIES})

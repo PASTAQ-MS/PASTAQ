@@ -102,7 +102,7 @@ class CMakeBuild(build_ext):
 setup(
     packages=find_namespace_packages(where='src/python-bindings'),
     package_dir={'': 'src/python-bindings'},
-    ext_modules=[CMakeExtension('pastaq/pastaq_cpp',, sourcedir=".")],
+    ext_modules=[CMakeExtension('pastaq/pastaq_cpp', sourcedir=".")],
     cmdclass=dict(build_ext=CMakeBuild),
     package_data={
         'pastaq': ['win64/timsdata.dll', 'linux64/libtimsdata.so'],
