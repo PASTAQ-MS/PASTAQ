@@ -1,3 +1,15 @@
+"""
+PASTAQ: Pipelines And Systems for Threshold Avoiding Quantification
+Pre-processing tools for LC-MS/MS data
+"""
+
+__version__ = "0.11.3"
+
+# Import all functions from C++ extension
+from .pastaq import *
+
+# Optional: Add convenient aliases or Python-only functions here
+
 import datetime
 import json
 import logging
