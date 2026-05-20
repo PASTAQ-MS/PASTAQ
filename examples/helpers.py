@@ -934,3 +934,52 @@ def plot_matched_peaks_scatter(
         'avg_log2_intensity': avg_log2_intensity,
         'rgba': rgba
     }
+    
+# plot to show isotope distribution of features
+def isotope_distribution_plot(
+    featureList,
+    labelList=None
+):
+    """Plot the isotope distribution for one or more feature lists.
+
+    Parameters:
+    - featureList: A list of feature lists, where each element is a list of feature objects
+                   returned by detect_features (each feature has a .peak_ids attribute).
+                   Pass a single dataset as [features] or multiple as [features1, features2, ...].
+
+    Returns:
+    - fig, ax: Matplotlib figure and axis with the isotope distribution plot.
+    """
+    colors = ['steelblue', 'darkorange', 'forestgreen', 'crimson', 'mediumpurple']
+
+    all_lengths = [[len(f.peak_ids) for f in features] for features in featureList]
+    max_len = max(max(lengths) for lengths in all_lengths)
+    x = np.arange(1, max_len + 1)
+
+    n = len(featureList)
+    bar_width = 0.8 / n
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    for i, lengths in enumerate(all_lengths):
+        counts = np.array([lengths.count(v) for v in x])
+        offset = (i - (n - 1) / 2) * bar_width
+        if labelList and i < len(labelList):
+            label = labelList[i]
+        else:
+            label = f'Dataset {i + 1}'
+        ax.bar(x + offset, counts, width=bar_width,
+               color=colors[i % len(colors)], edgecolor='black', label=label)
+        print(f"{label}: mean={np.mean(lengths):.2f}, median={np.median(lengths):.0f}, max={max(lengths)}")
+
+    ax.set_xlabel('Number of isotopologue peaks per feature')
+    ax.set_ylabel('Count')
+    ax.set_title('Feature isotope peak count distribution')
+    ax.set_xticks(x)
+    if n > 1:
+        ax.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+    return fig, ax

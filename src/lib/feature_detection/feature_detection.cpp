@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <map>
+#include <cmath>
 
 #include "feature_detection/feature_detection.hpp"
 
@@ -12,80 +13,89 @@ struct OptimalPath {
 };
 
 OptimalPath rolling_cosine_sim(std::vector<double> &A, std::vector<double> &B) {
+    // Check if any of the A and B vector element is 0. If yes then stop the program.
     // We need at least 2 isotopes to form a feature.
-    if (A.size() < 2 || B.size() < 2) {
+    bool has_zero_B = std::any_of(B.begin(), B.end(), [](double x) {return std::abs(x) < 1e-12;});
+    if (has_zero_B || A.size() < 2 || B.size() < 2) {
         return {0.0, 0, 0};
     }
     // Find the maximum b position and precalculate the norm of B.
-    double norm_a = 0.0;
-    double norm_b = 0.0;
     double max_b = 0.0;
     size_t max_b_index = 0;
     for (size_t i = 0; i < B.size(); ++i) {
-        norm_b += B[i] * B[i];
         if (B[i] > max_b) {
             max_b = B[i];
             max_b_index = i;
         }
     }
-    norm_b = std::sqrt(norm_b);
-    for (size_t i = 0; i < A.size(); ++i) {
-        norm_b += A[i] * A[i];
-    }
-    norm_a = std::sqrt(norm_a);
-
+    
     // We are going to roll the maximum of B (100%) through each position of A,
     // which means we are to perform k == A.size() cycles.
     double best_dot = 0.0;
     size_t best_path_min_i = 0;
     size_t best_path_max_i = 0;
+    // k will be the position of A aligned with the most intensive peak in B. k and max_b_index are 0 indexed,
+    // which means we are comparing A[k] with B[max_b_index].
     for (size_t k = 0; k < A.size(); ++k) {
-        size_t min_i = k < max_b_index ? 0 : k - max_b_index;
-        size_t max_i = std::min(A.size(), B.size() - max_b_index + k);
+        if (A[k] < 1e-12) continue;
+        size_t min_i = k < max_b_index ? 0 : k - max_b_index; // min_i is the first index of A that can be compared to max_b_index of B.
+        size_t max_i = std::min(A.size() - 1, k + B.size() - 1 - max_b_index); // max_i is the maximum index of A that can be compared to max_b_index of B.
 
         double norm_a = 0.0;
+        double norm_b = 0.0;
         double dot = 0.0;
         // Center->Left.
         size_t true_min_i = min_i;
         size_t true_max_i = max_i;
-        for (size_t i = 1; i < std::min(min_i, max_b_index); ++i) {
-            double a = A[min_i - i];
+        // i is the distance from the center (k) to the left. We are going to compare A[k - i] with B[max_b_index - i], which means we are comparing the position
+        // that is i steps to the left of k with the position that is i steps to the left of max_b_index.
+        // The highest peak is not included because it is already compared from the center to the right comparison.
+        // We are going to compare until we reach the first index of A or the first index of B, which means we are going to compare until i is less than or equal to min_i and max_b_index.
+        for (size_t i = 1; i <= std::min(k, max_b_index); ++i) {
+            double a = A[k - i]; // a is the intensity of A at the position that is i steps to the left of min_i, which is the first index of A that can be compared to max_b_index of B.
             double b = B[max_b_index - i];
 
-            // Check if difference between theoretical and measured is too big.
             double normalized_a = a / A[k];
-            double abs_diff = b / 100.0 / normalized_a;
-            if (abs_diff >= 4.0 || abs_diff < 1 / 4.0) {
-                true_min_i = min_i - i + 1;
+            double normalized_b = b / max_b;
+            double abs_diff = normalized_b / normalized_a;
+            if (abs_diff >= 4.0 || abs_diff < 1.0 / 4.0) {
+                true_min_i = k - i + 1;
                 break;
             }
 
             dot += a * b;
+            norm_a += a * a;
+            norm_b += b * b;
         }
-        // Center->Right.
-        for (size_t i = 0; min_i + i < max_i && max_b_index + i < B.size(); ++i) {
-            double a = A[min_i + i];
+        // Center->Right and include max b position.
+        for (size_t i = 0; k + i <= max_i && max_b_index + i < B.size(); ++i) {
+            double a = A[k + i];
             double b = B[max_b_index + i];
 
-            // Check if difference between theoretical and measured is too big.
             double normalized_a = a / A[k];
-            double abs_diff = b / 100.0 / normalized_a;
-            if (abs_diff >= 4.0 || abs_diff < 1 / 4.0) {
-                true_max_i = min_i + i;
+            double normalized_b = b / max_b;
+            double abs_diff = normalized_b / normalized_a;
+            if (abs_diff >= 4.0 || abs_diff < 1.0 / 4.0) {
+                true_max_i = k + i - 1;
                 break;
             }
 
             dot += a * b;
+            norm_a += a * a;
+            norm_b += b * b;
         }
-        dot = dot / (norm_a * norm_b);
+        norm_a = std::sqrt(norm_a);
+        norm_b = std::sqrt(norm_b);
+        double window_size = static_cast<double>(true_max_i - true_min_i + 1);
+        dot = dot * (window_size/B.size()) / (norm_a * norm_b);
         if (dot > best_dot && true_max_i > true_min_i &&
-            (true_max_i - true_min_i) > 1) {
+            (true_max_i - true_min_i) >= 1) {
             best_dot = dot;
             best_path_min_i = true_min_i;
             best_path_max_i = true_max_i;
         }
     }
-    size_t best_path_size = best_path_max_i - best_path_min_i;
+    size_t best_path_size = best_path_max_i - best_path_min_i + 1;
     if (best_path_size <= 1) {
         return {0.0, 0, 0};
     }
@@ -629,6 +639,8 @@ std::map<double, std::vector<double>> averagine_table = {
      {42.17, 89.57, 100, 78.98, 49.11, 27.68, 11.32, 4.83, 1.46, 0.45, 0.16,
       0.12}},
 };
+
+
 std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
     const std::vector<Centroid::Peak> &peaks,
     const std::vector<uint8_t> &charge_states) {
@@ -749,7 +761,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
                             // Check if distance is smaller.
                             if (distance < best_distance) {
                                 selected_node = node;
-                                distance = best_distance;
+                                best_distance = distance;
                             }
                         }
                     }
@@ -791,7 +803,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
                             // Check if distance is smaller.
                             if (distance < best_distance) {
                                 selected_node = node;
-                                distance = best_distance;
+                                best_distance = distance;
                             }
                         }
                     }
@@ -808,17 +820,16 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
             }
             // Find the averagine sequence for the reference mz.
             int64_t charge_state = charge_states[k];
-            double averagine_mz = ref_peak.fitted_mz * charge_state;
+            double averagine_mz = ref_peak.fitted_mz * charge_state - charge_state * 1.00728;
             auto averagine_key = averagine_table.lower_bound(averagine_mz);
             if (averagine_key == averagine_table.end()) {
                 continue;
             }
-            auto averagine_key_it_next = averagine_key;
-            averagine_key_it_next++;
-            if (averagine_key_it_next != averagine_table.end() &&
-                averagine_mz - averagine_key->first >
-                    averagine_key_it_next->first - averagine_mz) {
-                averagine_key++;
+            if (averagine_key != averagine_table.begin()) {
+                auto prev = std::prev(averagine_key);
+                if (averagine_key->first - averagine_mz > averagine_mz - prev->first) {
+                    averagine_key = prev;
+                }
             }
             std::vector<double> &averagine_heights = averagine_key->second;
             // Get the heights for the peaks in this path.
@@ -831,10 +842,10 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
             if (sim.dot > best_dot) {
                 best_dot = sim.dot;
                 best_charge_state = charge_state;
-                best_path = std::vector<uint64_t>(sim.max_i - sim.min_i);
-                size_t k = 0;
-                for (size_t i = sim.min_i; i < sim.max_i; ++i, ++k) {
-                    best_path[k] = path[i];
+                best_path = std::vector<uint64_t>(sim.max_i - sim.min_i + 1);
+                size_t path_k = 0;
+                for (size_t i = sim.min_i; i <= sim.max_i; ++i, ++path_k) {
+                    best_path[path_k] = path[i];
                 }
             }
         }
