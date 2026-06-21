@@ -968,6 +968,63 @@ std::vector<MetaMatch::PeakCluster> find_peak_clusters(
     return clusters;
 }
 
+std::vector<Centroid::Peak> make_peaks(const std::vector<double> &mzs,
+                                       const std::vector<double> &rts,
+                                       const std::vector<double> &intensities,
+                                       py::object sigma_mz_obj,
+                                       py::object sigma_rt_obj) {
+    const size_t n = mzs.size();
+    if (rts.size() != n || intensities.size() != n) {
+        throw std::invalid_argument(
+            "error: mz, rt, and intensity vectors must have the same length");
+    }
+
+    auto expand_sigma = [&](py::object obj,
+                            const char *name) -> std::vector<double> {
+        if (py::isinstance<py::float_>(obj) || py::isinstance<py::int_>(obj)) {
+            return std::vector<double>(n, obj.cast<double>());
+        }
+        auto v = obj.cast<std::vector<double>>();
+        if (v.size() != n) {
+            throw std::invalid_argument(
+                std::string("error: ") + name +
+                " vector length must match mz/rt/intensity length");
+        }
+        return v;
+    };
+    const auto sigma_mz = expand_sigma(sigma_mz_obj, "sigma_mz");
+    const auto sigma_rt = expand_sigma(sigma_rt_obj, "sigma_rt");
+
+    constexpr double n_sig_roi = 3.0;
+    constexpr double two_pi = 6.283185307179586;
+
+    std::vector<Centroid::Peak> peaks(n);
+    for (size_t i = 0; i < n; ++i) {
+        Centroid::Peak &p = peaks[i];
+        p.id = i;
+        p.local_max_mz = mzs[i];
+        p.local_max_rt = rts[i];
+        p.local_max_height = intensities[i];
+        p.roi_min_mz = mzs[i] - n_sig_roi * sigma_mz[i];
+        p.roi_max_mz = mzs[i] + n_sig_roi * sigma_mz[i];
+        p.roi_min_rt = rts[i] - n_sig_roi * sigma_rt[i];
+        p.roi_max_rt = rts[i] + n_sig_roi * sigma_rt[i];
+        p.raw_roi_mean_mz = mzs[i];
+        p.raw_roi_mean_rt = rts[i];
+        p.raw_roi_sigma_mz = sigma_mz[i];
+        p.raw_roi_sigma_rt = sigma_rt[i];
+        p.raw_roi_max_height = intensities[i];
+        p.raw_roi_total_intensity = intensities[i];
+        p.fitted_height = intensities[i];
+        p.fitted_mz = mzs[i];
+        p.fitted_rt = rts[i];
+        p.fitted_sigma_mz = sigma_mz[i];
+        p.fitted_sigma_rt = sigma_rt[i];
+        p.fitted_volume = intensities[i] * two_pi * sigma_mz[i] * sigma_rt[i];
+    }
+    return peaks;
+}
+
 }  // namespace PythonAPI
 
 PYBIND11_MODULE(pastaq, m) {
@@ -1099,41 +1156,41 @@ PYBIND11_MODULE(pastaq, m) {
         });
 
     py::class_<Centroid::Peak>(m, "Peak")
-        .def_readonly("id", &Centroid::Peak::id)
-        .def_readonly("local_max_mz", &Centroid::Peak::local_max_mz)
-        .def_readonly("local_max_rt", &Centroid::Peak::local_max_rt)
-        .def_readonly("local_max_height", &Centroid::Peak::local_max_height)
-        .def_readonly("rt_delta", &Centroid::Peak::rt_delta)
-        .def_readonly("roi_min_mz", &Centroid::Peak::roi_min_mz)
-        .def_readonly("roi_max_mz", &Centroid::Peak::roi_max_mz)
-        .def_readonly("roi_min_rt", &Centroid::Peak::roi_min_rt)
-        .def_readonly("roi_max_rt", &Centroid::Peak::roi_max_rt)
-        .def_readonly("raw_roi_mean_mz", &Centroid::Peak::raw_roi_mean_mz)
-        .def_readonly("raw_roi_mean_rt", &Centroid::Peak::raw_roi_mean_rt)
-        .def_readonly("raw_roi_sigma_mz", &Centroid::Peak::raw_roi_sigma_mz)
-        .def_readonly("raw_roi_sigma_rt", &Centroid::Peak::raw_roi_sigma_rt)
-        .def_readonly("raw_roi_skewness_mz",
-                      &Centroid::Peak::raw_roi_skewness_mz)
-        .def_readonly("raw_roi_skewness_rt",
-                      &Centroid::Peak::raw_roi_skewness_rt)
-        .def_readonly("raw_roi_kurtosis_mz",
-                      &Centroid::Peak::raw_roi_kurtosis_mz)
-        .def_readonly("raw_roi_kurtosis_rt",
-                      &Centroid::Peak::raw_roi_kurtosis_rt)
-        .def_readonly("raw_roi_total_intensity",
-                      &Centroid::Peak::raw_roi_total_intensity)
-        .def_readonly("raw_roi_max_height", &Centroid::Peak::raw_roi_max_height)
-        .def_readonly("raw_roi_num_points", &Centroid::Peak::raw_roi_num_points)
-        .def_readonly("raw_roi_num_scans", &Centroid::Peak::raw_roi_num_scans)
-        .def_readonly("fitted_height", &Centroid::Peak::fitted_height)
-        .def_readonly("fitted_mz", &Centroid::Peak::fitted_mz)
-        .def_readonly("fitted_rt", &Centroid::Peak::fitted_rt)
-        .def_readonly("fitted_sigma_mz", &Centroid::Peak::fitted_sigma_mz)
-        .def_readonly("fitted_sigma_rt", &Centroid::Peak::fitted_sigma_rt)
-        .def_readonly("fitted_volume", &Centroid::Peak::fitted_volume)
-        .def_readonly("peak_fit_failure", &Centroid::Peak::peak_fit_failure)
-        .def_readonly("fit_failure_code", &Centroid::Peak::fit_failure_code,
-              "64-bit unsigned integer encoding fit failure flags")
+        .def(py::init<>())
+        .def_readwrite("id", &Centroid::Peak::id)
+        .def_readwrite("local_max_mz", &Centroid::Peak::local_max_mz)
+        .def_readwrite("local_max_rt", &Centroid::Peak::local_max_rt)
+        .def_readwrite("local_max_height", &Centroid::Peak::local_max_height)
+        .def_readwrite("rt_delta", &Centroid::Peak::rt_delta)
+        .def_readwrite("roi_min_mz", &Centroid::Peak::roi_min_mz)
+        .def_readwrite("roi_max_mz", &Centroid::Peak::roi_max_mz)
+        .def_readwrite("roi_min_rt", &Centroid::Peak::roi_min_rt)
+        .def_readwrite("roi_max_rt", &Centroid::Peak::roi_max_rt)
+        .def_readwrite("raw_roi_mean_mz", &Centroid::Peak::raw_roi_mean_mz)
+        .def_readwrite("raw_roi_mean_rt", &Centroid::Peak::raw_roi_mean_rt)
+        .def_readwrite("raw_roi_sigma_mz", &Centroid::Peak::raw_roi_sigma_mz)
+        .def_readwrite("raw_roi_sigma_rt", &Centroid::Peak::raw_roi_sigma_rt)
+        .def_readwrite("raw_roi_skewness_mz",
+                       &Centroid::Peak::raw_roi_skewness_mz)
+        .def_readwrite("raw_roi_skewness_rt",
+                       &Centroid::Peak::raw_roi_skewness_rt)
+        .def_readwrite("raw_roi_kurtosis_mz",
+                       &Centroid::Peak::raw_roi_kurtosis_mz)
+        .def_readwrite("raw_roi_kurtosis_rt",
+                       &Centroid::Peak::raw_roi_kurtosis_rt)
+        .def_readwrite("raw_roi_total_intensity",
+                       &Centroid::Peak::raw_roi_total_intensity)
+        .def_readwrite("raw_roi_max_height", &Centroid::Peak::raw_roi_max_height)
+        .def_readwrite("raw_roi_num_points", &Centroid::Peak::raw_roi_num_points)
+        .def_readwrite("raw_roi_num_scans", &Centroid::Peak::raw_roi_num_scans)
+        .def_readwrite("fitted_height", &Centroid::Peak::fitted_height)
+        .def_readwrite("fitted_mz", &Centroid::Peak::fitted_mz)
+        .def_readwrite("fitted_rt", &Centroid::Peak::fitted_rt)
+        .def_readwrite("fitted_sigma_mz", &Centroid::Peak::fitted_sigma_mz)
+        .def_readwrite("fitted_sigma_rt", &Centroid::Peak::fitted_sigma_rt)
+        .def_readwrite("fitted_volume", &Centroid::Peak::fitted_volume)
+        .def_readwrite("peak_fit_failure", &Centroid::Peak::peak_fit_failure)
+        .def_readwrite("fit_failure_code", &Centroid::Peak::fit_failure_code)
         .def_readonly_static("error_messages", &Centroid::Peak::error_messages,
                              "Error messages for fit failure codes")
         .def(
@@ -1492,6 +1549,13 @@ PYBIND11_MODULE(pastaq, m) {
              py::arg("linked_psm"), py::arg("file_name"))
         .def("read_peaks", &PythonAPI::read_peaks,
              "Read the peaks from the binary peaks file", py::arg("file_name"))
+        .def("make_peaks", &PythonAPI::make_peaks,
+             "Create a peak list from arrays of mz, rt, and intensity. "
+             "sigma_mz and sigma_rt may each be a scalar (applied to all "
+             "peaks) or a vector of the same length as mz/rt/intensity.",
+             py::arg("mz"), py::arg("rt"), py::arg("intensity"),
+             py::arg("sigma_mz") = py::float_(0.01),
+             py::arg("sigma_rt") = py::float_(15.0))
         .def("read_raw_data", &PythonAPI::read_raw_data,
              "Read the raw_data from the binary raw_data file",
              py::arg("file_name"))
