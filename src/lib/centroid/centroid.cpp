@@ -20,7 +20,7 @@ void log_itg(const std::string& msg) {
         // Delete the log file and start fresh
         std::remove(log_path);
     }
-==
+    
     std::ofstream log_file(log_path, std::ios::app);
 
     if (!log_file) {

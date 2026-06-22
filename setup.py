@@ -99,6 +99,6 @@ class CMakeBuild(build_ext):
 
 # Configure extension: dotted path ensures correct placement under the pastaq package
 setup(
-    ext_modules=[CMakeExtension("pastaq.pastaq_cpp", sourcedir=".")],
+    ext_modules=[CMakeExtension("pastaq.pastaq", sourcedir=".")],
     cmdclass={"build_ext": CMakeBuild},
 )

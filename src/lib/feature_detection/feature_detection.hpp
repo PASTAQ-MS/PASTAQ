@@ -43,6 +43,17 @@ struct RootNode {
 
 typedef std::vector<RootNode> CandidateGraph;
 
+namespace Detail {
+struct OptimalPath {
+    double dot;
+    size_t min_i;
+    size_t max_i;
+};
+
+OptimalPath rolling_cosine_sim(const std::vector<double> &A,
+                               const std::vector<double> &B);
+}  // namespace Detail
+
 std::vector<Feature> detect_features(const std::vector<Centroid::Peak> &peaks,
                                      const std::vector<uint8_t> &charge_states);
 

@@ -24,7 +24,6 @@ import time
 
 # Import the dll or .so containing the bound C++ functions so they are in the pastaq namespace
 # The loadable file will be in the same directory as __init__.py in site-packages - hence the local (.) directory
-from .pastaq import *  # noqa F401, F403
 # Some internal C++ functions exposed to python via pybind11 start with underscore and won't be loaded by the line above
 # so they need to be loaded explicitly for access from python
 # Those _ functions should only be referenced here and are called by higher level python functions with the same

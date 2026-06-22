@@ -6,17 +6,14 @@
 
 // NOTE: The order matters. A should be the path we are exploring, and B the
 // reference theoretical path.
-struct OptimalPath {
-    double dot;
-    size_t min_i;
-    size_t max_i;
-};
-
-OptimalPath rolling_cosine_sim(std::vector<double> &A, std::vector<double> &B) {
-    // Check if any of the A and B vector element is 0. If yes then stop the program.
+FeatureDetection::Detail::OptimalPath
+FeatureDetection::Detail::rolling_cosine_sim(const std::vector<double> &A,
+                                             const std::vector<double> &B) {
+    // Check if any of the elements in of A or B is 0. If yes then the program returns 0 cosine similarity.
     // We need at least 2 isotopes to form a feature.
-    bool has_zero_B = std::any_of(B.begin(), B.end(), [](double x) {return std::abs(x) < 1e-12;});
-    if (has_zero_B || A.size() < 2 || B.size() < 2) {
+    bool has_zero_AB = std::any_of(B.begin(), B.end(), [](double x) {return std::abs(x) < 1e-12;}) ||
+    std::any_of(A.begin(), A.end(), [](double x) {return std::abs(x) < 1e-12;});
+    if (has_zero_AB || A.size() < 2 || B.size() < 2) {
         return {0.0, 0, 0};
     }
     // Find the maximum b position and precalculate the norm of B.
@@ -838,7 +835,7 @@ std::vector<FeatureDetection::Feature> FeatureDetection::detect_features(
                 path_heights.push_back(
                     peaks[sorted_peaks_mz[p].index].fitted_height);
             }
-            auto sim = rolling_cosine_sim(path_heights, averagine_heights);
+            auto sim = FeatureDetection::Detail::rolling_cosine_sim(path_heights, averagine_heights);
             if (sim.dot > best_dot) {
                 best_dot = sim.dot;
                 best_charge_state = charge_state;

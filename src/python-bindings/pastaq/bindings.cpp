@@ -1156,41 +1156,67 @@ PYBIND11_MODULE(pastaq, m) {
         });
 
     py::class_<Centroid::Peak>(m, "Peak")
-        .def(py::init<>())
-        .def_readwrite("id", &Centroid::Peak::id)
-        .def_readwrite("local_max_mz", &Centroid::Peak::local_max_mz)
-        .def_readwrite("local_max_rt", &Centroid::Peak::local_max_rt)
-        .def_readwrite("local_max_height", &Centroid::Peak::local_max_height)
-        .def_readwrite("rt_delta", &Centroid::Peak::rt_delta)
-        .def_readwrite("roi_min_mz", &Centroid::Peak::roi_min_mz)
-        .def_readwrite("roi_max_mz", &Centroid::Peak::roi_max_mz)
-        .def_readwrite("roi_min_rt", &Centroid::Peak::roi_min_rt)
-        .def_readwrite("roi_max_rt", &Centroid::Peak::roi_max_rt)
-        .def_readwrite("raw_roi_mean_mz", &Centroid::Peak::raw_roi_mean_mz)
-        .def_readwrite("raw_roi_mean_rt", &Centroid::Peak::raw_roi_mean_rt)
-        .def_readwrite("raw_roi_sigma_mz", &Centroid::Peak::raw_roi_sigma_mz)
-        .def_readwrite("raw_roi_sigma_rt", &Centroid::Peak::raw_roi_sigma_rt)
-        .def_readwrite("raw_roi_skewness_mz",
-                       &Centroid::Peak::raw_roi_skewness_mz)
-        .def_readwrite("raw_roi_skewness_rt",
-                       &Centroid::Peak::raw_roi_skewness_rt)
-        .def_readwrite("raw_roi_kurtosis_mz",
-                       &Centroid::Peak::raw_roi_kurtosis_mz)
-        .def_readwrite("raw_roi_kurtosis_rt",
-                       &Centroid::Peak::raw_roi_kurtosis_rt)
-        .def_readwrite("raw_roi_total_intensity",
-                       &Centroid::Peak::raw_roi_total_intensity)
-        .def_readwrite("raw_roi_max_height", &Centroid::Peak::raw_roi_max_height)
-        .def_readwrite("raw_roi_num_points", &Centroid::Peak::raw_roi_num_points)
-        .def_readwrite("raw_roi_num_scans", &Centroid::Peak::raw_roi_num_scans)
-        .def_readwrite("fitted_height", &Centroid::Peak::fitted_height)
-        .def_readwrite("fitted_mz", &Centroid::Peak::fitted_mz)
-        .def_readwrite("fitted_rt", &Centroid::Peak::fitted_rt)
-        .def_readwrite("fitted_sigma_mz", &Centroid::Peak::fitted_sigma_mz)
-        .def_readwrite("fitted_sigma_rt", &Centroid::Peak::fitted_sigma_rt)
-        .def_readwrite("fitted_volume", &Centroid::Peak::fitted_volume)
-        .def_readwrite("peak_fit_failure", &Centroid::Peak::peak_fit_failure)
-        .def_readwrite("fit_failure_code", &Centroid::Peak::fit_failure_code)
+        .def(py::init([] { return Centroid::Peak{}; }))
+        .def_readwrite("id", &Centroid::Peak::id,
+                       "Unique identifier for this peak")
+        .def_readwrite("local_max_mz", &Centroid::Peak::local_max_mz,
+                       "m/z value at local maximum (from grid coordinates)")
+        .def_readwrite("local_max_rt", &Centroid::Peak::local_max_rt,
+                       "Retention time at local maximum (from grid coordinates)")
+        .def_readwrite("local_max_height", &Centroid::Peak::local_max_height,
+                       "Intensity value at local maximum")
+        .def_readwrite("rt_delta", &Centroid::Peak::rt_delta,
+                       "Retention time shift from warping alignment")
+        .def_readwrite("roi_min_mz", &Centroid::Peak::roi_min_mz,
+                       "Minimum m/z of region of interest")
+        .def_readwrite("roi_max_mz", &Centroid::Peak::roi_max_mz,
+                       "Maximum m/z of region of interest")
+        .def_readwrite("roi_min_rt", &Centroid::Peak::roi_min_rt,
+                       "Minimum retention time of region of interest")
+        .def_readwrite("roi_max_rt", &Centroid::Peak::roi_max_rt,
+                       "Maximum retention time of region of interest")
+        .def_readwrite("raw_roi_mean_mz", &Centroid::Peak::raw_roi_mean_mz,
+                       "Mean m/z in ROI (method of moments on raw data)")
+        .def_readwrite("raw_roi_mean_rt", &Centroid::Peak::raw_roi_mean_rt,
+                       "Mean retention time in ROI (method of moments on raw data)")
+        .def_readwrite("raw_roi_sigma_mz", &Centroid::Peak::raw_roi_sigma_mz,
+                       "Sigma of m/z in ROI (method of moments on raw data)")
+        .def_readwrite("raw_roi_sigma_rt", &Centroid::Peak::raw_roi_sigma_rt,
+                       "Sigma of retention time in ROI (method of moments on raw data)")
+        .def_readwrite("raw_roi_skewness_mz", &Centroid::Peak::raw_roi_skewness_mz,
+                       "Skewness of m/z distribution in ROI (method of moments on raw data)")
+        .def_readwrite("raw_roi_skewness_rt", &Centroid::Peak::raw_roi_skewness_rt,
+                       "Skewness of retention time distribution in ROI (method of moments on raw data)")
+        .def_readwrite("raw_roi_kurtosis_mz", &Centroid::Peak::raw_roi_kurtosis_mz,
+                       "Kurtosis of m/z distribution in ROI (method of moments on raw data)")
+        .def_readwrite("raw_roi_kurtosis_rt", &Centroid::Peak::raw_roi_kurtosis_rt,
+                       "Kurtosis of retention time distribution in ROI (method of moments on raw data)")
+        .def_readwrite("raw_roi_total_intensity", &Centroid::Peak::raw_roi_total_intensity,
+                       "Total intensity summed over all points in ROI")
+        .def_readwrite("raw_roi_max_height", &Centroid::Peak::raw_roi_max_height,
+                       "Maximum intensity found in ROI")
+        .def_readwrite("raw_roi_num_points", &Centroid::Peak::raw_roi_num_points,
+                       "Number of raw data points in ROI")
+        .def_readwrite("raw_roi_num_scans", &Centroid::Peak::raw_roi_num_scans,
+                       "Number of scans contributing to ROI")
+        .def_readwrite("fitted_height", &Centroid::Peak::fitted_height,
+                       "Peak height from Gaussian fitting")
+        .def_readwrite("fitted_mz", &Centroid::Peak::fitted_mz,
+                       "Peak m/z center from Gaussian fitting")
+        .def_readwrite("fitted_rt", &Centroid::Peak::fitted_rt,
+                       "Peak retention time center from Gaussian fitting")
+        .def_readwrite("fitted_sigma_mz", &Centroid::Peak::fitted_sigma_mz,
+                       "Peak width (sigma) in m/z from Gaussian fitting")
+        .def_readwrite("fitted_sigma_rt", &Centroid::Peak::fitted_sigma_rt,
+                       "Peak width (sigma) in retention time from Gaussian fitting")
+        .def_readwrite("fitted_volume", &Centroid::Peak::fitted_volume,
+                       "Peak volume from Gaussian fitting")
+        .def_readwrite("peak_fit_failure", &Centroid::Peak::peak_fit_failure,
+                       "True if the Gaussian peak fitting failed quality checks")
+        .def_readwrite(
+            "fit_failure_code", &Centroid::Peak::fit_failure_code,
+            "Bitmask encoding peak-fit failure reasons. Decode with "
+            "get_fit_failure_errors(fit_failure_code, Peak.error_messages).")
         .def_readonly_static("error_messages", &Centroid::Peak::error_messages,
                              "Error messages for fit failure codes")
         .def(
