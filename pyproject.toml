@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=77", "wheel", "cmake>=3.14", "packaging>=23", "ninja; platform_system != 'Windows'"]
+requires = ["setuptools>=64", "wheel", "cmake>=3.14", "packaging>=23", "ninja; platform_system != 'Windows'"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,6 @@ version = "0.11.3"
 description = "Pipelines And Systems for Threshold Avoiding Quantification (PASTAQ): Pre-processing tools for LC-MS/MS data"
 readme = "README.md"
 requires-python = ">=3.8"
-license = "MIT"
 license-files = ["LICENSE.md"]
 keywords = ["mass spectrometry", "proteomics", "LC-MS", "data processing"]
 
