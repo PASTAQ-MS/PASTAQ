@@ -4,27 +4,22 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pastaq"
-version = "0.11.4"
+version = "0.11.3"
 description = "Pipelines And Systems for Threshold Avoiding Quantification (PASTAQ): Pre-processing tools for LC-MS/MS data"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MIT License"}
 keywords = ["mass spectrometry", "proteomics", "LC-MS", "data processing"]
 
 authors = [
     {name = "Peter Horvatovich", email = "p.l.horvatovich@rug.nl"},
-    {name = "Alejandro Sanchez Brotons", email = "a.sanchez.brotons@rug.nl"},
-    {name = "Kristoffer Basse", email = "k.basse@rug.nl"},
+    {name = "Alejandro Sanchez Brotons", email = "alex@alexsb.xyz"},
     {name = "Frank Suits", email = "fsuits44@gmail.com"},
-    {name = "Venustiano Soancatl Aguilar", email = "v.soancatl.aguilar@rug.nl"}
+    {name = "Kristoffer Basse", email = "k.basse@rug.nl"},
+    {name = "Venus Soancatl Aguilar", email = "v.soancatl.aguilar@rug.nl"}
 ]
 
 maintainers = [
-    {name = "Peter Horvatovich", email = "p.l.horvatovich@rug.nl"},
-    {name = "Alejandro Sanchez Brotons", email = "a.sanchez.brotons@rug.nl"},
-    {name = "Kristoffer Basse", email = "k.basse@rug.nl"},
-    {name = "Frank Suits", email = "fsuits44@gmail.com"},
-    {name = "Venustiano Soancatl Aguilar", email = "v.soancatl.aguilar@rug.nl"}
+    {name = "Peter Horvatovich", email = "p.l.horvatovich@rug.nl"}
 ]
 
 classifiers = [

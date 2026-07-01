@@ -3,7 +3,7 @@ PASTAQ: Pipelines And Systems for Threshold Avoiding Quantification
 Pre-processing tools for LC-MS/MS data
 """
 
-__version__ = "0.11.4"
+__version__ = "0.11.3"
 
 # Import all functions from C++ extension
 from .pastaq import *
@@ -24,7 +24,6 @@ import time
 
 # Import the dll or .so containing the bound C++ functions so they are in the pastaq namespace
 # The loadable file will be in the same directory as __init__.py in site-packages - hence the local (.) directory
-from .pastaq import *  # noqa F401, F403
 # Some internal C++ functions exposed to python via pybind11 start with underscore and won't be loaded by the line above
 # so they need to be loaded explicitly for access from python
 # Those _ functions should only be referenced here and are called by higher level python functions with the same
@@ -141,6 +140,98 @@ def warp_peaks(peak_list, time_map):
         Original peak list but with rt adjusted to match the reference
     """
     return pastaq._warp_peaks(peak_list, time_map)
+
+
+def create_peaks_from_arrays(mz, rt, intensity, sigma_mz, sigma_rt):
+    """Create a list of Peak objects from external arrays for use with WARP2D alignment.
+
+    This allows retention-time alignment of peaks detected by an external tool.
+    The returned peaks can be passed directly to calculate_time_map() and warp_peaks().
+
+    Args:
+        mz (array-like): m/z value for each peak.
+        rt (array-like): Retention time (seconds) for each peak.
+        intensity (array-like): Intensity (height) for each peak.
+        sigma_mz (float or array-like): Gaussian sigma in the m/z dimension.
+            A scalar applies the same value to all peaks; an array must be the
+            same length as mz.
+        sigma_rt (float or array-like): Gaussian sigma in the RT dimension.
+            A scalar applies the same value to all peaks; an array must be the
+            same length as rt.
+
+    Returns:
+        list[Peak]: Peak objects with all fitted_* fields populated, ready for
+            calculate_time_map() and warp_peaks().
+
+    Example:
+        peaks_ext = pastaq.create_peaks_from_arrays(
+            mz=[612.97, 613.47],
+            rt=[3640.0, 3640.0],
+            intensity=[1e6, 5e5],
+            sigma_mz=0.002,          # scalar: same sigma for all peaks
+            sigma_rt=raw_data.get_theoretical_sigma_mz(200) * 10,
+        )
+        time_map = pastaq.calculate_time_map(ref_peaks, peaks_ext, ...)
+    """
+    mz = list(mz)
+    rt = list(rt)
+    intensity = list(intensity)
+    n = len(mz)
+
+    if len(rt) != n or len(intensity) != n:
+        raise ValueError(
+            f"mz, rt, and intensity must have the same length "
+            f"(got {n}, {len(rt)}, {len(intensity)})"
+        )
+
+    if np.isscalar(sigma_mz):
+        sigma_mz = [float(sigma_mz)] * n
+    else:
+        sigma_mz = list(sigma_mz)
+        if len(sigma_mz) != n:
+            raise ValueError(
+                f"sigma_mz must be a scalar or match the length of mz "
+                f"(got {len(sigma_mz)}, expected {n})"
+            )
+
+    if np.isscalar(sigma_rt):
+        sigma_rt = [float(sigma_rt)] * n
+    else:
+        sigma_rt = list(sigma_rt)
+        if len(sigma_rt) != n:
+            raise ValueError(
+                f"sigma_rt must be a scalar or match the length of rt "
+                f"(got {len(sigma_rt)}, expected {n})"
+            )
+
+    two_pi = 2.0 * np.pi
+    peaks = []
+    for i in range(n):
+        p = pastaq.Peak()
+        p.id = i
+        p.fitted_mz = float(mz[i])
+        p.fitted_rt = float(rt[i])
+        p.fitted_height = float(intensity[i])
+        p.fitted_sigma_mz = float(sigma_mz[i])
+        p.fitted_sigma_rt = float(sigma_rt[i])
+        p.fitted_volume = p.fitted_height * p.fitted_sigma_mz * p.fitted_sigma_rt * two_pi
+        # Mirror to local_max fields so WARP2D sorting by height works correctly
+        p.local_max_mz = p.fitted_mz
+        p.local_max_rt = p.fitted_rt
+        p.local_max_height = p.fitted_height
+        # ROI at ±2σ, matching the convention used in build_peak()
+        p.roi_min_mz = p.fitted_mz - 2.0 * p.fitted_sigma_mz
+        p.roi_max_mz = p.fitted_mz + 2.0 * p.fitted_sigma_mz
+        p.roi_min_rt = p.fitted_rt - 2.0 * p.fitted_sigma_rt
+        p.roi_max_rt = p.fitted_rt + 2.0 * p.fitted_sigma_rt
+        p.raw_roi_mean_mz = p.fitted_mz
+        p.raw_roi_mean_rt = p.fitted_rt
+        p.raw_roi_max_height = p.fitted_height
+        p.raw_roi_total_intensity = p.fitted_height
+        p.rt_delta = 0.0
+        peaks.append(p)
+
+    return peaks
 
 
 def find_sequence_consensus(annotations, sequence_column, min_consensus_count):
@@ -394,7 +485,7 @@ def find_protein_groups(
     return protein_group_data, protein_group_metadata
 
 
-def plot_mesh(mesh, transform='sqrt', figure=None):
+def plot_mesh(mesh, transform='sqrt', figure=None, figsize=(10, 7), style='dark_background'):
     """Plot the mesh with side plots showing TIC vs. m/z and retention time.
 
     The central plot shows the mesh as a colored 2D image with RT vs. m/z.
@@ -405,6 +496,11 @@ def plot_mesh(mesh, transform='sqrt', figure=None):
         mesh (Grid): Grid of ion current vs. m/z and rt e.g. created by resample
         transform (string): Optional transform to apply, either sqrt, cubic, or log
         figure (figure): Optional figure in which to place the plots - otherwise created anew
+        figsize (tuple): Figure size as (width, height) in inches. Defaults to (10, 7).
+            Pass None to use the current matplotlib rcParams default.
+        style (str): Matplotlib style name (e.g. 'dark_background', 'default').
+            Applied as a context manager so it does not affect subsequent plots.
+            Pass None to use the current matplotlib style without any override.
 
     Returns:
         dictionary containing the three created plots with string keys img_plot, mz_plot, rt_plot
@@ -413,87 +509,96 @@ def plot_mesh(mesh, transform='sqrt', figure=None):
 
     """
 
-    plt.style.use('dark_background')
+    with plt.style.context(style or []):
+        if figure is None:
+            figure = plt.figure(figsize=figsize)
 
-    if figure is None:
-        figure = plt.figure()
+        img = mesh.data
+        img = np.reshape(img, (mesh.m, mesh.n))
+        bins_rt = mesh.bins_rt
+        bins_mz = mesh.bins_mz
 
-    img = mesh.data
-    img = np.reshape(img, (mesh.m, mesh.n))
-    bins_rt = mesh.bins_rt
-    bins_mz = mesh.bins_mz
+        plt.figure(figure.number)
+        plt.clf()
+        gs = gridspec.GridSpec(5, 5)
+        mz_plot = plt.subplot(gs[0, :-1])
+        mz_plot.clear()
+        mz_plot.plot(bins_mz, img.sum(axis=0))
+        mz_plot.margins(x=0)
+        mz_plot.set_xticks([])
+        mz_plot.set_ylabel("Intensity")
 
-    plt.figure(figure.number)
-    plt.clf()
-    gs = gridspec.GridSpec(5, 5)
-    mz_plot = plt.subplot(gs[0, :-1])
-    mz_plot.clear()
-    mz_plot.plot(bins_mz, img.sum(axis=0))
-    mz_plot.margins(x=0)
-    mz_plot.set_xticks([])
-    mz_plot.set_ylabel("Intensity")
+        rt_plot = plt.subplot(gs[1:, -1])
+        rt_plot.clear()
+        rt_plot.plot(img.sum(axis=1), bins_rt)
+        rt_plot.margins(y=0)
+        rt_plot.set_yticks([])
+        rt_plot.set_xlabel("Intens")
 
-    rt_plot = plt.subplot(gs[1:, -1])
-    rt_plot.clear()
-    rt_plot.plot(img.sum(axis=1), bins_rt)
-    rt_plot.margins(y=0)
-    rt_plot.set_yticks([])
-    rt_plot.set_xlabel("Intens")
+        img_plot = plt.subplot(gs[1:, :-1])
+        offset_rt = (np.array(mesh.bins_rt).max() -
+                     np.array(mesh.bins_rt).min())/mesh.m / 2
+        offset_mz = (np.array(mesh.bins_mz).max() -
+                     np.array(mesh.bins_mz).min())/mesh.n / 2
+        if transform == 'sqrt':
+            img_plot.pcolormesh(
+                np.array(mesh.bins_mz) - offset_mz,
+                np.array(mesh.bins_rt) - offset_rt,
+                img,
+                snap=True,
+                norm=colors.PowerNorm(gamma=1./2.))
+        elif transform == 'cubic':
+            img_plot.pcolormesh(
+                np.array(mesh.bins_mz) - offset_mz,
+                np.array(mesh.bins_rt) - offset_rt,
+                img,
+                norm=colors.PowerNorm(gamma=1./3.))
+        elif transform == 'log':
+            img_plot.pcolormesh(
+                np.array(mesh.bins_mz) - offset_mz,
+                np.array(mesh.bins_rt) - offset_rt,
+                img,
+                norm=colors.LogNorm(vmin=img.min()+1e-8, vmax=img.max()))
+        else:
+            img_plot.pcolormesh(mesh.bins_mz, mesh.bins_rt, img)
 
-    img_plot = plt.subplot(gs[1:, :-1])
-    offset_rt = (np.array(mesh.bins_rt).max() -
-                 np.array(mesh.bins_rt).min())/mesh.m / 2
-    offset_mz = (np.array(mesh.bins_mz).max() -
-                 np.array(mesh.bins_mz).min())/mesh.n / 2
-    if transform == 'sqrt':
-        img_plot.pcolormesh(
-            np.array(mesh.bins_mz) - offset_mz,
-            np.array(mesh.bins_rt) - offset_rt,
-            img,
-            snap=True,
-            norm=colors.PowerNorm(gamma=1./2.))
-    elif transform == 'cubic':
-        img_plot.pcolormesh(
-            np.array(mesh.bins_mz) - offset_mz,
-            np.array(mesh.bins_rt) - offset_rt,
-            img,
-            norm=colors.PowerNorm(gamma=1./3.))
-    elif transform == 'log':
-        img_plot.pcolormesh(
-            np.array(mesh.bins_mz) - offset_mz,
-            np.array(mesh.bins_rt) - offset_rt,
-            img,
-            norm=colors.LogNorm(vmin=img.min()+1e-8, vmax=img.max()))
-    else:
-        img_plot.pcolormesh(mesh.bins_mz, mesh.bins_rt, img)
+        img_plot.set_xlim([np.array(mesh.bins_mz).min() - offset_mz,
+                           np.array(mesh.bins_mz).max() - offset_mz])
+        img_plot.set_ylim([np.array(mesh.bins_rt).min() - offset_rt,
+                           np.array(mesh.bins_rt).max() - offset_rt])
 
-    img_plot.set_xlim([np.array(mesh.bins_mz).min() - offset_mz,
-                       np.array(mesh.bins_mz).max() - offset_mz])
-    img_plot.set_ylim([np.array(mesh.bins_rt).min() - offset_rt,
-                       np.array(mesh.bins_rt).max() - offset_rt])
+        img_plot.set_xlabel("m/z")
+        img_plot.set_ylabel("retention time (s)")
 
-    img_plot.set_xlabel("m/z")
-    img_plot.set_ylabel("retention time (s)")
-
-    return {
-        "img_plot": img_plot,
-        "mz_plot": mz_plot,
-        "rt_plot": rt_plot,
-    }
+        return {
+            "img_plot": img_plot,
+            "mz_plot": mz_plot,
+            "rt_plot": rt_plot,
+        }
 
 
-def plot_xic(peak, raw_data, figure=None, method="max"):
+def plot_xic(peak, raw_data, figure=None, method="max", style='dark_background'):
+    """Plot the extracted ion chromatogram for a peak.
+
+    Args:
+        peak (Peak): Peak whose ROI defines the XIC m/z and RT range.
+        raw_data (RawData): Raw data to extract the XIC from.
+        figure (figure): Optional existing figure to plot into.
+        method (str): XIC extraction method, 'max' or 'sum'.
+        style (str): Matplotlib style name. Applied as a context manager so it
+            does not affect subsequent plots. Pass None to use the current style.
+    """
     xic = peak.xic(raw_data, method=method)
     x = xic.retention_time
     y = xic.intensity
-    plt.style.use('dark_background')
-    if not figure:
-        figure = plt.figure()
+    with plt.style.context(style or []):
+        if not figure:
+            figure = plt.figure()
 
-    plt.plot(x, y, label='peak_id = {}'.format(peak.id))
-    plt.xlabel('Retention time (s)')
-    plt.ylabel('Intensity')
-    plt.legend()
+        plt.plot(x, y, label='peak_id = {}'.format(peak.id))
+        plt.xlabel('Retention time (s)')
+        plt.ylabel('Intensity')
+        plt.legend()
 
     return figure
 
@@ -504,7 +609,24 @@ def plot_peak_raw_points(
         img_plot=None,
         rt_plot=None,
         mz_plot=None,
-        xic_method="max"):
+        xic_method="max",
+        figsize=(10, 7),
+        style='dark_background'):
+    """Plot the raw data points within a peak's region of interest.
+
+    Args:
+        peak (Peak): Peak whose ROI defines the region to plot.
+        raw_data (RawData): Raw data to extract points from.
+        img_plot: Optional existing axes for the 2D scatter plot.
+        rt_plot: Optional existing axes for the RT/XIC marginal plot.
+        mz_plot: Optional existing axes for the m/z marginal plot.
+        xic_method (str): XIC extraction method for the RT marginal, 'max' or 'sum'.
+        figsize (tuple): Figure size as (width, height) in inches when creating a new
+            figure. Defaults to (10, 7). Pass None to use matplotlib rcParams default.
+        style (str): Matplotlib style name. Applied as a context manager when creating
+            a new figure so it does not affect subsequent plots. Pass None to use the
+            current style.
+    """
     data_points = raw_data.raw_points(
         peak.roi_min_mz,
         peak.roi_max_mz,
@@ -522,25 +644,25 @@ def plot_peak_raw_points(
     max_rt = peak.roi_max_rt
 
     if not img_plot and not rt_plot and not mz_plot:
-        plt.style.use('dark_background')
-        plt.figure()
-        plt.clf()
-        gs = gridspec.GridSpec(5, 5)
-        mz_plot = plt.subplot(gs[0, :-1])
-        mz_plot.margins(x=0)
-        mz_plot.set_xticks([])
-        mz_plot.set_ylabel("Intensity")
-        rt_plot = plt.subplot(gs[1:, -1])
-        rt_plot.margins(y=0)
-        rt_plot.set_yticks([])
-        rt_plot.set_xlabel("Intensity")
-        img_plot = plt.subplot(gs[1:, :-1])
+        with plt.style.context(style or []):
+            plt.figure(figsize=figsize)
+            plt.clf()
+            gs = gridspec.GridSpec(5, 5)
+            mz_plot = plt.subplot(gs[0, :-1])
+            mz_plot.margins(x=0)
+            mz_plot.set_xticks([])
+            mz_plot.set_ylabel("Intensity")
+            rt_plot = plt.subplot(gs[1:, -1])
+            rt_plot.margins(y=0)
+            rt_plot.set_yticks([])
+            rt_plot.set_xlabel("Intensity")
+            img_plot = plt.subplot(gs[1:, :-1])
 
-        # Set the min/max limits for mz/rt.
-        mz_plot.set_xlim([min_mz, max_mz])
-        rt_plot.set_ylim([min_rt, max_rt])
-        img_plot.set_xlim([min_mz, max_mz])
-        img_plot.set_ylim([min_rt, max_rt])
+            # Set the min/max limits for mz/rt.
+            mz_plot.set_xlim([min_mz, max_mz])
+            rt_plot.set_ylim([min_rt, max_rt])
+            img_plot.set_xlim([min_mz, max_mz])
+            img_plot.set_ylim([min_rt, max_rt])
 
     # NOTE: Adding 200 for a more pleasant color map on the first peaks, found
     # this number by trial and error, dont @ me.
@@ -1477,7 +1599,7 @@ def create_quantitative_tables(params, output_dir, logger=None, force_override=F
                                                   "peak_clusters_volume.csv")
             for i, input_file in enumerate(input_files):
                 stem = input_file['stem']
-                peak_clusters_df[stem] = [cluster.file_volumes[i]
+                peak_clusters_df[stem] = [cluster.volumes[i]
                                           for cluster in peak_clusters]
         elif params['quant_isotopes'] == 'height':
             out_path_peak_clusters = os.path.join(output_dir, 'quant',

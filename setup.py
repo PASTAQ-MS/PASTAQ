@@ -51,7 +51,7 @@ class CMakeBuild(build_ext):
 
         cmake_args = [
             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
-            f"-DPYTHON_EXECUTABLE={sys.executable}",
+            f"-DPython_EXECUTABLE={sys.executable}",
             f"-DCMAKE_BUILD_TYPE={cfg}",
             "-DPASTAQ_ENABLE_TESTS=OFF",
             "-DEIGEN_BUILD_DOC=OFF",
@@ -99,6 +99,6 @@ class CMakeBuild(build_ext):
 
 # Configure extension: dotted path ensures correct placement under the pastaq package
 setup(
-    ext_modules=[CMakeExtension("pastaq.pastaq_cpp", sourcedir=".")],
+    ext_modules=[CMakeExtension("pastaq.pastaq", sourcedir=".")],
     cmdclass={"build_ext": CMakeBuild},
 )

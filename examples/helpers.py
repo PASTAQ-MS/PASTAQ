@@ -168,10 +168,10 @@ def plot_msSpectra(mz, intensity, norm_mz_diff = 0.0035, diffFactor = 1.3, scanI
     plt.grid(False)  # Show grid
     return fig
 
-def plot_meshPeaks(mesh, peaks, localMax=[], size=(15,10), withFailedPeaks=False, showIndeces=False):
+def plot_meshPeaks(mesh, peaks, localMax=[], size=(15,10), withFailedPeaks=False, showIndeces=False, style='dark_background'):
     """
     Plotting mesh grid with peak positions.
-    
+
     Args:
         mesh: smoothed grid object.
         peaks: A list of peaks values.
@@ -179,13 +179,15 @@ def plot_meshPeaks(mesh, peaks, localMax=[], size=(15,10), withFailedPeaks=False
         size: A tuple defining the size of the figure (width, height).
         withFailedPeaks: If True, failed peaks are also plotted.
         showIndeces: If True, peak indeces are shown in the plot.
-        
+        style (str): Matplotlib style name passed to pq.plot_mesh. Pass None to
+            use the current matplotlib style without any override.
+
     Returns:
         Figure object as fig.
     """
     mzVec, rtVec, mzVecMax, rtVecMax, mzLocMax, rtLocMax = [], [], [], [], [], []
     # Create a mesh plot
-    plot = pq.plot_mesh(mesh, transform='sqrt', figure=None)
+    plot = pq.plot_mesh(mesh, transform='sqrt', figure=None, style=style)
     # print(size)
     plot['img_plot'].get_figure().set_size_inches(size[0], size[1], forward=True)
     
@@ -235,9 +237,13 @@ def plot_meshPeaks(mesh, peaks, localMax=[], size=(15,10), withFailedPeaks=False
         plot['img_plot'].scatter(mzVecMax, rtVecMax, s=100, facecolors='none', edgecolors='green', marker='o', alpha=0.7) # shows local maxima in quantified peaks
         plot['img_plot'].scatter(mzVec, rtVec, s=100, c='red', marker='.') # shows centre of quantified peaks
         plot['img_plot'].scatter(mzVecnF, rtVecnF, s=100, c='purple', marker='.') # shows centre of non quantified peaks
-        plot['img_plot'].scatter(mzVecMaxnF, rtVecMaxnF, s=100,  facecolors='none', edgecolors='yellow', marker='o', alpha=0.7) # shows local maxima in non quantified peaks
-    
+        plot['img_plot'].scatter(mzVecMaxnF, rtVecMaxnF, s=100,  facecolors='none', edgecolors='darkorange', marker='o', alpha=0.7) # shows local maxima in non quantified peaks
+
     if showIndeces:
+        is_dark = style is not None and 'dark' in style.lower()
+        label_bg = 'black' if is_dark else 'white'
+        color_fitted = 'white' if is_dark else 'black'
+        color_locmax = '#1ACCEF' if is_dark else '#0077AA'
         for k in range(len(peaks)):
             # Only show indices for peaks within mesh bin ranges
             if not withFailedPeaks and peaks[k].fit_failure_code != 0:
@@ -248,10 +254,10 @@ def plot_meshPeaks(mesh, peaks, localMax=[], size=(15,10), withFailedPeaks=False
                     peaks[k].fitted_rt - 0.01,  # adjust offset as needed
                     str(k),
                     fontsize=10,
-                    color='white',
+                    color=color_fitted,
                     ha='right',
                     va='bottom',
-                    bbox=dict(facecolor='none', edgecolor='none', alpha=0.5, pad=0.5)
+                    bbox=dict(facecolor=label_bg, edgecolor='none', alpha=0.5, pad=0.5)
                 )
             if (mz_min <= peaks[k].local_max_mz <= mz_max and rt_min <= peaks[k].local_max_rt <= rt_max):
                 plot['img_plot'].text(
@@ -259,10 +265,10 @@ def plot_meshPeaks(mesh, peaks, localMax=[], size=(15,10), withFailedPeaks=False
                     peaks[k].local_max_rt - 0.01,  # adjust offset as needed
                     str(k),
                     fontsize=10,
-                    color="#1ACCEF",
+                    color=color_locmax,
                     ha='right',
                     va='bottom',
-                    bbox=dict(facecolor='none', edgecolor='none', alpha=0.5, pad=0.5)
+                    bbox=dict(facecolor=label_bg, edgecolor='none', alpha=0.5, pad=0.5)
                 )
     
     # Set axis ranges based on mesh bins
@@ -408,87 +414,91 @@ def plot_meshPeaks_interactive(mesh, peaks, localMax=[], size=(1200, 600), withF
     fig.show()
     return fig
 
-def plot_meshRawPeaks(mesh, lcmsData, peaks, localMax=[], size=(15,10)):
+def plot_meshRawPeaks(mesh, lcmsData, peaks, localMax=[], size=(15,10), style='dark_background'):
     """
     Plots a mesh and raw data with identified peaks.
+
     Args:
         mesh (Mesh): The mesh object containing the mesh grid data.
         rawData (raw LC-MS data object): The raw LC-MS data from pastaq.
         peaks (list): A list of Peak objects representing the identified peaks and local maxima in the mesh.
         localMax (list): A list of local maxima to be plotted.
+        style (str): Matplotlib style name. Applied as a context manager so it does not
+            affect subsequent plots. Pass None to use the current matplotlib style.
     Returns:
         Figure: The scatter plot figure.
     Raises:
         None
     """
-    
+
     rawData =[[], [], []] # RT, mz, Intensity
     for i in range(0,len(lcmsData.scans),1):
         rawData[0] = rawData[0] + [lcmsData.scans[i].retention_time] * (lcmsData.scans[i].num_points)
         rawData[1] = rawData[1] + lcmsData.scans[i].mz
         rawData[2] = rawData[2] + [math.sqrt(x) for x in lcmsData.scans[i].intensity]
     # print(f"Length of vectors for the raw data scatter plot: {len(rawData[0])} for retention time, {len(rawData[1])} for m/z, {len(rawData[2])} for intensity.") # comment out to check the number of elemnts in mz, rt and intensity for the scatter plot
-    
-    scatterRaw = plt.figure(figsize=size, facecolor='black')  # Set the figure size
-    img = mesh.data
-    img = np.reshape(img, (mesh.m, mesh.n))
-    offset_rt = (np.array(mesh.bins_rt).max() -
-                    np.array(mesh.bins_rt).min())/mesh.m / 2
-    offset_mz = (np.array(mesh.bins_mz).max() -
-                    np.array(mesh.bins_mz).min())/mesh.n / 2
-    
-    plt.pcolormesh(
-                np.array(mesh.bins_mz) + offset_mz,
-                np.array(mesh.bins_rt) + offset_rt,
-                img,
-                snap=True,
-                cmap = 'viridis',
-                norm=colors.PowerNorm(gamma=1./2.),
-                alpha=0.6)
-    cbarMesh = plt.colorbar()
-    cbarMesh.set_label('Intensity grid')
-    plt.xlim([np.array(mesh.bins_mz).min() - offset_mz,
-                        np.array(mesh.bins_mz).max() + offset_mz])
-    plt.ylim([np.array(mesh.bins_rt).min() -+ offset_rt,
-                        np.array(mesh.bins_rt).max() + offset_rt])
 
-    # axRaw = scatterRaw.add_subplot(111)
-    plt.scatter(rawData[1], rawData[0], c = rawData[2], s = 5, alpha = 1, cmap = 'twilight_shifted', marker='.')
+    with plt.style.context(style or []):
+        scatterRaw = plt.figure(figsize=size)  # facecolor comes from the style
+        img = mesh.data
+        img = np.reshape(img, (mesh.m, mesh.n))
+        offset_rt = (np.array(mesh.bins_rt).max() -
+                        np.array(mesh.bins_rt).min())/mesh.m / 2
+        offset_mz = (np.array(mesh.bins_mz).max() -
+                        np.array(mesh.bins_mz).min())/mesh.n / 2
 
-    # Add color bar to show elevation scale
-    cbar = plt.colorbar()
-    cbar.set_label('Intensity raw data')
+        plt.pcolormesh(
+                    np.array(mesh.bins_mz) + offset_mz,
+                    np.array(mesh.bins_rt) + offset_rt,
+                    img,
+                    snap=True,
+                    cmap = 'viridis',
+                    norm=colors.PowerNorm(gamma=1./2.),
+                    alpha=0.6)
+        cbarMesh = plt.colorbar()
+        cbarMesh.set_label('Intensity grid')
+        plt.xlim([np.array(mesh.bins_mz).min() - offset_mz,
+                            np.array(mesh.bins_mz).max() + offset_mz])
+        plt.ylim([np.array(mesh.bins_rt).min() -+ offset_rt,
+                            np.array(mesh.bins_rt).max() + offset_rt])
 
-    # shows local maxima
-    mzVecLoc, rtVecLoc, mzVec, rtVec = [], [], [], []
-    for k in range(len(peaks)):
-        if peaks[k].fit_failure_code == 0:
-            mzVecLoc.insert(k, peaks[k].local_max_mz)
-            rtVecLoc.insert(k, peaks[k].local_max_rt)
-    plt.scatter(mzVecLoc, rtVecLoc, s=100, c='green', marker='o', alpha=0.7)
+        # axRaw = scatterRaw.add_subplot(111)
+        plt.scatter(rawData[1], rawData[0], c = rawData[2], s = 5, alpha = 1, cmap = 'twilight_shifted', marker='.')
 
-    # shows identified peaks
-    for k in range(len(peaks)):
-        if peaks[k].fit_failure_code == 0:
-            mzVec.insert(k, peaks[k].fitted_mz)
-            rtVec.insert(k, peaks[k].fitted_rt)
-    plt.scatter(mzVec, rtVec, s=100, c='red', marker='.')
-    
-    # shows local maxima
-    if localMax != []:
-        mzVecLocMax, rtVecLocMax = [], []
-        for k in range(len(localMax)):
-            mzVecLocMax.insert(k, localMax[k].mz)
-            rtVecLocMax.insert(k, localMax[k].rt)
-        plt.scatter(mzVecLocMax, rtVecLocMax, s=50, c='blue', marker='x', alpha=0.7)
+        # Add color bar to show elevation scale
+        cbar = plt.colorbar()
+        cbar.set_label('Intensity raw data')
 
-    # Label the axes
-    plt.xlabel('m/z')  # Set the x-axis label
-    plt.ylabel('Retention time (s)')  # Set the y-axis label
-    plt.title('Raw data of a zommed in area of the isotope cluster')  # Set the title
+        # shows local maxima
+        mzVecLoc, rtVecLoc, mzVec, rtVec = [], [], [], []
+        for k in range(len(peaks)):
+            if peaks[k].fit_failure_code == 0:
+                mzVecLoc.insert(k, peaks[k].local_max_mz)
+                rtVecLoc.insert(k, peaks[k].local_max_rt)
+        plt.scatter(mzVecLoc, rtVecLoc, s=100, c='green', marker='o', alpha=0.7)
 
-    # Show the plot
-    plt.show()
+        # shows identified peaks
+        for k in range(len(peaks)):
+            if peaks[k].fit_failure_code == 0:
+                mzVec.insert(k, peaks[k].fitted_mz)
+                rtVec.insert(k, peaks[k].fitted_rt)
+        plt.scatter(mzVec, rtVec, s=100, c='red', marker='.')
+
+        # shows local maxima
+        if localMax != []:
+            mzVecLocMax, rtVecLocMax = [], []
+            for k in range(len(localMax)):
+                mzVecLocMax.insert(k, localMax[k].mz)
+                rtVecLocMax.insert(k, localMax[k].rt)
+            plt.scatter(mzVecLocMax, rtVecLocMax, s=50, c='blue', marker='x', alpha=0.7)
+
+        # Label the axes
+        plt.xlabel('m/z')  # Set the x-axis label
+        plt.ylabel('Retention time (s)')  # Set the y-axis label
+        plt.title('Raw data of a zommed in area of the isotope cluster')  # Set the title
+
+        # Show the plot
+        plt.show()
     return scatterRaw
 
 #print 64 bit uint as binary with bytes representation
@@ -934,3 +944,52 @@ def plot_matched_peaks_scatter(
         'avg_log2_intensity': avg_log2_intensity,
         'rgba': rgba
     }
+    
+# plot to show isotope distribution of features
+def isotope_distribution_plot(
+    featureList,
+    labelList=None
+):
+    """Plot the isotope distribution for one or more feature lists.
+
+    Parameters:
+    - featureList: A list of feature lists, where each element is a list of feature objects
+                   returned by detect_features (each feature has a .peak_ids attribute).
+                   Pass a single dataset as [features] or multiple as [features1, features2, ...].
+
+    Returns:
+    - fig, ax: Matplotlib figure and axis with the isotope distribution plot.
+    """
+    colors = ['steelblue', 'darkorange', 'forestgreen', 'crimson', 'mediumpurple']
+
+    all_lengths = [[len(f.peak_ids) for f in features] for features in featureList]
+    max_len = max(max(lengths) for lengths in all_lengths)
+    x = np.arange(1, max_len + 1)
+
+    n = len(featureList)
+    bar_width = 0.8 / n
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    for i, lengths in enumerate(all_lengths):
+        counts = np.array([lengths.count(v) for v in x])
+        offset = (i - (n - 1) / 2) * bar_width
+        if labelList and i < len(labelList):
+            label = labelList[i]
+        else:
+            label = f'Dataset {i + 1}'
+        ax.bar(x + offset, counts, width=bar_width,
+               color=colors[i % len(colors)], edgecolor='black', label=label)
+        print(f"{label}: mean={np.mean(lengths):.2f}, median={np.median(lengths):.0f}, max={max(lengths)}")
+
+    ax.set_xlabel('Number of isotopologue peaks per feature')
+    ax.set_ylabel('Count')
+    ax.set_title('Feature isotope peak count distribution')
+    ax.set_xticks(x)
+    if n > 1:
+        ax.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+    return fig, ax

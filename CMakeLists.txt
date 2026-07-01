@@ -2,6 +2,24 @@ cmake_minimum_required(VERSION 3.14)
 
 project(pastaq VERSION "0.11.3")
 
+# Build optimizations - ccache support
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    message(STATUS "Using ccache: ${CCACHE_PROGRAM}")
+else()
+    message(STATUS "ccache not found - install with: sudo apt install ccache")
+endif()
+
+# Unity builds option (optional, mainly for CI/release)
+option(PASTAQ_UNITY_BUILD "Enable unity builds for faster compilation" OFF)
+if(PASTAQ_UNITY_BUILD AND CMAKE_VERSION VERSION_GREATER_EQUAL "3.16")
+    set(CMAKE_UNITY_BUILD ON)
+    set(CMAKE_UNITY_BUILD_BATCH_SIZE 8)
+    message(STATUS "Unity builds enabled (batch size: 8)")
+endif()
+
 # Set project properties.
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -69,12 +87,44 @@ else()
     target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen zlib)
 endif()
 
+# Apply precompiled headers to pastaqlib (CMake 3.16+)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.16")
+    set(USE_PCH ON CACHE BOOL "Use precompiled headers")
+    if(USE_PCH)
+        target_precompile_headers(pastaqlib PRIVATE
+            <algorithm> <vector> <map> <string> <thread> <fstream> <iostream>
+        )
+        message(STATUS "Precompiled headers enabled for pastaqlib")
+    endif()
+endif()
+
 # Build the python bindings.
 # --------------------------
 # PyBind.
+set(PYBIND11_FINDPYTHON ON CACHE BOOL "Force pybind11 to use modern FindPython" FORCE)
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/pybind11")
 pybind11_add_module(pastaq src/python-bindings/pastaq/bindings.cpp)
 target_link_libraries(pastaq PRIVATE pastaqlib)
+
+# Apply precompiled headers to Python bindings (must NOT use REUSE_FROM pastaqlib because
+# pybind11_add_module sets -fvisibility=hidden, which differs from pastaqlib's PCH flags and
+# causes a compilation error on Clang/macOS: "default visibility differs in PCH file vs. current file")
+if(USE_PCH AND CMAKE_VERSION VERSION_GREATER_EQUAL "3.16")
+    target_precompile_headers(pastaq PRIVATE
+        <algorithm> <vector> <map> <string> <thread> <fstream> <iostream>
+    )
+    message(STATUS "Precompiled headers enabled for Python bindings")
+endif()
+
+# Apply LTO for release builds
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
+    if(ipo_supported)
+        set_target_properties(pastaqlib pastaq PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
+        message(STATUS "Link-time optimization (LTO) enabled")
+    endif()
+endif()
 
 # Include tests if testing library is present.
 # --------------------------------------------
