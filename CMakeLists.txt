@@ -106,9 +106,13 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/pybind11")
 pybind11_add_module(pastaq src/python-bindings/pastaq/bindings.cpp)
 target_link_libraries(pastaq PRIVATE pastaqlib)
 
-# Reuse precompiled headers for Python bindings
+# Apply precompiled headers to Python bindings (must NOT use REUSE_FROM pastaqlib because
+# pybind11_add_module sets -fvisibility=hidden, which differs from pastaqlib's PCH flags and
+# causes a compilation error on Clang/macOS: "default visibility differs in PCH file vs. current file")
 if(USE_PCH AND CMAKE_VERSION VERSION_GREATER_EQUAL "3.16")
-    target_precompile_headers(pastaq REUSE_FROM pastaqlib)
+    target_precompile_headers(pastaq PRIVATE
+        <algorithm> <vector> <map> <string> <thread> <fstream> <iostream>
+    )
     message(STATUS "Precompiled headers enabled for Python bindings")
 endif()
 
