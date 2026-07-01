@@ -993,3 +993,37 @@ def isotope_distribution_plot(
     plt.show()
 
     return fig, ax
+
+def plot_MA_matched_peaks_scatter(
+    matched_peaks,
+    *,
+    cmap: str = 'plasma',
+    s: float = 15,
+    edgecolors: str = 'black',
+    linewidth: float = 0.3,
+    vmin: float | None = None,
+    vmax: float | None = None,
+    min_alpha: float = 0.2,
+    max_alpha: float = 1.0,
+    alpha: float = 0.75,
+    figsize=(12, 6),
+    title: str | None = None,
+    annotate_stats: bool = True,
+    ax=None
+):
+    """
+    # MA-plot: log2 fold change (centroid/profile) vs log2(profile intensity)
+    # for all matched peaks between profile and centroid data
+    """
+    log2_fc = np.array([m['profile_centroid_intensity_log2ratio'] for m in matched_peaks])
+    log2_prof_int = np.log2([m['profile_peak_intensity'] for m in matched_peaks])
+
+    fig, ax = plt.subplots(figsize=figsize)
+    sc = ax.scatter(log2_prof_int, log2_fc, s=10, alpha=alpha, c=log2_prof_int, cmap=cmap)
+    ax.axhline(0, color='red', linewidth=1, linestyle='--', label='FC = 0')
+    ax.set_xlabel('log₂(Profile Intensity)')
+    ax.set_ylabel('log₂(Centroid Intensity / Profile Intensity)')
+    ax.set_title('MA-plot: Fold Change vs Profile Intensity\n(all matched profile–centroid peak pairs, n={})'.format(len(matched_peaks)))
+    plt.colorbar(sc, ax=ax, label='log₂(Profile Intensity)')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
