@@ -8,7 +8,7 @@ version = "0.11.3"
 description = "Pipelines And Systems for Threshold Avoiding Quantification (PASTAQ): Pre-processing tools for LC-MS/MS data"
 readme = "README.md"
 requires-python = ">=3.8"
-license-files = ["LICENSE.md"]
+license = "MIT"
 keywords = ["mass spectrometry", "proteomics", "LC-MS", "data processing"]
 
 authors = [
