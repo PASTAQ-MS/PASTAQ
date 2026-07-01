@@ -105,6 +105,7 @@ jobs:
           # Pass CMake args to disable unnecessary builds
           CIBW_ENVIRONMENT: >
             CMAKE_BUILD_PARALLEL_LEVEL=4
+            PIP_PREFER_BINARY=1
             PASTAQ_CMAKE_ARGS="-DPASTAQ_ENABLE_TESTS=OFF -DEIGEN_BUILD_DOC=OFF -DEIGEN_BUILD_TESTING=OFF -DBUILD_TESTING=OFF"
           
           # Python 3.13 specific: Set free-threading flag if needed
