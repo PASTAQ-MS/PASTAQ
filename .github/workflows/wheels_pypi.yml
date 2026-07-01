@@ -75,7 +75,6 @@ jobs:
           # Linux: x86_64 only (64-bit)
           CIBW_ARCHS_LINUX: x86_64
           CIBW_BEFORE_ALL_LINUX: |
-            yum install -y libjpeg-turbo-devel
             pip install cmake
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: auditwheel repair -w {dest_dir} {wheel}
