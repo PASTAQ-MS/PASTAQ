@@ -1015,15 +1015,75 @@ def plot_MA_matched_peaks_scatter(
     # MA-plot: log2 fold change (centroid/profile) vs log2(profile intensity)
     # for all matched peaks between profile and centroid data
     """
-    log2_fc = np.array([m['profile_centroid_intensity_log2ratio'] for m in matched_peaks])
-    log2_prof_int = np.log2([m['profile_peak_intensity'] for m in matched_peaks])
+    # Collect data (skip non-positive intensities to avoid log2 issues)
+    prof = []
+    cent = []
+    for m in matched_peaks:
+        ip = m.get('profile_peak_intensity')
+        ic = m.get('centroid_peak_intensity')
+        if ip is None or ic is None or ip <= 0 or ic <= 0:
+            continue
+        prof.append(ip)
+        cent.append(ic)
 
-    fig, ax = plt.subplots(figsize=figsize)
-    sc = ax.scatter(log2_prof_int, log2_fc, s=10, alpha=alpha, c=log2_prof_int, cmap=cmap)
+    prof = np.asarray(prof, dtype=float)
+    cent = np.asarray(cent, dtype=float)
+
+    if prof.size == 0:
+        if ax is None:
+            fig, ax = plt.subplots(figsize=figsize)
+        else:
+            fig = ax.figure
+        ax.text(0.5, 0.5, 'No matched peaks with positive intensities', ha='center', va='center')
+        ax.set_axis_off()
+        return fig, ax
+
+    log2_prof_int = np.log2(prof)
+    # Fold-change (centroid / profile) to match axis label
+    log2_fc = np.log2(cent / prof)
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+
+    # Robust color scaling unless explicit bounds are provided
+    if vmin is None:
+        vmin = np.percentile(log2_prof_int, 5)
+    if vmax is None:
+        vmax = np.percentile(log2_prof_int, 95)
+
+    norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+    cmap_obj = plt.get_cmap(cmap)
+    rgba = cmap_obj(norm(log2_prof_int))
+
+    # Per-point alpha based on |log2_fc|, scaled by the global alpha parameter
+    ratio_scale = np.abs(log2_fc)
+    ratio_ref = np.percentile(ratio_scale, 95.0) if ratio_scale.size else 1.0
+    alpha_vals = min_alpha + (max_alpha - min_alpha) * np.clip(ratio_scale / (ratio_ref + 1e-12), 0, 1)
+    rgba[:, 3] = np.clip(alpha_vals * alpha, 0, 1)
+
+    sc = ax.scatter(log2_prof_int, log2_fc, s=s, c=rgba, edgecolors=edgecolors, linewidth=linewidth)
     ax.axhline(0, color='red', linewidth=1, linestyle='--', label='FC = 0')
     ax.set_xlabel('log₂(Profile Intensity)')
     ax.set_ylabel('log₂(Centroid Intensity / Profile Intensity)')
-    ax.set_title('MA-plot: Fold Change vs Profile Intensity\n(all matched profile–centroid peak pairs, n={})'.format(len(matched_peaks)))
-    plt.colorbar(sc, ax=ax, label='log₂(Profile Intensity)')
+    ax.set_title(title or f"MA-plot: Fold Change vs Profile Intensity\n(all matched profile–centroid peak pairs, n={log2_fc.size})")
+    fig.colorbar(sc, ax=ax, label='log₂(Profile Intensity)')
     ax.legend()
     ax.grid(True, alpha=0.3)
+
+    if annotate_stats:
+        finite_fc = log2_fc[np.isfinite(log2_fc)]
+        if finite_fc.size:
+            ax.text(
+                0.02,
+                0.98,
+                f"mean={finite_fc.mean():.3f}\nmedian={np.median(finite_fc):.3f}\nstd={(finite_fc.std(ddof=1) if finite_fc.size > 1 else 0.0):.3f}",
+                transform=ax.transAxes,
+                ha='left',
+                va='top',
+                fontsize=9,
+                bbox=dict(boxstyle='round,pad=0.3', fc='white', ec='black', alpha=0.8),
+            )
+
+    return fig, ax
