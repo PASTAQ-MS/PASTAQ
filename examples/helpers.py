@@ -1067,7 +1067,7 @@ def plot_MA_matched_peaks_scatter(
     ax.axhline(0, color='red', linewidth=1, linestyle='--', label='FC = 0')
     ax.set_xlabel('log₂(Profile Intensity)')
     ax.set_ylabel('log₂(Centroid Intensity / Profile Intensity)')
-    ax.set_title(title or f"MA-plot: Fold Change vs Profile Intensity\n(all matched profile–centroid peak pairs, n={log2_fc.size})")
+    ax.set_title(title or f"MA-plot: Log2 Fold Change vs Profile Intensity\n(all matched profile–centroid peak pairs, n={log2_fc.size})")
     fig.colorbar(sc, ax=ax, label='log₂(Profile Intensity)')
     ax.legend()
     ax.grid(True, alpha=0.3)
