@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 
-project(pastaq VERSION "0.11.3")
+project(pastaq VERSION "0.11.5")
 
 # Build optimizations - ccache support
 find_program(CCACHE_PROGRAM ccache)
@@ -80,12 +80,12 @@ add_library(pastaqlib
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/warp2d/warp2d_serialize.cpp"
     )
 
-target_include_directories(pastaqlib PUBLIC src/lib)
-if (WIN32)
-    target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen zlibstatic)
-else()
-    target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen zlib)
-endif()
+target_include_directories(pastaqlib PUBLIC 
+    src/lib
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/zlib"
+    "${CMAKE_CURRENT_BINARY_DIR}/ext/zlib"
+)
+target_link_libraries(pastaqlib ${CMAKE_THREAD_LIBS_INIT} Eigen3::Eigen zlibstatic)
 
 # Apply precompiled headers to pastaqlib (CMake 3.16+)
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.16")
