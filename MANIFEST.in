@@ -7,9 +7,8 @@ include MANIFEST.in
 
 recursive-include src *.cpp *.hpp *.h *.py
 recursive-include ext/zlib *.c *.h CMakeLists.txt *.cmake
-recursive-include ext/pybind11 *.h *.cpp *.cmake CMakeLists.txt
-recursive-include ext/eigen CMakeLists.txt *.cmake
+recursive-include ext/pybind11 *.h *.hpp *.cpp *.cmake CMakeLists.txt
+recursive-include ext/eigen *.h *.hpp *.cmake CMakeLists.txt
 recursive-include ext/doctest *.h CMakeLists.txt
 
 global-exclude *.pyc *.pyo __pycache__
-global-exclude .git .gitignore .gitmodules
