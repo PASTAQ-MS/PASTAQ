@@ -110,13 +110,16 @@ test-command = "python -c \"import pastaq; print(pastaq.__version__)\""
 # Build settings
 build-frontend = "build"
 
+# Enable prerelease CPython (cibuildwheel 3 replacement for CIBW_PRERELEASE_PYTHONS)
+enable = ["cpython-prerelease"]
+
 [tool.cibuildwheel.environment]
 CMAKE_BUILD_PARALLEL_LEVEL = "4"
 
 # ===== LINUX: x86_64 only (64-bit) =====
 [tool.cibuildwheel.linux]
 archs = ["x86_64"]
-manylinux-x86_64-image = "manylinux2014"
+manylinux-x86_64-image = "manylinux_2_28"
 # Clean stale build artifacts before configuring
 before-all = [
     "pip install cmake",
