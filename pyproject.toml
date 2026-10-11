@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pastaq"
-version = "0.11.5"
+version = "0.11.51"
 description = "Pipelines And Systems for Threshold Avoiding Quantification (PASTAQ): Pre-processing tools for LC-MS/MS data"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -33,6 +33,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: C++",
     "Operating System :: POSIX :: Linux",
     "Operating System :: Microsoft :: Windows",
@@ -89,7 +90,7 @@ namespaces = false
 
 [tool.cibuildwheel]
 # Build for CPython 3.8-3.13 (added 3.13)
-build = "cp38-* cp39-* cp310-* cp311-* cp312-* cp313-*"
+build = "cp38-* cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*" 
 
 # Skip unwanted builds
 skip = [
@@ -143,7 +144,7 @@ addopts = "-v --cov=pastaq --cov-report=term-missing"
 
 [tool.black]
 line-length = 100
-target-version = ['py38', 'py39', 'py310', 'py311', 'py312', 'py313']
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312', 'py313', 'py314']
 
 [tool.ruff]
 line-length = 100

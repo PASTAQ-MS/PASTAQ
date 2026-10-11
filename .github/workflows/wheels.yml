@@ -49,13 +49,13 @@ jobs:
         shell: bash
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.16.5
+        uses: pypa/cibuildwheel@v2.21.3
         env:
           # Build Python 3.8-3.13 (added Python 3.13)
-          CIBW_BUILD: cp38-* cp39-* cp310-* cp311-* cp312-* cp313-*
+          CIBW_BUILD: cp38-* cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*
           
           # Skip unwanted builds:
-          # - 32-bit builds (*-win32, *-manylinux_i686)
+          # - 32-bit builds (*-win32, *-linux_i686)
           # - musllinux (use glibc manylinux instead)
           # - PyPy (pybind11 works best with CPython)
           CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux_* pp*"
@@ -75,8 +75,9 @@ jobs:
           # Linux: x86_64 only (64-bit)
           CIBW_ARCHS_LINUX: x86_64
           CIBW_BEFORE_ALL_LINUX: |
-            pip install cmake
-          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+                set -eux
+                dnf install -y libjpeg-turbo-devel zlib-devel cmake
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28          
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: auditwheel repair -w {dest_dir} {wheel}
           
           # Windows: x64 only (64-bit)
